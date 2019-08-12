@@ -1810,3 +1810,6 @@
 	status = "okay";
 };
 
+&irblaster {
+	status = "disable";
+};
