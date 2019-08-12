@@ -402,6 +402,12 @@
 		key_tolerance = <40>;
 	};
 
+	khadas-redled {
+		compatible = "khadas-redled";
+		status = "okay";
+
+	};
+
 	unifykey{
 		compatible = "amlogic, unifykey";
 		status = "ok";
