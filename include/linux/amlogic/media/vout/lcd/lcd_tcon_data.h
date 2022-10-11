@@ -1,6 +1,15 @@
-/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
-/*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+/* include/linux/amlogic/media/vout/lcd/lcd_tcon_data.h
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the named License,
+ * or any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU General Public License for more details.
+ *
  */
 
 #ifndef _INC_AML_LCD_TCON_DATA_H
@@ -35,6 +44,7 @@
 #define LCD_TCON_DATA_PART_TYPE_CHK_WR_MASK     0xcb
 #define LCD_TCON_DATA_PART_TYPE_CHK_EXIT        0xce
 #define LCD_TCON_DATA_PART_TYPE_PARAM           0xf0 /* only for tool */
+#define LCD_TCON_DATA_PART_TYPE_CONTROL         0xfc
 #define LCD_TCON_DATA_PART_TYPE_DELAY           0xfd
 
 #define LCD_TCON_DATA_PART_FLAG_TUNINTG_LUT     0x00
@@ -50,13 +60,22 @@
 #define LCD_TCON_INIT_BIN_NAME_SIZE             28
 #define LCD_TCON_INIT_BIN_VERSION_SIZE          8
 
+/* tcon data control defaine */
+#define LCD_TCON_DATA_CTRL_FLAG_MULTI           BIT(0)
+
+#define LCD_TCON_DATA_CTRL_DEFAULT              0x00
+#define LCD_TCON_DATA_CTRL_MULTI_VFREQ          0x01
+#define LCD_TCON_DATA_CTRL_MULTI_BL_LEVEL       0x11
+#define LCD_TCON_DATA_CTRL_MULTI_BL_PWM_DUTY    0x12
+
 struct lcd_tcon_init_block_header_s {
 	unsigned int crc32;
 	unsigned int reserved;
 	unsigned int block_size;
 	unsigned short header_size;
 	unsigned short reserved1;
-	unsigned int block_type;
+	unsigned short block_type;
+	unsigned short block_ctrl;
 	unsigned char reserved2[5];
 	unsigned char data_byte_width;
 	unsigned short chipid;
@@ -70,7 +89,8 @@ struct lcd_tcon_data_block_header_s {
 	unsigned int block_size;
 	unsigned short header_size;
 	unsigned short ext_header_size;
-	unsigned int block_type;
+	unsigned short block_type;
+	unsigned short block_ctrl;
 	unsigned int block_flag;
 	unsigned short init_priority;
 	unsigned short chipid;
@@ -81,6 +101,18 @@ struct lcd_tcon_data_block_ext_header_s {
 	unsigned short part_cnt;
 	unsigned char part_mapping_byte;
 	unsigned char reserved[13];
+};
+
+#define LCD_TCON_DATA_PART_CTRL_SIZE_PRE    (LCD_TCON_DATA_PART_NAME_SIZE + 12)
+struct lcd_tcon_data_part_ctrl_s {
+	char name[LCD_TCON_DATA_PART_NAME_SIZE];
+	unsigned short part_id;
+	unsigned char tuning_flag;
+	unsigned char part_type;
+	unsigned short ctrl_data_flag;
+	unsigned short ctrl_sub_type;
+	unsigned short data_byte_width;
+	unsigned short data_cnt;
 };
 
 #define LCD_TCON_DATA_PART_WR_N_SIZE_PRE    (LCD_TCON_DATA_PART_NAME_SIZE + 12)
@@ -107,7 +139,7 @@ struct lcd_tcon_data_part_wr_ddr_s {
 	unsigned int data_cnt;
 };
 
-#define LCD_TCON_DATA_PART_WR_MASK_SIZE_PRE    (LCD_TCON_DATA_PART_NAME_SIZE + 6)
+#define LCD_TCON_DATA_PART_WR_MASK_SIZE_PRE   (LCD_TCON_DATA_PART_NAME_SIZE + 6)
 struct lcd_tcon_data_part_wr_mask_s {
 	char name[LCD_TCON_DATA_PART_NAME_SIZE];
 	unsigned short part_id;
@@ -117,7 +149,7 @@ struct lcd_tcon_data_part_wr_mask_s {
 	unsigned char reg_data_byte;
 };
 
-#define LCD_TCON_DATA_PART_RD_MASK_SIZE_PRE    (LCD_TCON_DATA_PART_NAME_SIZE + 6)
+#define LCD_TCON_DATA_PART_RD_MASK_SIZE_PRE  (LCD_TCON_DATA_PART_NAME_SIZE + 6)
 struct lcd_tcon_data_part_rd_mask_s {
 	char name[LCD_TCON_DATA_PART_NAME_SIZE];
 	unsigned short part_id;
@@ -127,7 +159,8 @@ struct lcd_tcon_data_part_rd_mask_s {
 	unsigned char reg_data_byte;
 };
 
-#define LCD_TCON_DATA_PART_CHK_WR_MASK_SIZE_PRE    (LCD_TCON_DATA_PART_NAME_SIZE + 9)
+#define LCD_TCON_DATA_PART_CHK_WR_MASK_SIZE_PRE \
+	(LCD_TCON_DATA_PART_NAME_SIZE + 9)
 struct lcd_tcon_data_part_chk_wr_mask_s {
 	char name[LCD_TCON_DATA_PART_NAME_SIZE];
 	unsigned short part_id;
@@ -140,7 +173,8 @@ struct lcd_tcon_data_part_chk_wr_mask_s {
 	unsigned char data_chk_cnt;
 };
 
-#define LCD_TCON_DATA_PART_CHK_EXIT_SIZE_PRE    (LCD_TCON_DATA_PART_NAME_SIZE + 6)
+#define LCD_TCON_DATA_PART_CHK_EXIT_SIZE_PRE \
+	(LCD_TCON_DATA_PART_NAME_SIZE + 6)
 struct lcd_tcon_data_part_chk_exit_s {
 	char name[LCD_TCON_DATA_PART_NAME_SIZE];
 	unsigned short part_id;
@@ -169,6 +203,7 @@ struct lcd_tcon_data_part_param_s {
 };
 
 union lcd_tcon_data_part_u {
+	struct lcd_tcon_data_part_ctrl_s *ctrl;
 	struct lcd_tcon_data_part_wr_n_s *wr_n;
 	struct lcd_tcon_data_part_wr_ddr_s *wr_ddr;
 	struct lcd_tcon_data_part_wr_mask_s *wr_mask;

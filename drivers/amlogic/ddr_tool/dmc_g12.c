@@ -1,6 +1,18 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/amlogic/ddr_tool/dmc_g12.c
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
 #include <linux/cdev.h>
@@ -24,9 +36,10 @@
 #include <linux/kallsyms.h>
 #include <linux/of_irq.h>
 #include <linux/interrupt.h>
+#include <linux/amlogic/cpu_version.h>
 #include <linux/amlogic/page_trace.h>
-#include "ddr_port.h"
-#include "dmc_monitor.h"
+#include <linux/amlogic/dmc_monitor.h>
+#include <linux/amlogic/ddr_port.h>
 
 #define DMC_PROT0_RANGE		((0x00a0  << 2))
 #define DMC_PROT0_CTRL		((0x00a1  << 2))
@@ -38,26 +51,26 @@
 #define DMC_VIO_ADDR2		((0x00bb  << 2))
 #define DMC_VIO_ADDR3		((0x00bc  << 2))
 
-#define DMC_VIO_PROT_RANGE0	BIT(21)
-#define DMC_VIO_PROT_RANGE1	BIT(22)
+#define DMC_VIO_PROT_RANGE0	(1 << 21)
+#define DMC_VIO_PROT_RANGE1	(1 << 22)
 
 static size_t g12_dmc_dump_reg(char *buf)
 {
 	size_t sz = 0, i;
 	unsigned long val;
 
-	val = dmc_prot_rw(NULL, DMC_PROT0_RANGE, 0, DMC_READ);
+	val = dmc_prot_rw(DMC_PROT0_RANGE, 0, DMC_READ);
 	sz += sprintf(buf + sz, "DMC_PROT0_RANGE:%lx\n", val);
-	val = dmc_prot_rw(NULL, DMC_PROT0_CTRL, 0, DMC_READ);
+	val = dmc_prot_rw(DMC_PROT0_CTRL, 0, DMC_READ);
 	sz += sprintf(buf + sz, "DMC_PROT0_CTRL:%lx\n", val);
-	val = dmc_prot_rw(NULL, DMC_PROT1_RANGE, 0, DMC_READ);
+	val = dmc_prot_rw(DMC_PROT1_RANGE, 0, DMC_READ);
 	sz += sprintf(buf + sz, "DMC_PROT1_RANGE:%lx\n", val);
-	val = dmc_prot_rw(NULL, DMC_PROT1_CTRL, 0, DMC_READ);
+	val = dmc_prot_rw(DMC_PROT1_CTRL, 0, DMC_READ);
 	sz += sprintf(buf + sz, "DMC_PROT1_CTRL:%lx\n", val);
-	val = dmc_prot_rw(NULL, DMC_SEC_STATUS, 0, DMC_READ);
+	val = dmc_prot_rw(DMC_SEC_STATUS, 0, DMC_READ);
 	sz += sprintf(buf + sz, "DMC_SEC_STATUS:%lx\n", val);
 	for (i = 0; i < 4; i++) {
-		val = dmc_prot_rw(NULL, DMC_VIO_ADDR0 + (i << 2), 0, DMC_READ);
+		val = dmc_prot_rw(DMC_VIO_ADDR0 + (i << 2), 0, DMC_READ);
 		sz += sprintf(buf + sz, "DMC_VIO_ADDR%zu:%lx\n", i, val);
 	}
 
@@ -74,14 +87,14 @@ static void check_violation(struct dmc_monitor *mon, void *data)
 	struct page_trace *trace;
 
 	switch (mon->chip) {
-	case DMC_TYPE_G12B:
+	case MESON_CPU_MAJOR_ID_G12B:
 		/* bit fix for G12B */
 		off1 = 24;
 		off2 = 13;
 		break;
-	case DMC_TYPE_SM1:
-	case DMC_TYPE_TL1:
-	case DMC_TYPE_TM2:
+	case MESON_CPU_MAJOR_ID_SM1:
+	case MESON_CPU_MAJOR_ID_TL1:
+	case MESON_CPU_MAJOR_ID_TM2:
 		/* bit fix for SM1/TL1/TM2 */
 		off1 = 22;
 		off2 = 11;
@@ -94,10 +107,10 @@ static void check_violation(struct dmc_monitor *mon, void *data)
 	}
 
 	for (i = 1; i < 4; i += 2) {
-		status = dmc_prot_rw(NULL, DMC_VIO_ADDR0 + (i << 2), 0, DMC_READ);
+		status = dmc_prot_rw(DMC_VIO_ADDR0 + (i << 2), 0, DMC_READ);
 		if (!(status & (1 << off1)))
 			continue;
-		addr = dmc_prot_rw(NULL, DMC_VIO_ADDR0 + ((i - 1) << 2), 0,
+		addr = dmc_prot_rw(DMC_VIO_ADDR0 + ((i - 1) << 2), 0,
 				   DMC_READ);
 		if (addr > mon->addr_end)
 			continue;
@@ -120,10 +133,11 @@ static void check_violation(struct dmc_monitor *mon, void *data)
 		/* ignore sd_emmc in device */
 		if (port == 7 && (subport == 11 || subport == 4))
 			continue;
+
 		pr_emerg(DMC_TAG", addr:%08lx, s:%08lx, ID:%s, sub:%s, c:%ld, d:%p\n",
-			 addr, status, to_ports(port),
-			 to_sub_ports(port, subport, id_str),
-			 mon->same_page, data);
+			addr, status, to_ports(port),
+			to_sub_ports(port, subport, id_str),
+			mon->same_page, data);
 		show_violation_mem(addr);
 		if (!port) /* dump stack for CPU write */
 			dump_stack();
@@ -138,7 +152,7 @@ static void g12_dmc_mon_irq(struct dmc_monitor *mon, void *data)
 {
 	unsigned long value;
 
-	value = dmc_prot_rw(NULL, DMC_SEC_STATUS, 0, DMC_READ);
+	value = dmc_prot_rw(DMC_SEC_STATUS, 0, DMC_READ);
 	if (in_interrupt()) {
 		if (value & DMC_WRITE_VIOLATION)
 			check_violation(mon, data);
@@ -147,7 +161,7 @@ static void g12_dmc_mon_irq(struct dmc_monitor *mon, void *data)
 		mod_delayed_work(system_wq, &mon->work, 0);
 	}
 	/* clear irq */
-	dmc_prot_rw(NULL, DMC_SEC_STATUS, value, DMC_WRITE);
+	dmc_prot_rw(DMC_SEC_STATUS, value, DMC_WRITE);
 }
 
 static int g12_dmc_mon_set(struct dmc_monitor *mon)
@@ -157,20 +171,20 @@ static int g12_dmc_mon_set(struct dmc_monitor *mon)
 	/* aligned to 64KB */
 	end = ALIGN(mon->addr_end, DMC_ADDR_SIZE);
 	value = (mon->addr_start >> 16) | ((end >> 16) << 16);
-	dmc_prot_rw(NULL, DMC_PROT0_RANGE, value, DMC_WRITE);
+	dmc_prot_rw(DMC_PROT0_RANGE, value, DMC_WRITE);
 
 	value = (1 << 24) | mon->device;
-	dmc_prot_rw(NULL, DMC_PROT0_CTRL, value, DMC_WRITE);
+	dmc_prot_rw(DMC_PROT0_CTRL, value, DMC_WRITE);
 
-	pr_emerg("range:%08lx - %08lx, device:%llx\n",
-		 mon->addr_start, mon->addr_end, mon->device);
+	pr_emerg("range:%08lx - %08lx, device:%x\n",
+		mon->addr_start, mon->addr_end, mon->device);
 	return 0;
 }
 
 void g12_dmc_mon_disable(struct dmc_monitor *mon)
 {
-	dmc_prot_rw(NULL, DMC_PROT0_RANGE, 0, DMC_WRITE);
-	dmc_prot_rw(NULL, DMC_PROT0_CTRL, 0, DMC_WRITE);
+	dmc_prot_rw(DMC_PROT0_RANGE, 0, DMC_WRITE);
+	dmc_prot_rw(DMC_PROT0_CTRL, 0, DMC_WRITE);
 	mon->device     = 0;
 	mon->addr_start = 0;
 	mon->addr_end   = 0;

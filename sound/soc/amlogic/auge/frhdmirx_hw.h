@@ -1,8 +1,19 @@
-/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * sound/soc/amlogic/auge/frhdmirx_hw.h
+ *
+ * Copyright (C) 2018 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
-
 #ifndef __FRHDMIRX_HW_H__
 #define __FRHDMIRX_HW_H__
 
@@ -21,24 +32,18 @@ enum {
 	HDMIRX_SPDIF_TO_HDMIRX = 3,
 };
 
-enum {
-	TL1_FRHDMIRX = 0,
-	T7_FRHDMIRX = 1,
-};
-
 void arc_source_enable(int src, bool enable);
 void arc_earc_source_select(int src);
 void arc_enable(bool enable);
 
-void frhdmirx_enable(bool enable, int version);
+void frhdmirx_enable(bool enable);
 void frhdmirx_src_select(int src);
-void frhdmirx_ctrl(int channels, int src, int version);
+void frhdmirx_ctrl(int channels, int src);
 void frhdmirx_clr_PAO_irq_bits(void);
 void frhdmirx_clr_SPDIF_irq_bits(void);
-void frhdmirx_clr_SPDIF_irq_bits_for_t7_version(void);
-unsigned int frhdmirx_get_ch_status(int num, int version);
-unsigned int frhdmirx_get_chan_status_pc(enum hdmirx_mode mode, int version);
-void frhdmirx_clr_all_irq_bits(int version);
+unsigned int frhdmirx_get_ch_status(int num);
+unsigned int frhdmirx_get_chan_status_pc(enum hdmirx_mode mode);
+void frhdmirx_clr_all_irq_bits(void);
 void frhdmirx_afifo_reset(void);
 
 #endif

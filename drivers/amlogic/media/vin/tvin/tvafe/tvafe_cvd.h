@@ -1,6 +1,18 @@
-/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/amlogic/media/vin/tvin/tvafe/tvafe_cvd.h
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
 #ifndef _TVAFE_CVD_H
@@ -87,11 +99,13 @@ struct tvafe_cvd2_hw_data_s {
 	unsigned char acc425_cnt;
 	unsigned char acc3xx_cnt;
 	unsigned char acc358_cnt;
+	unsigned int noise_level;
 	bool secam_detected;
 	bool secam_phase;
 	bool fsc_358;
 	bool fsc_425;
 	bool fsc_443;
+	bool low_amp;
 };
 
 /* cvd2 memory */
@@ -184,44 +198,45 @@ struct tvafe_cvd2_s {
 /* ***************************************** */
 /* ******** GLOBAL FUNCTION CLAIM ******** */
 /* ********************************************* */
-int cvd_get_rf_strength(void);
+extern int cvd_get_rf_strength(void);
 
-void tvafe_cvd2_try_format(struct tvafe_cvd2_s *cvd2,
-		struct tvafe_cvd2_mem_s *mem, enum tvin_sig_fmt_e fmt);
-bool tvafe_cvd2_no_sig(struct tvafe_cvd2_s *cvd2,
-		struct tvafe_cvd2_mem_s *mem, bool is_dec_start);
-bool tvafe_cvd2_fmt_chg(struct tvafe_cvd2_s *cvd2);
-enum tvin_sig_fmt_e tvafe_cvd2_get_format(struct tvafe_cvd2_s *cvd2);
+extern void tvafe_cvd2_try_format(struct tvafe_cvd2_s *cvd2,
+			struct tvafe_cvd2_mem_s *mem, enum tvin_sig_fmt_e fmt);
+extern bool tvafe_cvd2_no_sig(struct tvafe_cvd2_s *cvd2,
+			struct tvafe_cvd2_mem_s *mem, bool is_dec_start);
+extern bool tvafe_cvd2_fmt_chg(struct tvafe_cvd2_s *cvd2);
+extern enum tvin_sig_fmt_e tvafe_cvd2_get_format(
+			struct tvafe_cvd2_s *cvd2);
 #ifdef TVAFE_SET_CVBS_PGA_EN
-void tvafe_cvd2_adj_pga(struct tvafe_cvd2_s *cvd2);
+extern void tvafe_cvd2_adj_pga(struct tvafe_cvd2_s *cvd2);
 #endif
 #ifdef TVAFE_SET_CVBS_CDTO_EN
-void tvafe_cvd2_adj_cdto(struct tvafe_cvd2_s *cvd2,
+extern void tvafe_cvd2_adj_cdto(struct tvafe_cvd2_s *cvd2,
 			unsigned int hcnt64);
 #endif
-void tvafe_cvd2_adj_hs(struct tvafe_cvd2_s *cvd2,
-		unsigned int hcnt64);
-void tvafe_cvd2_adj_hs_ntsc(struct tvafe_cvd2_s *cvd2,
+extern void tvafe_cvd2_adj_hs(struct tvafe_cvd2_s *cvd2,
+			unsigned int hcnt64);
+extern void tvafe_cvd2_adj_hs_ntsc(struct tvafe_cvd2_s *cvd2,
 			unsigned int hcnt64);
 
-void tvafe_cvd2_set_default_cdto(struct tvafe_cvd2_s *cvd2);
-void tvafe_cvd2_set_default_de(struct tvafe_cvd2_s *cvd2);
-void tvafe_cvd2_check_3d_comb(struct tvafe_cvd2_s *cvd2);
-void tvafe_cvd2_reset_pga(void);
-enum tvafe_cvbs_video_e tvafe_cvd2_get_lock_status(struct tvafe_cvd2_s *cvd2);
-int tvafe_cvd2_get_atv_format(void);
-int tvafe_cvd2_get_hv_lock(void);
-void tvafe_cvd2_hold_rst(void);
-void tvafe_snow_config(unsigned int onoff);
-void tvafe_snow_config_clamp(unsigned int onoff);
-void tvafe_snow_config_acd(void);
-void tvafe_snow_config_acd_resume(void);
-enum tvin_aspect_ratio_e tvafe_cvd2_get_wss(void);
-void cvd_vbi_mem_set(unsigned int offset, unsigned int size);
-void cvd_vbi_config(void);
-void tvafe_cvd2_rf_ntsc50_en(bool v);
-void tvafe_cvd2_non_std_config(struct tvafe_cvd2_s *cvd2);
-int cvd_set_debug_parm(const char *buff, char **parm);
+extern void tvafe_cvd2_set_default_cdto(struct tvafe_cvd2_s *cvd2);
+extern void tvafe_cvd2_set_default_de(struct tvafe_cvd2_s *cvd2);
+extern void tvafe_cvd2_check_3d_comb(struct tvafe_cvd2_s *cvd2);
+extern void tvafe_cvd2_reset_pga(void);
+extern enum tvafe_cvbs_video_e tvafe_cvd2_get_lock_status(
+			struct tvafe_cvd2_s *cvd2);
+extern int tvafe_cvd2_get_atv_format(void);
+extern int tvafe_cvd2_get_hv_lock(void);
+extern void tvafe_cvd2_hold_rst(void);
+extern void tvafe_snow_config(unsigned int onoff);
+extern void tvafe_snow_config_clamp(unsigned int onoff);
+extern void tvafe_snow_config_acd(void);
+extern void tvafe_snow_config_acd_resume(void);
+extern enum tvin_aspect_ratio_e tvafe_cvd2_get_wss(void);
+extern void cvd_vbi_mem_set(unsigned int offset, unsigned int size);
+extern void cvd_vbi_config(void);
+extern void tvafe_cvd2_rf_ntsc50_en(bool v);
+extern void tvafe_cvd2_non_std_config(struct tvafe_cvd2_s *cvd2);
 
 extern bool tvafe_snow_function_flag;
 extern bool reinit_scan;

@@ -353,27 +353,35 @@ int cabc_alg_state(void)
 	pr_info("\n--------cabc alg parameters-------\n");
 	pr_info("cabc_max95_ratio = %d\n", fw_cabc_param->cabc_param->cabc_max95_ratio);
 	pr_info("cabc_hist_mode = %d\n", fw_cabc_param->cabc_param->cabc_hist_mode);
-	pr_info("cabc_hist_blend_alpha = %d\n",
+	pr_info(
+		"cabc_hist_blend_alpha = %d\n",
 		fw_cabc_param->cabc_param->cabc_hist_blend_alpha);
-	pr_info("cabc_init_bl_min = %d\n",
+	pr_info(
+		"cabc_init_bl_min = %d\n",
 		fw_cabc_param->cabc_param->cabc_init_bl_min);
-	pr_info("cabc_init_bl_max = %d\n",
+	pr_info(
+		"cabc_init_bl_max = %d\n",
 		fw_cabc_param->cabc_param->cabc_init_bl_max);
-	pr_info("cabc_tf_alpha = %d\n",
+	pr_info(
+		"cabc_tf_alpha = %d\n",
 		fw_cabc_param->cabc_param->cabc_tf_alpha);
 	pr_info("cabc_tf_en = %d\n", fw_cabc_param->cabc_param->cabc_tf_en);
 	pr_info("cabc_sc_flag = %d\n", fw_cabc_param->cabc_param->cabc_sc_flag);
-	pr_info("cabc_sc_hist_diff_thd = %d\n",
+	pr_info(
+		"cabc_sc_hist_diff_thd = %d\n",
 		fw_cabc_param->cabc_param->cabc_sc_hist_diff_thd);
-	pr_info("cabc_sc_apl_diff_thd = %d\n",
+	pr_info(
+		"cabc_sc_apl_diff_thd = %d\n",
 		fw_cabc_param->cabc_param->cabc_sc_apl_diff_thd);
-	pr_info("cabc_en = %d\n",
+	pr_info(
+		"cabc_en = %d\n",
 		fw_cabc_param->cabc_param->cabc_en);
 
 	pr_info("\n--------fw vpp y hist-------\n");
 	if (fw_cabc_param->i_hist) {
 		for (i = 0; i < 16; i++)
-			pr_info("i_hist[%2d ~ %2d] = 0x%5x, 0x%5x, 0x%5x, 0x%5x\n",
+			pr_info(
+				"i_hist[%2d ~ %2d] = 0x%5x, 0x%5x, 0x%5x, 0x%5x\n",
 				i * 4, i * 4 + 3,
 				fw_cabc_param->i_hist[i * 4],
 				fw_cabc_param->i_hist[i * 4 + 1],
@@ -449,13 +457,16 @@ int aad_alg_state(void)
 			fw_aad_param->aad_param->aad_lms2rgb_matrix[i * 3 + 1],
 			fw_aad_param->aad_param->aad_lms2rgb_matrix[i * 3 + 2]);
 	for (i = 0; i < 17; i++)
-		pr_info("aad_LUT_Y_gain[%d] = %d\n",
+		pr_info(
+			"aad_LUT_Y_gain[%d] = %d\n",
 			i, fw_aad_param->aad_param->aad_LUT_Y_gain[i]);
 	for (i = 0; i < 17; i++)
-		pr_info("aad_LUT_RG_gain[%d] = %d\n",
+		pr_info(
+			"aad_LUT_RG_gain[%d] = %d\n",
 			i, fw_aad_param->aad_param->aad_LUT_RG_gain[i]);
 	for (i = 0; i < 17; i++)
-		pr_info("aad_LUT_BG_gain[%d] = %d\n",
+		pr_info(
+			"aad_LUT_BG_gain[%d] = %d\n",
 			i, fw_aad_param->aad_param->aad_LUT_BG_gain[i]);
 	pr_info("aad_Y_gain_min = %d\n", fw_aad_param->aad_param->aad_Y_gain_min);
 	pr_info("aad_Y_gain_max = %d\n", fw_aad_param->aad_param->aad_Y_gain_max);
@@ -531,40 +542,46 @@ int pre_gamma_alg_state(void)
 	pr_info("\n--------pre_gamma R-------\n");
 	for (i = 0; i < 17; i++) {
 		if (i < 16)
-			pr_info("pre_gamma R[%2d ~ %2d] = %4d, %4d, %4d, %4d\n",
+			pr_info(
+				"pre_gamma R[%2d ~ %2d] = %4d, %4d, %4d, %4d\n",
 				i * 4, i * 4 + 3,
 				pre_gamma[0][i * 4],
 				pre_gamma[0][i * 4 + 1],
 				pre_gamma[0][i * 4 + 2],
 				pre_gamma[0][i * 4 + 3]);
 		else
-			pr_info("pre_gamma R[%2d] = %4d\n",
+			pr_info(
+				"pre_gamma R[%2d] = %4d\n",
 				i * 4, pre_gamma[0][i * 4]);
 	}
 	pr_info("\n--------pre_gamma G-------\n");
 	for (i = 0; i < 17; i++) {
 		if (i < 16)
-			pr_info("pre_gamma G[%2d ~ %2d] = %4d, %4d, %4d, %4d\n",
+			pr_info(
+				"pre_gamma G[%2d ~ %2d] = %4d, %4d, %4d, %4d\n",
 				i * 4, i * 4 + 3,
 				pre_gamma[1][i * 4],
 				pre_gamma[1][i * 4 + 1],
 				pre_gamma[1][i * 4 + 2],
 				pre_gamma[1][i * 4 + 3]);
 		else
-			pr_info("pre_gamma G[%2d] = %4d\n",
+			pr_info(
+				"pre_gamma G[%2d] = %4d\n",
 				i * 4, pre_gamma[1][i * 4]);
 	}
 	pr_info("\n--------pre_gamma B-------\n");
 	for (i = 0; i < 17; i++) {
 		if (i < 16)
-			pr_info("pre_gamma B[%2d ~ %2d] = %4d, %4d, %4d, %4d\n",
+			pr_info(
+				"pre_gamma B[%2d ~ %2d] = %4d, %4d, %4d, %4d\n",
 				i * 4, i * 4 + 3,
 				pre_gamma[2][i * 4],
 				pre_gamma[2][i * 4 + 1],
 				pre_gamma[2][i * 4 + 2],
 				pre_gamma[2][i * 4 + 3]);
 		else
-			pr_info("pre_gamma B[%2d] = %4d\n",
+			pr_info(
+				"pre_gamma B[%2d] = %4d\n",
 				i * 4, pre_gamma[2][i * 4]);
 	}
 	pr_info("pre_gamma_proc = %p\n", fw_pregm_param->pre_gamma_proc);
@@ -581,7 +598,8 @@ int cabc_aad_print(void)
 	return 0;
 }
 
-static void str_sapr_conv(const char *s, unsigned int size, int *dest, int num)
+static void str_sapr_conv(
+	const char *s, unsigned int size, int *dest, int num)
 {
 	int i, j;
 	char *s1;
@@ -589,7 +607,7 @@ static void str_sapr_conv(const char *s, unsigned int size, int *dest, int num)
 	unsigned int len;
 	long value;
 
-	if (size <= 0 || !s)
+	if ((size <= 0) || (!s))
 		return;
 
 	s1 = kmalloc(size + 1, GFP_KERNEL);
@@ -662,7 +680,8 @@ int cabc_aad_debug(char **param)
 			goto error;
 		if (!param[1])
 			goto error;
-		str_sapr_conv(param[1], 5,
+		str_sapr_conv(
+			param[1], 5,
 			fw_aad_param->aad_param->aad_LUT_Y_gain,
 			17);
 		pr_info("set aad_LUT_Y_gain\n");
@@ -671,7 +690,8 @@ int cabc_aad_debug(char **param)
 			goto error;
 		if (!param[1])
 			goto error;
-		str_sapr_conv(param[1], 5,
+		str_sapr_conv(
+			param[1], 5,
 			fw_aad_param->aad_param->aad_LUT_RG_gain,
 			17);
 		pr_info("set aad_LUT_RG_gain\n");
@@ -680,7 +700,8 @@ int cabc_aad_debug(char **param)
 			goto error;
 		if (!param[1])
 			goto error;
-		str_sapr_conv(param[1], 5,
+		str_sapr_conv(
+			param[1], 5,
 			fw_aad_param->aad_param->aad_LUT_BG_gain,
 			17);
 		pr_info("set aad_LUT_BG_gain\n");
@@ -767,7 +788,8 @@ int cabc_aad_debug(char **param)
 			if (kstrtoul(param[3], 10, &val) < 0)
 				goto error;
 			fw_aad_param->aad_param->aad_b_gain = val;
-			pr_info("aad_rgb_gain = %d, %d, %d\n",
+			pr_info(
+				"aad_rgb_gain = %d, %d, %d\n",
 				fw_aad_param->aad_param->aad_r_gain,
 				fw_aad_param->aad_param->aad_g_gain,
 				fw_aad_param->aad_param->aad_b_gain);
@@ -777,7 +799,8 @@ int cabc_aad_debug(char **param)
 			goto error;
 		if (!param[1])
 			goto error;
-		str_sapr_conv(param[1], 4,
+		str_sapr_conv(
+			param[1], 4,
 			lut,
 			33);
 		for (i = 0; i < 11; i++) {
@@ -802,7 +825,8 @@ int cabc_aad_debug(char **param)
 			if (kstrtoul(param[4], 10, &val) < 0)
 				goto error;
 			fw_aad_param->aad_param->aad_gain_lut[i][2] = val;
-			pr_info("gain_lut[%d] = %d, %d, %d\n",
+			pr_info(
+				"gain_lut[%d] = %d, %d, %d\n",
 				i,
 				fw_aad_param->aad_param->aad_gain_lut[i][0],
 				fw_aad_param->aad_param->aad_gain_lut[i][1],
@@ -813,7 +837,8 @@ int cabc_aad_debug(char **param)
 			goto error;
 		if (!param[1])
 			goto error;
-		str_sapr_conv(param[1], 4,
+		str_sapr_conv(
+			param[1], 4,
 			lut,
 			22);
 		for (i = 0; i < 11; i++) {
@@ -834,7 +859,8 @@ int cabc_aad_debug(char **param)
 			if (kstrtoul(param[3], 10, &val) < 0)
 				goto error;
 			fw_aad_param->aad_param->aad_xy_lut[i][1] = val;
-			pr_info("gain_lut[%d] = %d, %d\n",
+			pr_info(
+				"gain_lut[%d] = %d, %d\n",
 				i,
 				fw_aad_param->aad_param->aad_xy_lut[i][0],
 				fw_aad_param->aad_param->aad_xy_lut[i][1]);
@@ -859,7 +885,8 @@ int cabc_aad_debug(char **param)
 			if (kstrtoul(param[3], 10, &val) < 0)
 				goto error;
 			fw_aad_param->aad_param->sensor_input[2] = val;
-			pr_info("sensor_input = %d, %d, %d\n",
+			pr_info(
+				"sensor_input = %d, %d, %d\n",
 				fw_aad_param->aad_param->sensor_input[0],
 				fw_aad_param->aad_param->sensor_input[1],
 				fw_aad_param->aad_param->sensor_input[2]);

@@ -201,7 +201,6 @@ dwc_otg_core_if_t *dwc_otg_cil_init(const uint32_t *reg_base_addr, int host_only
 	core_if->hwcfg4.d32 =
 	    DWC_READ_REG32(&core_if->core_global_regs->ghwcfg4);
 
-#ifndef CONFIG_AMLOGIC_USB
 	/* Force host mode to get HPTXFSIZ exact power on value */
 	{
 		gusbcfg_data_t gusbcfg = {.d32 = 0 };
@@ -220,7 +219,6 @@ dwc_otg_core_if_t *dwc_otg_cil_init(const uint32_t *reg_base_addr, int host_only
 		gusbcfg.b.force_host_mode = 0;
 		DWC_WRITE_REG32(&core_if->core_global_regs->gusbcfg, gusbcfg.d32);
 	}
-#endif
 
 	DWC_DEBUGPL(DBG_CILV, "hwcfg1=%08x\n", core_if->hwcfg1.d32);
 	DWC_DEBUGPL(DBG_CILV, "hwcfg2=%08x\n", core_if->hwcfg2.d32);
@@ -1561,6 +1559,8 @@ void dwc_otg_enable_device_interrupts(dwc_otg_core_if_t *core_if)
 	intr_mask.b.enumdone = 1;
 	/* Disable Disconnect interrupt in Device mode */
 	intr_mask.b.disconnect = 0;
+	if (core_if->phy_interface == 0)
+		intr_mask.b.sofintr = 1;
 
 	if (!core_if->multiproc_int_enable) {
 		intr_mask.b.inepintr = 1;

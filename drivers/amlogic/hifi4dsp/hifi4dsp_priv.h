@@ -1,6 +1,18 @@
-/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/amlogic/hifi4dsp/hifi4dsp_api.h
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
 #ifndef _HIFI4DSP_PRIV_H
@@ -29,6 +41,9 @@ struct reg_iomem_t {
 };
 
 extern struct reg_iomem_t g_regbases;
+extern unsigned int boot_sram_addr;
+extern unsigned int boot_sram_size;
+extern unsigned int dspcount;
 
 struct class;
 
@@ -49,20 +64,15 @@ struct hifi4dsp_priv {
 	struct clk *p_clk_gate;
 };
 
-#define	HIFI4DSP_MAX_CNT	2
-extern struct hifi4dsp_priv *hifi4dsp_p[HIFI4DSP_MAX_CNT];
-
 struct hifi4dsp_miscdev_t {
 	struct miscdevice dsp_miscdev;
 	struct hifi4dsp_priv *priv;
 };
 
+struct hifi4dsp_priv *hifi4dsp_privdata(void);
+
 #ifndef HIFI4DSP_PRNT
 #define HIFI4DSP_PRNT(...)  pr_info(__VA_ARGS__)
 #endif
-
-/*power ctrl*/
-#define PWR_ON    1
-#define PWR_OFF   0
 
 #endif /*_HIFI4DSP_PRIV_H*/

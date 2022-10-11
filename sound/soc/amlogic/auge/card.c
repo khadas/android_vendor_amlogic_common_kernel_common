@@ -1,11 +1,21 @@
-// SPDX-License-Identifier: GPL-2.0
-//
-// ASoC simple sound card support
-//
-// Copyright (C) 2012 Renesas Solutions Corp.
-// Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+/*
+ * sound/soc/amlogic/auge/card.c
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
+ */
 
-//#define DEBUG
+#define DEBUG
 #include <linux/clk.h>
 #include <linux/device.h>
 #include <linux/gpio.h>
@@ -17,65 +27,33 @@
 #include <linux/string.h>
 #include <linux/timer.h>
 #include <linux/workqueue.h>
-//#include <linux/extcon.h>
-#include <linux/extcon-provider.h>
+#include <linux/extcon.h>
 #include <sound/jack.h>
 #include <sound/soc.h>
 #include <sound/soc-dai.h>
-#include <sound/control.h>
+#include "../../../../drivers/gpio/gpiolib.h"
 #include "card.h"
 
 #include "effects.h"
 #include "iomap.h"
 #include "regs.h"
-#include "../common/misc.h"
-#include "../common/audio_uevent.h"
-#include "audio_controller.h"
-//#include <linux/amlogic/media/sound/debug.h>
 
-/*the same as audio hal type define!*/
-static const char * const audio_format[] = {
-	"PCM",
-	"DTS_EXPRESS",
-	"DOLBY_DIGITAL",
-	"DTS",
-	"DOLBY_DIGITAL_PLUS",
-	"DTS_HD",
-	"MULTI_CHANNEL PCM",
-	"DOLBY_TRUEHD",
-	"DTS_HD_MA",
-	"HIFI PCM",
-	"DOLBY_AC4",
-	"DOLBY_MAT",
-	"DOLBY_DDP_ATMOS",
-	"DOLBY_THD_ATMOS",
-	"DOLBY_MAT_ATMOS",
-	"DOLBY_AC4_ATMOS",
-};
-
-enum audio_hal_format {
-	TYPE_PCM = 0,
-	TYPE_DTS_EXPRESS = 1,
-	TYPE_AC3 = 2,
-	TYPE_DTS = 3,
-	TYPE_EAC3 = 4,
-	TYPE_DTS_HD = 5,
-	TYPE_MULTI_PCM = 6,
-	TYPE_TRUE_HD = 7,
-	TYPE_DTS_HD_MA = 8,
-	TYPE_PCM_HIGH_SR = 9,
-	TYPE_AC4 = 10,
-	TYPE_MAT = 11,
-	TYPE_DDP_ATMOS = 12,
-	TYPE_TRUE_HD_ATMOS = 13,
-	TYPE_MAT_ATMOS = 14,
-	TYPE_AC4_ATMOS = 15,
-};
+#include <linux/amlogic/media/sound/misc.h>
+#include <linux/amlogic/media/sound/debug.h>
 
 struct aml_jack {
 	struct snd_soc_jack jack;
 	struct snd_soc_jack_pin pin;
 	struct snd_soc_jack_gpio gpio;
+};
+
+struct aml_chipset_info {
+	/* INT address separated from start address for ddr */
+	bool ddr_addr_separated;
+	/* two spdif out ? */
+	bool spdif_b;
+	/* eq/drc function */
+	bool eqdrc_fn;
 };
 
 struct aml_card_data {
@@ -88,9 +66,6 @@ struct aml_card_data {
 
 		struct aml_dai cpu_dai;
 		struct aml_dai codec_dai;
-		struct snd_soc_dai_link_component cpus;   /* single cpu */
-		struct snd_soc_dai_link_component codecs; /* single codec */
-		struct snd_soc_dai_link_component platforms;
 		unsigned int mclk_fs;
 	} *dai_props;
 	unsigned int mclk_fs;
@@ -99,28 +74,32 @@ struct aml_card_data {
 	struct snd_soc_dai_link *dai_link;
 	int spk_mute_gpio;
 	bool spk_mute_active_low;
-	bool spk_mute_flag;
+	int acodec_mute_gpio;
+	bool acodec_mute_active_low;
 	struct gpio_desc *avout_mute_desc;
 	struct timer_list timer;
 	struct work_struct work;
 	struct work_struct init_work;
-	bool hp_last_state;
-	bool hp_cur_state;
-	bool hp_det_status;
+	int hp_last_state;
+	int hp_cur_state;
+	int hp_det_status;
 	int hp_gpio_det;
 	int hp_detect_flag;
 	bool hp_det_enable;
 	enum of_gpio_flags hp_det_flags;
-	bool micphone_last_state;
-	bool micphone_cur_state;
-	bool micphone_det_status;
+	int micphone_last_state;
+	int micphone_cur_state;
+	int micphone_det_status;
 	int micphone_gpio_det;
 	int mic_detect_flag;
 	bool mic_det_enable;
 	bool av_mute_enable;
 	bool spk_mute_enable;
+	bool acodec_mute_enable;
+	struct aml_chipset_info *chipinfo;
 	int irq_exception64;
-	enum audio_hal_format hal_fmt;
+	/* soft locker attached to */
+	struct soft_locker slocker;
 };
 
 #define aml_priv_to_dev(priv) ((priv)->snd_card.dev)
@@ -128,6 +107,13 @@ struct aml_card_data {
 #define aml_priv_to_props(priv, i) ((priv)->dai_props + (i))
 #define aml_card_to_priv(card) \
 	(container_of(card, struct aml_card_data, snd_card))
+
+struct soft_locker *aml_get_card_locker(struct snd_soc_card *card)
+{
+	struct aml_card_data *priv = aml_card_to_priv(card);
+
+	return &priv->slocker;
+}
 
 #define DAI	"sound-dai"
 #define CELL	"#sound-dai-cells"
@@ -151,58 +137,6 @@ static const unsigned int microphone_cable[] = {
 struct extcon_dev *audio_extcon_headphone;
 struct extcon_dev *audio_extcon_microphone;
 
-static const struct soc_enum audio_hal_format_enum =
-	SOC_ENUM_SINGLE(SND_SOC_NOPM, 0, ARRAY_SIZE(audio_format),
-			audio_format);
-
-static int aml_audio_hal_format_get_enum(struct snd_kcontrol *kcontrol,
-	struct snd_ctl_elem_value *ucontrol)
-{
-	struct snd_soc_card *card = snd_kcontrol_chip(kcontrol);
-	struct aml_card_data *p_aml_audio;
-
-	p_aml_audio = snd_soc_card_get_drvdata(card);
-	ucontrol->value.integer.value[0] = p_aml_audio->hal_fmt;
-
-	return 0;
-}
-
-static int aml_audio_hal_format_set_enum(struct snd_kcontrol *kcontrol,
-	struct snd_ctl_elem_value *ucontrol)
-{
-	struct snd_soc_card *card = snd_kcontrol_chip(kcontrol);
-	struct aml_card_data *p_aml_audio;
-	int hal_format = ucontrol->value.integer.value[0];
-
-	p_aml_audio = snd_soc_card_get_drvdata(card);
-
-	audio_send_uevent(card, AUDIO_SPDIF_FMT_EVENT, hal_format);
-	pr_info("update audio atmos flag! audio_type = %d\n", hal_format);
-
-	if (p_aml_audio->hal_fmt != hal_format)
-		p_aml_audio->hal_fmt = hal_format;
-
-	return 0;
-}
-
-static int aml_chip_id_get(struct snd_kcontrol *kcontrol,
-			struct snd_ctl_elem_value *ucontrol)
-{
-	(void)kcontrol;
-	ucontrol->value.integer.value[0] = aml_return_chip_id();
-	return 0;
-}
-
-static const struct snd_kcontrol_new snd_user_controls[] = {
-	SOC_ENUM_EXT("Audio HAL Format",
-		     audio_hal_format_enum,
-		     aml_audio_hal_format_get_enum,
-		     aml_audio_hal_format_set_enum),
-
-	SND_SOC_BYTES_EXT("AML chip id", 1,
-			aml_chip_id_get, NULL)
-};
-
 static void jack_audio_start_timer(struct aml_card_data *card_data,
 				  unsigned long delay)
 {
@@ -215,10 +149,9 @@ static void jack_audio_stop_timer(struct aml_card_data *card_data)
 	del_timer_sync(&card_data->timer);
 	cancel_work_sync(&card_data->work);
 }
-
-static void jack_timer_func(struct timer_list *t)
+static void jack_timer_func(unsigned long data)
 {
-	struct aml_card_data *card_data = from_timer(card_data, t, timer);
+	struct aml_card_data *card_data = (struct aml_card_data *)data;
 	unsigned long delay = msecs_to_jiffies(150);
 
 	schedule_work(&card_data->work);
@@ -235,7 +168,8 @@ static int jack_audio_hp_detect(struct aml_card_data *card_data)
 	if (card_data->hp_last_state != card_data->hp_cur_state) {
 		while (loop_num < 5) {
 			card_data->hp_cur_state =
-				gpio_get_value_cansleep(card_data->hp_jack.gpio.gpio);
+				gpio_get_value_cansleep(
+					card_data->hp_jack.gpio.gpio);
 
 			if (card_data->hp_last_state != card_data->hp_cur_state)
 				change_cnt++;
@@ -264,7 +198,8 @@ static int jack_audio_micphone_detect(struct aml_card_data *card_data)
 	if (card_data->micphone_last_state != card_data->micphone_cur_state) {
 		while (loop_num < 5) {
 			card_data->micphone_cur_state =
-				gpio_get_value_cansleep(card_data->mic_jack.gpio.gpio);
+				gpio_get_value_cansleep(
+					card_data->mic_jack.gpio.gpio);
 			if (card_data->micphone_last_state !=
 				card_data->micphone_cur_state)
 				change_cnt++;
@@ -284,7 +219,6 @@ static int jack_audio_micphone_detect(struct aml_card_data *card_data)
 	}
 	return -1;
 }
-
 static void jack_work_func(struct work_struct *work)
 {
 	struct aml_card_data *card_data = NULL;
@@ -297,8 +231,8 @@ static void jack_work_func(struct work_struct *work)
 		flag = jack_audio_hp_detect(card_data);
 		if (flag == -1)
 			return;
-
 		if (card_data->hp_detect_flag != flag) {
+
 			card_data->hp_detect_flag = flag;
 
 			if (card_data->hp_det_flags == OF_GPIO_ACTIVE_LOW)
@@ -309,16 +243,13 @@ static void jack_work_func(struct work_struct *work)
 					EXTCON_JACK_HEADPHONE, 1);
 				snd_soc_jack_report(&card_data->hp_jack.jack,
 					status, SND_JACK_HEADPHONE);
-				audio_send_uevent(&card_data->snd_card,
-					HEADPHONE_DETECTION_EVENT, 1);
 			} else {
 				extcon_set_state_sync(audio_extcon_headphone,
 					EXTCON_JACK_HEADPHONE, 0);
 				snd_soc_jack_report(&card_data->hp_jack.jack, 0,
-					SND_JACK_HEADPHONE);
-				audio_send_uevent(&card_data->snd_card,
-					HEADPHONE_DETECTION_EVENT, 0);
+						SND_JACK_HEADPHONE);
 			}
+
 		}
 	}
 	if (card_data->mic_det_enable == 1) {
@@ -326,6 +257,7 @@ static void jack_work_func(struct work_struct *work)
 		if (flag == -1)
 			return;
 		if (card_data->mic_detect_flag != flag) {
+
 			card_data->mic_detect_flag = flag;
 
 			if (flag) {
@@ -333,16 +265,13 @@ static void jack_work_func(struct work_struct *work)
 					EXTCON_JACK_MICROPHONE, 1);
 				snd_soc_jack_report(&card_data->mic_jack.jack,
 					status, SND_JACK_MICROPHONE);
-				audio_send_uevent(&card_data->snd_card,
-					MICROPHONE_DETECTION_EVENT, 1);
 			} else {
 				extcon_set_state_sync(audio_extcon_microphone,
 					EXTCON_JACK_MICROPHONE, 0);
 				snd_soc_jack_report(&card_data->mic_jack.jack,
 					0, SND_JACK_MICROPHONE);
-				audio_send_uevent(&card_data->snd_card,
-					MICROPHONE_DETECTION_EVENT, 0);
 			}
+
 		}
 	}
 }
@@ -353,6 +282,7 @@ static int aml_card_init_jack(struct snd_soc_card *card,
 {
 	struct aml_card_data *priv = aml_card_to_priv(card);
 	struct device *dev = card->dev;
+	struct gpio_desc *desc;
 	enum of_gpio_flags flags = 0;
 	char prop[128];
 	char *pin_name;
@@ -368,12 +298,14 @@ static int aml_card_init_jack(struct snd_soc_card *card,
 		gpio_name	= "Headphone detection";
 		mask		= SND_JACK_HEADPHONE;
 
-		det = of_get_named_gpio_flags(dev->of_node, prop, 0, &priv->hp_det_flags);
-		if (det < 0) {
+		desc = of_get_named_gpiod_flags(dev->of_node, prop, 0,
+				&priv->hp_det_flags);
+		if (IS_ERR(desc)) {
 			priv->hp_det_enable = 0;
 			return -1;
 		}
 		priv->hp_det_enable = 1;
+		det = desc_to_gpio(desc);
 		gpio_request(det, "hp-det-gpio");
 	} else {
 		snprintf(prop, sizeof(prop), "%smic-det-gpio", prefix);
@@ -381,18 +313,17 @@ static int aml_card_init_jack(struct snd_soc_card *card,
 		gpio_name	= "Mic detection";
 		mask		= SND_JACK_MICROPHONE;
 
-		det = of_get_named_gpio_flags(dev->of_node, prop, 0, &flags);
-		if (det < 0) {
+		desc = of_get_named_gpiod_flags(dev->of_node, prop, 0, &flags);
+		if (IS_ERR(desc)) {
 			priv->mic_det_enable = 0;
 			return -1;
 		}
 		priv->mic_det_enable = 1;
+		det = desc_to_gpio(desc);
 		gpio_request(det, "mic-det-gpio");
 	}
 
 	if (gpio_is_valid(det)) {
-		int state;
-
 		sjack->pin.pin		= pin_name;
 		sjack->pin.mask		= mask;
 
@@ -403,18 +334,15 @@ static int aml_card_init_jack(struct snd_soc_card *card,
 		sjack->gpio.debounce_time = 150;
 
 		gpio_direction_input(det);
-		state = gpiod_set_pull(gpio_to_desc(det), GPIOD_PULL_DIS);
-		if (state)
-			pr_err("set gpiod pull failed, ret %d\n", state);
+		gpiod_set_pull(desc, GPIOD_PULL_DIS);
 		snd_soc_card_jack_new(card, pin_name, mask,
 				      &sjack->jack,
 				      &sjack->pin, 1);
 
 		snd_soc_jack_add_gpios(&sjack->jack, 1,
 				       &sjack->gpio);
-	} else {
+	} else
 		pr_info("detect gpio is invalid\n");
-	}
 
 	if (is_hp) {
 		if (det >= 0)
@@ -428,7 +356,9 @@ static int aml_card_init_jack(struct snd_soc_card *card,
 
 static void audio_jack_detect(struct aml_card_data *card_data)
 {
-	timer_setup(&card_data->timer, jack_timer_func, 0);
+	init_timer(&card_data->timer);
+	card_data->timer.function = jack_timer_func;
+	card_data->timer.data = (unsigned long)card_data;
 
 	INIT_WORK(&card_data->work, jack_work_func);
 
@@ -444,17 +374,15 @@ static void audio_extcon_register(struct aml_card_data *priv,
 
 	if (priv->hp_det_enable == 1) {
 		/*audio extcon headphone*/
-		edev = devm_extcon_dev_allocate(dev, headphone_cable);
+		edev = extcon_dev_allocate(headphone_cable);
 		if (IS_ERR(edev)) {
 			pr_info("failed to allocate audio extcon headphone\n");
 			return;
 		}
-		/*
-		 * edev->dev.parent = dev;
-		 * edev->name = "audio_extcon_headphone";
-		 * dev_set_name(&edev->dev, "headphone");
-		 */
-		ret = devm_extcon_dev_register(dev, edev);
+		edev->dev.parent = dev;
+		edev->name = "audio_extcon_headphone";
+		dev_set_name(&edev->dev, "headphone");
+		ret = extcon_dev_register(edev);
 		if (ret < 0) {
 			pr_info("failed to register audio extcon headphone\n");
 			return;
@@ -463,18 +391,16 @@ static void audio_extcon_register(struct aml_card_data *priv,
 	}
 	if (priv->mic_det_enable == 1) {
 		/*audio extcon microphone*/
-		edev = devm_extcon_dev_allocate(dev, microphone_cable);
+		edev = extcon_dev_allocate(microphone_cable);
 		if (IS_ERR(edev)) {
 			pr_info("failed to allocate audio extcon microphone\n");
 			return;
 		}
 
-		/*
-		 * edev->dev.parent = dev;
-		 * edev->name = "audio_extcon_microphone";
-		 * dev_set_name(&edev->dev, "microphone");
-		 */
-		ret = devm_extcon_dev_register(dev, edev);
+		edev->dev.parent = dev;
+		edev->name = "audio_extcon_microphone";
+		dev_set_name(&edev->dev, "microphone");
+		ret = extcon_dev_register(edev);
 		if (ret < 0) {
 			pr_info("failed to register audio extcon microphone\n");
 			return;
@@ -487,6 +413,37 @@ static void aml_card_remove_jack(struct aml_jack *sjack)
 {
 	if (gpio_is_valid(sjack->gpio.gpio))
 		snd_soc_jack_free_gpios(&sjack->jack, 1, &sjack->gpio);
+}
+
+static int aml_card_startup(struct snd_pcm_substream *substream)
+{
+	struct snd_soc_pcm_runtime *rtd = substream->private_data;
+	struct aml_card_data *priv =	snd_soc_card_get_drvdata(rtd->card);
+	struct aml_dai_props *dai_props =
+		aml_priv_to_props(priv, rtd->num);
+	int ret;
+
+	ret = clk_prepare_enable(dai_props->cpu_dai.clk);
+	if (ret)
+		return ret;
+
+	ret = clk_prepare_enable(dai_props->codec_dai.clk);
+	if (ret)
+		clk_disable_unprepare(dai_props->cpu_dai.clk);
+
+	return ret;
+}
+
+static void aml_card_shutdown(struct snd_pcm_substream *substream)
+{
+	struct snd_soc_pcm_runtime *rtd = substream->private_data;
+	struct aml_card_data *priv =	snd_soc_card_get_drvdata(rtd->card);
+	struct aml_dai_props *dai_props =
+		aml_priv_to_props(priv, rtd->num);
+
+	clk_disable_unprepare(dai_props->cpu_dai.clk);
+
+	clk_disable_unprepare(dai_props->codec_dai.clk);
 }
 
 static int aml_card_hw_params(struct snd_pcm_substream *substream,
@@ -516,24 +473,18 @@ static int aml_card_hw_params(struct snd_pcm_substream *substream,
 			ret = snd_soc_dai_set_sysclk(codec_dai, 0, mclk,
 				SND_SOC_CLOCK_IN);
 
-			if (ret && ret != -ENOTSUPP) {
-				pr_err("codec_dai soc dai set sysclk failed\n");
+			if (ret && ret != -ENOTSUPP)
 				goto err;
-			}
 		}
 
 		ret = snd_soc_dai_set_sysclk(cpu_dai, clk_idx, mclk,
 					     SND_SOC_CLOCK_OUT);
-		if (ret && ret != -ENOTSUPP) {
-			pr_err("cpu_dai soc dai set sysclk failed\n");
+		if (ret && ret != -ENOTSUPP)
 			goto err;
-		}
 
 		ret = snd_soc_dai_set_fmt(cpu_dai, dai_link->dai_fmt);
-		if (ret && ret != -ENOTSUPP) {
-			pr_err("cpu_dai soc dai set fmt failed\n");
+		if (ret && ret != -ENOTSUPP)
 			goto err;
-		}
 	}
 
 	return 0;
@@ -542,6 +493,8 @@ err:
 }
 
 static struct snd_soc_ops aml_card_ops = {
+	.startup    = aml_card_startup,
+	.shutdown   = aml_card_shutdown,
 	.hw_params  = aml_card_hw_params,
 };
 
@@ -616,8 +569,8 @@ static int aml_card_dai_link_of(struct device_node *node,
 		goto dai_link_of_err;
 	}
 
-	dai_link->cpus->of_node = of_parse_phandle(cpu, DAI, 0);
-	if (!dai_link->cpus->of_node) {
+	dai_link->cpu_of_node = of_parse_phandle(cpu, DAI, 0);
+	if (!dai_link->cpu_of_node) {
 		dev_err(dev, "error getting cpu phandle\n");
 		return -EINVAL;
 	}
@@ -637,14 +590,17 @@ static int aml_card_dai_link_of(struct device_node *node,
 		dev_err(dev, "%s, dai-link idx:%d, error getting cpu dai name:%s\n",
 			__func__,
 			idx,
-			dai_link->cpus->dai_name);
+			dai_link->cpu_dai_name);
 		goto dai_link_of_err;
 	}
 
 	ret = snd_soc_of_get_dai_link_codecs(dev, codec, dai_link);
 
 	if (ret < 0) {
-		dev_err(dev, "%s, error dai-link idx:%d, ret %d\n", __func__, idx, ret);
+		dev_err(dev, "%s, dai-link idx:%d, error getting codec dai name:%s\n",
+			__func__,
+			idx,
+			dai_link->codec_dai_name);
 		goto dai_link_of_err;
 	}
 
@@ -688,16 +644,18 @@ static int aml_card_dai_link_of(struct device_node *node,
 	if (dai_props->suffix_name)
 		ret = aml_card_set_dailink_name(dev, dai_link,
 					"%s-%s-%s",
-					dai_link->cpus->dai_name,
+					dai_link->cpu_dai_name,
 					dai_link->codecs->dai_name,
 					dai_props->suffix_name);
 	else
 		ret = aml_card_set_dailink_name(dev, dai_link,
 					"%s-%s",
-					dai_link->cpus->dai_name,
+					dai_link->cpu_dai_name,
 					dai_link->codecs->dai_name);
 	if (ret < 0)
 		goto dai_link_of_err;
+
+	locker_add_dai_name(&priv->slocker, idx, dai_link->cpu_dai_name);
 
 	dai_link->ops = &aml_card_ops;
 	dai_link->init = aml_card_dai_init;
@@ -705,7 +663,7 @@ static int aml_card_dai_link_of(struct device_node *node,
 	dev_dbg(dev, "\tname : %s\n", dai_link->stream_name);
 	dev_dbg(dev, "\tformat : %04x\n", dai_link->dai_fmt);
 	dev_dbg(dev, "\tcpu : %s / %d\n",
-		dai_link->cpus->dai_name,
+		dai_link->cpu_dai_name,
 		dai_props->cpu_dai.sysclk);
 	dev_dbg(dev, "\tcodec : %s / %d\n",
 		dai_link->codecs->dai_name,
@@ -743,7 +701,7 @@ static int aml_card_parse_aux_devs(struct device_node *node,
 		aux_node = of_parse_phandle(node, PREFIX "aux-devs", i);
 		if (!aux_node)
 			return -EINVAL;
-		priv->snd_card.aux_dev[i].dlc.of_node = aux_node;
+		priv->snd_card.aux_dev[i].codec_of_node = aux_node;
 	}
 
 	priv->snd_card.num_aux_devs = n;
@@ -759,13 +717,11 @@ static int spk_mute_set(struct snd_kcontrol *kcontrol,
 	bool active_low = priv->spk_mute_active_low;
 	bool mute = ucontrol->value.integer.value[0];
 
-	priv->spk_mute_flag = mute;
-
 	if (gpio_is_valid(gpio)) {
 		bool value = active_low ? !mute : mute;
 
 		gpio_set_value(gpio, value);
-		pr_info("%s: mute flag = %d\n", __func__, mute);
+		pr_info("spk_mute_set: mute flag = %d\n", mute);
 	}
 
 	return 0;
@@ -789,10 +745,50 @@ static int spk_mute_get(struct snd_kcontrol *kcontrol,
 	return 0;
 }
 
+static int acodec_mute_set(struct snd_kcontrol *kcontrol,
+			  struct snd_ctl_elem_value *ucontrol)
+{
+	struct snd_soc_card *soc_card = snd_kcontrol_chip(kcontrol);
+	struct aml_card_data *priv = aml_card_to_priv(soc_card);
+	int gpio = priv->acodec_mute_gpio;
+	bool active_low = priv->acodec_mute_active_low;
+	bool mute = ucontrol->value.integer.value[0];
+
+	if (gpio_is_valid(gpio)) {
+		bool value = active_low ? !mute : mute;
+
+		gpio_set_value(gpio, value);
+		pr_info("acodec_mute_set: mute flag = %d\n", mute);
+	}
+
+	return 0;
+}
+
+static int acodec_mute_get(struct snd_kcontrol *kcontrol,
+			  struct snd_ctl_elem_value *ucontrol)
+{
+	struct snd_soc_card *soc_card = snd_kcontrol_chip(kcontrol);
+	struct aml_card_data *priv = aml_card_to_priv(soc_card);
+	int gpio = priv->acodec_mute_gpio;
+	bool active_low = priv->acodec_mute_active_low;
+
+	if (gpio_is_valid(gpio)) {
+		bool value = gpio_get_value(gpio);
+		bool mute = active_low ? !value : value;
+
+		ucontrol->value.integer.value[0] = mute;
+	}
+
+	return 0;
+}
+
 static const struct snd_kcontrol_new card_controls[] = {
 	SOC_SINGLE_BOOL_EXT("SPK mute", 0,
 			    spk_mute_get,
 			    spk_mute_set),
+	SOC_SINGLE_BOOL_EXT("ACODEC mute", 0,
+			    acodec_mute_get,
+			    acodec_mute_set),
 };
 
 static int aml_card_parse_gpios(struct device_node *node,
@@ -803,18 +799,16 @@ static int aml_card_parse_gpios(struct device_node *node,
 	enum of_gpio_flags flags;
 	int gpio;
 	bool active_low;
+	int ret;
+	unsigned int sleep_time = 500;
 
 	gpio = of_get_named_gpio_flags(node, "spk_mute-gpios", 0, &flags);
 	priv->spk_mute_gpio = gpio;
 
 	if (gpio_is_valid(gpio)) {
-		int  ret;
 		active_low = !!(flags & OF_GPIO_ACTIVE_LOW);
 		flags = active_low ? GPIOF_OUT_INIT_HIGH : GPIOF_OUT_INIT_LOW;
 		priv->spk_mute_active_low = active_low;
-
-		snd_soc_add_card_controls(soc_card, card_controls,
-						ARRAY_SIZE(card_controls));
 
 		if (priv->spk_mute_enable) {
 			gpio_set_value(priv->spk_mute_gpio,
@@ -822,29 +816,66 @@ static int aml_card_parse_gpios(struct device_node *node,
 				GPIOF_OUT_INIT_HIGH);
 		} else {
 			msleep(200);
-			if (!priv->spk_mute_flag)
+			gpio_set_value(priv->spk_mute_gpio,
+				(active_low) ? GPIOF_OUT_INIT_HIGH :
+				GPIOF_OUT_INIT_LOW);
+			}
+
+		ret = devm_gpio_request_one(dev, gpio, flags, "spk_mute");
+		if (!ret) {
+			if (priv->spk_mute_enable) {
+				gpio_set_value(priv->spk_mute_gpio,
+					(active_low) ? GPIOF_OUT_INIT_LOW :
+					GPIOF_OUT_INIT_HIGH);
+			} else {
+				msleep(200);
 				gpio_set_value(priv->spk_mute_gpio,
 					(active_low) ? GPIOF_OUT_INIT_HIGH :
 					GPIOF_OUT_INIT_LOW);
-		}
-
-		ret = devm_gpio_request_one(dev, gpio, flags, "spk_mute");
-		if (ret < 0) {
-			dev_err(dev, "spk_mute get gpio error!\n");
+			}
 		}
 	}
+
+	gpio = of_get_named_gpio_flags(node, "acodec_mute-gpios", 0, &flags);
+	priv->acodec_mute_gpio = gpio;
+	if (gpio_is_valid(gpio)) {
+		active_low = !!(flags & OF_GPIO_ACTIVE_LOW);
+		flags = active_low ? GPIOF_OUT_INIT_HIGH : GPIOF_OUT_INIT_LOW;
+		priv->acodec_mute_active_low = active_low;
+		ret = devm_gpio_request_one(dev, gpio, flags, "acodec_mute");
+		if (!ret) {
+			if (priv->acodec_mute_enable)
+				gpio_set_value(priv->acodec_mute_gpio,
+					(active_low) ? GPIOF_OUT_INIT_LOW :
+					GPIOF_OUT_INIT_HIGH);
+			else
+				gpio_set_value(priv->acodec_mute_gpio,
+					(active_low) ? GPIOF_OUT_INIT_HIGH :
+					GPIOF_OUT_INIT_LOW);
+		}
+	}
+
+	if (gpio_is_valid(priv->acodec_mute_gpio) ||
+		gpio_is_valid(priv->spk_mute_gpio))
+		snd_soc_add_card_controls(soc_card, card_controls,
+			ARRAY_SIZE(card_controls));
+
 	if (IS_ERR_OR_NULL(priv->avout_mute_desc)) {
 		priv->avout_mute_desc = gpiod_get(dev,
 					"avout_mute", GPIOF_OUT_INIT_LOW);
 	}
 	if (!IS_ERR(priv->avout_mute_desc)) {
 		if (!priv->av_mute_enable) {
-			msleep(500);
+			if (!of_property_read_u32(node,
+				"av_mute_sleep_time", &sleep_time))
+				msleep(sleep_time);
+			else
+				msleep(500);
 			gpiod_direction_output(priv->avout_mute_desc,
 				GPIOF_OUT_INIT_HIGH);
-			pr_info("av out status: %s\n",
+			pr_info("av out status: %s av_mute_sleep_time:%d\n",
 				gpiod_get_value(priv->avout_mute_desc) ?
-				"high" : "low");
+				"high" : "low", sleep_time);
 		} else {
 			gpiod_direction_output(priv->avout_mute_desc,
 				GPIOF_OUT_INIT_LOW);
@@ -936,38 +967,68 @@ card_parse_end:
 	return ret;
 }
 
+static struct aml_chipset_info g12a_chipset_info = {
+	.spdif_b        = true,
+	.eqdrc_fn       = true,
+};
+
+static struct aml_chipset_info tl1_chipset_info = {
+	.spdif_b        = true,
+};
+
 static const struct of_device_id auge_of_match[] = {
 	{
-		.compatible = "amlogic, auge-sound-card",
+		.compatible = "amlogic, axg-sound-card",
 	},
-	{}
+	{
+		.compatible = "amlogic, g12a-sound-card",
+		.data       = &g12a_chipset_info,
+	},
+	{
+		.compatible = "amlogic, tl1-sound-card",
+		.data       = &tl1_chipset_info,
+	},
+	{
+		.compatible = "amlogic, tm2-sound-card",
+		.data       = &tl1_chipset_info,
+	},
+	{},
 };
 MODULE_DEVICE_TABLE(of, auge_of_match);
 
 static int card_suspend_pre(struct snd_soc_card *card)
 {
 	struct aml_card_data *priv = snd_soc_card_get_drvdata(card);
-	struct device *dev = aml_priv_to_dev(priv);
 
 	priv->av_mute_enable = 1;
 	priv->spk_mute_enable = 1;
-	aml_card_parse_gpios(dev->of_node, priv);
-	pr_info("it is card_pre_suspend\n");
+	priv->acodec_mute_enable = 1;
+	INIT_WORK(&priv->init_work, aml_init_work);
+	schedule_work(&priv->init_work);
+
 	return 0;
 }
 
 static int card_resume_post(struct snd_soc_card *card)
 {
 	struct aml_card_data *priv = snd_soc_card_get_drvdata(card);
-	struct device *dev = aml_priv_to_dev(priv);
 
 	priv->av_mute_enable = 0;
 	priv->spk_mute_enable = 0;
-	aml_card_parse_gpios(dev->of_node, priv);
-	pr_info("it is card_post_resume\n");
+	priv->acodec_mute_enable = 0;
+	INIT_WORK(&priv->init_work, aml_init_work);
+	schedule_work(&priv->init_work);
+
 	return 0;
 
 }
+
+static const struct snd_kcontrol_new snd_controls[] = {
+	SOC_SINGLE_BOOL_EXT("Audio Debug",
+			    0,
+			    audio_debug_get,
+			    audio_debug_put),
+};
 
 static irqreturn_t aml_audio_exception64_isr(int irq, void *dev_id)
 {
@@ -1020,7 +1081,7 @@ static int aml_card_probe(struct platform_device *pdev)
 	struct aml_dai_props *dai_props;
 	struct device_node *np = pdev->dev.of_node;
 	struct device *dev = &pdev->dev;
-	int num, ret, i;
+	int num, ret;
 
 	/* Get the number of DAI links */
 	if (np && of_get_child_by_name(np, PREFIX "dai-link"))
@@ -1033,6 +1094,13 @@ static int aml_card_probe(struct platform_device *pdev)
 	if (!priv)
 		return -ENOMEM;
 
+	/* chipset related */
+	priv->chipinfo = (struct aml_chipset_info *)
+		of_device_get_match_data(&pdev->dev);
+
+	if (!priv->chipinfo)
+		pr_warn_once("check whether to update sound card init data\n");
+
 	dai_props = devm_kzalloc(dev, sizeof(*dai_props) * num, GFP_KERNEL);
 	dai_link  = devm_kzalloc(dev, sizeof(*dai_link)  * num, GFP_KERNEL);
 	if (!dai_props || !dai_link)
@@ -1041,15 +1109,6 @@ static int aml_card_probe(struct platform_device *pdev)
 	priv->dai_props			= dai_props;
 	priv->dai_link			= dai_link;
 
-	for (i = 0; i < num; i++) {
-		dai_link[i].cpus		= &dai_props[i].cpus;
-		dai_link[i].num_cpus		= 1;
-		dai_link[i].codecs		= &dai_props[i].codecs;
-		dai_link[i].num_codecs		= 1;
-		dai_link[i].platforms		= &dai_props[i].platforms;
-		dai_link[i].num_platforms	= 1;
-	}
-
 	/* Init snd_soc_card */
 	priv->snd_card.owner		= THIS_MODULE;
 	priv->snd_card.dev		= dev;
@@ -1057,8 +1116,11 @@ static int aml_card_probe(struct platform_device *pdev)
 	priv->snd_card.num_links	= num;
 	priv->snd_card.suspend_pre	= card_suspend_pre;
 	priv->snd_card.resume_post	= card_resume_post;
+	priv->snd_card.controls		= snd_controls;
+	priv->snd_card.num_controls	= ARRAY_SIZE(snd_controls);
 
 	if (np && of_device_is_available(np)) {
+
 		ret = aml_card_parse_of(np, priv);
 		if (ret < 0) {
 			dev_err(dev, "%s, aml_card_parse_of error %d %s\n",
@@ -1090,10 +1152,10 @@ static int aml_card_probe(struct platform_device *pdev)
 				(cinfo->card) ? cinfo->card : cinfo->name;
 		dai_link->name		= cinfo->name;
 		dai_link->stream_name	= cinfo->name;
-		dai_link->platforms->name	= cinfo->platform;
-		dai_link->codecs->name	= cinfo->codec;
-		dai_link->cpus->dai_name   = cinfo->cpu_dai.name;
-		dai_link->codecs->dai_name = cinfo->codec_dai.name;
+		dai_link->platform_name	= cinfo->platform;
+		dai_link->codec_name	= cinfo->codec;
+		dai_link->cpu_dai_name	= cinfo->cpu_dai.name;
+		dai_link->codec_dai_name = cinfo->codec_dai.name;
 		dai_link->dai_fmt	= cinfo->daifmt;
 		dai_link->init		= aml_card_dai_init;
 		memcpy(&priv->dai_props->cpu_dai, &cinfo->cpu_dai,
@@ -1123,18 +1185,24 @@ static int aml_card_probe(struct platform_device *pdev)
 		goto err;
 	}
 
-	card_add_effects_init(&priv->snd_card);
+	if (priv->chipinfo && priv->chipinfo->eqdrc_fn) {
+		pr_info("eq/drc v1 function enable\n");
+		ret = card_add_effects_init(&priv->snd_card);
+		if (ret < 0)
+			pr_warn_once("Failed to add audio effects v1 controls\n");
+	}
 
 	if (priv->hp_det_enable == 1 || priv->mic_det_enable == 1) {
+		priv->hp_detect_flag = -1;
+		priv->hp_last_state = -1;
+		priv->mic_detect_flag = -1;
+		priv->micphone_last_state = -1;
 		audio_jack_detect(priv);
 		audio_extcon_register(priv, dev);
 	}
-
-	snd_soc_add_card_controls(&priv->snd_card, snd_user_controls,
-				  ARRAY_SIZE(snd_user_controls));
-
 	priv->av_mute_enable = 0;
 	priv->spk_mute_enable = 0;
+	priv->acodec_mute_enable = 0;
 	INIT_WORK(&priv->init_work, aml_init_work);
 	schedule_work(&priv->init_work);
 
@@ -1168,7 +1236,9 @@ static void aml_card_platform_shutdown(struct platform_device *pdev)
 
 	priv->av_mute_enable = 1;
 	priv->spk_mute_enable = 1;
-	aml_card_parse_gpios(pdev->dev.of_node, priv);
+	priv->acodec_mute_enable = 1;
+	INIT_WORK(&priv->init_work, aml_init_work);
+	schedule_work(&priv->init_work);
 }
 
 static struct platform_driver aml_card = {
@@ -1182,21 +1252,9 @@ static struct platform_driver aml_card = {
 	.shutdown = aml_card_platform_shutdown,
 };
 
-int __init aml_card_init(void)
-{
-	return platform_driver_register(&aml_card);
-}
+module_platform_driver(aml_card);
 
-void __exit aml_card_exit(void)
-{
-	platform_driver_unregister(&aml_card);
-}
-
-#ifndef MODULE
-module_init(aml_card_init);
-module_exit(aml_card_exit);
 MODULE_ALIAS("platform:asoc-aml-card");
 MODULE_LICENSE("GPL v2");
 MODULE_DESCRIPTION("ASoC aml Sound Card");
 MODULE_AUTHOR("AMLogic, Inc.");
-#endif

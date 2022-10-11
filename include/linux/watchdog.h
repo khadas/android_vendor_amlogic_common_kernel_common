@@ -1,4 +1,3 @@
-/* SPDX-License-Identifier: GPL-2.0 */
 /*
  *	Generic watchdog defines. Derived from..
  *
@@ -90,6 +89,9 @@ struct watchdog_ops {
  *
  * The driver-data field may not be accessed directly. It must be accessed
  * via the watchdog_set_drvdata and watchdog_get_drvdata helpers.
+ *
+ * The lock field is for watchdog core internal use only and should not be
+ * touched.
  */
 struct watchdog_device {
 	int id;
@@ -115,10 +117,6 @@ struct watchdog_device {
 #define WDOG_NO_WAY_OUT		1	/* Is 'nowayout' feature set ? */
 #define WDOG_STOP_ON_REBOOT	2	/* Should be stopped on reboot */
 #define WDOG_HW_RUNNING		3	/* True if HW watchdog running */
-#define WDOG_STOP_ON_UNREGISTER	4	/* Should be stopped on unregister */
-#ifdef CONFIG_AMLOGIC_MODIFY
-#define WDOG_KERNEL_FEEDING	5	/* True if kernel feed watchdog */
-#endif
 	struct list_head deferred;
 };
 
@@ -130,16 +128,6 @@ static inline bool watchdog_active(struct watchdog_device *wdd)
 {
 	return test_bit(WDOG_ACTIVE, &wdd->status);
 }
-
-#ifdef CONFIG_AMLOGIC_MODIFY
-/* Use the following function to check whether or not the watchdog feed
- * mode is kernel
- */
-static inline bool watchdog_kernel_feeding(struct watchdog_device *wdd)
-{
-	return test_bit(WDOG_KERNEL_FEEDING, &wdd->status);
-}
-#endif
 
 /*
  * Use the following function to check whether or not the hardware watchdog
@@ -161,12 +149,6 @@ static inline void watchdog_set_nowayout(struct watchdog_device *wdd, bool noway
 static inline void watchdog_stop_on_reboot(struct watchdog_device *wdd)
 {
 	set_bit(WDOG_STOP_ON_REBOOT, &wdd->status);
-}
-
-/* Use the following function to stop the watchdog when unregistering it */
-static inline void watchdog_stop_on_unregister(struct watchdog_device *wdd)
-{
-	set_bit(WDOG_STOP_ON_UNREGISTER, &wdd->status);
 }
 
 /* Use the following function to check if a timeout value is invalid */

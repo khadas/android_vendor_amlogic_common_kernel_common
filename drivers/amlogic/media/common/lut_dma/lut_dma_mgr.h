@@ -1,6 +1,18 @@
-/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/amlogic/media/common/lut_dma/lut_dma_mgr.h
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
 #ifndef LUT_DMA_MGR_H_
@@ -77,10 +89,10 @@ struct lut_dma_ins {
 	unsigned char baddr_set;
 	u32 trigger_irq_type;
 	u32 rd_table_size[DMA_BUF_NUM];
-	ulong rd_phy_addr[DMA_BUF_NUM];
+	u32 rd_phy_addr[DMA_BUF_NUM];
 	u32 *rd_table_addr[DMA_BUF_NUM];
 	u32 wr_table_size[DMA_BUF_NUM];
-	ulong wr_phy_addr[DMA_BUF_NUM];
+	u32 wr_phy_addr[DMA_BUF_NUM];
 	u32 *wr_table_addr[DMA_BUF_NUM];
 	u32 wr_size[DMA_BUF_NUM];
 };
@@ -95,12 +107,10 @@ struct lut_dma_device_info {
 enum cpu_type_e {
 	MESON_CPU_MAJOR_ID_COMPATIBALE = 0x1,
 	MESON_CPU_MAJOR_ID_SC2_,
-	MESON_CPU_MAJOR_ID_T7_,
-	MESON_CPU_MAJOR_ID_UNKNOWN_,
+	MESON_CPU_MAJOR_ID_UNKNOWN,
 };
 
 struct lutdma_device_data_s {
 	enum cpu_type_e cpu_type;
-	int support_8G_addr;
 };
 #endif

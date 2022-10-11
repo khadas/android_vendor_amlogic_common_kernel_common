@@ -1,9 +1,12 @@
-// SPDX-License-Identifier: GPL-2.0-only
 /*
  * VFIO PCI config space virtualization
  *
  * Copyright (C) 2012 Red Hat, Inc.  All rights reserved.
  *     Author: Alex Williamson <alex.williamson@redhat.com>
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
  *
  * Derived from original vfio:
  * Copyright 2010 Cisco Systems, Inc.  All rights reserved.
@@ -27,6 +30,8 @@
 #include <linux/slab.h>
 
 #include "vfio_pci_private.h"
+
+#define PCI_CFG_SPACE_SIZE	256
 
 /* Fake capability ID for standard config space */
 #define PCI_CAP_ID_BASIC	0
@@ -147,7 +152,7 @@ static int vfio_user_config_read(struct pci_dev *pdev, int offset,
 
 	*val = cpu_to_le32(tmp_val);
 
-	return ret;
+	return pcibios_err_to_errno(ret);
 }
 
 static int vfio_user_config_write(struct pci_dev *pdev, int offset,
@@ -168,7 +173,7 @@ static int vfio_user_config_write(struct pci_dev *pdev, int offset,
 		break;
 	}
 
-	return ret;
+	return pcibios_err_to_errno(ret);
 }
 
 static int vfio_default_config_read(struct vfio_pci_device *vdev, int pos,
@@ -252,7 +257,7 @@ static int vfio_direct_config_read(struct vfio_pci_device *vdev, int pos,
 
 	ret = vfio_user_config_read(vdev->pdev, pos, val, count);
 	if (ret)
-		return ret;
+		return pcibios_err_to_errno(ret);
 
 	if (pos >= PCI_CFG_SPACE_SIZE) { /* Extended cap header mangling */
 		if (offset < 4)
@@ -290,7 +295,7 @@ static int vfio_raw_config_read(struct vfio_pci_device *vdev, int pos,
 
 	ret = vfio_user_config_read(vdev->pdev, pos, val, count);
 	if (ret)
-		return ret;
+		return pcibios_err_to_errno(ret);
 
 	return count;
 }
@@ -406,7 +411,7 @@ bool __vfio_pci_memory_enabled(struct vfio_pci_device *vdev)
 	 * PF SR-IOV capability, there's therefore no need to trigger
 	 * faults based on the virtual value.
 	 */
-	return pdev->no_command_memory || (cmd & PCI_COMMAND_MEMORY);
+	return pdev->is_virtfn || (cmd & PCI_COMMAND_MEMORY);
 }
 
 /*
@@ -423,7 +428,8 @@ static void vfio_bar_restore(struct vfio_pci_device *vdev)
 	if (pdev->is_virtfn)
 		return;
 
-	pci_info(pdev, "%s: reset recovery - restoring BARs\n", __func__);
+	pr_info("%s: %s reset recovery - restoring bars\n",
+		__func__, dev_name(&pdev->dev));
 
 	for (i = PCI_BASE_ADDRESS_0; i <= PCI_BASE_ADDRESS_5; i += 4, rbar++)
 		pci_user_write_config_dword(pdev, i, *rbar);
@@ -518,8 +524,8 @@ static int vfio_basic_config_read(struct vfio_pci_device *vdev, int pos,
 
 	count = vfio_default_config_read(vdev, pos, count, perm, offset, val);
 
-	/* Mask in virtual memory enable */
-	if (offset == PCI_COMMAND && vdev->pdev->no_command_memory) {
+	/* Mask in virtual memory enable for SR-IOV devices */
+	if (offset == PCI_COMMAND && vdev->pdev->is_virtfn) {
 		u16 cmd = le16_to_cpu(*(__le16 *)&vdev->vconfig[PCI_COMMAND]);
 		u32 tmp_val = le32_to_cpu(*val);
 
@@ -587,11 +593,9 @@ static int vfio_basic_config_write(struct vfio_pci_device *vdev, int pos,
 		 * shows it disabled (phys_mem/io, then the device has
 		 * undergone some kind of backdoor reset and needs to be
 		 * restored before we allow it to enable the bars.
-		 * SR-IOV devices will trigger this - for mem enable let's
-		 * catch this now and for io enable it will be caught later
+		 * SR-IOV devices will trigger this, but we catch them later
 		 */
-		if ((new_mem && virt_mem && !phys_mem &&
-		     !pdev->no_command_memory) ||
+		if ((new_mem && virt_mem && !phys_mem) ||
 		    (new_io && virt_io && !phys_io) ||
 		    vfio_need_bar_restore(vdev))
 			vfio_bar_restore(vdev);
@@ -713,7 +717,7 @@ static int vfio_pm_config_write(struct vfio_pci_device *vdev, int pos,
 			break;
 		}
 
-		vfio_pci_set_power_state(vdev, state);
+		pci_set_power_state(vdev->pdev, state);
 	}
 
 	return count;
@@ -886,7 +890,7 @@ static int vfio_exp_config_write(struct vfio_pci_device *vdev, int pos,
 /* Permissions for PCI Express capability */
 static int __init init_pci_cap_exp_perm(struct perm_bits *perm)
 {
-	/* Alloc largest of possible sizes */
+	/* Alloc larger of two possible sizes */
 	if (alloc_perm_bits(perm, PCI_CAP_EXP_ENDPOINT_SIZEOF_V2))
 		return -ENOMEM;
 
@@ -1140,7 +1144,7 @@ static int vfio_msi_config_write(struct vfio_pci_device *vdev, int pos,
 						 start + PCI_MSI_FLAGS,
 						 flags);
 		if (ret)
-			return ret;
+			return pcibios_err_to_errno(ret);
 	}
 
 	return count;
@@ -1298,16 +1302,11 @@ static int vfio_cap_len(struct vfio_pci_device *vdev, u8 cap, u8 pos)
 			vdev->extended_caps = (dword != 0);
 		}
 
-		/* length based on version and type */
-		if ((pcie_caps_reg(pdev) & PCI_EXP_FLAGS_VERS) == 1) {
-			if (pci_pcie_type(pdev) == PCI_EXP_TYPE_RC_END)
-				return 0xc; /* "All Devices" only, no link */
+		/* length based on version */
+		if ((pcie_caps_reg(pdev) & PCI_EXP_FLAGS_VERS) == 1)
 			return PCI_CAP_EXP_ENDPOINT_SIZEOF_V1;
-		} else {
-			if (pci_pcie_type(pdev) == PCI_EXP_TYPE_RC_END)
-				return 0x2c; /* No link */
+		else
 			return PCI_CAP_EXP_ENDPOINT_SIZEOF_V2;
-		}
 	case PCI_CAP_ID_HT:
 		ret = pci_read_config_byte(pdev, pos + 3, &byte);
 		if (ret)
@@ -1326,8 +1325,8 @@ static int vfio_cap_len(struct vfio_pci_device *vdev, u8 cap, u8 pos)
 		else
 			return PCI_SATA_SIZEOF_SHORT;
 	default:
-		pci_warn(pdev, "%s: unknown length for PCI cap %#x@%#x\n",
-			 __func__, cap, pos);
+		pr_warn("%s: %s unknown length for pci cap 0x%x@0x%x\n",
+			dev_name(&pdev->dev), __func__, cap, pos);
 	}
 
 	return 0;
@@ -1400,8 +1399,8 @@ static int vfio_ext_cap_len(struct vfio_pci_device *vdev, u16 ecap, u16 epos)
 		}
 		return PCI_TPH_BASE_SIZEOF;
 	default:
-		pci_warn(pdev, "%s: unknown length for PCI ecap %#x@%#x\n",
-			 __func__, ecap, epos);
+		pr_warn("%s: %s unknown length for pci ecap 0x%x@0x%x\n",
+			dev_name(&pdev->dev), __func__, ecap, epos);
 	}
 
 	return 0;
@@ -1507,8 +1506,8 @@ static int vfio_cap_init(struct vfio_pci_device *vdev)
 		}
 
 		if (!len) {
-			pci_info(pdev, "%s: hiding cap %#x@%#x\n", __func__,
-				 cap, pos);
+			pr_info("%s: %s hiding cap 0x%x\n",
+				__func__, dev_name(&pdev->dev), cap);
 			*prev = next;
 			pos = next;
 			continue;
@@ -1519,8 +1518,9 @@ static int vfio_cap_init(struct vfio_pci_device *vdev)
 			if (likely(map[pos + i] == PCI_CAP_ID_INVALID))
 				continue;
 
-			pci_warn(pdev, "%s: PCI config conflict @%#x, was cap %#x now cap %#x\n",
-				 __func__, pos + i, map[pos + i], cap);
+			pr_warn("%s: %s pci config conflict @0x%x, was cap 0x%x now cap 0x%x\n",
+				__func__, dev_name(&pdev->dev),
+				pos + i, map[pos + i], cap);
 		}
 
 		BUILD_BUG_ON(PCI_CAP_ID_MAX >= PCI_CAP_ID_INVALID_VIRT);
@@ -1576,13 +1576,13 @@ static int vfio_ecap_init(struct vfio_pci_device *vdev)
 			if (len == 0xFF) {
 				len = vfio_ext_cap_len(vdev, ecap, epos);
 				if (len < 0)
-					return len;
+					return ret;
 			}
 		}
 
 		if (!len) {
-			pci_info(pdev, "%s: hiding ecap %#x@%#x\n",
-				 __func__, ecap, epos);
+			pr_info("%s: %s hiding ecap 0x%x@0x%x\n",
+				__func__, dev_name(&pdev->dev), ecap, epos);
 
 			/* If not the first in the chain, we can skip over it */
 			if (prev) {
@@ -1604,8 +1604,9 @@ static int vfio_ecap_init(struct vfio_pci_device *vdev)
 			if (likely(map[epos + i] == PCI_CAP_ID_INVALID))
 				continue;
 
-			pci_warn(pdev, "%s: PCI config conflict @%#x, was ecap %#x now ecap %#x\n",
-				 __func__, epos + i, map[epos + i], ecap);
+			pr_warn("%s: %s pci config conflict @0x%x, was ecap 0x%x now ecap 0x%x\n",
+				__func__, dev_name(&pdev->dev),
+				epos + i, map[epos + i], ecap);
 		}
 
 		/*
@@ -1734,14 +1735,12 @@ int vfio_config_init(struct vfio_pci_device *vdev)
 				 vconfig[PCI_INTERRUPT_PIN]);
 
 		vconfig[PCI_INTERRUPT_PIN] = 0; /* Gratuitous for good VFs */
-	}
-	if (pdev->no_command_memory) {
+
 		/*
-		 * VFs and devices that set pdev->no_command_memory do not
-		 * implement the memory enable bit of the COMMAND register
-		 * therefore we'll not have it set in our initial copy of
-		 * config space after pci_enable_device().  For consistency
-		 * with PFs, set the virtual enable bit here.
+		 * VFs do no implement the memory enable bit of the COMMAND
+		 * register therefore we'll not have it set in our initial
+		 * copy of config space after pci_enable_device().  For
+		 * consistency with PFs, set the virtual enable bit here.
 		 */
 		*(__le16 *)&vconfig[PCI_COMMAND] |=
 					cpu_to_le16(PCI_COMMAND_MEMORY);

@@ -1,6 +1,18 @@
-/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * include/linux/amlogic/meson_uvm_core.h
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
 #ifndef __MESON_UVM_H
@@ -27,8 +39,7 @@ enum uvm_alloc_flag {
 	UVM_DELAY_ALLOC,
 	UVM_FAKE_ALLOC,
 	UVM_SECURE_ALLOC,
-	UVM_SKIP_REALLOC,
-	UVM_DETACH_FLAG = 30
+	UVM_SKIP_REALLOC
 };
 
 /**
@@ -52,8 +63,6 @@ struct uvm_handle {
 	struct kref ref;
 	/* protects the uvm_handle fields */
 	struct mutex lock;
-	/* protects the whole operation of detaching hook mod */
-	struct mutex detachlock;
 
 	struct uvm_alloc *ua;
 	struct dma_buf *dmabuf;
@@ -103,8 +112,10 @@ struct uvm_alloc {
 	int scalar;
 	struct uvm_buf_obj *obj;
 	void (*free)(struct uvm_buf_obj *obj);
-	int (*delay_alloc)(struct dma_buf *dmabuf, struct uvm_buf_obj *obj);
-	int (*gpu_realloc)(struct dma_buf *dmabuf, struct uvm_buf_obj *obj, int scalar);
+	int (*delay_alloc)(struct dma_buf *dmabuf,
+			struct uvm_buf_obj *obj, u64 *flag);
+	int (*gpu_realloc)(struct dma_buf *dmabuf,
+			struct uvm_buf_obj *obj, int scalar);
 };
 
 struct uvm_alloc_info {
@@ -114,8 +125,10 @@ struct uvm_alloc_info {
 	struct sg_table *sgt;
 	struct uvm_buf_obj *obj;
 	void (*free)(struct uvm_buf_obj *obj);
-	int (*delay_alloc)(struct dma_buf *dmabuf, struct uvm_buf_obj *obj);
-	int (*gpu_realloc)(struct dma_buf *dmabuf, struct uvm_buf_obj *obj, int scalar);
+	int (*delay_alloc)(struct dma_buf *dmabuf,
+			struct uvm_buf_obj *obj, u64 *flag);
+	int (*gpu_realloc)(struct dma_buf *dmabuf,
+			struct uvm_buf_obj *obj, int scalar);
 };
 
 enum uvm_hook_mod_type {
@@ -124,10 +137,7 @@ enum uvm_hook_mod_type {
 	VF_PROCESS_V4LVIDEO,
 	VF_PROCESS_DI,
 	VF_PROCESS_VIDEOCOMPOSER,
-	VF_PROCESS_DECODER,
-	PROCESS_NN,
-	PROCESS_GRALLOC,
-	PROCESS_INVALID
+	VF_PROCESS_DECODER
 };
 
 /**
@@ -145,8 +155,6 @@ struct uvm_hook_mod {
 	enum uvm_hook_mod_type type;
 	void *arg;
 	void (*free)(void *arg);
-	int (*getinfo)(void *arg, char *buf);
-	int (*setinfo)(void *arg, char *buf);
 	struct sync_fence *acquire_fence;
 	struct list_head list;
 };
@@ -155,8 +163,6 @@ struct uvm_hook_mod_info {
 	enum uvm_hook_mod_type type;
 	void *arg;
 	void (*free)(void *arg);
-	int (*getinfo)(void *arg, char *buf);
-	int (*setinfo)(void *arg, char *buf);
 	struct sync_fence *acquire_fence;
 };
 
@@ -187,11 +193,6 @@ int uvm_attach_hook_mod(struct dma_buf *dmabuf,
 			struct uvm_hook_mod_info *info);
 int uvm_detach_hook_mod(struct dma_buf *dmabuf,
 			int type);
-
-int meson_uvm_getinfo(int shared_fd,
-			int mode_type, char *buf);
-int meson_uvm_setinfo(int shared_fd,
-			int mode_type, char *buf);
 
 struct uvm_hook_mod *uvm_get_hook_mod(struct dma_buf *dmabuf,
 				      int type);

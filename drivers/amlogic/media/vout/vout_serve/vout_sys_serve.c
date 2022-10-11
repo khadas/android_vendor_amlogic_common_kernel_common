@@ -1,6 +1,18 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/amlogic/media/vout/vout_serve/vout_sys_serve.c
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
 #include <linux/version.h>
@@ -16,7 +28,6 @@
 #include <linux/of_device.h>
 #include <linux/amlogic/iomap.h>
 #include <linux/amlogic/media/vout/vout_notify.h>
-#include <linux/amlogic/gki_module.h>
 
 #define VSPR(fmt, args...)     pr_info("vout sys: " fmt "", ## args)
 #define VSERR(fmt, args...)    pr_err("vout sys: error: " fmt "", ## args)
@@ -176,7 +187,7 @@ static struct platform_driver aml_vs_driver = {
 	},
 };
 
-int __init vout_sys_serve_init(void)
+static int __init aml_vs_init_module(void)
 {
 	int ret = 0;
 
@@ -188,11 +199,14 @@ int __init vout_sys_serve_init(void)
 	return ret;
 }
 
-__exit void vout_sys_serve_exit(void)
+static __exit void aml_vs_exit_module(void)
 {
 	platform_driver_unregister(&aml_vs_driver);
 }
 
-//MODULE_AUTHOR("Evoke Zhang <evoke.zhang@amlogic.com>");
-//MODULE_DESCRIPTION("VOUT_SYS Server Module");
-//MODULE_LICENSE("GPL");
+subsys_initcall(aml_vs_init_module);
+module_exit(aml_vs_exit_module);
+
+MODULE_AUTHOR("Evoke Zhang <evoke.zhang@amlogic.com>");
+MODULE_DESCRIPTION("VOUT_SYS Server Module");
+MODULE_LICENSE("GPL");

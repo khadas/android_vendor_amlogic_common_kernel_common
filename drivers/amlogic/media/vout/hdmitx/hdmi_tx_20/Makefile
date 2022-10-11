@@ -1,10 +1,15 @@
-$(MEDIA_MODULE_NAME)-$(CONFIG_AMLOGIC_HDMITX) += vout/hdmitx/hdmi_tx_20/hdmi_tx_main.o
-$(MEDIA_MODULE_NAME)-$(CONFIG_AMLOGIC_HDMITX) += vout/hdmitx/hdmi_tx_20/hdmi_tx_video.o
-$(MEDIA_MODULE_NAME)-$(CONFIG_AMLOGIC_HDMITX) += vout/hdmitx/hdmi_tx_20/hdmi_tx_audio.o
-$(MEDIA_MODULE_NAME)-$(CONFIG_AMLOGIC_HDMITX) += vout/hdmitx/hdmi_tx_20/hdmi_tx_edid.o
-$(MEDIA_MODULE_NAME)-$(CONFIG_AMLOGIC_HDMITX) += vout/hdmitx/hdmi_tx_20/hdmi_tx_compliance.o
-$(MEDIA_MODULE_NAME)-$(CONFIG_AMLOGIC_HDMITX) += vout/hdmitx/hdmi_tx_20/hdmi_tx_audio.o
-$(MEDIA_MODULE_NAME)-$(CONFIG_AMLOGIC_HDMITX) += vout/hdmitx/hdmi_tx_20/hdmi_tx_hdcp.o
-$(MEDIA_MODULE_NAME)-$(CONFIG_AMLOGIC_HDMITX) += vout/hdmitx/hdmi_tx_20/hdmi_tx_scdc.o
+obj-$(CONFIG_AMLOGIC_HDMITX)		+= hdmitx20.o
 
-include drivers/amlogic/media/vout/hdmitx/hdmi_tx_20/hw/Makefile
+ifdef CONFIG_DRM_MESON_HDMI
+hdmitx20-objs := hdmi_tx_main_drm.o
+else
+hdmitx20-objs := hdmi_tx_main.o
+endif
+
+hdmitx20-objs += hdmi_tx_video.o hdmi_tx_audio.o hdmi_tx_edid.o \
+		 hdmi_tx_audio.o hdmi_tx_hdcp.o hdmi_tx_scdc.o dv_emp_vsem.o hdmi_tx_compliance.o \
+		 hdmi_tx_calibration.o
+
+obj-$(CONFIG_AMLOGIC_HDMITX) += hw/
+
+#EXTRA_CFLAGS += -O2

@@ -1,4 +1,3 @@
-/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
  * drivers/amlogic/media/vin/tvin/vdin/vdin_afbce.h
  *
@@ -309,19 +308,19 @@
 
 #define AFBCE_MMU_RMIF_RO_STAT    0x41c6
 
-void vdin_write_mif_or_afbce_init(struct vdin_dev_s *devp);
-void vdin_write_mif_or_afbce(struct vdin_dev_s *devp,
-			     enum vdin_output_mif_e sel);
-void vdin_afbce_update(struct vdin_dev_s *devp);
-void vdin_afbce_config(struct vdin_dev_s *devp);
-void vdin_afbce_maptable_init(struct vdin_dev_s *devp);
-void vdin_afbce_set_next_frame(struct vdin_dev_s *devp,
-			       unsigned int rdma_enable, struct vf_entry *vfe);
-void vdin_afbce_clear_writedown_flag(struct vdin_dev_s *devp);
-int vdin_afbce_read_writedown_flag(void);
-void vdin_afbce_soft_reset(void);
-void vdin_afbce_mode_init(struct vdin_dev_s *devp);
-void vdin_afbce_mode_update(struct vdin_dev_s *devp);
+extern void vdin_write_mif_or_afbce_init(struct vdin_dev_s *devp);
+extern void vdin_write_mif_or_afbce(struct vdin_dev_s *devp,
+	enum vdin_output_mif_e sel);
+extern void vdin_afbce_update(struct vdin_dev_s *devp);
+extern void vdin_afbce_config(struct vdin_dev_s *devp);
+extern void vdin_afbce_maptable_init(struct vdin_dev_s *devp);
+extern void vdin_afbce_set_next_frame(struct vdin_dev_s *devp,
+	unsigned int rdma_enable, struct vf_entry *vfe);
+extern void vdin_afbce_clear_writedown_flag(struct vdin_dev_s *devp);
+extern int vdin_afbce_read_writedown_flag(void);
+extern void vdin_afbce_soft_reset(void);
+extern void vdin_afbce_mode_init(struct vdin_dev_s *devp);
+extern void vdin_afbce_mode_update(struct vdin_dev_s *devp);
 bool vdin_chk_is_comb_mode(struct vdin_dev_s *devp);
 #endif
 

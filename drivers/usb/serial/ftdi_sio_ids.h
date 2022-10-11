@@ -1,4 +1,3 @@
-/* SPDX-License-Identifier: GPL-2.0 */
 /*
  * vendor/product IDs (VID/PID) of devices using FTDI USB serial converters.
  * Please keep numerically sorted within individual areas, thanks!
@@ -1566,13 +1565,6 @@
  */
 #define UNJO_VID			0x22B7
 #define UNJO_ISODEBUG_V1_PID		0x150D
-
-/*
- * IDS GmbH
- */
-#define IDS_VID				0x2CAF
-#define IDS_SI31A_PID			0x13A2
-#define IDS_CM31A_PID			0x13A3
 
 /*
  * U-Blox products (http://www.u-blox.com).

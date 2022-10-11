@@ -43,7 +43,7 @@
 #include <linux/of_fdt.h>
 #include <linux/amlogic/media/vfm/vframe.h>
 #include <linux/amlogic/media/vpu/vpu.h>	//VPU_MEM_POWER_ON
-#include "../deinterlace/di_pqa.h"
+#include "di_pqa.h"
 
 /*for di_ext_ops*/
 /*#include <linux/amlogic/media/video_sink/video.h> */
@@ -213,15 +213,15 @@ EXPORT_SYMBOL(dil_get_flg);
 
 void ext_switch_vpu_mem_pd_vmod(unsigned int vmod, bool on)
 {
-	//switch_vpu_mem_pd_vmod(vmod,
-			       //on ? VPU_MEM_POWER_ON : VPU_MEM_POWER_DOWN);
+	switch_vpu_mem_pd_vmod(vmod,
+			       on ? VPU_MEM_POWER_ON : VPU_MEM_POWER_DOWN);
 }
 
 const struct ext_ops_s ext_ops_4_di = {
 	.switch_vpu_mem_pd_vmod		= ext_switch_vpu_mem_pd_vmod,
 	/*no use ?*/
 /*	.vf_get_receiver_name		= vf_get_receiver_name,*/
-	//.switch_vpu_clk_gate_vmod	= switch_vpu_clk_gate_vmod,
+	.switch_vpu_clk_gate_vmod	= switch_vpu_clk_gate_vmod,
 	.get_current_vscale_skip_count	= get_current_vscale_skip_count,
 	.cvs_alloc_table = canvas_pool_alloc_canvas_table,
 	.cvs_free_table	= canvas_pool_free_canvas_table,
@@ -239,18 +239,17 @@ EXPORT_SYMBOL(dil_attch_ext_api);
  * reserved mem for di *
  **************************************/
 
-int __init rmem_dil_init(struct reserved_mem *rmem,
-			 struct device *dev)
+static int __init rmem_dil_init(struct reserved_mem *rmem,
+				struct device *dev)
 {
 	struct dil_dev_s *devp = dev_get_drvdata(dev);
 
 	if (devp) {
 		devp->mem_start = rmem->base;
 		devp->mem_size = rmem->size;
-	#ifdef MARK_HIS//mark for ko can't use the reserved mem
 		if (!of_get_flat_dt_prop(rmem->fdt_node, "no-map", NULL))
 			devp->flg_map = 1;
-	#endif
+
 #ifdef MARK_HIS
 		o_size = rmem->size / DI_CHANNEL_NUB;
 
@@ -367,7 +366,8 @@ static struct platform_driver dev_driver_tab = {
 
 };
 
-int __init dil_init(void)
+#ifdef MARK_HIS
+int dil_init(void)
 {
 	PR_INF("%s.\n", __func__);
 	if (platform_driver_register(&dev_driver_tab)) {
@@ -378,12 +378,35 @@ int __init dil_init(void)
 	return 0;
 }
 
-void __exit dil_exit(void)
+void dil_exit(void)
+{
+	platform_driver_unregister(&dev_driver_tab);
+	PR_INF("%s: ok.\n", __func__);
+}
+#else
+static int __init dil_init(void)
+{
+	PR_INF("%s.\n", __func__);
+	if (platform_driver_register(&dev_driver_tab)) {
+		PR_ERR("%s: can't register\n", __func__);
+		return -ENODEV;
+	}
+	PR_INF("%s ok.\n", __func__);
+	return 0;
+}
+
+static void __exit dil_exit(void)
 {
 	platform_driver_unregister(&dev_driver_tab);
 	PR_INF("%s: ok.\n", __func__);
 }
 
-//MODULE_DESCRIPTION("AMLOGIC DI_LOCAL driver");
-//MODULE_LICENSE("GPL");
-//MODULE_VERSION("4.0.0");
+module_init(dil_init);
+module_exit(dil_exit);
+
+MODULE_DESCRIPTION("AMLOGIC DI_LOCAL driver");
+MODULE_LICENSE("GPL");
+MODULE_VERSION("4.0.0");
+
+#endif
+

@@ -1,6 +1,18 @@
-/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/amlogic/media/di_multi/di_mem_sct_def.h
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
 #ifndef __DI_MEM_SCT_DEF_H__
@@ -17,8 +29,9 @@ void *decoder_mmu_box_alloc_box(const char *name,
 
 //int decoder_mmu_box_sc_check(void *handle, int is_tvp);
 
-int decoder_mmu_box_alloc_idx(void *handle, int idx, int num_pages,
-			      unsigned int *mmu_index_adr);
+int decoder_mmu_box_alloc_idx(
+	void *handle, int idx, int num_pages,
+	unsigned int *mmu_index_adr);
 
 int decoder_mmu_box_free_idx_tail(void *handle, int idx,
 	int start_release_index);
@@ -43,8 +56,9 @@ void *di_mmu_box_alloc_box(const char *name,
 
 //int decoder_mmu_box_sc_check(void *handle, int is_tvp);
 
-int di_mmu_box_alloc_idx(void *handle, int idx, int num_pages,
-			 unsigned int *mmu_index_adr);
+int di_mmu_box_alloc_idx(
+	void *handle, int idx, int num_pages,
+	unsigned int *mmu_index_adr);
 
 int di_mmu_box_free_idx_tail(void *handle, int idx,
 	int start_release_index);

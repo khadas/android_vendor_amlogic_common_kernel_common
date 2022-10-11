@@ -18,3 +18,9 @@ menuconfig AMLOGIC_UVM_ALLOCATOR
 	  say y to enable amlogic uvm allocator device driver.
 	  gralloc will call it to allocate dmabuf fd.
 
+menuconfig AMLOGIC_ION_DELAY_ALLOC
+	bool "Amlogic ion delay alloc device driver"
+	default n
+	help
+	  say y to enable amlogic ion delay alloc device driver.
+	  Android Q gralloc will call it to implement delay alloc.

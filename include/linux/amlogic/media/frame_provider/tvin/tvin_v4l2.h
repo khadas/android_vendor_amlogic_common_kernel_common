@@ -1,6 +1,18 @@
-/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * include/linux/amlogic/media/frame_provider/tvin/tvin_v4l2.h
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
 #ifndef __TVIN_V4L2_H
@@ -135,6 +147,17 @@ enum camera_focus_mode_e {
 	CAM_FOCUS_MODE_CONTI_PIC,
 };
 
+/* removed this when move to new v4l2 */
+#define V4L2_CID_AUTO_FOCUS_START               (V4L2_CID_CAMERA_CLASS_BASE+28)
+#define V4L2_CID_AUTO_FOCUS_STOP                (V4L2_CID_CAMERA_CLASS_BASE+29)
+#define V4L2_CID_AUTO_FOCUS_STATUS              (V4L2_CID_CAMERA_CLASS_BASE+30)
+#define V4L2_AUTO_FOCUS_STATUS_IDLE             (0 << 0)
+#define V4L2_AUTO_FOCUS_STATUS_BUSY             (1 << 0)
+#define V4L2_AUTO_FOCUS_STATUS_REACHED          (1 << 1)
+#define V4L2_AUTO_FOCUS_STATUS_FAILED           (1 << 2)
+
+/* removed this when move to new v4l2 */
+
 enum camera_night_mode_flip_e {
 	CAM_NM_AUTO = 0,
 	CAM_NM_ENABLE,
@@ -232,8 +255,7 @@ enum cam_command_e {
 	/* bypass isp for raw data */
 	CMD_ISP_BYPASS,
 };
-
-const char *cam_cmd_to_str(enum cam_command_e cmd);
+extern const char *cam_cmd_to_str(enum cam_command_e cmd);
 
 /* ---------- xml struct ---------- */
 
@@ -600,9 +622,9 @@ struct cam_function_s {
 	unsigned int (*get_aet_max_gain)(void *priv);
 	unsigned int (*get_aet_max_step)(void *priv);
 	unsigned int (*get_aet_gain_by_step)(void *priv,
-					     unsigned int new_step);
+		unsigned int new_step);
 	 bool (*set_aet_new_step)(void *priv, unsigned int new_step,
-				  bool exp_mode, bool ag_mode);
+		bool exp_mode, bool ag_mode);
 	 bool (*check_mains_freq)(void *priv);
 	void *priv_data;
 };
@@ -670,12 +692,12 @@ enum vdin_format_convert_e {
 	VDIN_FORMAT_CONVERT_YUV_YUV444,
 	VDIN_FORMAT_CONVERT_YUV_RGB,
 	VDIN_FORMAT_CONVERT_YUV_GBR,
-	VDIN_FORMAT_CONVERT_YUV_BRG,/* 5 */
+	VDIN_FORMAT_CONVERT_YUV_BRG,
 	VDIN_FORMAT_CONVERT_RGB_YUV422,
 	VDIN_FORMAT_CONVERT_GBR_YUV422,
 	VDIN_FORMAT_CONVERT_BRG_YUV422,
 	VDIN_FORMAT_CONVERT_RGB_YUV444,
-	VDIN_FORMAT_CONVERT_RGB_RGB,/* 10 */
+	VDIN_FORMAT_CONVERT_RGB_RGB,
 	VDIN_FORMAT_CONVERT_YUV_NV12,
 	VDIN_FORMAT_CONVERT_YUV_NV21,
 	VDIN_FORMAT_CONVERT_RGB_NV12,
@@ -720,9 +742,12 @@ enum cam_interface_e {
 	CAM_MIPI,
 };
 
-#define PARAM_STATE_NULL			0x00000000
-#define PARAM_STATE_HISTGRAM		0x00000001
-#define PARAM_STATE_SCREENCAP		0x00000002
+enum param_flag {
+	PARAM_STATE_NULL		= 0x00000000,
+	PARAM_STATE_HISTGRAM		= 0x00000001,
+	PARAM_STATE_SCREENCAP		= 0x00000002,
+	PARAM_STATE_WR_MEM_ORDER_STD	= 0x00000004,
+};
 
 /* *********************************************************************** */
 
@@ -797,7 +822,7 @@ struct vdin_parm_s {
 	struct csi_parm_s csi_hw_info;
 
 	/*for reserved */
-	uintptr_t reserved;
+	uintptr_t reserved;	/* enum param_flag */
 };
 
 struct fe_arg_s {
@@ -814,13 +839,12 @@ struct vdin_v4l2_ops_s {
 	int (*tvin_fe_func)(int no, struct fe_arg_s *arg); /* for isp command */
 	int (*tvin_vdin_func)(int no, struct vdin_arg_s *arg);
 	void *private;
-	int (*start_tvin_service_ex)(int devnum, int port, struct vdin_parm_s *para);
 };
 
 /*
  *macro defined applied to camera driver is ending
  */
-int v4l2_vdin_ops_init(struct vdin_v4l2_ops_s *vdin_v4l2p);
-struct vdin_v4l2_ops_s *get_vdin_v4l2_ops(void);
-int vdin_reg_v4l2(struct vdin_v4l2_ops_s *ops);
+extern int v4l2_vdin_ops_init(struct vdin_v4l2_ops_s *vdin_v4l2p);
+extern struct vdin_v4l2_ops_s *get_vdin_v4l2_ops(void);
+extern int vdin_reg_v4l2(struct vdin_v4l2_ops_s *ops);
 #endif

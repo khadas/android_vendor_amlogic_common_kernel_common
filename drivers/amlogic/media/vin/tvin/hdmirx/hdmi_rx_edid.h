@@ -1,8 +1,19 @@
-/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/amlogic/media/vin/tvin/hdmirx/hdmi_rx_edid.h
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
-
 #ifndef _HDMI_RX_EDID_H_
 #define _HDMI_RX_EDID_H_
 
@@ -70,7 +81,7 @@
 #define DB_LEN_MAX 32
 /* short audio descriptor length */
 #define SAD_LEN 3
-#define BLK_LENGTH(a) ((a) & 0x1F)
+#define BLK_LENGTH(a) (a & 0x1F)
 /* maximum VSVDB length is VSVDB V0: 26bytes */
 #define VSVDB_LEN	26
 #define MAX_AUDIO_BLK_LEN 31
@@ -98,7 +109,7 @@ enum edid_tag_e {
 	EDID_TAG_AUDIO = 1,
 	EDID_TAG_VIDEO = 2,
 	EDID_TAG_VENDOR = 3,
-	EDID_TAG_HDR = ((0x7 << 8) | 6),
+	EDID_TAG_HDR = ((0x7<<8)|6),
 };
 
 enum edid_delivery_mothed_e {
@@ -168,13 +179,11 @@ struct detailed_timing_desc {
 	unsigned int hactive;
 	unsigned int vactive;
 };
-
 struct video_db_s {
 	/* video data block: 31 bytes long maximum*/
 	unsigned char svd_num;
 	unsigned char hdmi_vic[31];
 };
-
 /* audio data block*/
 struct audio_db_s {
 	/* support for below audio format:
@@ -271,8 +280,8 @@ struct vsdb_s {
 	unsigned char hdmi_smpte_sup;
 
 	/*3D*/
-	u16 _3d_struct_all;
-	u16 _3d_mask_15_0;
+	uint16_t _3d_struct_all;
+	uint16_t _3d_mask_15_0;
 	struct specific_vic_3d _2d_vic[16];
 	unsigned char _2d_vic_num;
 };
@@ -300,12 +309,12 @@ struct hf_vsdb_s {
 struct colorimetry_db_s {
 	unsigned char BT2020_RGB:1;
 	unsigned char BT2020_YCC:1;
-	unsigned char bt2020_cycc:1;
-	unsigned char adobe_rgb:1;
-	unsigned char adobe_ycc601:1;
-	unsigned char sycc601:1;
-	unsigned char xvycc709:1;
-	unsigned char xvycc601:1;
+	unsigned char BT2020_cYCC:1;
+	unsigned char Adobe_RGB:1;
+	unsigned char Adobe_YCC601:1;
+	unsigned char sYCC601:1;
+	unsigned char xvYCC709:1;
+	unsigned char xvYCC601:1;
 
 	unsigned char resvd:4;
 	/* MDX: designated for future gamut-related metadata. As yet undefined,
@@ -381,23 +390,23 @@ struct dv_vsvdb_s {
 	unsigned char colormetry:1;
 
 	unsigned char resvrd;
-	u16 Rx;
-	u16 Ry;
-	u16 Gx;
-	u16 Gy;
-	u16 Bx;
-	u16 By;
-	u16 Wx;
-	u16 Wy;
-	u16 tminPQ;
-	u16 tmaxPQ;
-	u8 dm_major_ver;
-	u8 dm_minor_ver;
+	uint16_t Rx;
+	uint16_t Ry;
+	uint16_t Gx;
+	uint16_t Gy;
+	uint16_t Bx;
+	uint16_t By;
+	uint16_t Wx;
+	uint16_t Wy;
+	uint16_t tminPQ;
+	uint16_t tmaxPQ;
+	uint8_t dm_major_ver;
+	uint8_t dm_minor_ver;
 };
 
 struct cta_data_blk_info {
 	unsigned char cta_blk_index;
-	u16 tag_code;
+	uint16_t tag_code;
 	unsigned char offset;
 	unsigned char blk_len;
 };
@@ -481,7 +490,7 @@ struct edid_info_s {
 	/* 54 + 18 * x */
 	unsigned char monitor_name[13];
 	unsigned int max_sup_pixel_clk;
-	u8 extension_flag;
+	uint8_t extension_flag;
 	/* 127 */
 	unsigned char block0_chk_sum;
 
@@ -493,7 +502,7 @@ struct edid_info_s {
 };
 
 struct cta_blk_pair {
-	u16 tag_code;
+	uint16_t tag_code;
 	char *blk_name;
 };
 
@@ -645,8 +654,7 @@ enum hdmi_vic_e {
 	HDMI_2160p30_64x27 = 105,
 	HDMI_2160p50_64x27 = 106,
 	HDMI_2160p60_64x27 = 107,
-	HDMI_720x480i = 108,
-	HDMI_RESERVED = 109,
+	HDMI_RESERVED = 108,
 	/* VIC 108~255: Reserved for the Future */
 
 	/* the following VICs are for y420 mode,
@@ -727,38 +735,37 @@ unsigned char rx_parse_arc_aud_type(const unsigned char *buff);
 bool hdmi_rx_top_edid_update(void);
 unsigned char rx_get_edid_index(void);
 unsigned char *rx_get_edid(int edid_index);
-void edid_parse_block0(u8 *p_edid, struct edid_info_s *edid_info);
-void edid_parse_cea_ext_block(u8 *p_edid,
-			      struct cea_ext_parse_info *blk_parse_info);
-void rx_edid_parse(u8 *p_edid, struct edid_info_s *edid_info);
+void edid_parse_block0(uint8_t *p_edid, struct edid_info_s *edid_info);
+void edid_parse_cea_ext_block(uint8_t *p_edid,
+	struct cea_ext_parse_info *blk_parse_info);
+void rx_edid_parse(uint8_t *p_edid, struct edid_info_s *edid_info);
 void rx_edid_parse_print(struct edid_info_s *edid_info);
 void rx_blk_index_print(struct cta_blk_parse_info *blk_info);
-int rx_edid_free_size(u8 *cur_edid, int size);
+int rx_edid_free_size(uint8_t *cur_edid, int size);
 unsigned char rx_edid_total_free_size(unsigned char *cur_edid,
-				      unsigned int size);
+	unsigned int size);
 unsigned char rx_get_cea_dtd_size(unsigned char *cur_edid, unsigned int size);
 bool rx_set_earc_cap_ds(unsigned char *data, unsigned int len);
 void rx_prase_earc_capds_dbg(void);
 void edid_splice_earc_capds(unsigned char *p_edid,
-			    unsigned char *earc_cap_ds,
-			    unsigned int len);
-void edid_splice_earc_capds_dbg(u8 *p_edid);
-void edid_splice_data_blk_dbg(u8 *p_edid, u8 idx);
-void edid_rm_db_by_tag(u8 *p_edid, u16 tagid);
-void edid_rm_db_by_idx(u8 *p_edid, u8 blk_idx);
+	unsigned char *earc_cap_ds, unsigned int len);
+void edid_splice_earc_capds_dbg(uint8_t *p_edid);
+void edid_splice_data_blk_dbg(uint8_t *p_edid, uint8_t idx);
+void edid_rm_db_by_tag(uint8_t *p_edid, uint16_t tagid);
+void edid_rm_db_by_idx(uint8_t *p_edid, uint8_t blk_idx);
 void splice_tag_db_to_edid(u8 *p_edid, u8 *add_buf,
 			   u8 buf_len, u16 tagid);
-u8 *edid_tag_extract(u8 *p_edid, u16 tagid);
+uint8_t *edid_tag_extract(uint8_t *p_edid, uint16_t tagid);
 void splice_data_blk_to_edid(u_char *p_edid, u_char *add_buf,
 			     u_char blk_idx);
 void rx_modify_edid(unsigned char *buffer,
-		    int len, unsigned char *addition);
+				int len, unsigned char *addition);
 void rx_edid_update_audio_info(unsigned char *p_edid,
-			       unsigned int len);
-bool is_ddc_idle(unsigned char port_id);
+						unsigned int len);
+extern bool is_ddc_idle(unsigned char port_id);
 bool need_update_edid(void);
-enum edid_ver_e get_edid_selection(u8 port);
-enum edid_ver_e rx_parse_edid_ver(u8 *p_edid);
+enum edid_ver_e get_edid_selection(uint8_t port);
+enum edid_ver_e rx_parse_edid_ver(uint8_t *p_edid);
 u_char *rx_get_cur_edid(u_char port);
 bool rx_set_vsvdb(unsigned char *data, unsigned int len);
 #ifdef CONFIG_AMLOGIC_HDMITX

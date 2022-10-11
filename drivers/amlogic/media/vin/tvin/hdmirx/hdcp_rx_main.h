@@ -1,6 +1,21 @@
-/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/amlogic/media/vin/tvin/hdmirx/hdcp_main.h
+ *
+ *              (C) COPYRIGHT 2014 - 2015 SYNOPSYS, INC.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2
+ * as published by the Free Software Foundation.
+ *
+ * is program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ *
  */
 
 #ifndef _HDCP_MAIN_H_
@@ -135,6 +150,7 @@ struct esm_ioc_hpi_reg {
  */
 #define ESM_IOC_GET_PARAM _IOR('E', ESM_NR_GET_PARAM, struct esm_ioc_param)
 #define ESM_IOC_SET_PARAM _IOW('E', ESM_NR_SET_PARAM, struct esm_ioc_param)
+
 
 struct esm_ioc_param {
 	bool hpd;

@@ -1,8 +1,11 @@
-// SPDX-License-Identifier: GPL-2.0-only
 /*
  *  linux/arch/arm/mm/pgd.c
  *
  *  Copyright (C) 1998-2005 Russell King
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
  */
 #include <linux/mm.h>
 #include <linux/gfp.h>
@@ -17,7 +20,7 @@
 #include "mm.h"
 
 #ifdef CONFIG_ARM_LPAE
-#define __pgd_alloc()	kmalloc_array(PTRS_PER_PGD, sizeof(pgd_t), GFP_KERNEL)
+#define __pgd_alloc()	kmalloc(PTRS_PER_PGD * sizeof(pgd_t), GFP_KERNEL)
 #define __pgd_free(pgd)	kfree(pgd)
 #else
 #define __pgd_alloc()	(pgd_t *)__get_free_pages(GFP_KERNEL, 2)
@@ -61,21 +64,7 @@ pgd_t *pgd_alloc(struct mm_struct *mm)
 	new_pmd = pmd_alloc(mm, new_pud, 0);
 	if (!new_pmd)
 		goto no_pmd;
-#ifdef CONFIG_KASAN
-	/*
-	 * Copy PMD table for KASAN shadow mappings.
-	 */
-	init_pgd = pgd_offset_k(TASK_SIZE);
-	init_p4d = p4d_offset(init_pgd, TASK_SIZE);
-	init_pud = pud_offset(init_p4d, TASK_SIZE);
-	init_pmd = pmd_offset(init_pud, TASK_SIZE);
-	new_pmd = pmd_offset(new_pud, TASK_SIZE);
-	memcpy(new_pmd, init_pmd,
-	       (pmd_index(MODULES_VADDR) - pmd_index(TASK_SIZE))
-	       * sizeof(pmd_t));
-	clean_dcache_area(new_pmd, PTRS_PER_PMD * sizeof(pmd_t));
-#endif /* CONFIG_KASAN */
-#endif /* CONFIG_LPAE */
+#endif
 
 	if (!vectors_high()) {
 		/*
@@ -152,7 +141,7 @@ void pgd_free(struct mm_struct *mm, pgd_t *pgd_base)
 	pte = pmd_pgtable(*pmd);
 	pmd_clear(pmd);
 	pte_free(mm, pte);
-	mm_dec_nr_ptes(mm);
+	atomic_long_dec(&mm->nr_ptes);
 no_pmd:
 	pud_clear(pud);
 	pmd_free(mm, pmd);

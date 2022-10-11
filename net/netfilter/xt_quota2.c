@@ -106,7 +106,7 @@ static void quota2_log(unsigned int hooknum,
 		return;
 	}
 	pm = nlmsg_data(nlh);
-	if (skb->tstamp == 0)
+	if (skb->tstamp.tv64 == 0)
 		__net_timestamp((struct sk_buff *)skb);
 	pm->data_len = 0;
 	pm->hook = hooknum;
@@ -326,10 +326,10 @@ quota_mt2(const struct sk_buff *skb, struct xt_action_param *par)
 			ret = !ret;
 		} else if (e->quota) {
 			/* We are transitioning, log that fact. */
-			quota2_log(xt_hooknum(par),
+			quota2_log(par->hooknum,
 				   skb,
-				   xt_in(par),
-				   xt_out(par),
+				   par->in,
+				   par->out,
 				   q->name);
 			/* we do not allow even small packets from now on */
 			e->quota = 0;

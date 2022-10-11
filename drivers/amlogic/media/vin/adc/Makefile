@@ -1,5 +1,3 @@
-#
-# Makefile for ADC.
-#
-$(MEDIA_MODULE_NAME)-$(CONFIG_AMLOGIC_MEDIA_ADC) += vin/adc/adc.o
+obj-$(CONFIG_AMLOGIC_MEDIA_ADC) += amtvin_adc.o
+amtvin_adc-objs := adc.o
 

@@ -1,6 +1,18 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/amlogic/thermal/gpu_cooling.c
+ *
+ * Copyright (C) 2016 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
 #include <linux/module.h>
@@ -10,6 +22,7 @@
 #include <linux/slab.h>
 #include <linux/cpu.h>
 #include <linux/amlogic/gpu_cooling.h>
+
 
 static DEFINE_IDR(gpufreq_idr);
 static DEFINE_MUTEX(cooling_gpufreq_lock);
@@ -22,7 +35,7 @@ static struct device_node *np;
 
 void save_gpu_cool_para(int coef, struct device_node *n, int pp)
 {
-	if (dyn_coef == -1 && !np) {
+	if (dyn_coef == -1 && np == NULL) {
 		dyn_coef = coef;
 		np = n;
 		max_pp = pp;
@@ -64,6 +77,7 @@ static void release_idr(struct idr *idr, int id)
 	idr_remove(idr, id);
 	mutex_unlock(&cooling_gpufreq_lock);
 }
+
 
 /* gpufreq cooling device callback functions are defined below */
 
@@ -111,9 +125,8 @@ static int gpufreq_get_cur_state(struct thermal_cooling_device *cdev,
 		*state = ((max_state - 1) - temp);
 		gpufreq_device->gpufreq_state = *state;
 		pr_debug("current max state=%ld\n", *state);
-	} else {
+	} else
 		return -EINVAL;
-	}
 	return 0;
 }
 
@@ -138,12 +151,11 @@ static int gpufreq_set_cur_state(struct thermal_cooling_device *cdev,
 		 state, gpufreq_device->gpufreq_state);
 	/* if (gpufreq_device->gpufreq_state == state) */
 		/* return 0; */
-	gpufreq_device->gpufreq_state = state;
 	ret = gpufreq_get_max_state(cdev, &max_state);
-
-	if (WARN_ON(state >= max_state))
-		return -EINVAL;
-	state = max_state - 1 - state;
+	if (state > max_state-1)
+		state = max_state-1;
+	gpufreq_device->gpufreq_state = state;
+	state = max_state-1-state;
 
 	pr_debug("state=%ld,gpufreq_device->gpufreq_state=%d\n",
 		 state, gpufreq_device->gpufreq_state);
@@ -152,6 +164,8 @@ static int gpufreq_set_cur_state(struct thermal_cooling_device *cdev,
 			gpufreq_device->set_gpu_freq_idx((unsigned int)state);
 	}
 	return 0;
+
+
 }
 
 /*
@@ -180,7 +194,9 @@ static int gpufreq_get_requested_power(struct thermal_cooling_device *cdev,
 	pp   = gf_dev->get_online_pp();
 	coef = gf_dev->dyn_coeff;
 	load = gf_dev->get_gpu_loading();
+
 	*power = (freq * coef * pp) * load / 102400;
+
 	return 0;
 }
 
@@ -225,7 +241,6 @@ static int gpufreq_power2state(struct thermal_cooling_device *cdev,
 	*state = gf_dev->get_gpu_freq_level(freq);
 	return 0;
 }
-
 /* Bind gpufreq callbacks to thermal cooling device ops */
 static struct thermal_cooling_device_ops const gpufreq_cooling_ops = {
 	.get_max_state = gpufreq_get_max_state,
@@ -235,6 +250,7 @@ static struct thermal_cooling_device_ops const gpufreq_cooling_ops = {
 	.power2state   = gpufreq_power2state,
 	.get_requested_power = gpufreq_get_requested_power,
 };
+
 
 /**
  * gpufreq_cooling_register - function to create gpufreq cooling device.
@@ -251,7 +267,7 @@ struct gpufreq_cooling_device *gpufreq_cooling_alloc(void)
 {
 	struct gpufreq_cooling_device *gcdev;
 
-	gcdev = kzalloc(sizeof(*gcdev), GFP_KERNEL);
+	gcdev = kzalloc(sizeof(struct gpufreq_cooling_device), GFP_KERNEL);
 	if (!gcdev)
 		return ERR_PTR(-ENOMEM);
 	memset(gcdev, 0, sizeof(*gcdev));
@@ -281,9 +297,8 @@ int gpufreq_cooling_register(struct gpufreq_cooling_device *gpufreq_dev)
 	gpufreq_dev->gpufreq_state = 0;
 
 	cool_dev = thermal_of_cooling_device_register(gpufreq_dev->np,
-						      dev_name,
-						      gpufreq_dev,
-						      &gpufreq_cooling_ops);
+						dev_name, gpufreq_dev,
+						&gpufreq_cooling_ops);
 	if (!cool_dev) {
 		release_idr(&gpufreq_idr, gpufreq_dev->id);
 		kfree(gpufreq_dev);

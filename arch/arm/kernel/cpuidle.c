@@ -1,12 +1,21 @@
-// SPDX-License-Identifier: GPL-2.0-or-later
 /*
  * Copyright 2012 Linaro Ltd.
+ *
+ * The code contained herein is licensed under the GNU General Public
+ * License. You may obtain a copy of the GNU General Public License
+ * Version 2 or later at the following locations:
+ *
+ * http://www.opensource.org/licenses/gpl-license.html
+ * http://www.gnu.org/copyleft/gpl.html
  */
 
 #include <linux/cpuidle.h>
 #include <linux/of.h>
 #include <linux/of_device.h>
 #include <asm/cpuidle.h>
+#ifdef CONFIG_AMLOGIC_MODIFY
+#include <asm/perf_event.h>
+#endif
 
 extern struct of_cpuidle_method __cpuidle_method_of_table[];
 
@@ -45,9 +54,22 @@ int arm_cpuidle_simple_enter(struct cpuidle_device *dev,
  */
 int arm_cpuidle_suspend(int index)
 {
+#ifdef CONFIG_AMLOGIC_MODIFY
+	int ret;
+	int cpu = smp_processor_id();
+
+	ret = cpuidle_ops[cpu].suspend(index);
+
+	if (index > 0) {
+		pr_debug("arm_cpuidle_suspend(%d) exit\n", index);
+		enable_pmuserenr();
+	}
+	return ret;
+#else
 	int cpu = smp_processor_id();
 
 	return cpuidle_ops[cpu].suspend(index);
+#endif
 }
 
 /**
@@ -95,8 +117,8 @@ static int __init arm_cpuidle_read_ops(struct device_node *dn, int cpu)
 
 	ops = arm_cpuidle_get_ops(enable_method);
 	if (!ops) {
-		pr_warn("%pOF: unsupported enable-method property: %s\n",
-			dn, enable_method);
+		pr_warn("%s: unsupported enable-method property: %s\n",
+			dn->full_name, enable_method);
 		return -EOPNOTSUPP;
 	}
 
@@ -129,7 +151,7 @@ static int __init arm_cpuidle_read_ops(struct device_node *dn, int cpu)
  *  this cpu,
  *  -ENOENT if it fails to find an 'enable-method' property,
  *  -ENXIO if the HW reports a failure or a misconfiguration,
- *  -ENOMEM if the HW report an memory allocation failure 
+ *  -ENOMEM if the HW report an memory allocation failure
  */
 int __init arm_cpuidle_init(int cpu)
 {

@@ -1,6 +1,18 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/amlogic/drm/meson_vpu.c
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
 #include <drm/drmP.h>
@@ -18,7 +30,7 @@
 #include <linux/dma-contiguous.h>
 #include <linux/cma.h>
 #ifdef CONFIG_DRM_MESON_USE_ION
-#include <ion/ion_private.h>
+#include <ion/ion_priv.h>
 #endif
 
 /* Amlogic Headers */
@@ -35,7 +47,6 @@
 #include "meson_vpu_pipeline.h"
 
 #define AM_VOUT_NULL_MODE "null"
-static int irq_init_done;
 static struct platform_device *gp_dev;
 static unsigned long gem_mem_start, gem_mem_size;
 
@@ -106,8 +117,8 @@ void am_meson_crtc_handle_vsync(struct am_meson_crtc *amcrtc)
 			continue;
 		atomic_dec(&amcrtc->video_fence[i].refcount);
 		if (!atomic_read(&amcrtc->video_fence[i].refcount)) {
-			dma_fence_signal(amcrtc->video_fence[i].fence);
-			dma_fence_put(amcrtc->video_fence[i].fence);
+			fence_signal(amcrtc->video_fence[i].fence);
+			fence_put(amcrtc->video_fence[i].fence);
 			amcrtc->video_fence[i].fence = NULL;
 			DRM_DEBUG("video fence signal done index:%d\n", i);
 		}
@@ -115,6 +126,7 @@ void am_meson_crtc_handle_vsync(struct am_meson_crtc *amcrtc)
 	spin_lock_irqsave(&crtc->dev->event_lock, flags);
 	if (amcrtc->event) {
 		drm_crtc_send_vblank_event(crtc, amcrtc->event);
+		drm_crtc_vblank_put(crtc);
 		amcrtc->event = NULL;
 	}
 	spin_unlock_irqrestore(&crtc->dev->event_lock, flags);
@@ -131,9 +143,6 @@ static irqreturn_t am_meson_vpu_irq(int irq, void *arg)
 {
 	struct drm_device *dev = arg;
 	struct meson_drm *priv = dev->dev_private;
-
-	if (!irq_init_done)
-		return IRQ_NONE;
 
 	am_meson_crtc_irq(priv);
 
@@ -179,21 +188,6 @@ static int am_meson_logo_info_update(struct meson_drm *priv)
 	return 0;
 }
 
-static void am_meson_vpu_power_config(bool en)
-{
-	meson_vpu_power_config(VPU_MAIL_AFBCD, en);
-	meson_vpu_power_config(VPU_VIU_OSD2, en);
-	meson_vpu_power_config(VPU_VIU_OSD_SCALE, en);
-	meson_vpu_power_config(VPU_VD2_OSD2_SCALE, en);
-	meson_vpu_power_config(VPU_VIU_OSD3, en);
-	meson_vpu_power_config(VPU_OSD_BLD34, en);
-	meson_vpu_power_config(VPU_VIU_OSD2, en);
-
-	meson_vpu_power_config(VPU_VIU2_OSD1, en);
-	meson_vpu_power_config(VPU_VIU2_OSD1, en);
-	meson_vpu_power_config(VPU_VIU2_OSD_ROT, en);
-}
-
 static int am_meson_vpu_bind(struct device *dev,
 			     struct device *master, void *data)
 {
@@ -204,8 +198,6 @@ static int am_meson_vpu_bind(struct device *dev,
 	struct am_meson_crtc *amcrtc;
 #ifdef CONFIG_CMA
 	struct cma *cma;
-	struct reserved_mem *rmem = NULL;
-	struct device_node *np, *mem_node;
 #endif
 	int ret, irq;
 
@@ -228,28 +220,18 @@ static int am_meson_vpu_bind(struct device *dev,
 		dev_err(dev, "failed to init reserved memory\n");
 	} else {
 #ifdef CONFIG_CMA
-		np = pdev->dev.of_node;
-		mem_node = of_parse_phandle(np, "memory-region", 0);
-		if (mem_node) {
-			rmem = of_reserved_mem_lookup(mem_node);
-			of_node_put(mem_node);
-			if (rmem) {
-				logo.size = rmem->size;
-				DRM_INFO("of read reservememsize=0x%x\n",
-					 logo.size);
-			}
-		} else {
-			DRM_ERROR("no memory-region\n");
-		}
 		gp_dev = pdev;
 		cma = dev_get_cma_area(&pdev->dev);
 		if (cma) {
+			logo.size = cma_get_size(cma);
+			DRM_INFO("reserved memory base:0x%x, size:0x%x\n",
+				 (u32)cma_get_base(cma), logo.size);
 			if (logo.size > 0) {
 				logo.logo_page =
 				dma_alloc_from_contiguous(&pdev->dev,
 							  logo.size >>
 							  PAGE_SHIFT,
-							  0, 0);
+							  0);
 				if (!logo.logo_page)
 					DRM_INFO("allocate buffer failed\n");
 				else
@@ -263,7 +245,8 @@ static int am_meson_vpu_bind(struct device *dev,
 			dma_declare_coherent_memory(drm_dev->dev,
 						    gem_mem_start,
 						    gem_mem_start,
-						    gem_mem_size);
+						    gem_mem_size,
+						    DMA_MEMORY_EXCLUSIVE);
 			pr_info("meson drm mem_start = 0x%x, size = 0x%x\n",
 				(u32)gem_mem_start, (u32)gem_mem_size);
 		} else {
@@ -283,12 +266,7 @@ static int am_meson_vpu_bind(struct device *dev,
 
 	ret = of_property_read_u8(dev->of_node,
 				  "osd_ver", &pipeline->osd_version);
-
-	if (0)
-		am_meson_vpu_power_config(1);
-	else
-		osd_vpu_power_on();
-
+	meson_drm_osd_canvas_alloc();
 	vpu_pipeline_init(pipeline);
 
 	/*vsync irq.*/
@@ -305,7 +283,6 @@ static int am_meson_vpu_bind(struct device *dev,
 		return ret;
 	/* IRQ is initially disabled; it gets enabled in crtc_enable */
 	disable_irq(amcrtc->irq);
-	irq_init_done = 1;
 	DRM_INFO("[%s] out\n", __func__);
 	return 0;
 }
@@ -321,8 +298,7 @@ static void am_meson_vpu_unbind(struct device *dev,
 	amvecm_drm_gamma_disable(0);
 	am_meson_ctm_disable();
 #endif
-	am_meson_vpu_power_config(0);
-	vpu_pipeline_fini(private->pipeline);
+	meson_drm_osd_canvas_free();
 }
 
 static const struct component_ops am_meson_vpu_component_ops = {
@@ -331,22 +307,18 @@ static const struct component_ops am_meson_vpu_component_ops = {
 };
 
 static const struct of_device_id am_meson_vpu_driver_dt_match[] = {
-#ifndef CONFIG_AMLOGIC_REMOVE_OLD
-	{ .compatible = "amlogic, meson-gxbb-vpu",},
-	{ .compatible = "amlogic, meson-gxl-vpu",},
-	{ .compatible = "amlogic, meson-gxm-vpu",},
-	{ .compatible = "amlogic, meson-txl-vpu",},
-	{ .compatible = "amlogic, meson-txlx-vpu",},
-	{ .compatible = "amlogic, meson-axg-vpu",},
-	{.compatible = "amlogic, meson-tl1-vpu",},
-#endif
-	{ .compatible = "amlogic, meson-g12a-vpu",},
-	{ .compatible = "amlogic, meson-g12b-vpu",},
-	{.compatible = "amlogic, meson-sm1-vpu",},
-	{.compatible = "amlogic, meson-tm2-vpu",},
-	{.compatible = "amlogic, meson-t5-vpu",},
-	{.compatible = "amlogic, meson-sc2-vpu",},
-	{.compatible = "amlogic, meson-s4-vpu",},
+	{ .compatible = "amlogic,meson-gxbb-vpu",},
+	{ .compatible = "amlogic,meson-gxl-vpu",},
+	{ .compatible = "amlogic,meson-gxm-vpu",},
+	{ .compatible = "amlogic,meson-txl-vpu",},
+	{ .compatible = "amlogic,meson-txlx-vpu",},
+	{ .compatible = "amlogic,meson-axg-vpu",},
+	{ .compatible = "amlogic,meson-g12a-vpu",},
+	{ .compatible = "amlogic,meson-g12b-vpu",},
+	{ .compatible = "amlogic, meson-tl1-vpu",},
+	{ .compatible = "amlogic, meson-sm1-vpu",},
+	{ .compatible = "amlogic, meson-tm2-vpu",},
+	{ .compatible = "amlogic, meson-sc2-vpu",},
 	{}
 };
 
@@ -412,20 +384,7 @@ static int __init gem_mem_setup(struct reserved_mem *rmem)
 
 RESERVEDMEM_OF_DECLARE(gem, "amlogic, gem_memory", gem_mem_setup);
 
-int __init am_meson_vpu_init(void)
-{
-	return platform_driver_register(&am_meson_vpu_platform_driver);
-}
-
-void __exit am_meson_vpu_exit(void)
-{
-	platform_driver_unregister(&am_meson_vpu_platform_driver);
-}
-
-#ifndef MODULE
-module_init(am_meson_vpu_init);
-module_exit(am_meson_vpu_exit);
-#endif
+module_platform_driver(am_meson_vpu_platform_driver);
 
 MODULE_AUTHOR("MultiMedia Amlogic <multimedia-sh@amlogic.com>");
 MODULE_DESCRIPTION("Amlogic Meson Drm VPU driver");

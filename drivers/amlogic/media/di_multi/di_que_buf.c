@@ -409,7 +409,8 @@ static bool n_out(struct buf_que_s *pqb, struct qs_cls_s *p,
 }
 
 /* 2020-12-07 */
-static bool n_is_in(struct buf_que_s *pqb, struct qs_cls_s *p, union q_buf_u ubuf)
+static bool n_is_in(struct buf_que_s *pqb, struct qs_cls_s *p,
+	union q_buf_u ubuf)
 {
 	struct qs_err_msg_s msg;
 	//struct qs_cls_s *p;

@@ -1,6 +1,18 @@
-/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/amlogic/media/vin/tvin/tvafe/tvafe_avin_detect.h
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
 #ifndef TVAFE_AVIN_DETECT_H_
@@ -9,6 +21,7 @@
 #include <linux/cdev.h>
 #include <linux/workqueue.h>
 #include <linux/mutex.h>
+
 
 #define HHI_CVBS_DETECT_CNTL	0x2e
 #define AFE_DETECT_RSV3_BIT		31
@@ -44,6 +57,8 @@
 #define AFE_CH2_COMP_LEVEL_ADJ_WIDTH	3
 #define AFE_CH2_EN_DC_BIAS_BIT		18
 #define AFE_CH2_EN_DC_BIAS_WIDTH	1
+#define AFE_T5_CH2_EN_DC_BIAS_BIT	11
+#define AFE_T5_CH2_EN_DC_BIAS_WIDTH	1
 #define AFE_CH2_DETECT_MODE_SELECT_BIT	17
 #define AFE_CH2_DETECT_MODE_SELECT_WIDTH	1
 #define AFE_CH2_COMP_HYS_ADJ_BIT	16
@@ -82,12 +97,12 @@
 #define CVBS_IRQ0_COUNTER		0x3c26
 #define CVBS_IRQ1_COUNTER		0x3c27
 
+
 enum tvafe_avin_status_e {
 	TVAFE_AVIN_STATUS_IN = 0,
 	TVAFE_AVIN_STATUS_OUT = 1,
 	TVAFE_AVIN_STATUS_UNKNOWN = 2,
 };
-
 enum tvafe_avin_channel_e {
 	TVAFE_AVIN_CHANNEL1 = 0,
 	TVAFE_AVIN_CHANNEL2 = 1,
@@ -120,6 +135,9 @@ struct tvafe_avin_det_s {
 };
 
 enum avin_cpu_type {
+	AVIN_CPU_TYPE_TXL = 0,
+	AVIN_CPU_TYPE_TXLX   = 1,
+	AVIN_CPU_TYPE_TXHD   = 2,
 	AVIN_CPU_TYPE_TL1   = 3,
 	AVIN_CPU_TYPE_TM2   = 4,
 	AVIN_CPU_TYPE_T5    = 5,

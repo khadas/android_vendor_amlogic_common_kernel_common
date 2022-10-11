@@ -1,4 +1,3 @@
-/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
  * drivers/amlogic/media/enhancement/amvecm/amvecm_vlock_regmap.h
  *
@@ -19,6 +18,7 @@
 #ifndef __AMVECM_VLOCK_REGMAP_H
 #define __AMVECM_VLOCK_REGMAP_H
 
+
 struct vlock_regs_s {
 	unsigned int addr;
 	unsigned int val;
@@ -27,7 +27,7 @@ struct vlock_regs_s {
 #define VLOCK_DEFAULT_REG_SIZE 20
 static struct vlock_regs_s vlock_enc_setting[VLOCK_DEFAULT_REG_SIZE] = {
 	/* optimize */
-	{0x3000,     0xE3f53f10  },
+	{0x3000,     0xc3f13f12  },
 	{0x3001,     0x41E3c3c   },
 	{0x3002,     0x6000000   },
 	{0x3003,     0x20709605/*0x20709709  */},
@@ -82,7 +82,7 @@ static struct vlock_regs_s vlock_pll_phase_setting[VLOCK_PHASE_REG_SIZE] = {
 	{0x300c,	 0x06000000},
 	{0x3025,	 0x00013000},
 	{0x3027,	 0x00022002},
-	{0x3028,	 0x0001f000},
+	{0x3028,	 0x00008f00},
 	{0x302a,	 0x00022002},
 };
 
@@ -93,11 +93,12 @@ static struct vlock_regs_s vlock_encl_phase_setting[VLOCK_PHASE_REG_SIZE] = {
 	{0x300a,	 0x06000000},
 	{0x300b,	 0x06000000},
 	{0x300c,	 0x06000000},
-	{0x3025,	 0x00013000},
+	{0x3025,	 0x0001f000},
 	{0x3027,	 0x00022002},
-	{0x3028,	 0x00013000},
+	{0x3028,	 0x0001f000},
 	{0x302a,	 0x00022002},
 };
+
 
 #endif
 

@@ -1,21 +1,14 @@
-// SPDX-License-Identifier: GPL-2.0
-#include <errno.h>
+#include "../perf.h"
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
-#include <linux/kernel.h>
-#include <linux/zalloc.h>
-#include "dso.h"
 #include "session.h"
 #include "thread.h"
 #include "thread-stack.h"
+#include "util.h"
 #include "debug.h"
-#include "namespaces.h"
 #include "comm.h"
-#include "map.h"
-#include "symbol.h"
 #include "unwind.h"
-#include "callchain.h"
 
 #include <api/fs/fs.h>
 
@@ -47,10 +40,7 @@ struct thread *thread__new(pid_t pid, pid_t tid)
 		thread->tid = tid;
 		thread->ppid = -1;
 		thread->cpu = -1;
-		INIT_LIST_HEAD(&thread->namespaces_list);
 		INIT_LIST_HEAD(&thread->comm_list);
-		init_rwsem(&thread->namespaces_lock);
-		init_rwsem(&thread->comm_lock);
 
 		comm_str = malloc(32);
 		if (!comm_str)
@@ -63,11 +53,8 @@ struct thread *thread__new(pid_t pid, pid_t tid)
 			goto err_thread;
 
 		list_add(&comm->list, &thread->comm_list);
-		refcount_set(&thread->refcnt, 1);
+		atomic_set(&thread->refcnt, 1);
 		RB_CLEAR_NODE(&thread->rb_node);
-		/* Thread holds first ref to nsdata. */
-		thread->nsinfo = nsinfo__new(pid);
-		srccode_state_init(&thread->srccode_state);
 	}
 
 	return thread;
@@ -79,8 +66,7 @@ err_thread:
 
 void thread__delete(struct thread *thread)
 {
-	struct namespaces *namespaces, *tmp_namespaces;
-	struct comm *comm, *tmp_comm;
+	struct comm *comm, *tmp;
 
 	BUG_ON(!RB_EMPTY_NODE(&thread->rb_node));
 
@@ -90,117 +76,32 @@ void thread__delete(struct thread *thread)
 		map_groups__put(thread->mg);
 		thread->mg = NULL;
 	}
-	down_write(&thread->namespaces_lock);
-	list_for_each_entry_safe(namespaces, tmp_namespaces,
-				 &thread->namespaces_list, list) {
-		list_del_init(&namespaces->list);
-		namespaces__free(namespaces);
-	}
-	up_write(&thread->namespaces_lock);
-
-	down_write(&thread->comm_lock);
-	list_for_each_entry_safe(comm, tmp_comm, &thread->comm_list, list) {
-		list_del_init(&comm->list);
+	list_for_each_entry_safe(comm, tmp, &thread->comm_list, list) {
+		list_del(&comm->list);
 		comm__free(comm);
 	}
-	up_write(&thread->comm_lock);
+	unwind__finish_access(thread);
 
-	nsinfo__zput(thread->nsinfo);
-	srccode_state_free(&thread->srccode_state);
-
-	exit_rwsem(&thread->namespaces_lock);
-	exit_rwsem(&thread->comm_lock);
 	free(thread);
 }
 
 struct thread *thread__get(struct thread *thread)
 {
 	if (thread)
-		refcount_inc(&thread->refcnt);
+		atomic_inc(&thread->refcnt);
 	return thread;
 }
 
 void thread__put(struct thread *thread)
 {
-	if (thread && refcount_dec_and_test(&thread->refcnt)) {
+	if (thread && atomic_dec_and_test(&thread->refcnt)) {
 		/*
-		 * Remove it from the dead threads list, as last reference is
-		 * gone, if it is in a dead threads list.
-		 *
-		 * We may not be there anymore if say, the machine where it was
-		 * stored was already deleted, so we already removed it from
-		 * the dead threads and some other piece of code still keeps a
-		 * reference.
-		 *
-		 * This is what 'perf sched' does and finally drops it in
-		 * perf_sched__lat(), where it calls perf_sched__read_events(),
-		 * that processes the events by creating a session and deleting
-		 * it, which ends up destroying the list heads for the dead
-		 * threads, but before it does that it removes all threads from
-		 * it using list_del_init().
-		 *
-		 * So we need to check here if it is in a dead threads list and
-		 * if so, remove it before finally deleting the thread, to avoid
-		 * an use after free situation.
+		 * Remove it from the dead_threads list, as last reference
+		 * is gone.
 		 */
-		if (!list_empty(&thread->node))
-			list_del_init(&thread->node);
+		list_del_init(&thread->node);
 		thread__delete(thread);
 	}
-}
-
-static struct namespaces *__thread__namespaces(const struct thread *thread)
-{
-	if (list_empty(&thread->namespaces_list))
-		return NULL;
-
-	return list_first_entry(&thread->namespaces_list, struct namespaces, list);
-}
-
-struct namespaces *thread__namespaces(struct thread *thread)
-{
-	struct namespaces *ns;
-
-	down_read(&thread->namespaces_lock);
-	ns = __thread__namespaces(thread);
-	up_read(&thread->namespaces_lock);
-
-	return ns;
-}
-
-static int __thread__set_namespaces(struct thread *thread, u64 timestamp,
-				    struct perf_record_namespaces *event)
-{
-	struct namespaces *new, *curr = __thread__namespaces(thread);
-
-	new = namespaces__new(event);
-	if (!new)
-		return -ENOMEM;
-
-	list_add(&new->list, &thread->namespaces_list);
-
-	if (timestamp && curr) {
-		/*
-		 * setns syscall must have changed few or all the namespaces
-		 * of this thread. Update end time for the namespaces
-		 * previously used.
-		 */
-		curr = list_next_entry(new, list);
-		curr->end_time = timestamp;
-	}
-
-	return 0;
-}
-
-int thread__set_namespaces(struct thread *thread, u64 timestamp,
-			   struct perf_record_namespaces *event)
-{
-	int ret;
-
-	down_write(&thread->namespaces_lock);
-	ret = __thread__set_namespaces(thread, timestamp, event);
-	up_write(&thread->namespaces_lock);
-	return ret;
 }
 
 struct comm *thread__comm(const struct thread *thread)
@@ -234,8 +135,8 @@ struct comm *thread__exec_comm(const struct thread *thread)
 	return last;
 }
 
-static int ____thread__set_comm(struct thread *thread, const char *str,
-				u64 timestamp, bool exec)
+int __thread__set_comm(struct thread *thread, const char *str, u64 timestamp,
+		       bool exec)
 {
 	struct comm *new, *curr = thread__comm(thread);
 
@@ -251,23 +152,12 @@ static int ____thread__set_comm(struct thread *thread, const char *str,
 		list_add(&new->list, &thread->comm_list);
 
 		if (exec)
-			unwind__flush_access(thread->mg);
+			unwind__flush_access(thread);
 	}
 
 	thread->comm_set = true;
 
 	return 0;
-}
-
-int __thread__set_comm(struct thread *thread, const char *str, u64 timestamp,
-		       bool exec)
-{
-	int ret;
-
-	down_write(&thread->comm_lock);
-	ret = ____thread__set_comm(thread, str, timestamp, exec);
-	up_write(&thread->comm_lock);
-	return ret;
 }
 
 int thread__set_comm_from_proc(struct thread *thread)
@@ -287,7 +177,7 @@ int thread__set_comm_from_proc(struct thread *thread)
 	return err;
 }
 
-static const char *__thread__comm_str(const struct thread *thread)
+const char *thread__comm_str(const struct thread *thread)
 {
 	const struct comm *comm = thread__comm(thread);
 
@@ -295,17 +185,6 @@ static const char *__thread__comm_str(const struct thread *thread)
 		return NULL;
 
 	return comm__str(comm);
-}
-
-const char *thread__comm_str(struct thread *thread)
-{
-	const char *str;
-
-	down_read(&thread->comm_lock);
-	str = __thread__comm_str(thread);
-	up_read(&thread->comm_lock);
-
-	return str;
 }
 
 /* CHECKME: it should probably better return the max comm len from its comm list */
@@ -331,7 +210,7 @@ int thread__insert_map(struct thread *thread, struct map *map)
 {
 	int ret;
 
-	ret = unwind__prepare_access(thread->mg, map, NULL);
+	ret = unwind__prepare_access(thread, map, NULL);
 	if (ret)
 		return ret;
 
@@ -344,19 +223,22 @@ int thread__insert_map(struct thread *thread, struct map *map)
 static int __thread__prepare_access(struct thread *thread)
 {
 	bool initialized = false;
-	int err = 0;
-	struct maps *maps = &thread->mg->maps;
-	struct map *map;
+	int i, err = 0;
 
-	down_read(&maps->lock);
+	for (i = 0; i < MAP__NR_TYPES; ++i) {
+		struct maps *maps = &thread->mg->maps[i];
+		struct map *map;
 
-	for (map = maps__first(maps); map; map = map__next(map)) {
-		err = unwind__prepare_access(thread->mg, map, &initialized);
-		if (err || initialized)
-			break;
+		pthread_rwlock_rdlock(&maps->lock);
+
+		for (map = maps__first(maps); map; map = map__next(map)) {
+			err = unwind__prepare_access(thread, map, &initialized);
+			if (err || initialized)
+				break;
+		}
+
+		pthread_rwlock_unlock(&maps->lock);
 	}
-
-	up_read(&maps->lock);
 
 	return err;
 }
@@ -365,16 +247,17 @@ static int thread__prepare_access(struct thread *thread)
 {
 	int err = 0;
 
-	if (dwarf_callchain_users)
+	if (symbol_conf.use_callchain)
 		err = __thread__prepare_access(thread);
 
 	return err;
 }
 
 static int thread__clone_map_groups(struct thread *thread,
-				    struct thread *parent,
-				    bool do_maps_clone)
+				    struct thread *parent)
 {
+	int i;
+
 	/* This is new thread, we share map groups for process. */
 	if (thread->pid_ == parent->pid_)
 		return thread__prepare_access(thread);
@@ -384,11 +267,16 @@ static int thread__clone_map_groups(struct thread *thread,
 			 thread->pid_, thread->tid, parent->pid_, parent->tid);
 		return 0;
 	}
+
 	/* But this one is new process, copy maps. */
-	return do_maps_clone ? map_groups__clone(thread, parent->mg) : 0;
+	for (i = 0; i < MAP__NR_TYPES; ++i)
+		if (map_groups__clone(thread, parent->mg, i) < 0)
+			return -ENOMEM;
+
+	return 0;
 }
 
-int thread__fork(struct thread *thread, struct thread *parent, u64 timestamp, bool do_maps_clone)
+int thread__fork(struct thread *thread, struct thread *parent, u64 timestamp)
 {
 	if (parent->comm_set) {
 		const char *comm = thread__comm_str(parent);
@@ -401,10 +289,11 @@ int thread__fork(struct thread *thread, struct thread *parent, u64 timestamp, bo
 	}
 
 	thread->ppid = parent->tid;
-	return thread__clone_map_groups(thread, parent, do_maps_clone);
+	return thread__clone_map_groups(thread, parent);
 }
 
-void thread__find_cpumode_addr_location(struct thread *thread, u64 addr,
+void thread__find_cpumode_addr_location(struct thread *thread,
+					enum map_type type, u64 addr,
 					struct addr_location *al)
 {
 	size_t i;
@@ -416,7 +305,7 @@ void thread__find_cpumode_addr_location(struct thread *thread, u64 addr,
 	};
 
 	for (i = 0; i < ARRAY_SIZE(cpumodes); i++) {
-		thread__find_symbol(thread, cpumodes[i], addr, al);
+		thread__find_addr_location(thread, cpumodes[i], type, addr, al);
 		if (al->map)
 			break;
 	}
@@ -431,26 +320,4 @@ struct thread *thread__main_thread(struct machine *machine, struct thread *threa
 		return NULL;
 
 	return machine__find_thread(machine, thread->pid_, thread->pid_);
-}
-
-int thread__memcpy(struct thread *thread, struct machine *machine,
-		   void *buf, u64 ip, int len, bool *is64bit)
-{
-       u8 cpumode = PERF_RECORD_MISC_USER;
-       struct addr_location al;
-       long offset;
-
-       if (machine__kernel_ip(machine, ip))
-               cpumode = PERF_RECORD_MISC_KERNEL;
-
-       if (!thread__find_map(thread, cpumode, ip, &al) || !al.map->dso ||
-	   al.map->dso->data.status == DSO_DATA_STATUS_ERROR ||
-	   map__load(al.map) < 0)
-               return -1;
-
-       offset = al.map->map_ip(al.map, ip);
-       if (is64bit)
-               *is64bit = al.map->dso->is_64_bit;
-
-       return dso__data_read_offset(al.map->dso, machine, offset, buf, len);
 }

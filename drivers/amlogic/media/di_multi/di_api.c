@@ -55,12 +55,12 @@ bool dim_attach_ext_api(struct di_ext_ops *di_api)
 
 void diext_clk_b_sw(bool on)
 {
-	struct di_dev_s *de_devp = get_dim_de_devp();
-
 	if (on)
-		vpu_dev_clk_gate_on(de_devp->dim_vpu_clk_gate_dev);
+		ops_ext()->switch_vpu_clk_gate_vmod(VPU_VPU_CLKB,
+						    VPU_CLK_GATE_ON);
 	else
-		vpu_dev_clk_gate_off(de_devp->dim_vpu_clk_gate_dev);
+		ops_ext()->switch_vpu_clk_gate_vmod(VPU_VPU_CLKB,
+						    VPU_CLK_GATE_OFF);
 }
 
 /*EXPORT_SYMBOL(dim_attach_ext_api);*/

@@ -1,7 +1,17 @@
-/* SPDX-License-Identifier: GPL-2.0+ */
 /*
+ * drivers/amlogic/media/vout/lcd/lcd_tv/lcd_tv.h
  *
- * Copyright (C) 2019 Amlogic, Inc. All rights reserved.
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
  *
  */
 
@@ -9,15 +19,15 @@
 #define __AML_LCD_TV_H__
 #include <linux/amlogic/media/vout/lcd/lcd_vout.h>
 
-void lcd_tv_config_update(struct aml_lcd_drv_s *pdrv);
-void lcd_tv_driver_init_pre(struct aml_lcd_drv_s *pdrv);
-void lcd_tv_driver_disable_post(struct aml_lcd_drv_s *pdrv);
-int lcd_tv_driver_init(struct aml_lcd_drv_s *pdrv);
-void lcd_tv_driver_disable(struct aml_lcd_drv_s *pdrv);
-int lcd_tv_driver_change(struct aml_lcd_drv_s *pdrv);
+extern void lcd_tv_config_update(struct lcd_config_s *pconf);
+extern void lcd_tv_driver_init_pre(void);
+extern void lcd_tv_driver_disable_post(void);
+extern int lcd_tv_driver_init(void);
+extern void lcd_tv_driver_disable(void);
+extern int lcd_tv_driver_change(void);
 
-void lcd_vbyone_wait_stable(struct aml_lcd_drv_s *pdrv);
-int lcd_vbyone_interrupt_up(struct aml_lcd_drv_s *pdrv);
-void lcd_vbyone_interrupt_down(struct aml_lcd_drv_s *pdrv);
+extern void lcd_vbyone_wait_stable(void);
+extern int lcd_vbyone_interrupt_up(void);
+extern void lcd_vbyone_interrupt_down(void);
 
 #endif

@@ -1,4 +1,3 @@
-/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
  * include/linux/amlogic/media/vfm/vframe.h
  *
@@ -20,9 +19,7 @@
 #define VFRAME_H
 
 #include <linux/types.h>
-#ifdef CONFIG_AMLOGIC_MEDIA_TVIN
 #include <linux/amlogic/media/frame_provider/tvin/tvin.h>
-#endif
 #include <linux/amlogic/media/canvas/canvas.h>
 #include <linux/atomic.h>
 #include <linux/amlogic/iomap.h>
@@ -83,20 +80,20 @@
 #define TB_DETECT_BFF             2
 #define TB_DETECT_TBF             3
 
-#define VFRAME_FLAG_NO_DISCONTINUE		1
-#define VFRAME_FLAG_SWITCHING_FENSE		2
-#define VFRAME_FLAG_HIGH_BANDWIDTH		4
+#define VFRAME_FLAG_NO_DISCONTINUE      1
+#define VFRAME_FLAG_SWITCHING_FENSE     2
+#define VFRAME_FLAG_HIGH_BANDWIDTH	4
 #define VFRAME_FLAG_ERROR_RECOVERY		8
 #define VFRAME_FLAG_SYNCFRAME			0x10
-#define VFRAME_FLAG_GAME_MODE			0x20
-#define VFRAME_FLAG_VIDEO_COMPOSER		0x40
-#define VFRAME_FLAG_VIDEO_COMPOSER_BYPASS	0x80
-#define VFRAME_FLAG_COMPOSER_DONE		0x100
-#define VFRAME_FLAG_VIDEO_COMPOSER_DMA		0x200
-#define VFRAME_FLAG_VIDEO_LINEAR		0x400
-#define VFRAME_FLAG_EMPTY_FRAME_V4L		0x800
-#define VFRAME_FLAG_FAKE_FRAME			0x1000
-#define VFRAME_FLAG_DOUBLE_FRAM		        0x2000
+#define VFRAME_FLAG_GAME_MODE		0x20
+#define VFRAME_FLAG_VIDEO_COMPOSER     0x40
+#define VFRAME_FLAG_VIDEO_COMPOSER_BYPASS     0x80
+#define VFRAME_FLAG_COMPOSER_DONE	0x100
+#define VFRAME_FLAG_VIDEO_COMPOSER_DMA	0x200
+#define VFRAME_FLAG_VIDEO_LINEAR	0x400
+#define VFRAME_FLAG_EMPTY_FRAME_V4L	0x800
+#define VFRAME_FLAG_FAKE_FRAME		0x1000
+#define VFRAME_FLAG_DOUBLE_FRAM		0x2000
 #define VFRAME_FLAG_VIDEO_DRM			0x4000
 #define VFRAME_FLAG_VIDEO_VDETECT		0x8000
 #define VFRAME_FLAG_VIDEO_VDETECT_PUT		0x10000
@@ -141,63 +138,62 @@ struct vframe_hist_s {
 	unsigned short vpp_gamma[64];
 	unsigned int vpp_hue_gamma[32];
 	unsigned int vpp_sat_gamma[32];
-
 #ifdef AML_LOCAL_DIMMING
 	unsigned int ldim_max[100];
 #endif
 } /*vframe_hist_t */;
 
 struct tvin_hdr10p_data_s {
-	u32 vsif_hb;
-	u32 vsif_ieee_code;
+	uint32_t vsif_hb;
+	uint32_t vsif_ieee_code;
 	struct pb4_st {
-		u8 rvd:1;
-		u8 max_lumin:5;
-		u8 app_ver:2;
+		uint8_t rvd:1;
+		uint8_t max_lumin:5;
+		uint8_t app_ver:2;
 	} __packed pb4_st;
-	u8 average_maxrgb;
-	u8 distrib_valus0;
-	u8 distrib_valus1;
-	u8 distrib_valus2;
-	u8 distrib_valus3;
-	u8 distrib_valus4;
-	u8 distrib_valus5;
-	u8 distrib_valus6;
-	u8 distrib_valus7;
-	u8 distrib_valus8;
+	uint8_t average_maxrgb;
+	uint8_t distrib_valus0;
+	uint8_t distrib_valus1;
+	uint8_t distrib_valus2;
+	uint8_t distrib_valus3;
+	uint8_t distrib_valus4;
+	uint8_t distrib_valus5;
+	uint8_t distrib_valus6;
+	uint8_t distrib_valus7;
+	uint8_t distrib_valus8;
 	struct pb15_18_st {
-		u32 knee_point_x_9_6:4;
-		u32 num_bezier_curve_anchors:4;
-		u32 knee_point_y_9_8:2;
-		u32 knee_point_x_5_0:6;
-		u32 knee_point_y_7_0:8;
-		u32 bezier_curve_anchors0:8;
+		uint32_t knee_point_x_9_6:4;
+		uint32_t num_bezier_curve_anchors:4;
+		uint32_t knee_point_y_9_8:2;
+		uint32_t knee_point_x_5_0:6;
+		uint32_t knee_point_y_7_0:8;
+		uint32_t bezier_curve_anchors0:8;
 	} __packed pb15_18_st;
-	u8 bezier_curve_anchors1;
-	u8 bezier_curve_anchors2;
-	u8 bezier_curve_anchors3;
-	u8 bezier_curve_anchors4;
-	u8 bezier_curve_anchors5;
-	u8 bezier_curve_anchors6;
-	u8 bezier_curve_anchors7;
-	u8 bezier_curve_anchors8;
+	uint8_t bezier_curve_anchors1;
+	uint8_t bezier_curve_anchors2;
+	uint8_t bezier_curve_anchors3;
+	uint8_t bezier_curve_anchors4;
+	uint8_t bezier_curve_anchors5;
+	uint8_t bezier_curve_anchors6;
+	uint8_t bezier_curve_anchors7;
+	uint8_t bezier_curve_anchors8;
 	struct pb27_st {
-		u8 rvd:6;
-		u8 no_delay_flag:1;
-		u8 overlay_flag:1;
+		uint8_t rvd:6;
+		uint8_t no_delay_flag:1;
+		uint8_t overlay_flag:1;
 	} __packed pb27_st;
 } __packed;
 
 /*vdin dolby vsi info param*/
 struct tvin_dv_vsif_s {
-	u8 dobly_vision_signal:1;
-	u8 backlt_ctrl_MD_present:1;
-	u8 auxiliary_MD_present:1;
-	u8 eff_tmax_PQ_hi;
-	u8 eff_tmax_PQ_low;
-	u8 auxiliary_runmode;
-	u8 auxiliary_runversion;
-	u8 auxiliary_debug0;
+	uint8_t dobly_vision_signal:1;
+	uint8_t backlt_ctrl_MD_present:1;
+	uint8_t auxiliary_MD_present:1;
+	uint8_t eff_tmax_PQ_hi;
+	uint8_t eff_tmax_PQ_low;
+	uint8_t auxiliary_runmode;
+	uint8_t auxiliary_runversion;
+	uint8_t auxiliary_debug0;
 };
 
 /*
@@ -246,7 +242,8 @@ struct vframe_master_display_colour_s {
 	u32 primaries[3][2];
 	u32 white_point[2];
 	u32 luminance[2];
-	struct vframe_content_light_level_s content_light_level;
+	struct vframe_content_light_level_s
+		content_light_level;
 }; /* master_display_colour_info_volume from SEI */
 
 /* vframe properties */
@@ -290,12 +287,10 @@ enum vframe_source_mode_e {
 	VFRAME_SOURCE_MODE_NTSC,
 	VFRAME_SOURCE_MODE_SECAM,
 };
-
 enum vframe_secam_phase_e {
 	VFRAME_PHASE_DB = 0,
 	VFRAME_PHASE_DR,
 };
-
 enum vframe_disp_mode_e {
 	VFRAME_DISP_MODE_NULL = 0,
 	VFRAME_DISP_MODE_UNKNOWN,
@@ -350,21 +345,21 @@ struct vframe_pic_mode_s {
 
 #define BITDEPTH_Y_SHIFT 8
 #define BITDEPTH_Y8    (0 << BITDEPTH_Y_SHIFT)
-#define BITDEPTH_Y9    (BIT(BITDEPTH_Y_SHIFT))
+#define BITDEPTH_Y9    (1 << BITDEPTH_Y_SHIFT)
 #define BITDEPTH_Y10   (2 << BITDEPTH_Y_SHIFT)
 #define BITDEPTH_Y12   (3 << BITDEPTH_Y_SHIFT)
 #define BITDEPTH_YMASK (3 << BITDEPTH_Y_SHIFT)
 
 #define BITDEPTH_U_SHIFT 10
 #define BITDEPTH_U8    (0 << BITDEPTH_U_SHIFT)
-#define BITDEPTH_U9    (BIT(BITDEPTH_U_SHIFT))
+#define BITDEPTH_U9    (1 << BITDEPTH_U_SHIFT)
 #define BITDEPTH_U10   (2 << BITDEPTH_U_SHIFT)
 #define BITDEPTH_U12   (3 << BITDEPTH_U_SHIFT)
 #define BITDEPTH_UMASK (3 << BITDEPTH_U_SHIFT)
 
 #define BITDEPTH_V_SHIFT 12
 #define BITDEPTH_V8    (0 << BITDEPTH_V_SHIFT)
-#define BITDEPTH_V9    (BIT(BITDEPTH_V_SHIFT))
+#define BITDEPTH_V9    (1 << BITDEPTH_V_SHIFT)
 #define BITDEPTH_V10   (2 << BITDEPTH_V_SHIFT)
 #define BITDEPTH_V12   (3 << BITDEPTH_V_SHIFT)
 #define BITDEPTH_VMASK (3 << BITDEPTH_V_SHIFT)
@@ -398,11 +393,18 @@ struct componser_info_t {
 	int axis[MAX_COMPOSER_COUNT][AXIS_INFO_COUNT];
 };
 
+struct nn_value_t {
+	int maxclass;
+	int maxprob;
+};
+
+#define AI_PQ_TOP 5
+
 struct dcntr_mem_s {
 	u32 index;
-	unsigned long grd_addr;
-	unsigned long yds_addr;
-	unsigned long cds_addr;
+	u32 grd_addr;
+	u32 yds_addr;
+	u32 cds_addr;
 	u32 grd_size;
 	u32 yds_size;
 	u32 cds_size;
@@ -420,60 +422,16 @@ struct dcntr_mem_s {
 	bool cds_little_endian;
 	bool yds_canvas_mode;//0:linear address mode  1:canvas mode
 	bool cds_canvas_mode;
-	unsigned int ori_w; //add for copy from vfm
-	unsigned int ori_h; //add for copy from vfm
 };
 
 struct hf_info_t {
+	bool revert_mode;
 	u32 index;
 	ulong phy_addr;
 	u32 width;
 	u32 height;
 	u32 buffer_w;
 	u32 buffer_h;
-};
-
-enum nn_status_e {
-	NN_INVALID = -1,
-	NN_WAIT_DOING = 0,
-	NN_START_DOING = 1,
-	NN_DONE = 2,
-	NN_DISPLAYED = 3
-};
-
-enum nn_mode_e {
-	NN_MODE_2X2 = 1,
-	NN_MODE_3X3 = 2,
-	NN_MODE_4X4 = 3,
-};
-
-struct vf_nn_sr_t {
-	int nn_out_fd;
-	struct dma_buf *nn_out_dma_buf;
-	u64 nn_out_phy_addr;
-	struct file *nn_out_file;
-	u32 nn_out_file_count;
-	u32 nn_out_width;
-	u32 nn_out_height;
-	struct dma_fence *fence;
-	int shared_fd;
-	u32 hf_phy_addr;
-	u32 hf_width;
-	u32 hf_height;
-	u32 hf_align_w;
-	u32 hf_align_h;
-	u32 nn_status;
-	u32 nn_index;
-	u32 nn_mode;
-	struct timeval start_time;
-};
-
-#define VC_FLAG_AI_SR	0x1
-
-struct video_composer_private {
-	u32 index;
-	u32 flag; /*if  & VC_FLAG_AI_SR, and VPP will get AI_SR_out*/
-	struct vf_nn_sr_t *srout_data;
 };
 
 struct vframe_s {
@@ -495,15 +453,10 @@ struct vframe_s {
 	u64 timestamp;
 	u32 flag;
 
-	unsigned int fmeter0_hcnt[4];
-	unsigned int fmeter1_hcnt[4];
-	int fmeter0_score;
-	int fmeter1_score;
-
 	u32 canvas0Addr;
 	u32 canvas1Addr;
-	ulong compHeadAddr;
-	ulong compBodyAddr;
+	u32 compHeadAddr;
+	u32 compBodyAddr;
 
 	u32 plane_num;
 	struct canvas_config_s canvas0_config[3];
@@ -516,8 +469,8 @@ struct vframe_s {
 	u32 compHeight;
 	u32 ratio_control;
 	u32 bitdepth;
-
 	/*
+	 * bit 31: is_cuva
 	 * bit 30: is_dv
 	 * bit 29: present_flag
 	 * bit 28-26: video_format
@@ -542,11 +495,9 @@ struct vframe_s {
 	enum vframe_source_type_e source_type;
 	enum vframe_secam_phase_e phase;
 	enum vframe_source_mode_e source_mode;
-#ifdef CONFIG_AMLOGIC_MEDIA_TVIN
 	enum tvin_sig_fmt_e sig_fmt;
+
 	enum tvin_trans_fmt trans_fmt;
-	struct tvafe_vga_parm_s vga_parm;
-#endif
 	struct vframe_view_s left_eye;
 	struct vframe_view_s right_eye;
 	u32 mode_3d_enable;
@@ -554,24 +505,24 @@ struct vframe_s {
 	/* vframe extension */
 	int (*early_process_fun)(void *arg, struct vframe_s *vf);
 	int (*process_fun)(void *arg, unsigned int zoom_start_x_lines,
-			   unsigned int zoom_end_x_lines,
-			   unsigned int zoom_start_y_lines,
-			   unsigned int zoom_end_y_lines, struct vframe_s *vf);
+		unsigned int zoom_end_x_lines,
+		unsigned int zoom_start_y_lines,
+		unsigned int zoom_end_y_lines, struct vframe_s *vf);
 	struct hf_info_t *hf_info;	/* hg data*/
 	void *private_data;
-	struct video_composer_private *vc_private;
+#if 1
 	/* vframe properties */
 	struct vframe_prop_s prop;
+#endif
 	struct list_head list;
-/* pixel aspect ratio */
+	struct tvafe_vga_parm_s vga_parm;
+	/* pixel aspect ratio */
 	enum pixel_aspect_ratio_e pixel_ratio;
 	u64 ready_jiffies64;	/* ready from decode on  jiffies_64 */
 	long long ready_clock[5];/*ns*/
 	long long ready_clock_hist[2];/*ns*/
 	atomic_t use_cnt;
-
 	atomic_t use_cnt_pip;
-	/* atomic_t use_cnt_pip2; */
 	u32 frame_dirty;
 	/*
 	 *prog_proc_config:
@@ -587,8 +538,6 @@ struct vframe_s {
 	 * used by memory owner.
 	 */
 	void *mem_handle;
-	/* in secure memory */
-	int mem_sec;
 	/*for MMU H265/VP9 compress header*/
 	void *mem_head_handle;
 	struct vframe_pic_mode_s pic_mode;
@@ -597,6 +546,7 @@ struct vframe_s {
 
 	u32 sar_width;
 	u32 sar_height;
+
 	/*****************
 	 * di pulldown info
 	 * bit 3: interlace
@@ -606,29 +556,27 @@ struct vframe_s {
 	 *****************/
 	u32 di_pulldown;
 	u32 di_gmv;
-
+	u32 di_cm_cnt;
 	u32 axis[4];
 	u32 crop[4];
-
-	struct vsif_info vsif;
-	struct emp_info emp;
-
 	u32 zorder;
 	u32 repeat_count[2];
 	struct file *file_vf;
 	bool rendered;
 
 	struct codec_mm_box_s mm_box;
+	struct vsif_info vsif;
+	struct emp_info emp;
 
 	/* signal format and sei data */
 	struct vframe_src_fmt_s src_fmt;
 	/*for di process NR and cts, storage dec vf*/
 	void *vf_ext;
-	u32 di_cm_cnt;
+
 	u32 dwHeadAddr;
 	u32 dwBodyAddr;
 	bool fgs_valid;
-	ulong fgs_table_adr;
+	u32 fgs_table_adr;
 
 	u32 di_instance_id;
 
@@ -637,7 +585,8 @@ struct vframe_s {
 
 	/*for double write VP9/AV1 vf*/
 	void *mem_dw_handle;
-	struct dma_fence *fence;
+	struct nn_value_t nn_value[AI_PQ_TOP];
+	struct fence *fence;
 		/*current is dv input*/
 	bool dv_input;
 	/* dv mode crc check:
@@ -655,26 +604,25 @@ struct vframe_s {
 	char *hdr10p_data_buf;
 
 	bool discard_dv_data;
-
-	u32 frame_type;
-
-	u32 meta_data_size;
-	char *meta_data_buf;
 } /*vframe_t */;
 
+#if 0
+struct vframe_prop_s *vdin_get_vframe_prop(u32 index);
+#endif
 int get_curren_frame_para(int *top, int *left, int *bottom, int *right);
 
 u8 is_vpp_postblend(void);
 
 void pause_video(unsigned char pause_flag);
-s32 update_vframe_src_fmt(struct vframe_s *vf,
-			  void *sei,
-			  u32 size,
-			  bool dual_layer,
-			  char *prov_name,
-			  char *recv_name);
+
+s32 update_vframe_src_fmt(
+	struct vframe_s *vf, void *sei,
+	u32 size, bool dual_layer,
+	char *prov_name, char *recv_name);
+
 void *get_sei_from_src_fmt(struct vframe_s *vf, u32 *sei_size);
 enum vframe_signal_fmt_e get_vframe_src_fmt(struct vframe_s *vf);
 s32 clear_vframe_src_fmt(struct vframe_s *vf);
 int get_md_from_src_fmt(struct vframe_s *vf);
+
 #endif /* VFRAME_H */

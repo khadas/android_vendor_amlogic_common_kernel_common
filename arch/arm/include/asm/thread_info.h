@@ -1,8 +1,11 @@
-/* SPDX-License-Identifier: GPL-2.0-only */
 /*
  *  arch/arm/include/asm/thread_info.h
  *
  *  Copyright (C) 2002 Russell King.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
  */
 #ifndef __ASM_ARM_THREAD_INFO_H
 #define __ASM_ARM_THREAD_INFO_H
@@ -13,20 +16,16 @@
 #include <asm/fpstate.h>
 #include <asm/page.h>
 
-#ifdef CONFIG_KASAN
-/*
- * KASan uses a lot of extra stack space so the thread size order needs to
- * be increased.
- */
+#ifdef CONFIG_AMLOGIC_KASAN32
 #define THREAD_SIZE_ORDER	2
 #else
 #define THREAD_SIZE_ORDER	1
-#endif
+#endif /* CONFIG_AMLOGIC_KASAN32 */
+
 #define THREAD_SIZE		(PAGE_SIZE << THREAD_SIZE_ORDER)
 
 #ifdef CONFIG_AMLOGIC_VMAP
-/* must align up to 8 bytes */
-#define THREAD_INFO_SIZE	((sizeof(struct thread_info) + 7) & 0xfffffff8)
+#define THREAD_INFO_SIZE	(sizeof(struct thread_info))
 #define THREAD_INFO_OFFSET	(THREAD_SIZE - THREAD_INFO_SIZE)
 #define THREAD_START_SP		(THREAD_SIZE - 8 - THREAD_INFO_SIZE)
 #define VMAP_RESERVE_SIZE	(8 + 4 * 4)
@@ -68,9 +67,6 @@ struct thread_info {
 	struct task_struct	*task;		/* main task structure */
 	__u32			cpu;		/* cpu */
 	__u32			cpu_domain;	/* cpu domain */
-#ifdef CONFIG_STACKPROTECTOR_PER_TASK
-	unsigned long		stack_canary;
-#endif
 	struct cpu_context_save	cpu_context;	/* cpu context */
 	__u32			syscall;	/* syscall number */
 	__u8			used_cp[16];	/* thread used copro */
@@ -92,6 +88,9 @@ struct thread_info {
 	.preempt_count	= INIT_PREEMPT_COUNT,				\
 	.addr_limit	= KERNEL_DS,					\
 }
+
+#define init_thread_info	(init_thread_union.thread_info)
+#define init_stack		(init_thread_union.stack)
 
 /*
  * how to get the current stack pointer in C

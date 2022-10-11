@@ -1,6 +1,18 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/amlogic/dvb/demux/aml_dmx.c
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
 #include <linux/version.h>
@@ -211,9 +223,9 @@ static struct sw_demux_sec_filter *_dmx_dmx_sec_filter_alloc(struct
 	return &sec_feed->filter[i];
 }
 
-#ifdef DEBUG_DUMP
 static void prdump(const char *m, const void *data, u32 len)
 {
+	return;
 	if (m)
 		dprint_i("%s:\n", m);
 	if (data) {
@@ -251,7 +263,6 @@ static void prdump(const char *m, const void *data, u32 len)
 		}
 	}
 }
-#endif
 
 static void _sec_cb(u8 *sec, int len, void *data)
 {
@@ -276,7 +287,7 @@ static void _sec_cb(u8 *sec, int len, void *data)
 	spin_unlock(&dmxdevfilter->dev->lock);
 
 	if (sec_feed->sec_cb)
-		sec_feed->sec_cb(sec, len, NULL, 0, source_filter, 0);
+		sec_feed->sec_cb(sec, len, NULL, 0, source_filter);
 }
 
 static int _ts_out_sec_cb(struct out_elem *pout, char *buf,
@@ -288,12 +299,10 @@ static int _ts_out_sec_cb(struct out_elem *pout, char *buf,
 	int ret = 0;
 
 //      dprint("%s\n", __func__);
-#ifdef DEBUG_DUMP
 	if (debug_dmx == 1) {
 		pr_dbg("%s len:%d\n", __func__, count);
 		prdump("org", buf, 4);
 	}
-#endif
 	if (sec_feed->state != DMX_STATE_GO)
 		return 0;
 
@@ -305,7 +314,8 @@ static int _ts_out_sec_cb(struct out_elem *pout, char *buf,
 }
 
 static int _dmx_ts_feed_set(struct dmx_ts_feed *ts_feed, u16 pid, int ts_type,
-			    enum dmx_ts_pes pes_type, ktime_t timeout)
+			    enum dmx_ts_pes pes_type,
+			    size_t circular_buffer_size, ktime_t timeout)
 {
 	struct sw_demux_ts_feed *feed = (struct sw_demux_ts_feed *)ts_feed;
 	struct aml_dmx *demux = (struct aml_dmx *)ts_feed->parent->priv;
@@ -399,7 +409,8 @@ static int _dmx_ts_feed_set(struct dmx_ts_feed *ts_feed, u16 pid, int ts_type,
 			pr_dbg("%s DMX_OUTPUT_RAW_MODE\n", __func__);
 		}
 	} else {
-		if (filter->params.pes.output == DMX_OUT_TAP) {
+		if (filter->params.pes.output == DMX_OUT_TAP ||
+			filter->params.pes.output == DMX_OUT_TSDEMUX_TAP) {
 			format = PES_FORMAT;
 			pr_dbg("%s PES_FORMAT\n", __func__);
 		} else {
@@ -451,8 +462,8 @@ static int _dmx_ts_feed_set(struct dmx_ts_feed *ts_feed, u16 pid, int ts_type,
 		}
 	}
 
-	feed->ts_out_elem = ts_output_open(sid, demux->id, format,
-		type, media_type, output_mode);
+	feed->ts_out_elem = ts_output_open(
+		sid, demux->id, format, type, media_type, output_mode);
 	if (feed->ts_out_elem) {
 		if (format == DVR_FORMAT) {
 			demux->dvr_ts_output = feed->ts_out_elem;
@@ -556,7 +567,6 @@ static int _dmx_ts_feed_start_filtering(struct dmx_ts_feed *ts_feed)
 //              mutex_unlock(demux->pmutex);
 //              return -EINVAL;
 //      }
-
 	spin_lock_irq(demux->pslock);
 	ts_feed->is_filtering = 1;
 	feed->state = DMX_STATE_GO;
@@ -623,7 +633,8 @@ static int _dmx_section_feed_allocate_filter(struct dmx_section_feed *feed,
 }
 
 static int _dmx_section_feed_set(struct dmx_section_feed *feed,
-				 u16 pid, int check_crc)
+				 u16 pid, size_t circular_buffer_size,
+				 int check_crc)
 {
 	struct sw_demux_sec_feed *sec_feed = (struct sw_demux_sec_feed *)feed;
 	struct aml_dmx *demux = (struct aml_dmx *)feed->parent->priv;
@@ -651,15 +662,15 @@ static int _dmx_section_add_filter(struct sw_demux_sec_feed *sec_feed, int i)
 	params.pid = sec_feed->pid;
 	params.crc32 = sec_feed->check_crc;
 
-	memmove(&sec_feed->filter[i].section_filter.filter_value[1],
+	memcpy(&sec_feed->filter[i].section_filter.filter_value[1],
 	       &sec_feed->filter[i].section_filter.filter_value[3],
-	       SWDMX_SEC_FILTER_LEN - 3);
-	memmove(&sec_feed->filter[i].section_filter.filter_mask[1],
+	       SWDMX_SEC_FILTER_LEN - 1);
+	memcpy(&sec_feed->filter[i].section_filter.filter_mask[1],
 	       &sec_feed->filter[i].section_filter.filter_mask[3],
-	       SWDMX_SEC_FILTER_LEN - 3);
-	memmove(&sec_feed->filter[i].section_filter.filter_mode[1],
+	       SWDMX_SEC_FILTER_LEN - 1);
+	memcpy(&sec_feed->filter[i].section_filter.filter_mode[1],
 	       &sec_feed->filter[i].section_filter.filter_mode[3],
-	       SWDMX_SEC_FILTER_LEN - 3);
+	       SWDMX_SEC_FILTER_LEN - 1);
 
 	_invert_mode(&sec_feed->filter[i].section_filter);
 
@@ -748,8 +759,8 @@ static int _dmx_section_feed_start_filtering(struct dmx_section_feed *feed)
 		pr_dbg("pid elem:0x%lx exist\n",
 		       (unsigned long)(sec_feed->sec_out_elem));
 
-	sec_feed->sec_out_elem = ts_output_find_same_section_pid(sid,
-		sec_feed->pid);
+	sec_feed->sec_out_elem = ts_output_find_same_section_pid(
+		sid, sec_feed->pid);
 	if (sec_feed->sec_out_elem) {
 		pr_dbg("find same pid elem:0x%lx\n",
 		       (unsigned long)(sec_feed->sec_out_elem));
@@ -776,8 +787,8 @@ static int _dmx_section_feed_start_filtering(struct dmx_section_feed *feed)
 			sec_level = 0;
 		}
 	}
-	sec_feed->sec_out_elem = ts_output_open(sid, demux->id,
-		SECTION_FORMAT, SEC_TYPE, MEDIA_TS_SYS, 0);
+	sec_feed->sec_out_elem = ts_output_open(
+		sid, demux->id, SECTION_FORMAT, SEC_TYPE, MEDIA_TS_SYS, 0);
 	if (sec_feed->sec_out_elem) {
 		mem_size = sec_buf_size;
 		ret = ts_output_set_mem(sec_feed->sec_out_elem,
@@ -858,7 +869,7 @@ static int _dmx_section_feed_release_filter(struct dmx_section_feed *feed,
 	}
 	for (i = 0; i < MAX_FILTER_PER_SEC_FEED; i++) {
 		if (sec_feed->filter[i].state != DMX_STATE_FREE &&
-		    &sec_feed->filter[i].section_filter == filter) {
+		    (&sec_feed->filter[i].section_filter) == filter) {
 			swdmx_sec_filter_free(sec_feed->filter[i].secf);
 			sec_feed->filter[i].secf = NULL;
 			memset(filter, 0, sizeof(struct dmx_section_filter));
@@ -919,7 +930,7 @@ static int out_ts_elem_cb(struct out_elem *pout, char *buf,
 			return 0;
 	}
 	if (ts_feed->ts_cb)
-		ts_feed->ts_cb(buf, count, NULL, 0, source_feed, NULL);
+		ts_feed->ts_cb(buf, count, NULL, 0, source_feed);
 	return count;
 }
 
@@ -1507,9 +1518,6 @@ static int _dmx_set_hw_source(struct dmx_demux *dmx, int hw_source)
 		demux->demod_sid = -1;
 		ts_output_update_filter(demux->id, demux->local_sid);
 		dsc_set_sid(demux->id, INPUT_LOCAL, demux->local_sid);
-		advb->tsn_flag &= (~(1 << demux->id));
-		if (!advb->tsn_flag)
-			tsn_set_double_out(0);
 	} else if (hw_source >= FRONTEND_TS0 && hw_source <= FRONTEND_TS7) {
 		demux->ts_index = hw_source - FRONTEND_TS0;
 		if (advb->ts[demux->ts_index].ts_sid != -1 &&
@@ -1519,27 +1527,6 @@ static int _dmx_set_hw_source(struct dmx_demux *dmx, int hw_source)
 			dsc_set_sid(demux->id, INPUT_DEMOD, demux->demod_sid);
 		}
 		demux->local_sid = -1;
-		advb->tsn_flag &= (~(1 << demux->id));
-		if (!advb->tsn_flag)
-			tsn_set_double_out(0);
-	} else if (hw_source >= DMA_0_1 && hw_source <= DMA_7_1) {
-		demux->local_sid = hw_source - DMA_0_1 + 0x20;
-		demux->demod_sid = -1;
-		ts_output_update_filter(demux->id, demux->local_sid);
-		dsc_set_sid(demux->id, INPUT_LOCAL, demux->local_sid);
-		advb->tsn_flag |= (1 << demux->id);
-		tsn_set_double_out(1);
-	} else if (hw_source >= FRONTEND_TS0_1 && hw_source <= FRONTEND_TS7_1) {
-		demux->ts_index = hw_source - FRONTEND_TS0_1;
-		if (advb->ts[demux->ts_index].ts_sid != -1) {
-			demux->demod_sid =
-				advb->ts[demux->ts_index].ts_sid ^ 0x20;
-			ts_output_update_filter(demux->id, demux->demod_sid);
-			dsc_set_sid(demux->id, INPUT_DEMOD, demux->demod_sid);
-		}
-		demux->local_sid = -1;
-		advb->tsn_flag |= (1 << demux->id);
-		tsn_set_double_out(1);
 	}
 	mutex_unlock(demux->pmutex);
 	return 0;
@@ -1599,28 +1586,6 @@ static int _dmx_get_dvr_mem(struct dmx_demux *dmx,
 
 	info->wp_offset = wp_offset;
 	mutex_unlock(demux->pmutex);
-	return 0;
-}
-
-static int _dmx_remap_pid(struct dmx_demux *dmx, u16 pids[2])
-{
-	struct aml_dmx *demux = (struct aml_dmx *)dmx->priv;
-	int pid = (short)pids[0];
-	int pid_new = (short)pids[1];
-	unsigned int sid;
-
-	if (mutex_lock_interruptible(demux->pmutex))
-		return -ERESTARTSYS;
-
-	if (demux->source != INPUT_DEMOD)
-		sid = demux->local_sid;
-	else
-		sid = demux->demod_sid;
-
-	ts_output_remap_pid(sid, pid, pid_new);
-
-	mutex_unlock(demux->pmutex);
-
 	return 0;
 }
 
@@ -1694,7 +1659,6 @@ int dmx_init(struct aml_dmx *pdmx, struct dvb_adapter *dvb_adapter)
 	pdmx->dmx.get_dmx_mem_info = _dmx_get_mem_info;
 	pdmx->dmx.set_sec_mem = _dmx_set_sec_mem;
 	pdmx->dmx.get_dvr_mem = _dmx_get_dvr_mem;
-	pdmx->dmx.remap_pid = _dmx_remap_pid;
 	pdmx->dev.filternum = (MAX_TS_FEED_NUM + MAX_SEC_FEED_NUM);
 	pdmx->dev.demux = &pdmx->dmx;
 	pdmx->dev.capabilities = DMXDEV_CAP_DUPLEX;
@@ -2015,41 +1979,36 @@ static ssize_t dump_ts_store(struct class *class,
 	mutex_unlock(&advb->mutex);
 	return size;
 }
-
+static struct class_attribute aml_dmx_class_attrs[] = {
 #ifdef OPEN_REGISTER_NODE
-static CLASS_ATTR_RW(register_addr);
-static CLASS_ATTR_RW(register_value);
+	__ATTR(register_addr, 0644, register_addr_show,
+	       register_addr_store),
+	__ATTR(register_value, 0644, register_value_show,
+	       register_value_store),
 #endif
-static CLASS_ATTR_RW(dump_register);
-static CLASS_ATTR_RW(dump_filter);
-static CLASS_ATTR_RO(dump_av_level);
-static CLASS_ATTR_RW(cache_status);
-static CLASS_ATTR_RW(dump_ts);
-
-static struct attribute *aml_dmx_class_attrs[] = {
-#ifdef OPEN_REGISTER_NODE
-	&class_attr_register_addr.attr,
-	&class_attr_register_value.attr,
-#endif
-	&class_attr_dump_register.attr,
-	&class_attr_dump_filter.attr,
-	&class_attr_dump_av_level.attr,
-	&class_attr_cache_status.attr,
-	&class_attr_dump_ts.attr,
-	NULL
+	__ATTR(dump_register, 0644, dump_register_show,
+	       dump_register_store),
+	__ATTR(dump_filter, 0644, dump_filter_show,
+	       dump_filter_store),
+	__ATTR(dump_av_level, 0644, dump_av_level_show,
+		   NULL),
+	__ATTR(cache_status, 0644, cache_status_show,
+	       cache_status_store),
+	__ATTR(dump_ts, 0644, dump_ts_show,
+	       dump_ts_store),
+	__ATTR_NULL
 };
-
-ATTRIBUTE_GROUPS(aml_dmx_class);
 
 static struct class aml_dmx_class = {
 	.name = "dmx",
-	.class_groups = aml_dmx_class_groups,
+	.class_attrs = aml_dmx_class_attrs,
 };
 
 int dmx_regist_dmx_class(void)
 {
 	if (class_register(&aml_dmx_class) < 0)
 		dprint("register class error\n");
+
 	return 0;
 }
 

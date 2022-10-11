@@ -1,4 +1,3 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
  * drivers/amlogic/media/video_processor/v4lvideo/v4lvideo.c
  *
@@ -16,14 +15,12 @@
  *
  */
 
-#undef DEBUG
 #define DEBUG
 #include <linux/amlogic/media/vout/vout_notify.h>
 #include <linux/amlogic/media/vfm/vframe.h>
 #include <linux/amlogic/media/vfm/vframe_provider.h>
 #include <linux/amlogic/media/vfm/vframe_receiver.h>
-/* media module used media/registers/cpu_version.h since kernel 5.4 */
-#include <linux/amlogic/media/registers/cpu_version.h>
+#include <linux/amlogic/cpu_version.h>
 #include "v4lvideo.h"
 #include <media/videobuf2-core.h>
 #include <media/videobuf2-v4l2.h>
@@ -39,7 +36,6 @@
 #include <linux/amlogic/media/vfm/amlogic_fbc_hook_v1.h>
 #include <linux/amlogic/media/di/di.h>
 #include "../../common/vfm/vfm.h"
-#include <linux/amlogic/media/utils/am_com.h>
 #include <linux/amlogic/media/amdolbyvision/dolby_vision.h>
 #include <linux/amlogic/meson_uvm_core.h>
 
@@ -48,7 +44,7 @@
 #define V4LVIDEO_VERSION "1.0"
 #define RECEIVER_NAME "v4lvideo"
 #define V4LVIDEO_DEVICE_NAME   "v4lvideo"
-//#define DUR2PTS(x) ((x) - ((x) >> 4))
+#define DUR2PTS(x) ((x) - ((x) >> 4))
 
 static atomic_t global_set_cnt = ATOMIC_INIT(0);
 static u32 alloc_sei = 1;
@@ -58,7 +54,7 @@ static u32 alloc_sei = 1;
 static unsigned int video_nr_base = 30;
 static unsigned int n_devs = 9;
 #define N_DEVS 9
-static unsigned int debug;
+static unsigned int v4lvideo_debug;
 static unsigned int get_count[N_DEVS];
 static unsigned int put_count[N_DEVS];
 static unsigned int q_count[N_DEVS];
@@ -119,6 +115,62 @@ const struct video_info_t cts_vp9_videos[] = {
 	},
 };
 
+const struct video_info_t cts_videos[] = {
+	{
+		.width = 256,
+		.height = 108,
+	},
+	{
+		.width = 256,
+		.height = 144,
+	},
+	{
+		.width = 192,
+		.height = 144,
+	},
+	{
+		.width = 82,
+		.height = 144,
+	},
+	{
+		.width = 320,
+		.height = 240,
+	},
+	{
+		.width = 136,
+		.height = 240,
+	},
+	{
+		.width = 640,
+		.height = 272,
+	},
+	{
+		.width = 202,
+		.height = 306,
+	},
+	{
+		.width = 270,
+		.height = 480,
+	},
+	{
+		.width = 426,
+		.height = 182,
+	},
+	{
+		.width = 426,
+		.height = 240,
+	},
+	{
+		.width = 202,
+		.height = 360,
+	},
+	{
+		.width = 810,
+		.height = 1440,
+	},
+};
+
+const s32 num_videos = ARRAY_SIZE(cts_videos);
 const s32 num_vp9_videos = ARRAY_SIZE(cts_vp9_videos);
 
 #define PRINT_ERROR		0X0
@@ -129,7 +181,7 @@ const s32 num_vp9_videos = ARRAY_SIZE(cts_vp9_videos);
 int v4l_print(int index, int debug_flag, const char *fmt, ...)
 {
 	if ((print_flag & debug_flag) ||
-	    debug_flag == PRINT_ERROR) {
+	    (debug_flag == PRINT_ERROR)) {
 		unsigned char buf[256];
 		int len = 0;
 		va_list args;
@@ -176,14 +228,6 @@ EXPORT_SYMBOL(v4lvideo_dec_count_decrease);
 static struct keeper_mgr *get_keeper_mgr(void)
 {
 	return &keeper_mgr_private;
-}
-
-static inline u64 dur2pts(u32 duration)
-{
-	u32 ret;
-
-	ret = duration - (duration >> 4);
-	return ret;
 }
 
 void keeper_mgr_init(void)
@@ -250,7 +294,9 @@ static const struct v4lvideo_fmt *get_format(struct v4l2_format *f)
 	return __get_format(f->fmt.pix.pixelformat);
 }
 
-static void video_keeper_keep_mem(void *mem_handle, int type, int *id)
+static void video_keeper_keep_mem(
+	void *mem_handle, int type,
+	int *id)
 {
 	int ret;
 	int old_id = *id;
@@ -302,7 +348,8 @@ static void video_keeper_keep_mem(void *mem_handle, int type, int *id)
 	mgr->keep_list[slot_i].keep_id = *id;
 }
 
-static void video_keeper_free_mem(int keep_id, int delayms)
+static void video_keeper_free_mem(
+	int keep_id, int delayms)
 {
 	struct keeper_mgr *mgr = get_keeper_mgr();
 	int i;
@@ -324,10 +371,9 @@ static void video_keeper_free_mem(int keep_id, int delayms)
 			} else if (mgr->keep_list[i].count == 0) {
 				mgr->keep_list[i].keep_id = -1;
 				mgr->keep_list[i].handle = NULL;
-			} else {
+			} else
 				pr_err("v4lvideo: free mem err count =%d\n",
 				       mgr->keep_list[i].count);
-			}
 		}
 	}
 	spin_unlock_irqrestore(&mgr->lock, flags);
@@ -352,12 +398,13 @@ static void vf_keep(struct v4lvideo_dev *dev,
 	u32 inst_id = dev->inst;
 
 	if (!file_private_data) {
-		V4LVID_ERR("%s error: file_private_data is NULL", __func__);
+		V4LVID_ERR("vf_keep error: file_private_data is NULL");
 		return;
 	}
+
 	vf_p = file_private_data->vf_p;
 
-	if (!vf_p || vf_p != v4lvideo_file->vf_p) {
+	if (!vf_p || (vf_p != v4lvideo_file->vf_p)) {
 		v4l_print(dev->inst, PRINT_ERROR,
 			"maybe file has been released\n");
 		mutex_lock(&dev->mutex_opened);
@@ -384,7 +431,7 @@ static void vf_keep(struct v4lvideo_dev *dev,
 	if (file_private_data->flag & V4LVIDEO_FLAG_DI_NR) {
 		vf_ext_p = file_private_data->vf_ext_p;
 		if (!vf_ext_p) {
-			V4LVID_ERR("%s error: vf_ext is NULL", __func__);
+			V4LVID_ERR("vf_keep error: vf_ext is NULL");
 			return;
 		}
 		vf_p = vf_ext_p;
@@ -392,9 +439,14 @@ static void vf_keep(struct v4lvideo_dev *dev,
 
 	if (vf_p->type & VIDTYPE_SCATTER)
 		type = MEM_TYPE_CODEC_MM_SCATTER;
-	video_keeper_keep_mem(vf_p->mem_handle,	type, &keep_id);
-	video_keeper_keep_mem(vf_p->mem_head_handle, MEM_TYPE_CODEC_MM,
-			      &keep_head_id);
+	video_keeper_keep_mem(
+		vf_p->mem_handle,
+		type,
+		&keep_id);
+	video_keeper_keep_mem(
+		vf_p->mem_head_handle,
+		MEM_TYPE_CODEC_MM,
+		&keep_head_id);
 
 	file_private_data->keep_id = keep_id;
 	file_private_data->keep_head_id = keep_head_id;
@@ -410,11 +462,13 @@ static void vf_free(struct file_private_data *file_private_data)
 
 	inst_id = file_private_data->v4l_inst_id;
 	if (file_private_data->keep_id > 0) {
-		video_keeper_free_mem(file_private_data->keep_id, 0);
+		video_keeper_free_mem(
+				file_private_data->keep_id, 0);
 		file_private_data->keep_id = -1;
 	}
 	if (file_private_data->keep_head_id > 0) {
-		video_keeper_free_mem(file_private_data->keep_head_id, 0);
+		video_keeper_free_mem(
+				file_private_data->keep_head_id, 0);
 		file_private_data->keep_head_id = -1;
 	}
 
@@ -472,7 +526,7 @@ void init_file_private_data(struct file_private_data *file_private_data)
 		file_private_data->flag = 0;
 		file_private_data->cnt_file = NULL;
 	} else {
-		V4LVID_ERR("%s is NULL!!", __func__);
+		V4LVID_ERR("init_file_private_data is NULL!!");
 	}
 }
 
@@ -527,7 +581,7 @@ int v4lvideo_alloc_map(int *inst)
 	list_for_each(p, &v4lvideo_devlist) {
 		dev = list_entry(p, struct v4lvideo_dev, v4lvideo_devlist);
 
-		if (dev->inst >= 0 && !dev->mapped) {
+		if ((dev->inst >= 0) && (!dev->mapped)) {
 			dev->mapped = true;
 			*inst = dev->inst;
 			v4lvideo_devlist_unlock(flags);
@@ -549,9 +603,9 @@ void v4lvideo_release_map(int inst)
 
 	list_for_each(p, &v4lvideo_devlist) {
 		dev = list_entry(p, struct v4lvideo_dev, v4lvideo_devlist);
-		if (dev->inst == inst && dev->mapped) {
+		if ((dev->inst == inst) && (dev->mapped)) {
 			dev->mapped = false;
-			pr_debug("%s %d OK\n", __func__, dev->inst);
+			pr_debug("v4lvideo_release_map %d OK\n", dev->inst);
 			break;
 		}
 	}
@@ -567,7 +621,7 @@ void v4lvideo_release_map_force(struct v4lvideo_dev *dev)
 
 	if (dev->mapped) {
 		dev->mapped = false;
-		pr_debug("%s %d OK\n", __func__, dev->inst);
+		pr_debug("v4lvideo_release_map %d OK\n", dev->inst);
 	}
 
 	v4lvideo_devlist_unlock(flags);
@@ -583,8 +637,8 @@ static int get_source_type(struct vframe_s *vf)
 	int interlace_mode;
 
 	interlace_mode = vf->type & VIDTYPE_TYPEMASK;
-	if (vf->source_type == VFRAME_SOURCE_TYPE_HDMI ||
-	    vf->source_type == VFRAME_SOURCE_TYPE_CVBS) {
+	if ((vf->source_type == VFRAME_SOURCE_TYPE_HDMI) ||
+	    (vf->source_type == VFRAME_SOURCE_TYPE_CVBS)) {
 		if ((vf->bitdepth & BITDEPTH_Y10) &&
 		    (!(vf->type & VIDTYPE_COMPRESS)) &&
 		    (get_cpu_type() >= MESON_CPU_MAJOR_ID_TXL))
@@ -631,19 +685,6 @@ static int get_input_format(struct vframe_s *vf)
 			format = GE2D_FORMAT_M24_YUV420;
 		break;
 	case DECODER_8BIT_BOTTOM:
-		if (vf->type & VIDTYPE_VIU_422)
-			format = GE2D_FORMAT_S16_YUV422
-				| (GE2D_FORMAT_S16_YUV422B & (3 << 3));
-		else if (vf->type & VIDTYPE_VIU_NV21)
-			format = GE2D_FORMAT_M24_NV21
-				| (GE2D_FORMAT_M24_NV21B & (3 << 3));
-		else if (vf->type & VIDTYPE_VIU_444)
-			format = GE2D_FORMAT_S24_YUV444
-				| (GE2D_FORMAT_S24_YUV444B & (3 << 3));
-		else
-			format = GE2D_FORMAT_M24_YUV420
-				| (GE2D_FMT_M24_YUV420B & (3 << 3));
-		break;
 	case DECODER_8BIT_TOP:
 		if (vf->type & VIDTYPE_VIU_422)
 			format = GE2D_FORMAT_S16_YUV422
@@ -742,8 +783,7 @@ static void dump_yuv_data(struct vframe_s *vf,
 	set_fs(fs);
 }
 
-static void do_vframe_afbc_soft_decode(struct v4l_data_t *v4l_data,
-					struct vframe_s *vf)
+static void do_vframe_afbc_soft_decode(struct v4l_data_t *v4l_data)
 {
 	int i, j, ret, y_size;
 	short *planes[4];
@@ -753,19 +793,27 @@ static void do_vframe_afbc_soft_decode(struct v4l_data_t *v4l_data,
 	int bit_10;
 	struct timeval start, end;
 	unsigned long time_use = 0;
+	struct vframe_s *vf = NULL;
+	struct file_private_data *file_private_data;
 
-	if ((vf->bitdepth & BITDEPTH_YMASK)  == BITDEPTH_Y10)
+	file_private_data = v4l_data->file_private_data;
+	if (file_private_data->flag & V4LVIDEO_FLAG_DI_NR)
+		vf = &file_private_data->vf_ext;
+	else
+		vf = &file_private_data->vf;
+
+	if ((vf->bitdepth & BITDEPTH_YMASK)  == (BITDEPTH_Y10))
 		bit_10 = 1;
 	else
 		bit_10 = 0;
 
 	y_size = vf->compWidth * vf->compHeight * sizeof(short);
-	pr_info("width: %d, height: %d, compWidth: %u, compHeight: %u.\n",
-		 vf->width, vf->height, vf->compWidth, vf->compHeight);
+	pr_debug("width: %d, height: %d, compWidth: %u, compHeight: %u.\n",
+		vf->width, vf->height, vf->compWidth, vf->compHeight);
 	for (i = 0; i < 4; i++) {
 		planes[i] = vmalloc(y_size);
-		pr_info("plane %d size: %d, vmalloc addr: %p.\n",
-			 i, y_size, planes[i]);
+		pr_debug("plane %d size: %d, vmalloc addr: %p.\n",
+			i, y_size, planes[i]);
 	}
 
 	do_gettimeofday(&start);
@@ -803,9 +851,10 @@ static void do_vframe_afbc_soft_decode(struct v4l_data_t *v4l_data,
 	}
 
 	for (i = 0; i < (vf->compHeight / 2); i++) {
+
 		for (j = 0; j < vf->compWidth; j += 2) {
-			s2c = v_src + j / 2;
-			s2c1 = u_src + j / 2;
+			s2c = v_src + j/2;
+			s2c1 = u_src + j/2;
 			tmp = (u8 *)(s2c);
 			tmp1 = (u8 *)(s2c1);
 
@@ -817,9 +866,10 @@ static void do_vframe_afbc_soft_decode(struct v4l_data_t *v4l_data,
 				*(vu_dst + j + 1) = tmp1[0];
 			}
 		}
-		vu_dst += v4l_data->byte_stride;
-		u_src += (vf->compWidth / 2);
-		v_src += (vf->compWidth / 2);
+
+			vu_dst += v4l_data->byte_stride;
+			u_src += (vf->compWidth / 2);
+			v_src += (vf->compWidth / 2);
 	}
 
 	do_gettimeofday(&end);
@@ -834,6 +884,27 @@ free:
 		vfree(planes[i]);
 }
 
+static bool need_do_extend_one_column(struct vframe_s *vf,
+				      struct v4l_data_t *v4l_data)
+{
+	u32 video_idx;
+
+	if (cts_video_flag || (vf->width >= v4l_data->byte_stride))
+		return false;
+	pr_debug("width:%d height:%d num_videos:%d\n",
+			v4l_data->width,
+			v4l_data->height,
+			num_videos);
+	for (video_idx = 0; video_idx < num_videos; video_idx++) {
+		if (vf->width == cts_videos[video_idx].width &&
+			vf->height == cts_videos[video_idx].height) {
+			pr_info("need_do_extend_one_column\n");
+			return true;
+		}
+	}
+	return false;
+}
+
 /* for fbc output video:vp9 */
 static bool need_do_extend_one_column_fbc(struct vframe_s *vf,
 					  struct v4l_data_t *v4l_data)
@@ -843,7 +914,7 @@ static bool need_do_extend_one_column_fbc(struct vframe_s *vf,
 	pr_info("vf->compwidth:%d v4l_data->byte_stride:%d num_vp9_videos:%d\n",
 		 vf->compWidth, v4l_data->byte_stride, num_vp9_videos);
 
-	if (cts_video_flag || vf->compWidth >= v4l_data->byte_stride)
+	if (cts_video_flag || (vf->compWidth >= v4l_data->byte_stride))
 		return false;
 
 	for (video_idx = 0; video_idx < num_vp9_videos; video_idx++) {
@@ -864,7 +935,7 @@ static bool need_do_extend_one_row_fbc(struct vframe_s *vf,
 	pr_info("vf->compHeight:%d v4l_data->height:%d num_vp9_videos:%d\n",
 		 vf->compHeight, v4l_data->height, num_vp9_videos);
 
-	if (cts_video_flag || vf->compHeight >= v4l_data->height)
+	if (cts_video_flag || (vf->compHeight >= v4l_data->height))
 		return false;
 
 	for (video_idx = 0; video_idx < num_vp9_videos; video_idx++) {
@@ -877,85 +948,60 @@ static bool need_do_extend_one_row_fbc(struct vframe_s *vf,
 	return true;
 }
 
-void v4lvideo_data_copy(struct v4l_data_t *v4l_data,
-				struct dma_buf *dmabuf,
-				u32 align)
+void v4lvideo_data_copy(struct v4l_data_t *v4l_data, struct dma_buf *dmabuf)
 {
-	struct uvm_hook_mod *uhmod = NULL;
+	struct file *fp;
+	mm_segment_t fs;
+	loff_t pos;
+	char name_buf[32];
+	uint32_t write_size;
+
+	struct uvm_hook_mod *uhmod;
 	struct config_para_ex_s ge2d_config;
 	struct canvas_config_s dst_canvas_config[3];
 	struct vframe_s *vf = NULL;
 	const char *keep_owner = "ge2d_dest_comp";
 	bool di_mode = false;
 	bool is_10bit = false;
-	bool is_dec_vf = false;
-	u32 aligned_height = 0;
 	char *y_vaddr = NULL;
 	char *uv_vaddr = NULL;
 	char *y_src = NULL;
 	char *uv_src = NULL;
 	u32 row;
-	struct file_private_data *file_private_data = NULL;
+	u32 extend_width;
+	struct file_private_data *file_private_data;
 
-	is_dec_vf = is_valid_mod_type(dmabuf, VF_SRC_DECODER);
-
-	if (is_dec_vf) {
-		vf = dmabuf_get_vframe(dmabuf);
-		pr_debug("vf=%p vf->vf_ext:%p vf->flags:%d\n",
-				vf, vf->vf_ext, vf->flag);
-		if (vf->vf_ext &&
-				(vf->flag & VFRAME_FLAG_CONTAIN_POST_FRAME)) {
-			vf = vf->vf_ext;
-			pr_debug("get vf_ext\n");
-		}
-		dmabuf_put_vframe(dmabuf);
+	if (!dmabuf) {
+		file_private_data = v4l_data->file_private_data;
 	} else {
-		if (!dmabuf) {
-			file_private_data = v4l_data->file_private_data;
-		} else {
-			uhmod = uvm_get_hook_mod(dmabuf, VF_PROCESS_V4LVIDEO);
-			if (uhmod && uhmod->arg) {
-				file_private_data = uhmod->arg;
-				uvm_put_hook_mod(dmabuf, VF_PROCESS_V4LVIDEO);
-			}
-		}
-		pr_debug("%s: uhmod: %p\n", __func__, uhmod);
-		if (!file_private_data) {
-			pr_err("file_private_data is NULL\n");
+		uhmod = uvm_get_hook_mod(dmabuf, VF_PROCESS_V4LVIDEO);
+		if (!(!IS_ERR_VALUE(uhmod) && uhmod->arg)) {
+			pr_err("uvm_get_hook_mod fail.\n");
 			return;
 		}
-
-		if (file_private_data->flag & V4LVIDEO_FLAG_DI_NR)
-			vf = &file_private_data->vf_ext;
-		else
-			vf = &file_private_data->vf;
-		if (cts_use_di)
-			vf = &file_private_data->vf;
-
-		v4l_data->file_private_data = file_private_data;
+		file_private_data = uhmod->arg;
+		uvm_put_hook_mod(dmabuf, VF_PROCESS_V4LVIDEO);
 	}
 
-
-	pr_info("%s: vf->type: %d vf->compWidth: %d\n",
-			__func__, vf->type, vf->compWidth);
-	if (!vf) {
-		pr_err("vf is NULL\n");
+	if (!file_private_data) {
+		pr_err("v4lvideo_data_copy file_private_data is NULL\n");
 		return;
 	}
 
-	pr_debug("%s: vf->type: %d vf->compWidth: %d\n",
-			__func__, vf->type, vf->compWidth);
+	if (file_private_data->flag & V4LVIDEO_FLAG_DI_NR)
+		vf = &file_private_data->vf_ext;
+	else
+		vf = &file_private_data->vf;
+	if (cts_use_di)
+		vf = &file_private_data->vf;
 
-	/*
-	 * fbc decoder for VIDTYPE_COMPRESS
-	 */
 	if ((vf->type & VIDTYPE_COMPRESS)) {
 		pr_info("fbc decoder path\n");
-		do_vframe_afbc_soft_decode(v4l_data, vf);
+		v4l_data->file_private_data = file_private_data;
 		y_vaddr = v4l_data->dst_addr;
 		uv_vaddr = y_vaddr +
 			v4l_data->byte_stride * v4l_data->height;
-		do_vframe_afbc_soft_decode(v4l_data, vf);
+		do_vframe_afbc_soft_decode(v4l_data);
 		if (need_do_extend_one_column_fbc(vf, v4l_data) == true) {
 			for (row = 0; row < vf->compHeight; row++) {
 				int cnt = vf->compWidth +
@@ -990,7 +1036,6 @@ void v4lvideo_data_copy(struct v4l_data_t *v4l_data,
 		if (need_do_extend_one_row_fbc(vf, v4l_data) == false)
 			return;
 
-		pr_info("begin copy row\n");
 		y_src = y_vaddr + v4l_data->byte_stride * (vf->compHeight - 1);
 		uv_src = uv_vaddr +
 			v4l_data->byte_stride * (vf->compHeight / 2 - 1);
@@ -999,12 +1044,9 @@ void v4lvideo_data_copy(struct v4l_data_t *v4l_data,
 				uv_src, vf->compWidth + 1);
 		return;
 	}
-	/*
-	 * GE2D copy for non-compress
-	 */
 	is_10bit = vf->bitdepth & BITDEPTH_Y10;
 	di_mode = vf->type & VIDTYPE_DI_PW;
-	if (is_10bit && !di_mode) {
+	if (is_10bit && (!di_mode)) {
 		pr_err("vframe 10bit copy is not supported.\n");
 		return;
 	}
@@ -1015,39 +1057,32 @@ void v4lvideo_data_copy(struct v4l_data_t *v4l_data,
 	if (!context)
 		context = create_ge2d_work_queue();
 
-	if (!context) {
+	if (context == NULL) {
 		pr_err("create_ge2d_work_queue failed.\n");
 		return;
 	}
-	aligned_height = ALIGN(v4l_data->height, align);
+
 	dst_canvas_config[0].phy_addr = v4l_data->phy_addr[0];
 	dst_canvas_config[0].width = v4l_data->byte_stride;
 
 	dst_canvas_config[0].height = v4l_data->height;
 	dst_canvas_config[0].block_mode = 0;
 	dst_canvas_config[0].endian = 0;
-	/*
-	 * v4ldecoder:
-	 * for non-compress videos like H264
-	 * need align width and height
-	 * v4lvideo:
-	 * no requirement for height align
-	 */
 	dst_canvas_config[1].phy_addr = v4l_data->phy_addr[0] +
-		v4l_data->byte_stride * aligned_height;
+		v4l_data->byte_stride * v4l_data->height;
 	dst_canvas_config[1].width = v4l_data->byte_stride;
-	dst_canvas_config[1].height = v4l_data->height / 2;
+	dst_canvas_config[1].height = v4l_data->height/2;
 	dst_canvas_config[1].block_mode = 0;
 	dst_canvas_config[1].endian = 0;
 
-	pr_debug("compWidth: %u, compHeight: %u.\n",
-		 vf->compWidth, vf->compHeight);
-	pr_debug("vf-width:%u, vf-height:%u, vf-widht-align:%u\n",
-		 vf->width, vf->height, ALIGN(vf->width, 64));
-	pr_debug("umm-bytestride: %d, umm-width:%u, umm-height:%u\n",
-		 v4l_data->byte_stride, v4l_data->width, v4l_data->height);
-	pr_debug("y_addr:%lu, uv_addr:%lu.\n", dst_canvas_config[0].phy_addr,
-		 dst_canvas_config[1].phy_addr);
+	pr_debug("width:%u, height:%u, widht-align:%u, bytestride: %d, umm-width:%u, umm-height:%u, y_addr:%u, uv_addr:%u.,flag=%d\n",
+		 vf->width, vf->height, ALIGN(vf->width, 32),
+		 v4l_data->byte_stride, v4l_data->width,
+		 v4l_data->height,
+		 dst_canvas_config[0].phy_addr,
+		 dst_canvas_config[1].phy_addr,
+		 vf->flag);
+
 	if (vf->canvas0Addr == (u32)-1) {
 		if (canvas_src_id[0] <= 0)
 			canvas_src_id[0] =
@@ -1059,9 +1094,7 @@ void v4lvideo_data_copy(struct v4l_data_t *v4l_data,
 
 		if (canvas_src_id[0] <= 0 || canvas_src_id[1] <= 0) {
 			pr_err("canvas pool alloc fail.%d, %d, %d.\n",
-			       canvas_src_id[0],
-			       canvas_src_id[1],
-			       canvas_src_id[2]);
+			canvas_src_id[0], canvas_src_id[1], canvas_src_id[2]);
 			return;
 		}
 
@@ -1082,7 +1115,7 @@ void v4lvideo_data_copy(struct v4l_data_t *v4l_data,
 		canvas_dst_id[1] = canvas_pool_map_alloc_canvas(keep_owner);
 	if (canvas_dst_id[0] <= 0 || canvas_dst_id[1] <= 0) {
 		pr_err("canvas pool alloc dst fail. %d, %d.\n",
-		       canvas_dst_id[0], canvas_dst_id[1]);
+			canvas_dst_id[0], canvas_dst_id[1]);
 		return;
 	}
 	canvas_config_config(canvas_dst_id[0], &dst_canvas_config[0]);
@@ -1104,14 +1137,6 @@ void v4lvideo_data_copy(struct v4l_data_t *v4l_data,
 
 	ge2d_config.src_para.mem_type = CANVAS_TYPE_INVALID;
 	ge2d_config.src_para.format = get_input_format(vf);
-	/*
-	 * also need config ge2d src format
-	 * VFRAME_FLAG_VIDEO_LINEAR -> little ednian
-	 */
-	if (vf->flag & VFRAME_FLAG_VIDEO_LINEAR)
-		ge2d_config.src_para.format |= GE2D_LITTLE_ENDIAN;
-	pr_debug("%s: ge2d_config.src_para.format: %d\n",
-			__func__, ge2d_config.src_para.format);
 	ge2d_config.src_para.fill_color_en = 0;
 	ge2d_config.src_para.fill_mode = 0;
 	ge2d_config.src_para.x_rev = 0;
@@ -1134,9 +1159,15 @@ void v4lvideo_data_copy(struct v4l_data_t *v4l_data,
 	ge2d_config.dst_para.color = 0;
 	ge2d_config.dst_para.top = 0;
 	ge2d_config.dst_para.left = 0;
-	ge2d_config.dst_para.format = GE2D_FORMAT_M24_NV21
-					| GE2D_LITTLE_ENDIAN;
-	ge2d_config.dst_para.width = vf->width;
+	ge2d_config.dst_para.format = GE2D_FORMAT_M24_NV21 | GE2D_LITTLE_ENDIAN;
+	extend_width = vf->width;
+	if (need_do_extend_one_column(vf, v4l_data))
+		extend_width = vf->width + 1;
+	pr_info("extend_width:%d vf->width:%d vf->height:%d\n",
+		extend_width, vf->width, vf->height);
+	ge2d_config.dst_para.width = extend_width;
+	pr_info("ge2d_config.dst_para.width:%d\n",
+		ge2d_config.dst_para.width);
 	ge2d_config.dst_para.height = vf->height;
 
 	if (ge2d_context_config_ex(context, &ge2d_config) < 0) {
@@ -1146,12 +1177,30 @@ void v4lvideo_data_copy(struct v4l_data_t *v4l_data,
 
 	if (vf->type & VIDTYPE_INTERLACE)
 		stretchblt_noalpha(context, 0, 0, vf->width, vf->height / 2,
-				   0, 0, vf->width, vf->height);
+			0, 0, extend_width, vf->height);
 	else
 		stretchblt_noalpha(context, 0, 0, vf->width, vf->height,
-				   0, 0, vf->width, vf->height);
-	if (vf_dump)
-		dump_yuv_data(vf, v4l_data);
+			0, 0, extend_width, vf->height);
+
+	if (vf_dump) {
+		snprintf(name_buf, sizeof(name_buf), "/data/tmp/%d-%d.raw",
+				vf->width, vf->height);
+		fs = get_fs();
+		set_fs(KERNEL_DS);
+		pos = 0;
+		fp = filp_open(name_buf, O_CREAT | O_RDWR, 0644);
+		if (IS_ERR(fp)) {
+			pr_err("create %s fail.\n", name_buf);
+		} else {
+			write_size = v4l_data->byte_stride *
+				v4l_data->height * 3 / 2;
+			vfs_write(fp, phys_to_virt(v4l_data->phy_addr[0]),
+				write_size, &pos);
+			pr_debug("write %u size to file.\n", write_size);
+			filp_close(fp, NULL);
+		}
+		set_fs(fs);
+	}
 }
 
 static s32 v4lvideo_release_sei_data(struct vframe_s *vf)
@@ -1174,8 +1223,10 @@ static s32 v4lvideo_release_sei_data(struct vframe_s *vf)
 
 static void v4lvideo_private_data_release(struct file_private_data *data)
 {
-	if (!data)
+	if (!data) {
+		pr_err("v4lvideo_private_data_release NULL\n");
 		return;
+	}
 
 	if (data->is_keep)
 		vf_free(data);
@@ -1202,7 +1253,7 @@ struct file_private_data *v4lvideo_get_file_private_data(struct file *file_vf,
 	struct uvm_hook_mod_info info;
 	int ret;
 
-	if (!file_vf) {
+	if (IS_ERR_OR_NULL(file_vf)) {
 		pr_err("v4lvideo: get_file_private_data fail\n");
 		return NULL;
 	}
@@ -1218,7 +1269,8 @@ struct file_private_data *v4lvideo_get_file_private_data(struct file *file_vf,
 
 	uhmod = uvm_get_hook_mod((struct dma_buf *)(file_vf->private_data),
 				 VF_PROCESS_V4LVIDEO);
-	if (uhmod && uhmod->arg) {
+
+	if (!IS_ERR_OR_NULL(uhmod) && uhmod->arg) {
 		file_private_data = uhmod->arg;
 		uvm_put_hook_mod((struct dma_buf *)(file_vf->private_data),
 				 VF_PROCESS_V4LVIDEO);
@@ -1230,6 +1282,11 @@ struct file_private_data *v4lvideo_get_file_private_data(struct file *file_vf,
 	file_private_data = kzalloc(sizeof(*file_private_data), GFP_KERNEL);
 	if (!file_private_data)
 		return NULL;
+	if (IS_ERR(file_private_data)) {
+		kfree(file_private_data);
+		file_private_data = NULL;
+		return NULL;
+	}
 	info.type = VF_PROCESS_V4LVIDEO;
 	info.arg = file_private_data;
 	info.free = free_fd_private;
@@ -1247,23 +1304,24 @@ struct file_private_data *v4lvideo_get_vf(int fd)
 
 	file_vf = fget(fd);
 	if (!file_vf) {
-		pr_err("%s file_vf is NULL\n", __func__);
+		pr_err("v4lvideo_get_vf file_vf is NULL\n");
 		return NULL;
 	}
 
 	file_private_data = v4lvideo_get_file_private_data(file_vf, false);
 	fput(file_vf);
 	if (!file_private_data) {
-		pr_err("%s private is NULL\n", __func__);
+		pr_err("%s v4lvideo_get_vf private is NULL\n", __func__);
 		return NULL;
 	}
 
 	return file_private_data;
 }
 
-static s32 v4lvideo_import_sei_data(struct vframe_s *vf,
-				    struct vframe_s *dup_vf,
-				    char *provider)
+static s32 v4lvideo_import_sei_data(
+	struct vframe_s *vf,
+	struct vframe_s *dup_vf,
+	char *provider)
 {
 	struct provider_aux_req_s req;
 	s32 ret = -2;
@@ -1288,7 +1346,8 @@ static s32 v4lvideo_import_sei_data(struct vframe_s *vf,
 		req.aux_buf = NULL;
 		req.aux_size = 0;
 		req.dv_enhance_exist = 0;
-		vf_notify_provider_by_name(provider,
+		vf_notify_provider_by_name(
+			provider,
 			VFRAME_EVENT_RECEIVER_GET_AUX_DATA,
 			(void *)&req);
 		if (req.aux_buf && req.aux_size) {
@@ -1302,8 +1361,8 @@ static s32 v4lvideo_import_sei_data(struct vframe_s *vf,
 							    provider, NULL);
 				if (!ret) {
 				/* FIXME: work around for sei/el out of sync */
-					/*if (dup_vf->src_fmt.fmt == */
-					/*     VFRAME_SIGNAL_FMT_SDR && */
+					/*if ((dup_vf->src_fmt.fmt == */
+					/*     VFRAME_SIGNAL_FMT_SDR) && */
 					/*    !strcmp(provider, "dvbldec")) */
 					/*	dup_vf->src_fmt.fmt = */
 					/*	VFRAME_SIGNAL_FMT_DOVI; */
@@ -1339,14 +1398,13 @@ static s32 v4lvideo_import_sei_data(struct vframe_s *vf,
 			req.dv_enhance_exist, dup_vf->src_fmt.fmt);
 	return ret;
 }
-
 /* ------------------------------------------------------------------
  * DMA and thread functions
  * ------------------------------------------------------------------
  */
 unsigned int get_v4lvideo_debug(void)
 {
-	return debug;
+	return v4lvideo_debug;
 }
 EXPORT_SYMBOL(get_v4lvideo_debug);
 
@@ -1407,7 +1465,7 @@ static int vidioc_open(struct file *file)
 	int i;
 
 	if (dev->fd_num > 0) {
-		pr_err("%s error\n", __func__);
+		pr_err("vidioc_open error\n");
 		return -EBUSY;
 	}
 
@@ -1590,7 +1648,7 @@ static int vidioc_s_fmt_vid_cap(struct file *file, void *priv,
 	dev->fmt = get_format(f);
 	dev->width = f->fmt.pix.width;
 	dev->height = f->fmt.pix.height;
-	if (dev->width == 0 || dev->height == 0)
+	if ((dev->width == 0) || (dev->height == 0))
 		V4LVID_ERR("ion buffer w/h info is invalid!!!!!!!!!!!\n");
 
 	return 0;
@@ -1645,6 +1703,7 @@ static bool pop_specific_from_display_q(struct v4lvideo_dev *dev,
 		atomic_set(&v4lvideo_file->on_use, false);
 	return ret;
 }
+
 static int vidioc_qbuf(struct file *file, void *priv, struct v4l2_buffer *p)
 {
 	struct v4lvideo_dev *dev = video_drvdata(file);
@@ -1679,11 +1738,8 @@ static int vidioc_qbuf(struct file *file, void *priv, struct v4l2_buffer *p)
 
 	mutex_lock(&dev->mutex_input);
 	if (vf_p) {
-		if (!v4lvideo_file) {
-			pr_err("%s: v4lvideo_file NULL\n", __func__);
-			mutex_unlock(&dev->mutex_input);
-			return 0;
-		}
+		if (!v4lvideo_file)
+			pr_err("vidioc_qbuf: v4lvideo_file NULL\n");
 		if (file_private_data->is_keep) {
 			vf_free(file_private_data);
 		} else {
@@ -1697,10 +1753,10 @@ static int vidioc_qbuf(struct file *file, void *priv, struct v4l2_buffer *p)
 					put_count[inst_id]++;
 				} else {
 					vf_free(file_private_data);
-					pr_err("%s: vfm is unreg\n", __func__);
+					pr_err("vidioc_qbuf: vfm is unreg\n");
 				}
 			} else {
-				pr_err("%s: maybe in unreg\n", __func__);
+				pr_err("vidioc_qbuf: maybe in unreg\n");
 				if (v4lvideo_file->vf_type & VIDTYPE_DI_PW) {
 					dim_post_keep_cmd_release2(vf_p);
 					total_release_count[inst_id]++;
@@ -1714,7 +1770,7 @@ static int vidioc_qbuf(struct file *file, void *priv, struct v4l2_buffer *p)
 		}
 	} else {
 		dprintk(dev, 1,
-			"%s: vf is NULL, at the start of playback\n", __func__);
+			"vidioc_qbuf: vf is NULL, at the start of playback\n");
 	}
 
 	v4lvideo_release_sei_data(&file_private_data->vf);
@@ -1808,12 +1864,6 @@ static int vidioc_dqbuf(struct file *file, void *priv, struct v4l2_buffer *p)
 	u32 inst_id = dev->inst;
 
 	mutex_lock(&dev->mutex_input);
-
-	if (!dev->receiver_register) {
-		mutex_unlock(&dev->mutex_input);
-		return -EAGAIN;
-	}
-
 	buf = v4l2q_peek(&dev->input_queue);
 	if (!buf) {
 		dprintk(dev, 3, "No active queue to serve\n");
@@ -1844,7 +1894,8 @@ static int vidioc_dqbuf(struct file *file, void *priv, struct v4l2_buffer *p)
 	}
 
 	if (!dev->provider_name) {
-		provider_name = vf_get_provider_name(dev->vf_receiver_name);
+		provider_name = vf_get_provider_name(
+			dev->vf_receiver_name);
 		while (provider_name) {
 			if (!vf_get_provider_name(provider_name))
 				break;
@@ -1859,8 +1910,8 @@ static int vidioc_dqbuf(struct file *file, void *priv, struct v4l2_buffer *p)
 	get_count[inst_id]++;
 	vf->omx_index = dev->frame_num;
 	dev->am_parm.signal_type = vf->signal_type;
-	dev->am_parm.master_display_colour =
-			 vf->prop.master_display_colour;
+	dev->am_parm.master_display_colour
+		= vf->prop.master_display_colour;
 	if (vf->hdr10p_data_size > 0 && vf->hdr10p_data_buf) {
 		if (vf->hdr10p_data_size <= 128) {
 			dev->am_parm.hdr10p_data_size =
@@ -1929,9 +1980,9 @@ static int vidioc_dqbuf(struct file *file, void *priv, struct v4l2_buffer *p)
 			file_private_data->vf.canvas0_config[0].block_mode = 0;
 			file_private_data->vf.canvas0_config[0].endian = 0;
 			file_private_data->vf.vf_ext =
-				&file_private_data->vf_ext;
+				&(file_private_data->vf_ext);
 		}
-		file_private_data->vf.vf_ext = &file_private_data->vf_ext;
+		file_private_data->vf.vf_ext = &(file_private_data->vf_ext);
 	} else {
 		file_private_data->vf = *vf;
 		file_private_data->vf_p = vf;
@@ -1941,8 +1992,8 @@ static int vidioc_dqbuf(struct file *file, void *priv, struct v4l2_buffer *p)
 	file_private_data->vf.src_fmt.md_buf = file_private_data->md.p_md;
 	file_private_data->vf.src_fmt.comp_buf = file_private_data->md.p_comp;
 	file_private_data->v4l_inst_id = dev->inst;
-	v4lvideo_import_sei_data(vf,
-		&file_private_data->vf,
+	v4lvideo_import_sei_data(
+		vf, &file_private_data->vf,
 		dev->provider_name);
 
 	//pr_err("dqbuf: file_private_data=%p, vf=%p\n", file_private_data, vf);
@@ -1959,7 +2010,7 @@ static int vidioc_dqbuf(struct file *file, void *priv, struct v4l2_buffer *p)
 		dev->first_frame = 1;
 		pts_us64 = 0;
 	} else {
-		pts_tmp = dur2pts(vf->duration) * 100;
+		pts_tmp = DUR2PTS(vf->duration) * 100;
 		do_div(pts_tmp, 9);
 		pts_us64 = dev->last_pts_us64
 			+ pts_tmp;
@@ -1968,11 +2019,11 @@ static int vidioc_dqbuf(struct file *file, void *priv, struct v4l2_buffer *p)
 		vf->pts = pts_tmp;
 	}
 	/*workrun for decoder i pts err, if decoder fix it, this should remove*/
-	if ((!(vf->flag & VFRAME_FLAG_DOUBLE_FRAM)) &&
-		(vf->type & VIDTYPE_DI_PW || vf->type & VIDTYPE_INTERLACE) &&
-		vf->pts_us64 == dev->last_pts_us64) {
+	if ((!(vf->flag & VFRAME_FLAG_DOUBLE_FRAM))
+	    && (vf->type & VIDTYPE_DI_PW || vf->type & VIDTYPE_INTERLACE)
+	    && (vf->pts_us64 == dev->last_pts_us64)) {
 		dprintk(dev, 1, "pts same\n");
-		pts_tmp = dur2pts(vf->duration) * 100;
+		pts_tmp = DUR2PTS(vf->duration) * 100;
 		do_div(pts_tmp, 9);
 		pts_us64 = dev->last_pts_us64
 			+ pts_tmp;
@@ -1982,9 +2033,9 @@ static int vidioc_dqbuf(struct file *file, void *priv, struct v4l2_buffer *p)
 	}
 
 	*p = *buf;
-	 p->timestamp.tv_sec = pts_us64 >> 32;
-	 p->timestamp.tv_usec = pts_us64 & 0xFFFFFFFF;
-	 dev->last_pts_us64 = pts_us64;
+	p->timestamp.tv_sec = pts_us64 >> 32;
+	p->timestamp.tv_usec = pts_us64 & 0xFFFFFFFF;
+	dev->last_pts_us64 = pts_us64;
 
 	if ((vf->type & VIDTYPE_COMPRESS) != 0) {
 		p->timecode.type = vf->compWidth;
@@ -1994,6 +2045,10 @@ static int vidioc_dqbuf(struct file *file, void *priv, struct v4l2_buffer *p)
 		p->timecode.flags = vf->height;
 	}
 	p->sequence = dev->frame_num++;
+
+	if (vf->type & VIDTYPE_DI_PW || vf->type & VIDTYPE_INTERLACE)
+		p->field = V4L2_FIELD_INTERLACED;
+
 	//pr_err("dqbuf: frame_num=%d\n", p->sequence);
 	dq_count[inst_id]++;
 	return 0;
@@ -2072,8 +2127,8 @@ static int video_receiver_event_fun(int type, void *data, void *private_data)
 	u32 inst_id = dev->inst;
 
 	if (type == VFRAME_EVENT_PROVIDER_UNREG) {
-		dev->receiver_register = false;
 		mutex_lock(&dev->mutex_input);
+		dev->receiver_register = false;
 		while (!v4l2q_empty(&dev->display_queue)) {
 			v4lvideo_file = pop_from_display_q(dev);
 			if (!v4lvideo_file) {
@@ -2086,7 +2141,7 @@ static int video_receiver_event_fun(int type, void *data, void *private_data)
 			/*pr_err("unreg:v4lvideo, keep last frame\n");*/
 		}
 		mutex_unlock(&dev->mutex_input);
-		pr_err("unreg:v4lvideo inst=%d\n", dev->inst);
+		pr_err("unreg:v4lvideo\n");
 		v4l_print(dev->inst, PRINT_COUNT,
 			"unreg get=%d, put=%d, release=%d\n",
 			total_get_count[inst_id], total_put_count[inst_id],
@@ -2096,6 +2151,7 @@ static int video_receiver_event_fun(int type, void *data, void *private_data)
 		v4l2q_init(&dev->display_queue,
 			   V4LVIDEO_POOL_SIZE,
 			   (void **)&dev->v4lvideo_display_queue[0]);
+		dev->receiver_register = true;
 		dev->frame_num = 0;
 		dev->first_frame = 0;
 		dev->last_pts_us64 = U64_MAX;
@@ -2104,8 +2160,7 @@ static int video_receiver_event_fun(int type, void *data, void *private_data)
 		put_count[inst_id] = 0;
 		q_count[inst_id] = 0;
 		dq_count[inst_id] = 0;
-		pr_err("reg:v4lvideo inst=%d\n", dev->inst);
-		dev->receiver_register = true;
+		pr_err("reg:v4lvideo\n");
 	} else if (type == VFRAME_EVENT_PROVIDER_QUREY_STATE) {
 		if (dev->vf_wait_cnt > 1) {
 			if (!inactive_check_disp)
@@ -2149,10 +2204,8 @@ static int __init v4lvideo_create_instance(int inst)
 
 	vfd = &dev->vdev;
 	*vfd = v4lvideo_template;
-	vfd->dev_debug = debug;
+	vfd->dev_debug = v4lvideo_debug;
 	vfd->v4l2_dev = &dev->v4l2_dev;
-	vfd->device_caps = V4L2_CAP_VIDEO_CAPTURE | V4L2_CAP_STREAMING
-				| V4L2_CAP_READWRITE;
 
 	/*
 	 * Provide a mutex to v4l2 core. It will be used to protect
@@ -2249,16 +2302,17 @@ int v4lvideo_alloc_fd(int *fd)
 	int file_fd = get_unused_fd_flags(O_CLOEXEC);
 
 	if (file_fd < 0) {
-		pr_err("%s: get unused fd fail\n", __func__);
+		pr_err("v4lvideo_alloc_fd: get unused fd fail\n");
 		return -ENODEV;
 	}
 
 	private_data = kzalloc(sizeof(*private_data), GFP_KERNEL);
 	if (!private_data) {
 		put_unused_fd(file_fd);
-		pr_err("%s: private_date fail\n", __func__);
+		pr_err("v4lvideo_alloc_fd: private_date fail\n");
 		return -ENOMEM;
 	}
+
 	init_file_private_data(private_data);
 
 	file = anon_inode_getfile("v4lvideo_file",
@@ -2267,7 +2321,7 @@ int v4lvideo_alloc_fd(int *fd)
 	if (IS_ERR(file)) {
 		kfree((u8 *)private_data);
 		put_unused_fd(file_fd);
-		pr_err("%s: anon_inode_getfile fail\n", __func__);
+		pr_err("v4lvideo_alloc_fd: anon_inode_getfile fail\n");
 		return -ENODEV;
 	}
 
@@ -2337,9 +2391,9 @@ static int v4lvideo_fd_link(int src_fd, int dst_fd)
 	link_fd_count++;
 	return 0;
 }
-static ssize_t sei_cnt_show(struct class *class,
-			    struct class_attribute *attr,
-			    char *buf)
+
+static ssize_t sei_cnt_show(
+	struct class *class, struct class_attribute *attr, char *buf)
 {
 	ssize_t r;
 	int cnt;
@@ -2349,9 +2403,10 @@ static ssize_t sei_cnt_show(struct class *class,
 	return r;
 }
 
-static ssize_t sei_cnt_store(struct class *class,
-			     struct class_attribute *attr,
-			     const char *buf, size_t count)
+static ssize_t sei_cnt_store(
+	struct class *class,
+	struct class_attribute *attr,
+	const char *buf, size_t count)
 {
 	ssize_t r;
 	int val;
@@ -2360,21 +2415,20 @@ static ssize_t sei_cnt_store(struct class *class,
 	if (r < 0)
 		return -EINVAL;
 
-	pr_info("set sei_cnt val:%d\n", val);
 	atomic_set(&global_set_cnt, val);
 	return count;
 }
 
-static ssize_t alloc_sei_debug_show(struct class *class,
-				    struct class_attribute *attr,
-				    char *buf)
+static ssize_t alloc_sei_show(
+	struct class *class, struct class_attribute *attr, char *buf)
 {
 	return sprintf(buf, "alloc sei: %d\n", alloc_sei);
 }
 
-static ssize_t alloc_sei_debug_store(struct class *class,
-				     struct class_attribute *attr,
-				     const char *buf, size_t count)
+static ssize_t alloc_sei_store(
+	struct class *class,
+	struct class_attribute *attr,
+	const char *buf, size_t count)
 {
 	ssize_t r;
 	int val;
@@ -2387,159 +2441,154 @@ static ssize_t alloc_sei_debug_store(struct class *class,
 		alloc_sei = val;
 	else
 		alloc_sei = 0;
-	pr_info("set alloc_sei val:%d\n", alloc_sei);
 	return count;
 }
 
-static ssize_t video_nr_base_show(struct class *cla,
-				  struct class_attribute *attr,
-				  char *buf)
+static ssize_t video_nr_base_show(struct class *class,
+				  struct class_attribute *attr, char *buf)
 {
-	return snprintf(buf, 80,
-			"current video_nr_base is %d\n",
-			video_nr_base);
+	return sprintf(buf, "video_nr_base: %d\n", video_nr_base);
 }
 
-static ssize_t video_nr_base_store(struct class *cla,
+static ssize_t video_nr_base_store(struct class *class,
 				   struct class_attribute *attr,
 				   const char *buf, size_t count)
 {
-	long tmp;
-	int ret;
+	ssize_t r;
+	int val;
 
-	ret = kstrtol(buf, 0, &tmp);
-	if (ret != 0)
-		return ret;
-	video_nr_base = tmp;
+	r = kstrtoint(buf, 0, &val);
+	if (r < 0)
+		return -EINVAL;
+
+	if (val > 0)
+		video_nr_base = val;
+	else
+		video_nr_base = 0;
 	return count;
 }
 
-static ssize_t n_devs_show(struct class *cla,
-			   struct class_attribute *attr,
-			   char *buf)
+static ssize_t open_fd_count_show(struct class *class,
+				  struct class_attribute *attr, char *buf)
 {
-	return snprintf(buf, 80,
-			"current n_devs is %d\n",
-			n_devs);
+	return sprintf(buf, "open_fd_count: %d\n", open_fd_count);
 }
 
-static ssize_t n_devs_store(struct class *cla,
+static ssize_t release_fd_count_show(struct class *class,
+				     struct class_attribute *attr, char *buf)
+{
+	return sprintf(buf, "release_fd_count: %d\n", release_fd_count);
+}
+
+static ssize_t link_fd_count_show(struct class *class,
+				  struct class_attribute *attr, char *buf)
+{
+	return sprintf(buf, "link_fd_count: %d\n", link_fd_count);
+}
+
+static ssize_t link_put_fd_count_show(struct class *class,
+				      struct class_attribute *attr, char *buf)
+{
+	return sprintf(buf, "link_put_fd_count: %d\n", link_put_fd_count);
+}
+
+static ssize_t v4lvideo_version_show(struct class *class,
+			   struct class_attribute *attr, char *buf)
+{
+	return sprintf(buf, "%d\n", v4lvideo_version);
+}
+
+static ssize_t n_devs_show(struct class *class,
+			   struct class_attribute *attr, char *buf)
+{
+	return sprintf(buf, "n_devs: %d\n", n_devs);
+}
+
+static ssize_t n_devs_store(struct class *class,
 			    struct class_attribute *attr,
 			    const char *buf, size_t count)
 {
-	long tmp;
-	int ret;
+	ssize_t r;
+	int val;
 
-	ret = kstrtol(buf, 0, &tmp);
-	if (ret != 0) {
-		pr_info("ERROR converting %s to long int!\n", buf);
-		return ret;
-	}
-	n_devs = tmp;
+	r = kstrtoint(buf, 0, &val);
+	if (r < 0)
+		return -EINVAL;
+
+	if (val > 0)
+		n_devs = val;
+	else
+		n_devs = 0;
 	return count;
 }
 
-static ssize_t debug_show(struct class *cla,
-			  struct class_attribute *attr,
-			  char *buf)
+static ssize_t v4lvideo_debug_show(struct class *class,
+				   struct class_attribute *attr, char *buf)
 {
-	return snprintf(buf, 80,
-			"current debug is %d\n",
-			debug);
+	return sprintf(buf, "v4lvideo_debug: %d\n", v4lvideo_debug);
 }
 
-static ssize_t debug_store(struct class *cla,
-			   struct class_attribute *attr,
-			   const char *buf, size_t count)
+static ssize_t v4lvideo_debug_store(struct class *class,
+				    struct class_attribute *attr,
+				    const char *buf, size_t count)
 {
-	long tmp;
-	int ret;
+	ssize_t r;
+	int val;
 
-	ret = kstrtol(buf, 0, &tmp);
-	if (ret != 0) {
-		pr_info("ERROR converting %s to long int!\n", buf);
-		return ret;
-	}
-	debug = tmp;
+	r = kstrtoint(buf, 0, &val);
+	if (r < 0)
+		return -EINVAL;
+
+	if (val > 0)
+		v4lvideo_debug = val;
+	else
+		v4lvideo_debug = 0;
 	return count;
 }
 
-static ssize_t get_count_show(struct class *cla,
-			      struct class_attribute *attr,
-			      char *buf)
+static ssize_t get_count_show(struct class *class,
+			      struct class_attribute *attr, char *buf)
 {
-	return snprintf(buf, 80, "get_count: %d,%d,%d,%d,%d,%d,%d,%d,%d\n",
+	return sprintf(buf, "get_count: %d,%d,%d,%d,%d,%d,%d,%d,%d\n",
 		get_count[0], get_count[1], get_count[2],
 		get_count[3], get_count[4], get_count[5],
 		get_count[6], get_count[7], get_count[8]);
 }
 
-static ssize_t get_count_store(struct class *cla,
+static ssize_t get_count_store(struct class *class,
 			       struct class_attribute *attr,
 			       const char *buf, size_t count)
 {
-	long tmp;
-	int ret;
+	ssize_t r;
+	int val;
 	int i;
 
-	ret = kstrtol(buf, 0, &tmp);
-	if (ret != 0) {
-		pr_info("ERROR converting %s to long int!\n", buf);
-		return ret;
-	}
+	r = kstrtoint(buf, 0, &val);
+	if (r < 0)
+		return -EINVAL;
+
 	for (i = 0; i < N_DEVS; i++) {
-		if (tmp > 0)
-			get_count[i] = tmp;
+		if (val > 0)
+			get_count[i] = val;
 		else
 			get_count[i] = 0;
 	}
 	return count;
 }
 
-static ssize_t put_count_show(struct class *cla,
-			      struct class_attribute *attr,
-			      char *buf)
+static ssize_t put_count_show(struct class *class,
+			      struct class_attribute *attr, char *buf)
 {
-	return snprintf(buf, 80, "put_count: %d,%d,%d,%d,%d,%d,%d,%d,%d\n",
+	return sprintf(buf, "put_count: %d,%d,%d,%d,%d,%d,%d,%d,%d\n",
 		put_count[0], put_count[1], put_count[2],
 		put_count[3], put_count[4], put_count[5],
 		put_count[6], put_count[7], put_count[8]);
+
 }
 
-static ssize_t put_count_store(struct class *cla,
+static ssize_t put_count_store(struct class *class,
 			       struct class_attribute *attr,
 			       const char *buf, size_t count)
-{
-	long tmp;
-	int ret;
-	int i;
-
-	ret = kstrtol(buf, 0, &tmp);
-	if (ret != 0) {
-		pr_info("ERROR converting %s to long int!\n", buf);
-		return ret;
-	}
-	for (i = 0; i < N_DEVS; i++) {
-		if (tmp > 0)
-			put_count[i] = tmp;
-		else
-			put_count[i] = 0;
-	}
-	return count;
-}
-
-static ssize_t q_count_show(struct class *class,
-			    struct class_attribute *attr, char *buf)
-{
-	return snprintf(buf, 80, "q_count: %d,%d,%d,%d,%d,%d,%d,%d,%d\n",
-		q_count[0], q_count[1], q_count[2],
-		q_count[3], q_count[4], q_count[5],
-		q_count[6], q_count[7], q_count[8]);
-}
-
-static ssize_t q_count_store(struct class *class,
-			     struct class_attribute *attr,
-			     const char *buf, size_t count)
 {
 	ssize_t r;
 	int val;
@@ -2558,10 +2607,41 @@ static ssize_t q_count_store(struct class *class,
 	return count;
 }
 
+static ssize_t q_count_show(struct class *class,
+			    struct class_attribute *attr, char *buf)
+{
+	return sprintf(buf, "q_count: %d,%d,%d,%d,%d,%d,%d,%d,%d\n",
+		q_count[0], q_count[1], q_count[2],
+		q_count[3], q_count[4], q_count[5],
+		q_count[6], q_count[7], q_count[8]);
+
+}
+
+static ssize_t q_count_store(struct class *class,
+			     struct class_attribute *attr,
+			     const char *buf, size_t count)
+{
+	ssize_t r;
+	int val;
+	int i;
+
+	r = kstrtoint(buf, 0, &val);
+	if (r < 0)
+		return -EINVAL;
+
+	for (i = 0; i < N_DEVS; i++) {
+		if (val > 0)
+			q_count[i] = val;
+		else
+			q_count[i] = 0;
+	}
+	return count;
+}
+
 static ssize_t dq_count_show(struct class *class,
 			     struct class_attribute *attr, char *buf)
 {
-	return snprintf(buf, 80, "dq_count: %d,%d,%d,%d,%d,%d,%d,%d,%d\n",
+	return sprintf(buf, "dq_count: %d,%d,%d,%d,%d,%d,%d,%d,%d\n",
 		dq_count[0], dq_count[1], dq_count[2],
 		dq_count[3], dq_count[4], dq_count[5],
 		dq_count[6], dq_count[7], dq_count[8]);
@@ -2581,9 +2661,9 @@ static ssize_t dq_count_store(struct class *class,
 
 	for (i = 0; i < N_DEVS; i++) {
 		if (val > 0)
-			put_count[i] = val;
+			dq_count[i] = val;
 		else
-			put_count[i] = 0;
+			dq_count[i] = 0;
 	}
 	return count;
 }
@@ -2660,116 +2740,51 @@ static ssize_t dec_count_store(struct class *class,
 	return count;
 }
 
-static ssize_t vf_dump_show(struct class *cla,
-			    struct class_attribute *attr,
-			    char *buf)
+static ssize_t vf_dump_show(struct class *class,
+			    struct class_attribute *attr, char *buf)
 {
-	return snprintf(buf, 80,
-			"current vf_dump is %d\n",
-			vf_dump);
+	return sprintf(buf, "vf_dump: %d\n", vf_dump);
 }
 
-static ssize_t vf_dump_store(struct class *cla,
+static ssize_t vf_dump_store(struct class *class,
 			     struct class_attribute *attr,
 			     const char *buf, size_t count)
 {
-	long tmp;
-	int ret;
+	ssize_t r;
+	int val;
 
-	ret = kstrtol(buf, 0, &tmp);
-	if (ret != 0)
-		return ret;
+	r = kstrtoint(buf, 0, &val);
+	if (r < 0)
+		return -EINVAL;
 
-	vf_dump = tmp;
+	if (val > 0)
+		vf_dump = val;
+	else
+		vf_dump = 0;
 	return count;
 }
 
-static ssize_t open_fd_count_show(struct class *cla,
-			    struct class_attribute *attr,
-			    char *buf)
+static ssize_t print_flag_show(struct class *class,
+			    struct class_attribute *attr, char *buf)
 {
-	return snprintf(buf, 80, "open_fd_count is %d\n", open_fd_count);
+	return sprintf(buf, "print_flag: %d\n", print_flag);
 }
 
-static ssize_t release_fd_count_show(struct class *cla,
-			    struct class_attribute *attr,
-			    char *buf)
-{
-	return snprintf(buf, 80, "release_fd_count is %d\n", release_fd_count);
-}
-
-static ssize_t link_fd_count_show(struct class *cla,
-			    struct class_attribute *attr,
-			    char *buf)
-{
-	return snprintf(buf, 80, "link_fd_count is %d\n", link_fd_count);
-}
-
-static ssize_t link_put_fd_count_show(struct class *cla,
-			    struct class_attribute *attr,
-			    char *buf)
-{
-	return snprintf(buf, 80, "link_put_fd_count is %d\n", link_put_fd_count);
-}
-
-static ssize_t v4lvideo_version_show(struct class *cla,
-			    struct class_attribute *attr,
-			    char *buf)
-{
-	return snprintf(buf, 80, "v4lvideo_version is %d\n", v4lvideo_version);
-}
-
-static ssize_t total_get_count_show(struct class *cla,
-			    struct class_attribute *attr,
-			    char *buf)
-{
-	return snprintf(buf, 80, "total_get_count: %d,%d,%d,%d,%d,%d,%d,%d,%d\n",
-		total_get_count[0], total_get_count[1], total_get_count[2],
-		total_get_count[3], total_get_count[4], total_get_count[5],
-		total_get_count[6], total_get_count[7], total_get_count[8]);
-}
-
-static ssize_t total_put_count_show(struct class *cla,
-			    struct class_attribute *attr,
-			    char *buf)
-{
-	return snprintf(buf, 80, "total_put_count: %d,%d,%d,%d,%d,%d,%d,%d,%d\n",
-		total_put_count[0], total_put_count[1], total_put_count[2],
-		total_put_count[3], total_put_count[4], total_put_count[5],
-		total_put_count[6], total_put_count[7], total_put_count[8]);
-}
-
-static ssize_t total_release_count_show(struct class *cla,
-			    struct class_attribute *attr,
-			    char *buf)
-{
-	return snprintf(buf, 80, "total_release_count: %d,%d,%d,%d,%d,%d,%d,%d,%d\n",
-		total_release_count[0], total_release_count[1],
-		total_release_count[2], total_release_count[3],
-		total_release_count[4], total_release_count[5],
-		total_release_count[6], total_release_count[7],
-		total_release_count[8]);
-}
-
-static ssize_t print_flag_show(struct class *cla,
-			    struct class_attribute *attr,
-			    char *buf)
-{
-	return snprintf(buf, 80, "print_flag is %d\n", print_flag);
-}
-
-static ssize_t print_flag_store(struct class *cla,
+static ssize_t print_flag_store(struct class *class,
 			     struct class_attribute *attr,
 			     const char *buf, size_t count)
 {
-	long tmp;
-	int ret;
+	ssize_t r;
+	int val;
 
-	ret = kstrtol(buf, 0, &tmp);
-	if (ret != 0)
-		return ret;
+	r = kstrtoint(buf, 0, &val);
+	if (r < 0)
+		return -EINVAL;
 
-	print_flag = tmp;
+	if (val > 0)
+		print_flag = val;
+	else
+		print_flag = 0;
 	return count;
 }
 
@@ -2797,88 +2812,140 @@ static ssize_t cts_video_flag_store(struct class *class,
 	return count;
 }
 
-static ssize_t inactive_check_disp_show(struct class *cla,
-			    struct class_attribute *attr,
-			    char *buf)
+static ssize_t inactive_check_disp_show(struct class *class,
+			    struct class_attribute *attr, char *buf)
 {
-	return snprintf(buf, 80,
-			"current inactive_check_disp is %d\n",
-			inactive_check_disp);
+	return sprintf(buf, "inactive_check_disp: %d\n", inactive_check_disp);
 }
 
-static ssize_t inactive_check_disp_store(struct class *cla,
+static ssize_t inactive_check_disp_store(struct class *class,
 			     struct class_attribute *attr,
 			     const char *buf, size_t count)
 {
-	long tmp;
-	int ret;
+	ssize_t r;
+	int val;
 
-	ret = kstrtol(buf, 0, &tmp);
-	if (ret != 0)
-		return ret;
+	r = kstrtoint(buf, 0, &val);
+	if (r < 0)
+		return -EINVAL;
 
-	inactive_check_disp = tmp;
+	if (val > 0)
+		inactive_check_disp = val;
+	else
+		inactive_check_disp = 0;
 	return count;
 }
 
-static CLASS_ATTR_RW(sei_cnt);
-static CLASS_ATTR_RW(alloc_sei_debug);
-static CLASS_ATTR_RW(video_nr_base);
-static CLASS_ATTR_RW(n_devs);
-static CLASS_ATTR_RW(debug);
-static CLASS_ATTR_RW(get_count);
-static CLASS_ATTR_RW(put_count);
-static CLASS_ATTR_RW(q_count);
-static CLASS_ATTR_RW(dq_count);
-static CLASS_ATTR_RW(cts_use_di);
-static CLASS_ATTR_RW(render_use_dec);
-static CLASS_ATTR_RW(dec_count);
-static CLASS_ATTR_RW(vf_dump);
-static CLASS_ATTR_RO(open_fd_count);
-static CLASS_ATTR_RO(release_fd_count);
-static CLASS_ATTR_RO(link_fd_count);
-static CLASS_ATTR_RO(link_put_fd_count);
-static CLASS_ATTR_RO(v4lvideo_version);
-static CLASS_ATTR_RO(total_get_count);
-static CLASS_ATTR_RO(total_put_count);
-static CLASS_ATTR_RO(total_release_count);
-static CLASS_ATTR_RW(print_flag);
-static CLASS_ATTR_RW(cts_video_flag);
-static CLASS_ATTR_RW(inactive_check_disp);
+static ssize_t total_get_count_show(struct class *class,
+			    struct class_attribute *attr, char *buf)
+{
+	return sprintf(buf, "total_get_count: %d,%d,%d,%d,%d,%d,%d,%d,%d\n",
+		total_get_count[0], total_get_count[1], total_get_count[2],
+		total_get_count[3], total_get_count[4], total_get_count[5],
+		total_get_count[6], total_get_count[7], total_get_count[8]);
 
-static struct attribute *v4lvideo_class_attrs[] = {
-	&class_attr_sei_cnt.attr,
-	&class_attr_alloc_sei_debug.attr,
-	&class_attr_video_nr_base.attr,
-	&class_attr_n_devs.attr,
-	&class_attr_debug.attr,
-	&class_attr_get_count.attr,
-	&class_attr_put_count.attr,
-	&class_attr_q_count.attr,
-	&class_attr_dq_count.attr,
-	&class_attr_cts_use_di.attr,
-	&class_attr_render_use_dec.attr,
-	&class_attr_dec_count.attr,
-	&class_attr_vf_dump.attr,
-	&class_attr_open_fd_count.attr,
-	&class_attr_release_fd_count.attr,
-	&class_attr_link_fd_count.attr,
-	&class_attr_link_put_fd_count.attr,
-	&class_attr_v4lvideo_version.attr,
-	&class_attr_total_get_count.attr,
-	&class_attr_total_put_count.attr,
-	&class_attr_total_release_count.attr,
-	&class_attr_print_flag.attr,
-	&class_attr_inactive_check_disp.attr,
-	&class_attr_cts_video_flag.attr,
-	NULL
+}
+
+static ssize_t total_put_count_show(struct class *class,
+			    struct class_attribute *attr, char *buf)
+{
+	return sprintf(buf, "total_put_count: %d,%d,%d,%d,%d,%d,%d,%d,%d\n",
+		total_put_count[0], total_put_count[1], total_put_count[2],
+		total_put_count[3], total_put_count[4], total_put_count[5],
+		total_put_count[6], total_put_count[7], total_put_count[8]);
+
+}
+
+static ssize_t total_release_count_show(struct class *class,
+			    struct class_attribute *attr, char *buf)
+{
+	return sprintf(buf, "total_release_count: %d,%d,%d,%d,%d,%d,%d,%d,%d\n",
+		total_release_count[0], total_release_count[1],
+		total_release_count[2], total_release_count[3],
+		total_release_count[4], total_release_count[5],
+		total_release_count[6], total_release_count[7],
+		total_release_count[8]);
+}
+
+static struct class_attribute v4lvideo_class_attrs[] = {
+	__ATTR(sei_cnt,
+	       0664,
+	       sei_cnt_show,
+	       sei_cnt_store),
+	__ATTR(alloc_sei,
+	       0664,
+	       alloc_sei_show,
+	       alloc_sei_store),
+	__ATTR(video_nr_base,
+	       0664,
+	       video_nr_base_show,
+	       video_nr_base_store),
+	__ATTR(n_devs,
+	       0664,
+	       n_devs_show,
+	       n_devs_store),
+	__ATTR(v4lvideo_debug,
+	       0664,
+	       v4lvideo_debug_show,
+	       v4lvideo_debug_store),
+	__ATTR(get_count,
+	       0664,
+	       get_count_show,
+	       get_count_store),
+	__ATTR(put_count,
+	       0664,
+	       put_count_show,
+	       put_count_store),
+	__ATTR(q_count,
+	       0664,
+	       q_count_show,
+	       q_count_store),
+	__ATTR(dq_count,
+	       0664,
+	       dq_count_show,
+	       dq_count_store),
+	__ATTR(cts_use_di,
+	       0664,
+	       cts_use_di_show,
+	       cts_use_di_store),
+	__ATTR(render_use_dec,
+	       0664,
+	       render_use_dec_show,
+	       render_use_dec_store),
+	__ATTR(dec_count,
+	       0664,
+	       dec_count_show,
+	       dec_count_store),
+	__ATTR(vf_dump,
+	       0664,
+	       vf_dump_show,
+	       vf_dump_store),
+	__ATTR(print_flag,
+	       0664,
+	       print_flag_show,
+	       print_flag_store),
+	__ATTR(inactive_check_disp,
+	       0664,
+	       inactive_check_disp_show,
+	       inactive_check_disp_store),
+	__ATTR(cts_video_flag,
+	       0664,
+	       cts_video_flag_show,
+	       cts_video_flag_store),
+	__ATTR_RO(open_fd_count),
+	__ATTR_RO(release_fd_count),
+	__ATTR_RO(link_fd_count),
+	__ATTR_RO(link_put_fd_count),
+	__ATTR_RO(v4lvideo_version),
+	__ATTR_RO(total_get_count),
+	__ATTR_RO(total_put_count),
+	__ATTR_RO(total_release_count),
+	__ATTR_NULL
 };
-
-ATTRIBUTE_GROUPS(v4lvideo_class);
 
 static struct class v4lvideo_class = {
 	.name = "v4lvideo",
-	.class_groups = v4lvideo_class_groups,
+	.class_attrs = v4lvideo_class_attrs,
 };
 
 static int v4lvideo_open(struct inode *inode, struct file *file)
@@ -2965,10 +3032,11 @@ static const struct file_operations v4lvideo_fops = {
 	.poll = NULL,
 };
 
-int __init v4lvideo_init(void)
+static int __init v4lvideo_init(void)
 {
 	int ret = -1, i;
 	struct device *devp;
+
 	mutex_init(&mutex_dec_count);
 
 	keeper_mgr_init();
@@ -3019,7 +3087,7 @@ error1:
 	return ret;
 }
 
-void __exit v4lvideo_exit(void)
+static void __exit v4lvideo_exit(void)
 {
 	v4lvideo_v4l2_release();
 	device_destroy(&v4lvideo_class, MKDEV(V4LVIDEO_MAJOR, 0));
@@ -3027,8 +3095,10 @@ void __exit v4lvideo_exit(void)
 	class_unregister(&v4lvideo_class);
 }
 
-//MODULE_DESCRIPTION("Video Technology Magazine V4l Video Capture Board");
-//MODULE_AUTHOR("Amlogic, Jintao Xu<jintao.xu@amlogic.com>");
-//MODULE_LICENSE("Dual BSD/GPL");
-//MODULE_VERSION(V4LVIDEO_VERSION);
+MODULE_DESCRIPTION("Video Technology Magazine V4l Video Capture Board");
+MODULE_AUTHOR("Amlogic, Jintao Xu<jintao.xu@amlogic.com>");
+MODULE_LICENSE("Dual BSD/GPL");
+MODULE_VERSION(V4LVIDEO_VERSION);
 
+module_init(v4lvideo_init);
+module_exit(v4lvideo_exit);

@@ -1,6 +1,18 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/amlogic/media/osd/osd_prot.c
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
 /* Linux Headers */
@@ -52,12 +64,12 @@ int osd_set_prot(unsigned char   x_rev,
 		if (osd_index == OSD1) {
 			/* switch back to little endian */
 			VSYNCOSD_WR_MPEG_REG_BITS(VIU_OSD1_BLK0_CFG_W0,
-						  1, 15, 1);
+					1, 15, 1);
 			VSYNCOSD_WR_MPEG_REG(VIU_OSD1_PROT_CTRL, 0);
 		} else if (osd_index == OSD2) {
 			/* switch back to little endian */
 			VSYNCOSD_WR_MPEG_REG_BITS(VIU_OSD2_BLK0_CFG_W0,
-						  1, 15, 1);
+					1, 15, 1);
 			VSYNCOSD_WR_MPEG_REG(VIU_OSD2_PROT_CTRL, 0);
 		}
 		return 0;

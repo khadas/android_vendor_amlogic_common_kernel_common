@@ -1,6 +1,18 @@
-/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/amlogic/media/vin/tvin/bt656/bt656_601_in.h
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
 #ifndef __BT656_601_INPUT_H
@@ -11,10 +23,11 @@
 #include <linux/amlogic/media/frame_provider/tvin/tvin_v4l2.h>
 #include "../tvin_frontend.h"
 #include "../tvin_global.h"
-#include <linux/amlogic/media/registers/cpu_version.h>
+#include <linux/amlogic/cpu_version.h>
 
-#define BT656PR(fmt, args...)  pr_info("amvdec bt656in: " fmt "", ## args)
-#define BT656ERR(fmt, args...) pr_err("amvdec bt656in:error: " fmt "", ## args)
+#define BT656PR(fmt, args...)    pr_info("amvdec_bt656in: "fmt"", ## args)
+#define BT656ERR(fmt, args...)   pr_err("amvdec_bt656in: error: "fmt"", ## args)
+
 
 #define BT656_1                0xd0048000//0xd0048000~0xd004_ffff
 #define BT656_2                0xd0050000//0xd0050000~0xd005_ffff
@@ -233,39 +246,36 @@ static void __iomem *bt656_reg_base[BT656_MAX_DEVS];
 static int bt656_reg_read(u32 index, unsigned int reg, unsigned int *val)
 {
 	if (index <= BT656_MAX_DEVS) {
-		*val = readl(bt656_reg_base[index - 1] + reg);
+		*val = readl(bt656_reg_base[index-1]+reg);
 		return 0;
-	} else {
+	} else
 		return -1;
-	}
 }
 
 static int bt656_reg_write(u32 index, unsigned int reg, unsigned int val)
 {
 	if (index <= BT656_MAX_DEVS) {
-		writel(val, (bt656_reg_base[index - 1] + reg));
+		writel(val, (bt656_reg_base[index-1]+reg));
 		return 0;
-	} else {
+	} else
 		return -1;
-	}
 }
 
 static inline uint32_t bt656_rd(u32 index, uint32_t reg)
 {
 	int val = 0;
 
-	bt656_reg_read(index, (reg << 2), &val);
+	bt656_reg_read(index, (reg<<2), &val);
 	return val;
 }
 
 static inline void bt656_wr(u32 index, uint32_t reg, const uint32_t val)
 {
-	bt656_reg_write(index, (reg << 2), val);
+	bt656_reg_write(index, (reg<<2), val);
 }
 
 static inline void bt656_wr_bits(u32 index, uint32_t reg,
-				 const u32 value, const u32 start,
-				 const uint32_t len)
+		const uint32_t value, const uint32_t start, const uint32_t len)
 {
 	bt656_wr(index, reg, ((bt656_rd(index, reg) &
 			     ~(((1L << (len)) - 1) << (start))) |
@@ -273,27 +283,14 @@ static inline void bt656_wr_bits(u32 index, uint32_t reg,
 }
 
 static inline uint32_t bt656_rd_bits(u32 index, uint32_t reg,
-				     const u32 start, const u32 len)
+		const uint32_t start, const uint32_t len)
 {
-	u32 val;
+	uint32_t val;
 
 	val = ((bt656_rd(index, reg) >> (start)) & ((1L << (len)) - 1));
 
 	return val;
 }
-
-enum bt656_cpu_type {
-	BT656_CPU_TYPE_G12A   = 0,
-	BT656_CPU_TYPE_G12B   = 1,
-	BT656_CPU_TYPE_TL1    = 3,
-	BT656_CPU_TYPE_SM1    = 4,
-	BT656_CPU_TYPE_TM2    = 5,
-};
-
-struct meson_bt656in_data {
-	enum bt656_cpu_type cpu_id;
-	const char *name;
-};
 
 enum am656_status_e {
 	TVIN_AM656_STOP,

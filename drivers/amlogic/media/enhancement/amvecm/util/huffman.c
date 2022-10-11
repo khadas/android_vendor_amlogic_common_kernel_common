@@ -1,4 +1,3 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
  * drivers/amlogic/media/enhancement/amvecm/util/huffman.c
  *
@@ -30,13 +29,12 @@ struct _huffman_encode_table {
 	unsigned long bits;
 };
 
-static void _huffman_write_tree_make_table(unsigned char *out,
-					   unsigned long *outbitctr,
-					   unsigned long outlen,
-					   struct _huffman_encode_table *et,
-					   unsigned long code,
-					   unsigned int bits,
-					   struct _huffman_node *t)
+static void _huffman_write_tree_and_make_encode_table(
+				unsigned char *out, unsigned long *outbitctr,
+				unsigned long outlen,
+				struct _huffman_encode_table *et,
+				unsigned long code,
+				unsigned int bits, struct _huffman_node *t)
 {
 	struct _huffman_encode_table *eti;
 	unsigned int i;
@@ -46,20 +44,14 @@ static void _huffman_write_tree_make_table(unsigned char *out,
 	byte_index *= (byte_index < outlen);
 	if (t->lr[0]) {
 		out[byte_index] <<= 1;
-		_huffman_write_tree_make_table(out,
-					       outbitctr,
-					       outlen,
-					       et,
-					       code,
-					       bits + 1,
-					       t->lr[0]);
-		_huffman_write_tree_make_table(out,
-					       outbitctr,
-					       outlen,
-					       et,
-					       code | (1 << bits),
-					       bits + 1,
-					       t->lr[1]);
+		_huffman_write_tree_and_make_encode_table(
+			out, outbitctr, outlen, et,
+			code, bits + 1, t->lr[0]);
+		_huffman_write_tree_and_make_encode_table(
+			out, outbitctr, outlen,
+			et,
+			code | (1 << bits), bits + 1,
+			t->lr[1]);
 	} else {
 		out[byte_index] = (out[byte_index] << 1) | 1;
 		for (i = 0; i < 9; ++i) {
@@ -76,11 +68,10 @@ static void _huffman_write_tree_make_table(unsigned char *out,
 	}
 }
 
-static struct _huffman_node *_huffman_read_tree(const unsigned char *in,
-						unsigned long *inbitctr,
-						unsigned long inlen,
-						unsigned char **heapptr,
-						unsigned char *heapend)
+static struct _huffman_node *_huffman_read_tree(
+	const unsigned char *in, unsigned long *inbitctr,
+	unsigned long inlen, unsigned char **heapptr,
+	unsigned char *heapend)
 {
 	struct _huffman_node *n;
 	unsigned int i;
@@ -107,22 +98,23 @@ static struct _huffman_node *_huffman_read_tree(const unsigned char *in,
 			(((unsigned int)(tmp)) & 1) << i;
 		}
 	} else {
-		n->lr[0] = _huffman_read_tree(in, inbitctr, inlen,
-					      heapptr, heapend);
-		n->lr[1] = _huffman_read_tree(in, inbitctr, inlen,
-					      heapptr, heapend);
-		if (!(n->lr[0] && n->lr[1]))
+		n->lr[0] = _huffman_read_tree(
+			in, inbitctr, inlen,
+			heapptr, heapend);
+		n->lr[1] = _huffman_read_tree(
+			in, inbitctr, inlen,
+			heapptr, heapend);
+		if (!((n->lr[0]) && (n->lr[1])))
 			return (struct _huffman_node *)0;
 	}
 
 	return n;
 }
 
-unsigned long huffman_compress(const unsigned char *in,
-			       unsigned long inlen,
-			       unsigned char *out,
-			       unsigned long outlen,
-			       void *huffheap)
+unsigned long huffman_compress(
+	const unsigned char *in, unsigned long inlen,
+	unsigned char *out,
+	unsigned long outlen, void *huffheap)
 {
 	struct _huffman_encode_table *et, *eti;
 	struct _huffman_node *t, *n;
@@ -189,9 +181,10 @@ unsigned long huffman_compress(const unsigned char *in,
 	et = (struct _huffman_encode_table *)heapptr;
 	heapptr += (sizeof(struct _huffman_encode_table) * 257);
 	outbitctr = 0;
-	_huffman_write_tree_make_table(out, &outbitctr,
-				       outlen, et,
-				       0, 0, t);
+	_huffman_write_tree_and_make_encode_table(
+		out, &outbitctr,
+		outlen, et,
+		0, 0, t);
 	for (i = 0; i < inlen; ++i) {
 		eti = &(et[(unsigned long)in[i]]);
 		code = eti->code;
@@ -225,19 +218,19 @@ unsigned long huffman_compress(const unsigned char *in,
 	}
 }
 
-unsigned long huffman_decompress(const unsigned char *in,
-				 unsigned long inlen,
-				 unsigned char *out,
-				 unsigned long outlen,
-				 void *huffheap)
+unsigned long huffman_decompress(
+	const unsigned char *in, unsigned long inlen,
+	unsigned char *out,
+	unsigned long outlen, void *huffheap)
 {
 	struct _huffman_node *t, *n;
 	unsigned char *heapptr = (unsigned char *)huffheap, tmp;
 	unsigned long inbitctr, outptr, byte_index = 0;
 
 	inbitctr = 0;
-	t = _huffman_read_tree(in, &inbitctr, inlen, &heapptr,
-			       heapptr + HUFFHEAP_SIZE);
+	t = _huffman_read_tree(
+		in, &inbitctr, inlen, &heapptr,
+		heapptr + HUFFHEAP_SIZE);
 	if (!t)
 		return 0;
 	outptr = 0;

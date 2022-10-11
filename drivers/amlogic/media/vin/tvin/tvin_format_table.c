@@ -1,4 +1,3 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
  * drivers/amlogic/media/vin/tvin/tvin_format_table.c
  *
@@ -242,20 +241,19 @@ const char *tvin_sig_fmt_str(enum tvin_sig_fmt_e fmt)
 }
 EXPORT_SYMBOL(tvin_sig_fmt_str);
 
+
 const struct tvin_format_s *tvin_get_fmt_info(enum tvin_sig_fmt_e fmt)
 {
 	/* find  format table through format */
-	if (fmt < TVIN_SIG_FMT_HDMI_MAX &&
-	    fmt >= TVIN_SIG_FMT_HDMI_640X480P_60HZ)
-		return &tvin_hdmi_fmt_tbl[fmt -
-				TVIN_SIG_FMT_HDMI_640X480P_60HZ];
-	else if (fmt < TVIN_SIG_FMT_CVBS_MAX &&
-		 fmt > TVIN_SIG_FMT_HDMI_THRESHOLD)
-		return &tvin_cvbs_fmt_tbl[fmt - TVIN_SIG_FMT_CVBS_NTSC_M];
-	else if (fmt < TVIN_SIG_FMT_BT601_MAX &&
-		 fmt > TVIN_SIG_FMT_CVBS_THRESHOLD)
-		return &tvin_bt601_fmt_tbl[fmt -
-				TVIN_SIG_FMT_BT656IN_576I_50HZ];
+	if ((fmt < TVIN_SIG_FMT_HDMI_MAX) &&
+			(fmt >= TVIN_SIG_FMT_HDMI_640X480P_60HZ))
+		return &tvin_hdmi_fmt_tbl[fmt-TVIN_SIG_FMT_HDMI_640X480P_60HZ];
+	else if ((fmt < TVIN_SIG_FMT_CVBS_MAX) &&
+			(fmt > TVIN_SIG_FMT_HDMI_THRESHOLD))
+		return &tvin_cvbs_fmt_tbl[fmt-TVIN_SIG_FMT_CVBS_NTSC_M];
+	else if ((fmt < TVIN_SIG_FMT_BT601_MAX) &&
+			(fmt > TVIN_SIG_FMT_CVBS_THRESHOLD))
+		return &tvin_bt601_fmt_tbl[fmt-TVIN_SIG_FMT_BT656IN_576I_50HZ];
 	else
 		return NULL;
 }
@@ -778,10 +776,10 @@ EXPORT_SYMBOL(tvin_hdmi_fmt_tbl);
 const struct tvin_format_s tvin_cvbs_fmt_tbl[TVIN_SIG_FMT_CVBS_MAX -
 	TVIN_SIG_FMT_CVBS_NTSC_M + 1] = {
 	/* H_Active V_Active H_cnt Hcnt_offset Vcnt_offset Hs_cnt Hscnt_offset
-	 * H_Total V_Total Hs_Front Hs_Width Hs_bp Vs_Front Vs_Width
-	 * Vs_bp Hs_Polarity  Vs_Polarity
-	 * Scan_Mode Pixel_Clk(Khz/10) VBIs VBIe duration
-	 */
+	* H_Total V_Total Hs_Front Hs_Width Hs_bp Vs_Front Vs_Width
+	* Vs_bp Hs_Polarity  Vs_Polarity
+	* Scan_Mode Pixel_Clk(Khz/10) VBIs VBIe duration
+	*/
 
 	{	/* TVIN_SIG_FMT_CVBS_NTSC_M, */
 	720, 240, 0, 0, 0, 0, 0,
@@ -968,68 +966,68 @@ const unsigned char adc_cvbs_table[ADC_REG_NUM] = {
 };
 EXPORT_SYMBOL(adc_cvbs_table);
 
-#define r180 (unsigned char)((CVD2_CHROMA_DTO_NTSC_M >> 24) & 0x000000ff)
-#define r190 (unsigned char)((CVD2_CHROMA_DTO_NTSC_M >> 16) & 0x000000ff)
-#define r1a0 (unsigned char)((CVD2_CHROMA_DTO_NTSC_M  >> 8) & 0x000000ff)
-#define r1b0 (unsigned char)((CVD2_CHROMA_DTO_NTSC_M  >> 0) & 0x000000ff)
-#define r1c0 (unsigned char)((CVD2_HSYNC_DTO_NTSC_M >> 24) & 0x000000ff)
-#define r1d0 (unsigned char)((CVD2_HSYNC_DTO_NTSC_M >> 16) & 0x000000ff)
-#define r1e0 (unsigned char)((CVD2_HSYNC_DTO_NTSC_M  >> 8) & 0x000000ff)
-#define r1f0 (unsigned char)((CVD2_HSYNC_DTO_NTSC_M  >> 0) & 0x000000ff)
+#define r180 (unsigned char)((CVD2_CHROMA_DTO_NTSC_M >> 24)&0x000000ff)
+#define r190 (unsigned char)((CVD2_CHROMA_DTO_NTSC_M >> 16)&0x000000ff)
+#define r1a0 (unsigned char)((CVD2_CHROMA_DTO_NTSC_M  >> 8)&0x000000ff)
+#define r1b0 (unsigned char)((CVD2_CHROMA_DTO_NTSC_M  >> 0)&0x000000ff)
+#define r1c0 (unsigned char)((CVD2_HSYNC_DTO_NTSC_M >> 24)&0x000000ff)
+#define r1d0 (unsigned char)((CVD2_HSYNC_DTO_NTSC_M >> 16)&0x000000ff)
+#define r1e0 (unsigned char)((CVD2_HSYNC_DTO_NTSC_M  >> 8)&0x000000ff)
+#define r1f0 (unsigned char)((CVD2_HSYNC_DTO_NTSC_M  >> 0)&0x000000ff)
 
-#define r181 (unsigned char)((CVD2_CHROMA_DTO_NTSC_443 >> 24) & 0x000000ff)
-#define r191 (unsigned char)((CVD2_CHROMA_DTO_NTSC_443 >> 16) & 0x000000ff)
-#define r1a1 (unsigned char)((CVD2_CHROMA_DTO_NTSC_443 >> 8) & 0x000000ff)
-#define r1b1 (unsigned char)((CVD2_CHROMA_DTO_NTSC_443 >> 0) & 0x000000ff)
-#define r1c1 (unsigned char)((CVD2_HSYNC_DTO_NTSC_443 >> 24) & 0x000000ff)
-#define r1d1 (unsigned char)((CVD2_HSYNC_DTO_NTSC_443 >> 16) & 0x000000ff)
-#define r1e1 (unsigned char)((CVD2_HSYNC_DTO_NTSC_443 >> 8) & 0x000000ff)
-#define r1f1 (unsigned char)((CVD2_HSYNC_DTO_NTSC_443 >> 0) & 0x000000ff)
+#define r181 (unsigned char)((CVD2_CHROMA_DTO_NTSC_443>>24)&0x000000ff)
+#define r191 (unsigned char)((CVD2_CHROMA_DTO_NTSC_443>>16)&0x000000ff)
+#define r1a1 (unsigned char)((CVD2_CHROMA_DTO_NTSC_443 >> 8)&0x000000ff)
+#define r1b1 (unsigned char)((CVD2_CHROMA_DTO_NTSC_443 >> 0)&0x000000ff)
+#define r1c1 (unsigned char)((CVD2_HSYNC_DTO_NTSC_443>>24)&0x000000ff)
+#define r1d1 (unsigned char)((CVD2_HSYNC_DTO_NTSC_443>>16)&0x000000ff)
+#define r1e1 (unsigned char)((CVD2_HSYNC_DTO_NTSC_443 >> 8)&0x000000ff)
+#define r1f1 (unsigned char)((CVD2_HSYNC_DTO_NTSC_443 >> 0)&0x000000ff)
 
-#define r182 (unsigned char)((CVD2_CHROMA_DTO_PAL_I >> 24) & 0x000000ff)
-#define r192 (unsigned char)((CVD2_CHROMA_DTO_PAL_I >> 16) & 0x000000ff)
-#define r1a2 (unsigned char)((CVD2_CHROMA_DTO_PAL_I   >> 8) & 0x000000ff)
-#define r1b2 (unsigned char)((CVD2_CHROMA_DTO_PAL_I   >> 0) & 0x000000ff)
-#define r1c2 (unsigned char)((CVD2_HSYNC_DTO_PAL_I >> 24) & 0x000000ff)
-#define r1d2 (unsigned char)((CVD2_HSYNC_DTO_PAL_I >> 16) & 0x000000ff)
-#define r1e2 (unsigned char)((CVD2_HSYNC_DTO_PAL_I   >> 8) & 0x000000ff)
-#define r1f2 (unsigned char)((CVD2_HSYNC_DTO_PAL_I   >> 0) & 0x000000ff)
+#define r182 (unsigned char)((CVD2_CHROMA_DTO_PAL_I >> 24)&0x000000ff)
+#define r192 (unsigned char)((CVD2_CHROMA_DTO_PAL_I >> 16)&0x000000ff)
+#define r1a2 (unsigned char)((CVD2_CHROMA_DTO_PAL_I   >> 8)&0x000000ff)
+#define r1b2 (unsigned char)((CVD2_CHROMA_DTO_PAL_I   >> 0)&0x000000ff)
+#define r1c2 (unsigned char)((CVD2_HSYNC_DTO_PAL_I >> 24)&0x000000ff)
+#define r1d2 (unsigned char)((CVD2_HSYNC_DTO_PAL_I >> 16)&0x000000ff)
+#define r1e2 (unsigned char)((CVD2_HSYNC_DTO_PAL_I   >> 8)&0x000000ff)
+#define r1f2 (unsigned char)((CVD2_HSYNC_DTO_PAL_I   >> 0)&0x000000ff)
 
-#define r183 (unsigned char)((CVD2_CHROMA_DTO_PAL_M >> 24) & 0x000000ff)
-#define r193 (unsigned char)((CVD2_CHROMA_DTO_PAL_M >> 16) & 0x000000ff)
-#define r1a3 (unsigned char)((CVD2_CHROMA_DTO_PAL_M   >> 8) & 0x000000ff)
-#define r1b3 (unsigned char)((CVD2_CHROMA_DTO_PAL_M   >> 0) & 0x000000ff)
-#define r1c3 (unsigned char)((CVD2_HSYNC_DTO_PAL_M >> 24) & 0x000000ff)
-#define r1d3 (unsigned char)((CVD2_HSYNC_DTO_PAL_M >> 16) & 0x000000ff)
-#define r1e3 (unsigned char)((CVD2_HSYNC_DTO_PAL_M   >> 8) & 0x000000ff)
-#define r1f3 (unsigned char)((CVD2_HSYNC_DTO_PAL_M   >> 0) & 0x000000ff)
+#define r183 (unsigned char)((CVD2_CHROMA_DTO_PAL_M >> 24)&0x000000ff)
+#define r193 (unsigned char)((CVD2_CHROMA_DTO_PAL_M >> 16)&0x000000ff)
+#define r1a3 (unsigned char)((CVD2_CHROMA_DTO_PAL_M   >> 8)&0x000000ff)
+#define r1b3 (unsigned char)((CVD2_CHROMA_DTO_PAL_M   >> 0)&0x000000ff)
+#define r1c3 (unsigned char)((CVD2_HSYNC_DTO_PAL_M >> 24)&0x000000ff)
+#define r1d3 (unsigned char)((CVD2_HSYNC_DTO_PAL_M >> 16)&0x000000ff)
+#define r1e3 (unsigned char)((CVD2_HSYNC_DTO_PAL_M   >> 8)&0x000000ff)
+#define r1f3 (unsigned char)((CVD2_HSYNC_DTO_PAL_M   >> 0)&0x000000ff)
 
-#define r184 (unsigned char)((CVD2_CHROMA_DTO_PAL_60 >> 24) & 0x000000ff)
-#define r194 (unsigned char)((CVD2_CHROMA_DTO_PAL_60 >> 16) & 0x000000ff)
-#define r1a4 (unsigned char)((CVD2_CHROMA_DTO_PAL_60  >> 8) & 0x000000ff)
-#define r1b4 (unsigned char)((CVD2_CHROMA_DTO_PAL_60  >> 0) & 0x000000ff)
-#define r1c4 (unsigned char)((CVD2_HSYNC_DTO_PAL_60 >> 24) & 0x000000ff)
-#define r1d4 (unsigned char)((CVD2_HSYNC_DTO_PAL_60 >> 16) & 0x000000ff)
-#define r1e4 (unsigned char)((CVD2_HSYNC_DTO_PAL_60  >> 8) & 0x000000ff)
-#define r1f4 (unsigned char)((CVD2_HSYNC_DTO_PAL_60  >> 0) & 0x000000ff)
+#define r184 (unsigned char)((CVD2_CHROMA_DTO_PAL_60 >> 24)&0x000000ff)
+#define r194 (unsigned char)((CVD2_CHROMA_DTO_PAL_60 >> 16)&0x000000ff)
+#define r1a4 (unsigned char)((CVD2_CHROMA_DTO_PAL_60  >> 8)&0x000000ff)
+#define r1b4 (unsigned char)((CVD2_CHROMA_DTO_PAL_60  >> 0)&0x000000ff)
+#define r1c4 (unsigned char)((CVD2_HSYNC_DTO_PAL_60 >> 24)&0x000000ff)
+#define r1d4 (unsigned char)((CVD2_HSYNC_DTO_PAL_60 >> 16)&0x000000ff)
+#define r1e4 (unsigned char)((CVD2_HSYNC_DTO_PAL_60  >> 8)&0x000000ff)
+#define r1f4 (unsigned char)((CVD2_HSYNC_DTO_PAL_60  >> 0)&0x000000ff)
 
-#define r185 (unsigned char)((CVD2_CHROMA_DTO_PAL_CN >> 24) & 0x000000ff)
-#define r195 (unsigned char)((CVD2_CHROMA_DTO_PAL_CN >> 16) & 0x000000ff)
-#define r1a5 (unsigned char)((CVD2_CHROMA_DTO_PAL_CN  >> 8) & 0x000000ff)
-#define r1b5 (unsigned char)((CVD2_CHROMA_DTO_PAL_CN  >> 0) & 0x000000ff)
-#define r1c5 (unsigned char)((CVD2_HSYNC_DTO_PAL_CN >> 24) & 0x000000ff)
-#define r1d5 (unsigned char)((CVD2_HSYNC_DTO_PAL_CN >> 16) & 0x000000ff)
-#define r1e5 (unsigned char)((CVD2_HSYNC_DTO_PAL_CN  >> 8) & 0x000000ff)
-#define r1f5 (unsigned char)((CVD2_HSYNC_DTO_PAL_CN  >> 0) & 0x000000ff)
+#define r185 (unsigned char)((CVD2_CHROMA_DTO_PAL_CN >> 24)&0x000000ff)
+#define r195 (unsigned char)((CVD2_CHROMA_DTO_PAL_CN >> 16)&0x000000ff)
+#define r1a5 (unsigned char)((CVD2_CHROMA_DTO_PAL_CN  >> 8)&0x000000ff)
+#define r1b5 (unsigned char)((CVD2_CHROMA_DTO_PAL_CN  >> 0)&0x000000ff)
+#define r1c5 (unsigned char)((CVD2_HSYNC_DTO_PAL_CN >> 24)&0x000000ff)
+#define r1d5 (unsigned char)((CVD2_HSYNC_DTO_PAL_CN >> 16)&0x000000ff)
+#define r1e5 (unsigned char)((CVD2_HSYNC_DTO_PAL_CN  >> 8)&0x000000ff)
+#define r1f5 (unsigned char)((CVD2_HSYNC_DTO_PAL_CN  >> 0)&0x000000ff)
 
-#define r186 (unsigned char)((CVD2_CHROMA_DTO_SECAM >> 24) & 0x000000ff)
-#define r196 (unsigned char)((CVD2_CHROMA_DTO_SECAM >> 16) & 0x000000ff)
-#define r1a6 (unsigned char)((CVD2_CHROMA_DTO_SECAM   >> 8) & 0x000000ff)
-#define r1b6 (unsigned char)((CVD2_CHROMA_DTO_SECAM   >> 0) & 0x000000ff)
-#define r1c6 (unsigned char)((CVD2_HSYNC_DTO_SECAM >> 24) & 0x000000ff)
-#define r1d6 (unsigned char)((CVD2_HSYNC_DTO_SECAM >> 16) & 0x000000ff)
-#define r1e6 (unsigned char)((CVD2_HSYNC_DTO_SECAM   >> 8) & 0x000000ff)
-#define r1f6 (unsigned char)((CVD2_HSYNC_DTO_SECAM   >> 0) & 0x000000ff)
+#define r186 (unsigned char)((CVD2_CHROMA_DTO_SECAM >> 24)&0x000000ff)
+#define r196 (unsigned char)((CVD2_CHROMA_DTO_SECAM >> 16)&0x000000ff)
+#define r1a6 (unsigned char)((CVD2_CHROMA_DTO_SECAM   >> 8)&0x000000ff)
+#define r1b6 (unsigned char)((CVD2_CHROMA_DTO_SECAM   >> 0)&0x000000ff)
+#define r1c6 (unsigned char)((CVD2_HSYNC_DTO_SECAM >> 24)&0x000000ff)
+#define r1d6 (unsigned char)((CVD2_HSYNC_DTO_SECAM >> 16)&0x000000ff)
+#define r1e6 (unsigned char)((CVD2_HSYNC_DTO_SECAM   >> 8)&0x000000ff)
+#define r1f6 (unsigned char)((CVD2_HSYNC_DTO_SECAM   >> 0)&0x000000ff)
 
 /* 00~3f */
 const unsigned char cvd_part1_table[TVIN_SIG_FMT_CVBS_NTSC_50 -
@@ -1300,7 +1298,7 @@ const unsigned int cvd_part3_table[TVIN_SIG_FMT_CVBS_NTSC_50 -
 EXPORT_SYMBOL(cvd_part3_table);
 
 const unsigned int cvbs_acd_table[TVIN_SIG_FMT_CVBS_NTSC_50 -
-	TVIN_SIG_FMT_CVBS_NTSC_M + 1][ACD_REG_NUM + 1] = {
+	TVIN_SIG_FMT_CVBS_NTSC_M + 1][ACD_REG_NUM+1] = {
 	{
 		0x10101002, 0x0,       0x7f00e110, 0x08881e18, 0xb36d1858,
 		0x00007612, 0x00000000, 0x77444444,	0x20e000fe, 0x00000101,
@@ -1740,7 +1738,7 @@ const unsigned int cvbs_acd_table[TVIN_SIG_FMT_CVBS_NTSC_50 -
 EXPORT_SYMBOL(cvbs_acd_table);
 
 const unsigned int rf_acd_table[TVIN_SIG_FMT_CVBS_NTSC_50 -
-			TVIN_SIG_FMT_CVBS_NTSC_M + 1][ACD_REG_NUM + 1] = {
+				TVIN_SIG_FMT_CVBS_NTSC_M+1][ACD_REG_NUM+1] = {
 	{
 		0x10101002, 0x0,       0x7f00e110, 0x08881e18, 0xb36d1858,
 		0x00007612, 0x00000000, 0x77444444,	0x20e000fe, 0x00000101,
@@ -3139,5 +3137,5 @@ const unsigned char cvd_yc_reg_0x18_0x1f[TVIN_SIG_FMT_CVBS_NTSC_50 -
 };
 EXPORT_SYMBOL(cvd_yc_reg_0x18_0x1f);
 
-//MODULE_LICENSE("GPL");
+MODULE_LICENSE("GPL");
 

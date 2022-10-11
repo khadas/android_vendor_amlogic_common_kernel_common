@@ -1,7 +1,10 @@
-// SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (C) Sistina Software, Inc.  1997-2003 All rights reserved.
  * Copyright 2004-2011 Red Hat, Inc.
+ *
+ * This copyrighted material is made available to anyone wishing to use,
+ * modify, copy, or redistribute it subject to the terms and conditions
+ * of the GNU General Public License version 2.
  */
 
 #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
@@ -12,13 +15,14 @@
 #include <linux/types.h>
 #include <linux/delay.h>
 #include <linux/gfs2_ondisk.h>
-#include <linux/sched/signal.h>
 
 #include "incore.h"
 #include "glock.h"
 #include "util.h"
 #include "sys.h"
 #include "trace_gfs2.h"
+
+extern struct workqueue_struct *gfs2_control_wq;
 
 /**
  * gfs2_update_stats - Update time based stats
@@ -175,14 +179,14 @@ static void gdlm_bast(void *arg, int mode)
 		gfs2_glock_cb(gl, LM_ST_SHARED);
 		break;
 	default:
-		fs_err(gl->gl_name.ln_sbd, "unknown bast mode %d\n", mode);
+		pr_err("unknown bast mode %d\n", mode);
 		BUG();
 	}
 }
 
 /* convert gfs lock-state to dlm lock-mode */
 
-static int make_mode(struct gfs2_sbd *sdp, const unsigned int lmstate)
+static int make_mode(const unsigned int lmstate)
 {
 	switch (lmstate) {
 	case LM_ST_UNLOCKED:
@@ -194,7 +198,7 @@ static int make_mode(struct gfs2_sbd *sdp, const unsigned int lmstate)
 	case LM_ST_SHARED:
 		return DLM_LOCK_PR;
 	}
-	fs_err(sdp, "unknown LM state %d\n", lmstate);
+	pr_err("unknown LM state %d\n", lmstate);
 	BUG();
 	return -1;
 }
@@ -255,7 +259,7 @@ static int gdlm_lock(struct gfs2_glock *gl, unsigned int req_state,
 	u32 lkf;
 	char strname[GDLM_STRNAME_BYTES] = "";
 
-	req = make_mode(gl->gl_name.ln_sbd, req_state);
+	req = make_mode(req_state);
 	lkf = make_flags(gl, flags, req);
 	gfs2_glstats_inc(gl, GFS2_LKS_DCOUNT);
 	gfs2_sbstats_inc(gl, GFS2_LKS_DCOUNT);
@@ -303,7 +307,7 @@ static void gdlm_put_lock(struct gfs2_glock *gl)
 	error = dlm_unlock(ls->ls_dlm, gl->gl_lksb.sb_lkid, DLM_LKF_VALBLK,
 			   NULL, gl);
 	if (error) {
-		fs_err(sdp, "gdlm_unlock %x,%llx err=%d\n",
+		pr_err("gdlm_unlock %x,%llx err=%d\n",
 		       gl->gl_name.ln_type,
 		       (unsigned long long)gl->gl_name.ln_number, error);
 		return;
@@ -815,13 +819,6 @@ restart:
 		goto fail;
 	}
 
-	/**
-	 * If we're a spectator, we don't want to take the lock in EX because
-	 * we cannot do the first-mount responsibility it implies: recovery.
-	 */
-	if (sdp->sd_args.ar_spectator)
-		goto locks_done;
-
 	error = mounted_lock(sdp, DLM_LOCK_EX, DLM_LKF_CONVERT|DLM_LKF_NOQUEUE);
 	if (!error) {
 		mounted_mode = DLM_LOCK_EX;
@@ -897,16 +894,9 @@ locks_done:
 	if (lvb_gen < mount_gen) {
 		/* wait for mounted nodes to update control_lock lvb to our
 		   generation, which might include new recovery bits set */
-		if (sdp->sd_args.ar_spectator) {
-			fs_info(sdp, "Recovery is required. Waiting for a "
-				"non-spectator to mount.\n");
-			msleep_interruptible(1000);
-		} else {
-			fs_info(sdp, "control_mount wait1 block %u start %u "
-				"mount %u lvb %u flags %lx\n", block_gen,
-				start_gen, mount_gen, lvb_gen,
-				ls->ls_recover_flags);
-		}
+		fs_info(sdp, "control_mount wait1 block %u start %u mount %u "
+			"lvb %u flags %lx\n", block_gen, start_gen, mount_gen,
+			lvb_gen, ls->ls_recover_flags);
 		spin_unlock(&ls->ls_recover_spin);
 		goto restart;
 	}
@@ -1031,11 +1021,11 @@ static int set_recover_size(struct gfs2_sbd *sdp, struct dlm_slot *slots,
 	}
 
 	old_size = ls->ls_recover_size;
-	new_size = old_size;
-	while (new_size < max_jid + 1)
-		new_size += RECOVER_SIZE_INC;
-	if (new_size == old_size)
+
+	if (old_size >= max_jid + 1)
 		return 0;
+
+	new_size = old_size + RECOVER_SIZE_INC;
 
 	submit = kcalloc(new_size, sizeof(uint32_t), GFP_NOFS);
 	result = kcalloc(new_size, sizeof(uint32_t), GFP_NOFS);
@@ -1065,7 +1055,6 @@ static void free_recover_size(struct lm_lockstruct *ls)
 	ls->ls_recover_submit = NULL;
 	ls->ls_recover_result = NULL;
 	ls->ls_recover_size = 0;
-	ls->ls_lvb_bits = NULL;
 }
 
 /* dlm calls before it does lock recovery */
@@ -1099,7 +1088,7 @@ static void gdlm_recover_slot(void *arg, struct dlm_slot *slot)
 
 	spin_lock(&ls->ls_recover_spin);
 	if (ls->ls_recover_size < jid + 1) {
-		fs_err(sdp, "recover_slot jid %d gen %u short size %d\n",
+		fs_err(sdp, "recover_slot jid %d gen %u short size %d",
 		       jid, ls->ls_recover_block, ls->ls_recover_size);
 		spin_unlock(&ls->ls_recover_spin);
 		return;
@@ -1161,7 +1150,7 @@ static void gdlm_recovery_result(struct gfs2_sbd *sdp, unsigned int jid,
 		return;
 	}
 	if (ls->ls_recover_size < jid + 1) {
-		fs_err(sdp, "recovery_result jid %d short size %d\n",
+		fs_err(sdp, "recovery_result jid %d short size %d",
 		       jid, ls->ls_recover_size);
 		spin_unlock(&ls->ls_recover_spin);
 		return;
@@ -1182,7 +1171,7 @@ static void gdlm_recovery_result(struct gfs2_sbd *sdp, unsigned int jid,
 	spin_unlock(&ls->ls_recover_spin);
 }
 
-static const struct dlm_lockspace_ops gdlm_lockspace_ops = {
+const struct dlm_lockspace_ops gdlm_lockspace_ops = {
 	.recover_prep = gdlm_recover_prep,
 	.recover_slot = gdlm_recover_slot,
 	.recover_done = gdlm_recover_done,

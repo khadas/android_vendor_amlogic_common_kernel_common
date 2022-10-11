@@ -1,6 +1,5 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
- * drivers/amlogic/media/enhancement/amvecm/hdr/gamut_convet.c
+ * drivers/amlogic/media/enhancement/amvecm/hdr/am_hdr10_tm.c
  *
  * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
  *
@@ -137,7 +136,7 @@ int time_iir(u32 *maxl)
 
 	/*normalize to 10bit*/
 	hist_diff[2] >>= 6;
-	if (hist_diff[2] > sc_th || (*maxl <= panell)) {
+	if ((hist_diff[2] > sc_th) || (*maxl <= panell)) {
 		ret = 1;
 	} else {
 		bld_coef = hist_diff[2];
@@ -166,8 +165,9 @@ int time_iir(u32 *maxl)
 		ret = 2;
 	}
 
-	pr_hdr_tm("ret = %d, dtl_lum = %d, max_lum[1] = %d, max_lum[2] = %d\n",
-		  ret, dtl_lum, max_lum[1], max_lum[2]);
+	pr_hdr_tm(
+		"ret = %d, dtl_lum = %d, max_lum[1] = %d, max_lum[2] = %d\n",
+		ret, dtl_lum, max_lum[1], max_lum[2]);
 
 	return ret;
 }
@@ -252,13 +252,14 @@ int gen_knee_anchor(u32 maxl, u32 panell, u64 *sx, u64 *sy, u64 *anchor)
 		anchor_linear[i] = (i + 1) *
 			(1 << MAX12_BIT) / MAX_BEIZER_ORDER;
 
-	pr_hdr_tm("knee anchor p1: %lld, %lld, %lld, %lld, %lld, %lld, %lld, %lld, %lld, %lld %lld\n",
-		  sx1, sy1,
-		  anchor_linear[0], anchor_linear[1],
-		  anchor_linear[2], anchor_linear[3],
-		  anchor_linear[4], anchor_linear[5],
-		  anchor_linear[6], anchor_linear[7],
-		  anchor_linear[8]);
+	pr_hdr_tm(
+		"knee anchor p1: %lld, %lld, %lld, %lld, %lld, %lld, %lld, %lld, %lld, %lld %lld\n",
+		sx1, sy1,
+		anchor_linear[0], anchor_linear[1],
+		anchor_linear[2], anchor_linear[3],
+		anchor_linear[4], anchor_linear[5],
+		anchor_linear[6], anchor_linear[7],
+		anchor_linear[8]);
 
 	if (maxl <= panell) {
 		sx1 = knee_bypass;
@@ -282,8 +283,9 @@ int gen_knee_anchor(u32 maxl, u32 panell, u64 *sx, u64 *sy, u64 *anchor)
 			anchor[i] = div64_u64(anchor[i], norm);
 		}
 
-		anchor0 = calcp1((u32)sx1, (u32)sy1,
-				 panell, maxl, &basisootf_param, NULL);
+		anchor0 = calcp1(
+			(u32)sx1, (u32)sy1,
+			panell, maxl, &basisootf_param, NULL);
 
 		for (i = 1; i < MAX_BEIZER_ORDER - 1; i++)
 			anchor[i] = min(anchor[i], (i + 1) * anchor0);
@@ -294,13 +296,14 @@ int gen_knee_anchor(u32 maxl, u32 panell, u64 *sx, u64 *sy, u64 *anchor)
 	*sx = sx1;
 	*sy = sy1;
 
-	pr_hdr_tm("knee anchor p2: %lld, %lld, %lld, %lld, %lld, %lld, %lld, %lld, %lld, %lld %lld\n",
-		  sx1, sy1,
-		  anchor[0], anchor[1],
-		  anchor[2], anchor[3],
-		  anchor[4], anchor[5],
-		  anchor[6], anchor[7],
-		  anchor[8]);
+	pr_hdr_tm(
+		"knee anchor p2: %lld, %lld, %lld, %lld, %lld, %lld, %lld, %lld, %lld, %lld %lld\n",
+		sx1, sy1,
+		anchor[0], anchor[1],
+		anchor[2], anchor[3],
+		anchor[4], anchor[5],
+		anchor[6], anchor[7],
+		anchor[8]);
 
 	return 0;
 }
@@ -309,7 +312,7 @@ int dynamic_hdr_sdr_ootf(u32 maxl, u32 panell, u64 sx, u64 sy, u64 *anchor)
 {
 	int i;
 	u32 tgtl = 10000;
-	static u64 oe_x[OE_X] = {0};
+	u64 oe_x[OE_X] = {0};
 	int order = MAX_BEIZER_ORDER + 1;
 	u64 step;
 	u64 kx, ky;
@@ -324,14 +327,15 @@ int dynamic_hdr_sdr_ootf(u32 maxl, u32 panell, u64 sx, u64 sy, u64 *anchor)
 
 	gen_knee_anchor(maxl, panell, &sx, &sy, anchor);
 
-	pr_hdr_tm("d1: %d, %d, %lld, %lld, %lld, %lld, %lld, %lld, %lld, %lld, %lld, %lld %lld\n",
-		  maxl, panell,
-		  sx, sy,
-		  anchor[0], anchor[1],
-		  anchor[2], anchor[3],
-		  anchor[4], anchor[5],
-		  anchor[6], anchor[7],
-		  anchor[8]);
+	pr_hdr_tm(
+		"d1: %d, %d, %lld, %lld, %lld, %lld, %lld, %lld, %lld, %lld, %lld, %lld %lld\n",
+		maxl, panell,
+		sx, sy,
+		anchor[0], anchor[1],
+		anchor[2], anchor[3],
+		anchor[4], anchor[5],
+		anchor[6], anchor[7],
+		anchor[8]);
 
 	for (i = 0; i < order - 2; i++)
 		finalanchor[i + 1] = anchor[i] << (MAX32_BIT - MAX12_BIT);
@@ -382,9 +386,9 @@ int dynamic_hdr_sdr_ootf(u32 maxl, u32 panell, u64 sx, u64 sy, u64 *anchor)
 				oo_gain[i] = div64_u64(temp, panell);
 			} else if (oe_x[i] <=  kx_primy) {
 				step = oe_x[i] - kx;
-				decasteliau_alg(&ebzcur[0], step,
-						range_ebz_x,
-						finalanchor, order);
+				decasteliau_alg(
+					&ebzcur[0], step,
+					range_ebz_x,  finalanchor, order);
 				curvey[i] = ky +
 					((range_ebz_y * ebzcur[1] + MAX_32 / 2)
 					>> MAX32_BIT);
@@ -405,19 +409,21 @@ int dynamic_hdr_sdr_ootf(u32 maxl, u32 panell, u64 sx, u64 sy, u64 *anchor)
 
 	for (i = 0; i < OE_X; i++) {
 		if ((i + 1) % 10 == 0)
-			pr_hdr_tm("%d, %d, %d, %d, %d, %d, %d, %d, %d, %d\n",
-				  oo_gain[i - 9], oo_gain[i - 8],
-				  oo_gain[i - 7], oo_gain[i - 6],
-				  oo_gain[i - 5], oo_gain[i - 4],
-				  oo_gain[i - 3], oo_gain[i - 2],
-				  oo_gain[i - 1], oo_gain[i]);
+			pr_hdr_tm(
+				"%d, %d, %d, %d, %d, %d, %d, %d, %d, %d\n",
+				oo_gain[i - 9], oo_gain[i - 8],
+				oo_gain[i - 7], oo_gain[i - 6],
+				oo_gain[i - 5], oo_gain[i - 4],
+				oo_gain[i - 3], oo_gain[i - 2],
+				oo_gain[i - 1], oo_gain[i]);
 		if (i == 148)
-			pr_hdr_tm("%d, %d, %d, %d, %d, %d, %d, %d, %d\n",
-				  oo_gain[i - 8],
-				  oo_gain[i - 7], oo_gain[i - 6],
-				  oo_gain[i - 5], oo_gain[i - 4],
-				  oo_gain[i - 3], oo_gain[i - 2],
-				  oo_gain[i - 1], oo_gain[i]);
+			pr_hdr_tm(
+				"%d, %d, %d, %d, %d, %d, %d, %d, %d\n",
+				oo_gain[i - 8],
+				oo_gain[i - 7], oo_gain[i - 6],
+				oo_gain[i - 5], oo_gain[i - 4],
+				oo_gain[i - 3], oo_gain[i - 2],
+				oo_gain[i - 1], oo_gain[i]);
 	}
 	pr_hdr_tm("\n");
 
@@ -438,6 +444,11 @@ int hdr10_tm_dynamic_proc(struct vframe_master_display_colour_s *p)
 	int scn_chang_flag = 1;
 	struct aml_tmo_reg_sw *pre_tmo_reg;
 
+	if (!is_hdr_tmo_support()) {
+		pr_hdr_tm("ic unsupport tmo\n");
+		return 0;
+	}
+
 	if (p->luminance[0] > 10000)
 		p->luminance[0] /= 10000;
 	/*no luminance*/
@@ -448,8 +459,9 @@ int hdr10_tm_dynamic_proc(struct vframe_master_display_colour_s *p)
 
 	/*use 95% maxl because of high percert flicker*/
 	maxl = (percentile[8] > primry_maxl) ? primry_maxl : percentile[8];
-	pr_hdr_tm("maxl = %d, percentile[8] = %d, primry_maxl =%d\n",
-		  maxl, percentile[8], primry_maxl);
+	pr_hdr_tm(
+		"maxl = %d, percentile[8] = %d, primry_maxl =%d\n",
+		maxl, percentile[8], primry_maxl);
 
 	if (hdr_tm_iir)
 		scn_chang_flag = time_iir(&maxl);
@@ -476,7 +488,6 @@ int hdr10_tm_dynamic_proc(struct vframe_master_display_colour_s *p)
 		anchor[i] = P_init[i] << 2;
 
 	pre_tmo_reg = tmo_fw_param_get();
-
 	if (!is_hdr_tmo_support() || !pre_tmo_reg->pre_hdr10_tmo_alg) {
 		/*used old hdr alg*/
 		pr_hdr_tm("used old hdr alg - ");
@@ -493,10 +504,11 @@ int hdr10_tm_dynamic_proc(struct vframe_master_display_colour_s *p)
 	} else if (hdr10_tm_sel == 2) {
 		hdr10_tmo_gen(oo_gain);
 		memcpy(oo_y_lut_hdr_sdr, oo_gain, sizeof(u32) * OE_X);
-	} else {
-		memcpy(oo_y_lut_hdr_sdr, oo_y_lut_hdr_sdr_def,
+	} else
+		memcpy(
+			oo_y_lut_hdr_sdr,
+			oo_y_lut_hdr_sdr_def,
 			sizeof(u32) * OE_X);
-	}
 
 	if (hdr10_tm_dbg > 0)
 		hdr10_tm_dbg--;

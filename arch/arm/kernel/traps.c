@@ -1,9 +1,12 @@
-// SPDX-License-Identifier: GPL-2.0-only
 /*
  *  linux/arch/arm/kernel/traps.c
  *
  *  Copyright (C) 1995-2009 Russell King
  *  Fragments that appear the same as linux/arch/i386/kernel/traps.c (C) Linus Torvalds
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
  *
  *  'traps.c' handles hardware exceptions after we have saved some state in
  *  'linux/arch/arm/lib/traps.S'.  Mostly a debugging aid, but will probably
@@ -22,9 +25,7 @@
 #include <linux/bug.h>
 #include <linux/delay.h>
 #include <linux/init.h>
-#include <linux/sched/signal.h>
-#include <linux/sched/debug.h>
-#include <linux/sched/task_stack.h>
+#include <linux/sched.h>
 #include <linux/irq.h>
 
 #include <linux/atomic.h>
@@ -37,6 +38,9 @@
 #include <asm/tls.h>
 #include <asm/system_misc.h>
 #include <asm/opcodes.h>
+#ifdef CONFIG_AMLOGIC_DMC_MONITOR
+#include <linux/amlogic/dmc_monitor.h>
+#endif
 
 
 static const char *handler[]= {
@@ -51,11 +55,11 @@ void *vectors_page;
 
 #ifdef CONFIG_DEBUG_USER
 #ifdef CONFIG_AMLOGIC_USER_FAULT
-#define USER_DEBUG_UNDEFINED_INSTRUCTION BIT(0)
-#define USER_DEBUG_SYSTEM_CALL           BIT(1)
-#define USER_DEBUG_INVALID_DATA_ABORT    BIT(2)
-#define USER_DEBUG_SIGSEGV_FAULT         BIT(3)
-#define USER_DEBUG_SIGBUS_FAULT          BIT(14)
+#define USER_DEBUG_UNDEFINED_INSTRUCTION (1 << 0)
+#define USER_DEBUG_SYSTEM_CALL           (1 << 1)
+#define USER_DEBUG_INVALID_DATA_ABORT    (1 << 2)
+#define USER_DEBUG_SIGSEGV_FAULT         (1 << 3)
+#define USER_DEBUG_SIGBUS_FAULT          (1 << 4)
 unsigned int user_debug = USER_DEBUG_UNDEFINED_INSTRUCTION |
 			  USER_DEBUG_SYSTEM_CALL |
 			  USER_DEBUG_INVALID_DATA_ABORT |
@@ -77,16 +81,14 @@ static void dump_mem(const char *, const char *, unsigned long, unsigned long);
 
 void dump_backtrace_entry(unsigned long where, unsigned long from, unsigned long frame)
 {
-	unsigned long end = frame + 4 + sizeof(struct pt_regs);
-
 #ifdef CONFIG_KALLSYMS
 	printk("[<%08lx>] (%ps) from [<%08lx>] (%pS)\n", where, (void *)where, from, (void *)from);
 #else
 	printk("Function entered at [<%08lx>] from [<%08lx>]\n", where, from);
 #endif
 
-	if (in_entry_text(from) && end <= ALIGN(frame, THREAD_SIZE))
-		dump_mem("", "Exception stack", frame + 4, end);
+	if (in_exception_text(where))
+		dump_mem("", "Exception stack", frame + 4, frame + 4 + sizeof(struct pt_regs));
 }
 
 void dump_backtrace_stm(u32 *stack, u32 instruction)
@@ -377,14 +379,13 @@ void die(const char *str, struct pt_regs *regs, int err)
 }
 
 void arm_notify_die(const char *str, struct pt_regs *regs,
-		int signo, int si_code, void __user *addr,
-		unsigned long err, unsigned long trap)
+		struct siginfo *info, unsigned long err, unsigned long trap)
 {
 	if (user_mode(regs)) {
 		current->thread.error_code = err;
 		current->thread.trap_no = trap;
 
-		force_sig_fault(signo, si_code, addr);
+		force_sig_info(info->si_signo, info, current);
 	} else {
 		die(str, regs, err);
 	}
@@ -448,9 +449,10 @@ int call_undef_hook(struct pt_regs *regs, unsigned int instr)
 	return fn ? fn(regs, instr) : 1;
 }
 
-asmlinkage void do_undefinstr(struct pt_regs *regs)
+asmlinkage void __exception do_undefinstr(struct pt_regs *regs)
 {
 	unsigned int instr;
+	siginfo_t info;
 	void __user *pc;
 
 	pc = (void __user *)instruction_pointer(regs);
@@ -500,8 +502,13 @@ die_sig:
 		dump_instr(KERN_INFO, regs);
 	}
 #endif
-	arm_notify_die("Oops - undefined instruction", regs,
-		       SIGILL, ILL_ILLOPC, pc, 0, 6);
+
+	info.si_signo = SIGILL;
+	info.si_errno = 0;
+	info.si_code  = ILL_ILLOPC;
+	info.si_addr  = pc;
+
+	arm_notify_die("Oops - undefined instruction", regs, &info, 0, 6);
 }
 NOKPROBE_SYMBOL(do_undefinstr)
 
@@ -544,7 +551,7 @@ asmlinkage void bad_mode(struct pt_regs *regs, int reason)
 	console_verbose();
 
 #ifdef CONFIG_AMLOGIC_DMC_MONITOR
-	//dump_dmc_reg(buf);
+	dump_dmc_reg(buf);
 	pr_err("%s\n", buf);
 #endif
 
@@ -561,6 +568,8 @@ asmlinkage void bad_mode(struct pt_regs *regs, int reason)
 
 static int bad_syscall(int n, struct pt_regs *regs)
 {
+	siginfo_t info;
+
 	if ((current->personality & PER_MASK) != PER_LINUX) {
 		send_sig(SIGSEGV, current, 1);
 		return regs->ARM_r0;
@@ -574,10 +583,13 @@ static int bad_syscall(int n, struct pt_regs *regs)
 	}
 #endif
 
-	arm_notify_die("Oops - bad syscall", regs, SIGILL, ILL_ILLTRP,
-		       (void __user *)instruction_pointer(regs) -
-			 (thumb_mode(regs) ? 2 : 4),
-		       n, 0);
+	info.si_signo = SIGILL;
+	info.si_errno = 0;
+	info.si_code  = ILL_ILLTRP;
+	info.si_addr  = (void __user *)instruction_pointer(regs) -
+			 (thumb_mode(regs) ? 2 : 4);
+
+	arm_notify_die("Oops - bad syscall", regs, &info, n, 0);
 
 	return regs->ARM_r0;
 }
@@ -610,7 +622,7 @@ do_cache_op(unsigned long start, unsigned long end, int flags)
 	if (end < start || flags)
 		return -EINVAL;
 
-	if (!access_ok(start, end - start))
+	if (!access_ok(VERIFY_READ, start, end - start))
 		return -EFAULT;
 
 	return __do_cache_op(start, end);
@@ -623,18 +635,24 @@ do_cache_op(unsigned long start, unsigned long end, int flags)
 #define NR(x) ((__ARM_NR_##x) - __ARM_NR_BASE)
 asmlinkage int arm_syscall(int no, struct pt_regs *regs)
 {
+	siginfo_t info;
+
 	if ((no >> 16) != (__ARM_NR_BASE>> 16))
 		return bad_syscall(no, regs);
 
 	switch (no & 0xffff) {
 	case 0: /* branch through 0 */
-		arm_notify_die("branch through zero", regs,
-			       SIGSEGV, SEGV_MAPERR, NULL, 0, 0);
+		info.si_signo = SIGSEGV;
+		info.si_errno = 0;
+		info.si_code  = SEGV_MAPERR;
+		info.si_addr  = NULL;
+
+		arm_notify_die("branch through zero", regs, &info, 0, 0);
 		return 0;
 
 	case NR(breakpoint): /* SWI BREAK_POINT */
 		regs->ARM_pc -= thumb_mode(regs) ? 2 : 4;
-		ptrace_break(regs);
+		ptrace_break(current, regs);
 		return regs->ARM_r0;
 
 	/*
@@ -670,9 +688,6 @@ asmlinkage int arm_syscall(int no, struct pt_regs *regs)
 		set_tls(regs->ARM_r0);
 		return 0;
 
-	case NR(get_tls):
-		return current_thread_info()->tp_value[0];
-
 	default:
 		/* Calls 9f00xx..9f07ff are defined to return -ENOSYS
 		   if not implemented, rather than raising SIGILL.  This
@@ -697,10 +712,13 @@ asmlinkage int arm_syscall(int no, struct pt_regs *regs)
 		}
 	}
 #endif
-	arm_notify_die("Oops - bad syscall(2)", regs, SIGILL, ILL_ILLTRP,
-		       (void __user *)instruction_pointer(regs) -
-			 (thumb_mode(regs) ? 2 : 4),
-		       no, 0);
+	info.si_signo = SIGILL;
+	info.si_errno = 0;
+	info.si_code  = ILL_ILLTRP;
+	info.si_addr  = (void __user *)instruction_pointer(regs) -
+			 (thumb_mode(regs) ? 2 : 4);
+
+	arm_notify_die("Oops - bad syscall(2)", regs, &info, no, 0);
 	return 0;
 }
 
@@ -750,19 +768,23 @@ asmlinkage void
 baddataabort(int code, unsigned long instr, struct pt_regs *regs)
 {
 	unsigned long addr = instruction_pointer(regs);
+	siginfo_t info;
 
 #ifdef CONFIG_DEBUG_USER
 	if (user_debug & UDBG_BADABORT) {
-		pr_err("8<--- cut here ---\n");
 		pr_err("[%d] %s: bad data abort: code %d instr 0x%08lx\n",
 		       task_pid_nr(current), current->comm, code, instr);
 		dump_instr(KERN_ERR, regs);
-		show_pte(KERN_ERR, current->mm, addr);
+		show_pte(current->mm, addr);
 	}
 #endif
 
-	arm_notify_die("unknown data abort code", regs,
-		       SIGILL, ILL_ILLOPC, (void __user *)addr, instr, 0);
+	info.si_signo = SIGILL;
+	info.si_errno = 0;
+	info.si_code  = ILL_ILLOPC;
+	info.si_addr  = (void __user *)addr;
+
+	arm_notify_die("unknown data abort code", regs, &info, instr, 0);
 }
 
 void __readwrite_bug(const char *fn)
@@ -801,6 +823,7 @@ void abort(void)
 	/* if that doesn't kill us, halt */
 	panic("Oops failed to kill thread");
 }
+EXPORT_SYMBOL(abort);
 
 void __init trap_init(void)
 {

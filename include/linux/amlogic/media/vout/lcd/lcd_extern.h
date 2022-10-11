@@ -1,7 +1,17 @@
-/* SPDX-License-Identifier: GPL-2.0+ */
 /*
+ * include/linux/amlogic/media/vout/lcd/lcd_extern.h
  *
- * Copyright (C) 2019 Amlogic, Inc. All rights reserved.
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
  *
  */
 
@@ -18,6 +28,7 @@ enum lcd_extern_type_e {
 
 #define LCD_EXTERN_INIT_ON_MAX        3000
 #define LCD_EXTERN_INIT_OFF_MAX       100
+
 
 #define LCD_EXTERN_GPIO_NUM_MAX       6
 #define LCD_EXTERN_INDEX_INVALID      0xff
@@ -76,7 +87,7 @@ struct aml_lcd_extern_i2c_dev_s {
 	struct i2c_client *client;
 };
 
-struct aml_lcd_extern_driver_s *aml_lcd_extern_get_driver(int index);
+extern struct aml_lcd_extern_driver_s *aml_lcd_extern_get_driver(int index);
 void lcd_extern_index_lut_add(int index);
 #endif
 

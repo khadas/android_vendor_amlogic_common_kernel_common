@@ -1,7 +1,17 @@
-/* SPDX-License-Identifier: GPL-2.0+ */
 /*
+ * drivers/amlogic/media/vout/lcd/lcd_clk_config.h
  *
- * Copyright (C) 2019 Amlogic, Inc. All rights reserved.
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
  *
  */
 
@@ -38,24 +48,6 @@ struct lcd_clk_ctrl_s {
 #define LCD_PRBS_MODE_LVDS    BIT(0)
 #define LCD_PRBS_MODE_VX1     BIT(1)
 #define LCD_PRBS_MODE_MAX     2
-
-struct lcd_clktree_s {
-	unsigned char clk_gate_state;
-	unsigned char clk_gate_optional_state;
-
-	struct clk *encl_top_gate;
-	struct clk *encl_int_gate;
-
-	struct clk *dsi_host_gate;
-	struct clk *dsi_phy_gate;
-	struct clk *dsi_meas;
-	struct clk *mipi_enable_gate;
-	struct clk *mipi_bandgap_gate;
-	struct clk *gp0_pll;
-	struct clk *tcon_gate;
-	struct clk *tcon_clk;
-};
-
 struct lcd_clk_data_s {
 	/* clk path node parameters */
 	unsigned int pll_od_fb;
@@ -78,7 +70,6 @@ struct lcd_clk_data_s {
 
 	unsigned char clk_path_valid;
 	unsigned char vclk_sel;
-	int enc_clk_msr_id;
 	struct lcd_clk_ctrl_s *pll_ctrl_table;
 
 	unsigned int ss_level_max;
@@ -88,23 +79,22 @@ struct lcd_clk_data_s {
 	char **ss_freq_table;
 	char **ss_mode_table;
 
-	void (*clk_generate_parameter)(struct aml_lcd_drv_s *pdrv);
-	void (*pll_frac_generate)(struct aml_lcd_drv_s *pdrv);
-	void (*set_ss_level)(struct aml_lcd_drv_s *pdrv);
-	void (*set_ss_advance)(struct aml_lcd_drv_s *pdrv);
-	void (*clk_set)(struct aml_lcd_drv_s *pdrv);
-	void (*vclk_crt_set)(struct aml_lcd_drv_s *pdrv);
-	void (*clk_disable)(struct aml_lcd_drv_s *pdrv);
-	void (*clk_gate_switch)(struct aml_lcd_drv_s *pdrv, int status);
-	void (*clk_gate_optional_switch)(struct aml_lcd_drv_s *pdrv,
-					 int status);
-	void (*clktree_probe)(struct aml_lcd_drv_s *pdrv);
-	void (*clktree_remove)(struct aml_lcd_drv_s *pdrv);
-	void (*clk_config_init_print)(struct aml_lcd_drv_s *pdrv);
-	void (*prbs_clk_config)(struct aml_lcd_drv_s *pdrv,
-				unsigned int prbs_mode);
-	int (*clk_config_print)(struct aml_lcd_drv_s *pdrv,
-				char *buf, int offset);
+	void (*clk_generate_parameter)(struct lcd_config_s *pconf);
+	void (*pll_frac_generate)(struct lcd_config_s *pconf);
+	void (*set_ss_level)(unsigned int level);
+	void (*set_ss_advance)(unsigned int freq, unsigned int mode);
+	void (*clk_set)(struct lcd_config_s *pconf);
+	void (*clk_gate_switch)(struct aml_lcd_drv_s *lcd_drv, int status);
+	void (*clk_gate_optional_switch)(struct aml_lcd_drv_s *lcd_drv,
+			int status);
+	void (*clktree_probe)(void);
+	void (*clktree_remove)(void);
+	void (*clk_config_init_print)(void);
+	void (*prbs_clk_config)(unsigned int prbs_mode);
+	int (*clk_config_print)(char *buf, int offset);
+
+	int ppm;
+	void (*clk_finetune)(struct lcd_config_s *pconf, int ppm);
 };
 
 struct lcd_clk_config_s { /* unit: kHz */
@@ -113,8 +103,6 @@ struct lcd_clk_config_s { /* unit: kHz */
 	unsigned int fout;
 
 	/* pll parameters */
-	unsigned int pll_id;
-	unsigned int pll_offset;
 	unsigned int pll_mode; /* txl */
 	unsigned int pll_od_fb;
 	unsigned int pll_m;
@@ -131,41 +119,52 @@ struct lcd_clk_config_s { /* unit: kHz */
 	unsigned int ss_level;
 	unsigned int ss_freq;
 	unsigned int ss_mode;
-	unsigned int edp_div0;
-	unsigned int edp_div1;
 	unsigned int div_sel;
 	unsigned int xd;
 	unsigned int div_sel_max;
 	unsigned int xd_max;
 	unsigned int err_fmin;
-	unsigned int done;
 
-	struct lcd_clktree_s clktree;
 	struct lcd_clk_data_s *data;
+	int ppm_adj;
+};
+
+struct lcd_clktree_s {
+	unsigned char clk_gate_state;
+	unsigned char clk_gate_optional_state;
+
+	struct clk *encl_top_gate;
+	struct clk *encl_int_gate;
+
+	struct clk *dsi_host_gate;
+	struct clk *dsi_phy_gate;
+	struct clk *dsi_meas;
+	struct clk *mipi_enable_gate;
+	struct clk *mipi_bandgap_gate;
+	struct clk *gp0_pll;
+	struct clk *tcon_gate;
+	struct clk *tcon_clk;
 };
 
 /* ******** api ******** */
-int meson_clk_measure(unsigned int clk_mux);
-int lcd_debug_info_len(int num);
+extern int meson_clk_measure(unsigned int clk_mux);
+extern int lcd_debug_info_len(int num);
 
-extern spinlock_t lcd_clk_lock;
+extern struct lcd_clk_config_s *get_lcd_clk_config(void);
+extern int lcd_clk_config_print(char *buf, int offset);
+extern int lcd_encl_clk_msr(void);
+extern void lcd_pll_reset(void);
+extern int lcd_get_ss(char *buf);
+extern int lcd_set_ss(unsigned int level, unsigned int freq, unsigned int mode);
+extern void lcd_clk_update(struct lcd_config_s *pconf);
+void lcd_clk_finetune(struct lcd_config_s *pconf, int ppm);
+extern void lcd_clk_set(struct lcd_config_s *pconf);
+extern void lcd_clk_disable(void);
+extern void lcd_clk_generate_parameter(struct lcd_config_s *pconf);
+extern void lcd_clk_gate_switch(int status);
 
-struct lcd_clk_config_s *get_lcd_clk_config(struct aml_lcd_drv_s *pdrv);
-
-void lcd_clk_generate_parameter(struct aml_lcd_drv_s *pdrv);
-int lcd_get_ss(struct aml_lcd_drv_s *pdrv, char *buf);
-int lcd_set_ss(struct aml_lcd_drv_s *pdrv, unsigned int level,
-	       unsigned int freq, unsigned int mode);
-int lcd_encl_clk_msr(struct aml_lcd_drv_s *pdrv);
-void lcd_pll_reset(struct aml_lcd_drv_s *pdrv);
-void lcd_update_clk(struct aml_lcd_drv_s *pdrv);
-void lcd_set_clk(struct aml_lcd_drv_s *pdrv);
-void lcd_disable_clk(struct aml_lcd_drv_s *pdrv);
-void lcd_clk_gate_switch(struct aml_lcd_drv_s *pdrv, int status);
-int lcd_clk_config_print(struct aml_lcd_drv_s *pdrv, char *buf, int offset);
-
-int lcd_clk_path_change(struct aml_lcd_drv_s *pdrv, int sel);
-void lcd_clk_config_probe(struct aml_lcd_drv_s *pdrv);
-void lcd_clk_config_remove(struct aml_lcd_drv_s *pdrv);
+extern int lcd_clk_path_change(int sel);
+extern void lcd_clk_config_probe(void);
+extern void lcd_clk_config_remove(void);
 
 #endif

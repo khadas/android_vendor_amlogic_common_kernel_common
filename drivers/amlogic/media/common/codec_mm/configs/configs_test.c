@@ -1,6 +1,18 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/amlogic/media/common/codec_mm/configs/configs_test.c
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
 #include <linux/amlogic/media/codec_mm/configs.h>
@@ -12,6 +24,7 @@ static struct mconfig_node parser;
 static struct mconfig_node codec;
 static struct mconfig_node fast;
 static struct mconfig_node fast2;
+
 
 static  struct mconfig vdec_configs[] = {
 	MC_I32("vdec", 1),
@@ -30,6 +43,8 @@ static struct mconfig decoder_configs[] = {
 	MC_U32("rmvb", 4),
 };
 
+
+
 static struct mconfig parser_configs[] = {
 	MC_I32("ts", 1),
 	MC_I32("es", 1),
@@ -45,7 +60,6 @@ static struct mconfig vdec_profile[] = {
 	MC_CSTR("vc1",  "compress,di,c"),
 	MC_CSTR("rm",  "compress,di,di,ps"),
 };
-
 static int a, b, c, d, e;
 struct mconfig fast_profile[] = {
 	MC_PI32("265", &a),
@@ -61,9 +75,15 @@ int dump_set(const char *trigger, int id, const char *buf, int size)
 	return size;
 }
 
+
 struct mconfig fast2_profile[] = {
 	MC_FUN("trigger", NULL, &dump_set),
 };
+
+
+
+
+
 
 static int config_test(void)
 {
@@ -102,26 +122,24 @@ static int config_test(void)
 	/* configs_register_configs(); */
 	return 0;
 }
-
 int config_dump(void *buf, int size)
 {
 	config_test();
 	b++;
-	c = b + 3;
+	c = b+3;
 	a++;
 	d += 2;
 	return configs_list_nodes(NULL, buf, size,
 		LIST_MODE_FULL_CMDVAL_ALL);
 }
-
 int configs_config_setstr(const char *buf)
 {
 	int ret;
 
 	config_test();
-	pr_info("-----------start %s\n\n", __func__);
+	pr_info("-----------start configs_config_setstr\n\n");
 	ret = configs_set_path_valonpath(buf);
-	pr_info("-----------end %s\n\n", __func__);
+	pr_info("-----------end configs_config_setstr\n\n");
 	return ret;
 }
 

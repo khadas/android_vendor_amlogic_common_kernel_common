@@ -1,6 +1,18 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/amlogic/media/common/uvm/meson_uvm_allocator.c
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
 #include <linux/device.h>
@@ -10,7 +22,6 @@
 #include <linux/file.h>
 #include <linux/fs.h>
 #include <linux/miscdevice.h>
-#include <linux/of.h>
 #include <linux/rbtree.h>
 #include <linux/slab.h>
 #include <linux/uaccess.h>
@@ -19,11 +30,12 @@
 #include <linux/module.h>
 #include <linux/dma-buf.h>
 #include <linux/pagemap.h>
-#include <linux/ion.h>
+#include <ion/ion.h>
+#include <ion/ion_priv.h>
 #include <linux/meson_ion.h>
 
 #include "meson_uvm_allocator.h"
-#include "meson_uvm_nn_processor.h"
+#include "meson_uvm_conf.h"
 
 static struct mua_device *mdev;
 
@@ -41,31 +53,16 @@ module_param(mua_debug_level, int, 0644);
 static void mua_handle_free(struct uvm_buf_obj *obj)
 {
 	struct mua_buffer *buffer;
-	struct ion_buffer *ibuffer[2];
-	struct dma_buf *idmabuf[2];
-	int buf_cnt = 0;
 
 	buffer = container_of(obj, struct mua_buffer, base);
-	if (!buffer)
-		return;
-
-	ibuffer[0] = buffer->ibuffer[0];
-	ibuffer[1] = buffer->ibuffer[1];
-	idmabuf[0] = buffer->idmabuf[0];
-	idmabuf[1] = buffer->idmabuf[1];
-	MUA_PRINTK(1, "%s idmabuf[0]=%px idmabuf[1]=%px\n", __func__, idmabuf[0], idmabuf[1]);
-	MUA_PRINTK(1, "%s ibuffer[0]=%px ibuffer[1]=%px\n", __func__, ibuffer[0], ibuffer[1]);
-
-	while (buf_cnt < 2 && ibuffer[buf_cnt] && idmabuf[buf_cnt]) {
-		MUA_PRINTK(1, "%s free idmabuf[%d]\n", __func__, buf_cnt);
-		dma_buf_put(idmabuf[buf_cnt]);
-		buf_cnt++;
-	}
-
+	MUA_PRINTK(1, "%s get ion_handle, %px\n", __func__, obj);
+	if (buffer->handle)
+		ion_free(mdev->client, buffer->handle);
 	kfree(buffer);
 }
 
-static int meson_uvm_fill_pattern(struct mua_buffer *buffer, struct dma_buf *dmabuf, void *vaddr)
+static int meson_uvm_fill_pattern(struct mua_buffer *buffer,
+					struct dma_buf *dmabuf, void *vaddr)
 {
 	struct v4l_data_t val_data;
 
@@ -77,64 +74,59 @@ static int meson_uvm_fill_pattern(struct mua_buffer *buffer, struct dma_buf *dma
 	val_data.height = buffer->height;
 	val_data.phy_addr[0] = buffer->paddr;
 	MUA_PRINTK(1, "%s. width=%d height=%d byte_stride=%d\n",
-			__func__, buffer->width, buffer->height, buffer->byte_stride);
-	v4lvideo_data_copy(&val_data, dmabuf, buffer->align);
+			__func__, buffer->width,
+			buffer->height, buffer->byte_stride);
+	v4lvideo_data_copy(&val_data, dmabuf);
 
 	vunmap(vaddr);
 	return 0;
 }
 
 static int mua_process_gpu_realloc(struct dma_buf *dmabuf,
-				   struct uvm_buf_obj *obj, int scalar)
+					struct uvm_buf_obj *obj, int scalar)
 {
 	int i, j, num_pages;
-	struct dma_buf *idmabuf;
-	struct ion_buffer *ibuffer;
+	struct ion_handle *handle;
 	struct uvm_alloc_info info;
 	struct mua_buffer *buffer;
-	struct page *page;
 	struct page **tmp;
 	struct page **page_array;
 	pgprot_t pgprot;
 	void *vaddr;
+	phys_addr_t pat;
+	size_t len;
 	struct sg_table *src_sgt = NULL;
 	struct scatterlist *sg = NULL;
-	unsigned int id = meson_ion_cma_heap_id_get();
 
 	buffer = container_of(obj, struct mua_buffer, base);
 	MUA_PRINTK(1, "%s. buf_scalar=%d WxH: %dx%d\n",
-				__func__, scalar, buffer->width, buffer->height);
+			__func__, scalar, buffer->width, buffer->height);
 	memset(&info, 0, sizeof(info));
 
+	MUA_PRINTK(1, "%p, current->tgid:%d mdev->pid:%d buffer->commit_display:%d.\n",
+		__func__, current->tgid, mdev->pid, buffer->commit_display);
+
 	if (!enable_screencap && current->tgid == mdev->pid &&
-	    buffer->commit_display) {
-		MUA_PRINTK(0, "gpu_realloc: screen cap should not access the uvm buffer.\n");
+		buffer->commit_display) {
+		MUA_PRINTK(0, "screen cap should not access the uvm buffer.\n");
 		return -ENODEV;
 	}
-
 	dmabuf->size = buffer->size * scalar * scalar;
 	MUA_PRINTK(1, "buffer->size:%zu realloc dmabuf->size=%zu\n",
 			buffer->size, dmabuf->size);
-	if (!buffer->idmabuf[1]) {
-		id = meson_ion_codecmm_heap_id_get();
-		idmabuf = ion_alloc(dmabuf->size,
-				    (1 << id), ION_FLAG_EXTEND_MESON_HEAP);
-		if (IS_ERR(idmabuf)) {
+	if (1 /*!buffer->handle*/) {
+		handle = ion_alloc(mdev->client, dmabuf->size,
+				0, (1 << ION_HEAP_TYPE_CUSTOM), 0);
+		if (IS_ERR(handle)) {
 			MUA_PRINTK(0, "%s: ion_alloc fail.\n", __func__);
 			return -ENOMEM;
 		}
-		ibuffer = idmabuf->priv;
-		if (ibuffer) {
-			src_sgt = ibuffer->sg_table;
-			page = sg_page(src_sgt->sgl);
-			buffer->paddr = PFN_PHYS(page_to_pfn(page));
-			buffer->ibuffer[1] = ibuffer;
-			buffer->idmabuf[1] = idmabuf;
-			buffer->sg_table = ibuffer->sg_table;
-
-			info.sgt = src_sgt;
-			dmabuf_bind_uvm_delay_alloc(dmabuf, &info);
-		}
+		ion_phys(mdev->client, handle, (ion_phys_addr_t *)&pat, &len);
+		buffer->paddr = pat;
+		buffer->handle = handle;
+		buffer->sg_table = handle->buffer->sg_table;
+		info.sgt = handle->buffer->sg_table;
+		dmabuf_bind_uvm_delay_alloc(dmabuf, &info);
 	}
 
 	//start to do vmap
@@ -175,57 +167,48 @@ static int mua_process_gpu_realloc(struct dma_buf *dmabuf,
 }
 
 static int mua_process_delay_alloc(struct dma_buf *dmabuf,
-				   struct uvm_buf_obj *obj)
+					struct uvm_buf_obj *obj, u64 *flag)
 {
 	int i, j, num_pages;
-	struct dma_buf *idmabuf;
-	struct ion_buffer *ibuffer;
+	struct ion_handle *handle;
 	struct uvm_alloc_info info;
 	struct mua_buffer *buffer;
-	struct page *page;
 	struct page **tmp;
 	struct page **page_array;
 	pgprot_t pgprot;
 	void *vaddr;
+	phys_addr_t pat;
+	size_t len;
 	struct sg_table *src_sgt = NULL;
 	struct scatterlist *sg = NULL;
-	unsigned int ion_flags = 0;
-	unsigned int id = meson_ion_cma_heap_id_get();
 
 	buffer = container_of(obj, struct mua_buffer, base);
 	memset(&info, 0, sizeof(info));
 
-	MUA_PRINTK(1, "%p, %d.\n", __func__, __LINE__);
+	MUA_PRINTK(1, "%p, current->tgid:%d mdev->pid:%d buffer->commit_display:%d.\n",
+		__func__, current->tgid, mdev->pid, buffer->commit_display);
 
 	if (!enable_screencap && current->tgid == mdev->pid &&
-	    buffer->commit_display) {
-		MUA_PRINTK(0, "delay_alloc: screen cap should not access the uvm buffer.\n");
+		buffer->commit_display) {
+		*flag |= BIT(UVM_SKIP_REALLOC);
+		MUA_PRINTK(0, "screen cap should not access the uvm buffer. *flag:%llu\n", *flag);
 		return -ENODEV;
 	}
 
-	if (!buffer->ibuffer[0]) {
-		if (buffer->ion_flags & MUA_USAGE_PROTECTED)
-			ion_flags |= ION_FLAG_PROTECTED;
-		ion_flags |= ION_FLAG_EXTEND_MESON_HEAP;
-		id = meson_ion_codecmm_heap_id_get();
-		idmabuf = ion_alloc(dmabuf->size,
-				    (1 << id), ion_flags);
-		if (IS_ERR(idmabuf)) {
+	if (!buffer->handle) {
+		handle = ion_alloc(mdev->client, dmabuf->size, 0,
+					(1 << ION_HEAP_TYPE_CUSTOM), 0);
+		if (IS_ERR(handle)) {
 			MUA_PRINTK(0, "%s: ion_alloc fail.\n", __func__);
 			return -ENOMEM;
 		}
+		ion_phys(mdev->client, handle, (ion_phys_addr_t *)&pat, &len);
+		buffer->paddr = pat;
+		buffer->handle = handle;
+		buffer->sg_table = handle->buffer->sg_table;
+		info.sgt = handle->buffer->sg_table;
 
-		ibuffer = idmabuf->priv;
-		if (ibuffer) {
-			src_sgt = ibuffer->sg_table;
-			page = sg_page(src_sgt->sgl);
-			buffer->paddr = PFN_PHYS(page_to_pfn(page));
-			buffer->ibuffer[0] = ibuffer;
-			buffer->sg_table = ibuffer->sg_table;
-			buffer->idmabuf[0] = idmabuf;
-			info.sgt = src_sgt;
-			dmabuf_bind_uvm_delay_alloc(dmabuf, &info);
-		}
+		dmabuf_bind_uvm_delay_alloc(dmabuf, &info);
 	}
 
 	//start to do vmap
@@ -266,14 +249,12 @@ static int mua_process_delay_alloc(struct dma_buf *dmabuf,
 	return 0;
 }
 
-static int mua_handle_alloc(struct dma_buf *dmabuf, struct uvm_alloc_data *data, int alloc_buf_size)
+static int mua_handle_alloc(struct dma_buf *dmabuf,
+		struct uvm_alloc_data *data, int alloc_buf_size)
 {
 	struct mua_buffer *buffer;
 	struct uvm_alloc_info info;
-	struct dma_buf *idmabuf;
-	struct ion_buffer *ibuffer;
-	unsigned int ion_flags = 0;
-	unsigned int id = meson_ion_cma_heap_id_get();
+	struct ion_handle *handle;
 
 	memset(&info, 0, sizeof(info));
 	buffer = kzalloc(sizeof(*buffer), GFP_KERNEL);
@@ -282,29 +263,17 @@ static int mua_handle_alloc(struct dma_buf *dmabuf, struct uvm_alloc_data *data,
 	buffer->byte_stride = data->byte_stride;
 	buffer->width = data->width;
 	buffer->height = data->height;
-	buffer->ion_flags = data->flags;
-	buffer->align = data->align;
-
-	if (data->flags & MUA_USAGE_PROTECTED)
-		ion_flags |= ION_FLAG_PROTECTED;
 
 	if (data->flags & MUA_IMM_ALLOC) {
-		ion_flags |= ION_FLAG_EXTEND_MESON_HEAP;
-		id = meson_ion_codecmm_heap_id_get();
-		idmabuf = ion_alloc(alloc_buf_size,
-				    (1 << id), ion_flags);
-		if (IS_ERR(idmabuf)) {
+		handle = ion_alloc(mdev->client, alloc_buf_size, 0,
+				   (1 << ION_HEAP_TYPE_CUSTOM), 0);
+		if (IS_ERR(handle)) {
 			MUA_PRINTK(0, "%s: ion_alloc fail.\n", __func__);
 			kfree(buffer);
 			return -ENOMEM;
 		}
-
-		ibuffer = idmabuf->priv;
-		buffer->ibuffer[0] = ibuffer;
-		buffer->ibuffer[1] = NULL;
-		buffer->idmabuf[0] = idmabuf;
-		buffer->idmabuf[1] = NULL;
-		info.sgt = ibuffer->sg_table;
+		buffer->handle = handle;
+		info.sgt = handle->buffer->sg_table;
 		info.obj = &buffer->base;
 		info.flags = data->flags;
 		info.size = alloc_buf_size;
@@ -350,129 +319,6 @@ static int mua_set_commit_display(int fd, int commit_display)
 	return 0;
 }
 
-static int mua_get_meta_data(int fd, ulong arg)
-{
-	struct dma_buf *dmabuf;
-	struct uvm_handle *handle;
-	struct vframe_s *vfp;
-	struct uvm_meta_data meta;
-
-	dmabuf = dma_buf_get(fd);
-	if (IS_ERR_OR_NULL(dmabuf)) {
-		MUA_PRINTK(0, "invalid dmabuf fd\n");
-		return -EINVAL;
-	}
-
-	handle = dmabuf->priv;
-	vfp = &handle->vf;
-
-	/* check source type. */
-	if (!vfp->meta_data_size ||
-		vfp->meta_data_size > META_DATA_SIZE) {
-		MUA_PRINTK(0, "meta data size: %d is invalid.\n",
-			vfp->meta_data_size);
-		dma_buf_put(dmabuf);
-		return -EINVAL;
-	}
-
-	meta.fd = fd;
-	meta.size = vfp->meta_data_size;
-	memcpy(meta.data, vfp->meta_data_buf, vfp->meta_data_size);
-
-	if (copy_to_user((void __user *)arg, &meta, sizeof(meta))) {
-		MUA_PRINTK(0, "meta data copy err.\n");
-		dma_buf_put(dmabuf);
-		return -EFAULT;
-	}
-
-	dma_buf_put(dmabuf);
-
-	return 0;
-}
-
-static int mua_attach(int fd, int type, char *buf)
-{
-	struct uvm_hook_mod_info info;
-	int ret = 0;
-	struct dma_buf *dmabuf = NULL;
-
-	memset(&info, 0, sizeof(struct uvm_hook_mod_info));
-	info.type = PROCESS_INVALID;
-	info.arg = NULL;
-	info.acquire_fence = NULL;
-
-	switch (type) {
-	case PROCESS_NN:
-		ret = attach_nn_hook_mod_info(fd, buf, &info);
-		if (ret)
-			return -EINVAL;
-		break;
-	default:
-		MUA_PRINTK(0, "mod_type is not valid.\n");
-	}
-	if (ret) {
-		MUA_PRINTK(0, "get hook_mod_info failed\n");
-		return -EINVAL;
-	}
-
-	MUA_PRINTK(1, "core_attach: type:%d buf:%s.\n",
-		type, buf);
-	dmabuf = dma_buf_get(fd);
-
-	if (IS_ERR_OR_NULL(dmabuf)) {
-		MUA_PRINTK(0, "Invalid dmabuf %s %d\n", __func__, __LINE__);
-		return -EINVAL;
-	}
-
-	if (!dmabuf_is_uvm(dmabuf)) {
-		dma_buf_put(dmabuf);
-		MUA_PRINTK(0, "dmabuf is not uvm. %s %d\n", __func__, __LINE__);
-		return -EINVAL;
-	}
-
-	if (info.type >= VF_SRC_DECODER && info.type < PROCESS_INVALID)
-		ret = uvm_attach_hook_mod(dmabuf, &info);
-
-	dma_buf_put(dmabuf);
-	return ret;
-}
-
-static int mua_detach(int fd, int type)
-{
-	int ret = 0;
-	int index = 0;
-	struct dma_buf *dmabuf = NULL;
-	struct uvm_handle *handle = NULL;
-
-	dmabuf = dma_buf_get(fd);
-
-	if (IS_ERR_OR_NULL(dmabuf)) {
-		MUA_PRINTK(0, "Invalid dmabuf %s %d\n", __func__, __LINE__);
-		return -EINVAL;
-	}
-
-	if (!dmabuf_is_uvm(dmabuf)) {
-		dma_buf_put(dmabuf);
-		MUA_PRINTK(0, "dmabuf is not uvm. %s %d\n", __func__, __LINE__);
-		return -EINVAL;
-	}
-
-	handle = dmabuf->priv;
-
-	MUA_PRINTK(1, "[%s]: dmabuf %p.\n",  __func__, dmabuf);
-
-	if (handle->flags & MUA_DETACH) {
-		for (index = VF_SRC_DECODER; index < PROCESS_INVALID; index++) {
-			if (type & BIT(index))
-				ret &= uvm_detach_hook_mod(dmabuf, index);
-		}
-	}
-
-	dma_buf_put(dmabuf);
-
-	return ret;
-}
-
 static long mua_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 {
 	struct mua_device *md;
@@ -492,55 +338,11 @@ static long mua_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 		return -EFAULT;
 
 	switch (cmd) {
-	case UVM_IOC_ATTATCH:
-		MUA_PRINTK(1, "mua_ioctl_ATTATCH: shared_fd=%d, mode_type=%d\n",
-			data.hook_data.shared_fd,
-			data.hook_data.mode_type);
-		ret = mua_attach(data.hook_data.shared_fd,
-						data.hook_data.mode_type,
-						data.hook_data.data_buf);
-		if (ret < 0) {
-			MUA_PRINTK(1, "mua_attach fail.\n");
-			return -EINVAL;
-		}
-		if (copy_to_user((void __user *)arg, &data, _IOC_SIZE(cmd)))
-			return -EFAULT;
-		break;
-	case UVM_IOC_DETATCH:
-		MUA_PRINTK(1, "mua_ioctl_DETATCH: shared_fd=%d, mode_type=%d\n",
-			data.hook_data.shared_fd,
-			data.hook_data.mode_type);
-		ret = mua_detach(data.hook_data.shared_fd,
-						data.hook_data.mode_type);
-		if (ret < 0) {
-			MUA_PRINTK(1, "mua_detach fail.\n");
-			return -EINVAL;
-		}
-		break;
-	case UVM_IOC_GET_INFO:
-		ret = meson_uvm_getinfo(data.hook_data.shared_fd,
-						data.hook_data.mode_type,
-						data.hook_data.data_buf);
-		if (ret < 0) {
-			MUA_PRINTK(1, "meson_uvm_getinfo fail.\n");
-			return -EINVAL;
-		}
-		if (copy_to_user((void __user *)arg, &data, _IOC_SIZE(cmd)))
-			return -EFAULT;
-		break;
-	case UVM_IOC_SET_INFO:
-		ret = meson_uvm_setinfo(data.hook_data.shared_fd,
-						data.hook_data.mode_type,
-						data.hook_data.data_buf);
-		if (ret < 0) {
-			MUA_PRINTK(1, "meson_uvm_setinfo fail.\n");
-			return -EINVAL;
-		}
-		break;
 	case UVM_IOC_ALLOC:
 		MUA_PRINTK(1, "%s. original buf size:%d width:%d height:%d\n",
 					__func__, data.alloc_data.size,
-					data.alloc_data.width, data.alloc_data.height);
+					data.alloc_data.width,
+					data.alloc_data.height);
 
 		data.alloc_data.size = PAGE_ALIGN(data.alloc_data.size);
 		data.alloc_data.scaled_buf_size =
@@ -549,7 +351,7 @@ static long mua_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 			alloc_buf_size = data.alloc_data.scaled_buf_size;
 		else
 			alloc_buf_size = data.alloc_data.size;
-		MUA_PRINTK(1, "%s. buf_scalar=%d scaled_buf_size=%d\n",
+		MUA_PRINTK(1, "%s. buf_scalar=%d size=%d\n",
 					__func__, data.alloc_data.scalar,
 					data.alloc_data.scaled_buf_size);
 
@@ -559,7 +361,8 @@ static long mua_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 		if (IS_ERR(dmabuf))
 			return -ENOMEM;
 
-		ret = mua_handle_alloc(dmabuf, &data.alloc_data, alloc_buf_size);
+		ret = mua_handle_alloc(dmabuf, &data.alloc_data,
+				alloc_buf_size);
 		if (ret < 0) {
 			dma_buf_put(dmabuf);
 			return -ENOMEM;
@@ -590,13 +393,6 @@ static long mua_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 
 		if (ret < 0) {
 			MUA_PRINTK(0, "invalid dmabuf fd.\n");
-			return -EINVAL;
-		}
-		break;
-	case UVM_IOC_GET_METADATA:
-		ret = mua_get_meta_data(data.meta_data.fd, arg);
-		if (ret < 0) {
-			MUA_PRINTK(0, "get meta data fail.\n");
 			return -EINVAL;
 		}
 		break;
@@ -644,7 +440,17 @@ static int mua_probe(struct platform_device *pdev)
 	mdev->dev.fops = &mua_fops;
 	mutex_init(&mdev->buffer_lock);
 
+	mdev->client = meson_ion_client_create(-1, "meson-uvm-alloactor");
+	if (!mdev->client) {
+		pr_err("ion client create error.\n");
+		goto err;
+	}
+
 	return misc_register(&mdev->dev);
+
+err:
+	kfree(mdev);
+	return -ENOMEM;
 }
 
 static int mua_remove(struct platform_device *pdev)
@@ -668,15 +474,23 @@ static struct platform_driver mua_driver = {
 	.remove = mua_remove,
 };
 
-int __init mua_init(void)
+static int __init mua_init(void)
 {
-	return platform_driver_register(&mua_driver);
+	if (use_uvm) {
+		pr_info("meson_uvm_allocator call init\n");
+		return platform_driver_register(&mua_driver);
+	}
+
+	return 0;
 }
 
-void __exit mua_exit(void)
+static void __exit mua_exit(void)
 {
-	platform_driver_unregister(&mua_driver);
+	if (use_uvm)
+		platform_driver_unregister(&mua_driver);
 }
 
-//MODULE_DESCRIPTION("AMLOGIC uvm dmabuf allocator device driver");
-//MODULE_LICENSE("GPL");
+module_init(mua_init);
+module_exit(mua_exit);
+MODULE_DESCRIPTION("AMLOGIC uvm dmabuf allocator device driver");
+MODULE_LICENSE("GPL");

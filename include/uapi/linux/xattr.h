@@ -1,4 +1,3 @@
-/* SPDX-License-Identifier: GPL-2.0 WITH Linux-syscall-note */
 /*
   File: linux/xattr.h
 
@@ -17,11 +16,8 @@
 #if __UAPI_DEF_XATTR
 #define __USE_KERNEL_XATTR_DEFS
 
-#define XATTR_CREATE	 0x1	/* set value, fail if attr already exists */
-#define XATTR_REPLACE	 0x2	/* set value, fail if attr does not exist */
-#ifdef __KERNEL__ /* following is kernel internal, colocated for maintenance */
-#define XATTR_NOSECURITY 0x4	/* get value, do not involve security check */
-#endif
+#define XATTR_CREATE	0x1	/* set value, fail if attr already exists */
+#define XATTR_REPLACE	0x2	/* set value, fail if attr does not exist */
 #endif
 
 /* Namespaces */
@@ -68,9 +64,6 @@
 #define XATTR_NAME_SMACKEXEC	XATTR_SECURITY_PREFIX XATTR_SMACK_EXEC
 #define XATTR_NAME_SMACKTRANSMUTE XATTR_SECURITY_PREFIX XATTR_SMACK_TRANSMUTE
 #define XATTR_NAME_SMACKMMAP XATTR_SECURITY_PREFIX XATTR_SMACK_MMAP
-
-#define XATTR_APPARMOR_SUFFIX "apparmor"
-#define XATTR_NAME_APPARMOR XATTR_SECURITY_PREFIX XATTR_APPARMOR_SUFFIX
 
 #define XATTR_CAPS_SUFFIX "capability"
 #define XATTR_NAME_CAPS XATTR_SECURITY_PREFIX XATTR_CAPS_SUFFIX

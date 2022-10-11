@@ -1,6 +1,18 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/amlogic/media/common/resource_mgr/resourcemanage.c
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
 #include <linux/module.h>
@@ -30,8 +42,6 @@
 #define DEVICE_NAME "amresource_mgr"
 #define DEVICE_CLASS_NAME "resource_mgr"
 
-#define QUERY_SECURE_BUFFER (1)
-#define QUERY_NO_SECURE_BUFFER (0)
 struct {
 	int id;
 	char *name;
@@ -43,10 +53,6 @@ struct {
 	{RESMAN_ID_TSPARSER, "tsparser"},
 	{RESMAN_ID_CODEC_MM, "codec_mm"},
 	{RESMAN_ID_ADC_PLL, "adc_pll"},
-	{RESMAN_ID_DECODER, "decoder"},
-	{RESMAN_ID_HWC, "hwc"},
-	{RESMAN_ID_DMX, "dmx"},
-	{RESMAN_ID_DI, "di"},
 	{0, NULL}
 };
 
@@ -184,7 +190,7 @@ struct resman_resource {
 	} d;
 };
 
-static int resman_debug = 1;
+static int debug = 1;
 static int preempt_timeout_ms = 2500;
 static struct list_head sessions_head;
 static struct list_head resources_head;
@@ -196,12 +202,12 @@ static struct cdev *resman_cdev;
 static struct class *resman_class;
 static char *resman_configs;
 
-module_param(resman_debug, int, 0644);
+module_param(debug, int, 0644);
 module_param(preempt_timeout_ms, int, 0644);
 
 #define dprintk(level, fmt, arg...)					\
 	do {								\
-		if (resman_debug >= (level))					\
+		if (debug >= (level))					\
 			pr_info("resman: " fmt, ## arg);	\
 	} while (0)
 
@@ -256,8 +262,8 @@ static struct resman_resource *resman_find_resource_by_name(const char *name)
 	return NULL;
 }
 
-static struct resman_node *resman_find_node_by_resource_id
-		(struct resman_session *sess, int id)
+static struct resman_node *resman_find_node_by_resource_id(
+		struct resman_session *sess, int id)
 {
 	struct resman_node *ret = NULL;
 	struct resman_resource *resource = NULL;
@@ -305,7 +311,8 @@ static bool resman_acquire_resource(struct resman_session *sess,
 	node = kzalloc(sizeof(*node), GFP_KERNEL);
 
 	if (atomic_read(&resource->pending_acquire) > 0)
-		wait_event_interruptible(resource->wq_acquire,
+		wait_event_interruptible(
+				resource->wq_acquire,
 				atomic_read(&resource->pending_acquire) == 0);
 
 	mutex_lock(&resource->lock);
@@ -324,10 +331,10 @@ static bool resman_acquire_resource(struct resman_session *sess,
 		dprintk(1, "%d acquire [%s] success\n",
 			sess->id,
 			resource->name);
-	} else {
+	} else
 		dprintk(1, "%d acquire [%s] failed\n",
-			sess->id, resource->name);
-	}
+			sess->id,
+			resource->name);
 	mutex_unlock(&resource->lock);
 	kfree(arg_rw);
 	return ret;
@@ -359,7 +366,8 @@ static struct resman_session *resman_open_session(void)
 {
 	struct resman_session *sess = NULL;
 
-	sess = kzalloc(sizeof(*sess), GFP_KERNEL);
+	sess = kzalloc(
+			sizeof(struct resman_session), GFP_KERNEL);
 	if (!sess)
 		return NULL;
 
@@ -406,7 +414,8 @@ static void resman_send_event(struct resman_session *sess, __u32 type)
 {
 	struct resman_event *event;
 
-	event = kzalloc(sizeof(*event), GFP_KERNEL);
+	event = kzalloc(
+			sizeof(struct resman_event), GFP_KERNEL);
 	if (!event)
 		return;
 
@@ -430,7 +439,8 @@ static bool resman_preempt_session(struct resman_session *curr,
 
 	if (!mutex_trylock(&sess->lock)) {
 		/*other session may waiting to release this resource*/
-		if (wait_for_completion_interruptible_timeout(&node->pending_release,
+		if (wait_for_completion_interruptible_timeout(
+				&node->pending_release,
 				usecs_to_jiffies(10000)) <= 0)
 			goto beach;
 		need_unlock = false;
@@ -473,7 +483,8 @@ static bool resman_counter_preempt(struct resman_session *curr,
 		}
 	}
 	if (!selected)
-		selected = list_first_entry_or_null(&resource->sessions,
+		selected = list_first_entry_or_null(
+			&resource->sessions,
 			struct resman_node, slist);
 
 	if (resman_preempt_session(curr, selected))
@@ -516,7 +527,8 @@ static bool resman_counter_acquire(struct resman_session *sess,
 			atomic_inc(&resource->pending_acquire);
 			mutex_unlock(&resource->lock);
 			dprintk(1, "%d acquire wait\n", sess->id);
-			remain = wait_event_interruptible_timeout(resource->wq_release,
+			remain = wait_event_interruptible_timeout(
+					resource->wq_release,
 					(resource->value <
 						resource->d.counter.avail),
 					msecs_to_jiffies(timeout));
@@ -707,7 +719,8 @@ static bool resman_tvp_acquire(struct resman_session *sess,
 			atomic_inc(&resource->pending_acquire);
 			mutex_unlock(&resource->lock);
 			dprintk(1, "%d acquire wait\n", sess->id);
-			remain = wait_event_interruptible_timeout(resource->wq_release,
+			remain = wait_event_interruptible_timeout(
+					resource->wq_release,
 					(resman_count_codec_mm_session(false)
 							< count),
 					msecs_to_jiffies(timeout));
@@ -815,20 +828,16 @@ static bool resman_codec_mm_enough(struct resman_resource *resource,
 {
 	bool enough = true;
 
-	if (!secure && (codec_mm_get_free_size() >> 20 < score)) {
+	if (!secure && codec_mm_get_free_size() < score)
 		enough = false;
-		dprintk(2, "free size 0x%x\n", codec_mm_get_free_size());
-	} else if (secure && ((codec_mm_get_tvp_free_size() + codec_mm_get_free_size()) >> 20)
-			< score) {
+	else if (secure && atomic_read(&resource->d.codec_mm.counter_secure)
+		>= resource->d.codec_mm.secure)
 		enough = false;
-		dprintk(2, "free size 0x%x\n", codec_mm_get_tvp_free_size() +
-			+ codec_mm_get_free_size());
-	} else if (resource->value + score > resource->d.codec_mm.total)
+	else if (resource->value + score > resource->d.codec_mm.total)
 		enough = false;
 
 	return enough;
 }
-
 /**
  * resman_codec_mm_acquire() - resman_codec_mm_acquire
  *
@@ -857,8 +866,7 @@ static bool resman_codec_mm_acquire(struct resman_session *sess,
 		if (!strncmp(opt, "size", 4))
 			resman_parser_kv(opt, "size", &score);
 		else if (!strcmp(opt, "single"))
-		/*single mode,3/4 codec mm size is enough*/
-			score = resource->d.codec_mm.total*3/4;
+			score = resource->d.codec_mm.total;
 		else if (!strcmp(opt, "uhd"))
 			score = resource->d.codec_mm.uhd;
 		else if (!strcmp(opt, "secure"))
@@ -881,7 +889,8 @@ static bool resman_codec_mm_acquire(struct resman_session *sess,
 			atomic_inc(&resource->pending_acquire);
 			mutex_unlock(&resource->lock);
 			dprintk(1, "%d acquire wait\n", sess->id);
-			remain = wait_event_interruptible_timeout(resource->wq_release,
+			remain = wait_event_interruptible_timeout(
+					resource->wq_release,
 					resman_codec_mm_enough(resource,
 							       score,
 							       secure),
@@ -956,7 +965,8 @@ static bool resman_create_resource(const char *name,
 	char *opt;
 	int i;
 
-	resource = kzalloc(sizeof(*resource), GFP_KERNEL);
+	resource = kzalloc(
+			sizeof(struct resman_resource), GFP_KERNEL);
 	if (!resource)
 		goto error;
 
@@ -1156,11 +1166,8 @@ static void all_resource_init(void)
 		"tvp,type:3;"
 		"tsparser,type:1,avail:1;"
 		"codec_mm,type:4,total:0;"
-		"adc_pll,type:1,avail:1;"
-		"decoder,type:1,avail:9;"
-		"dmx,type:1,avail:4;"
-		"di,type:1,avail:4;"
-		"hwc,type:1,avail:9;";
+		"adc_pll,type:1,avail:1;";
+
 	INIT_LIST_HEAD(&sessions_head);
 	INIT_LIST_HEAD(&resources_head);
 	resman_parser_config(default_configs);
@@ -1205,42 +1212,6 @@ beach:
 	return r;
 }
 
-static int resman_estimate_tvp_available(int size)
-{
-	int free_size = codec_mm_get_free_size();
-	int tvp_fhd, tvp_uhd;
-	int mode = 0;
-
-	free_size += codec_mm_get_tvp_free_size();
-	if (size <= 0) {
-		codec_mm_get_default_tvp_size(&tvp_fhd, &tvp_uhd);
-		if (free_size >= tvp_uhd)
-			mode = 2;
-		else if (free_size > tvp_fhd)
-			mode = 1;
-	} else {
-		if (free_size >= size)
-			mode = 2;
-	}
-	return mode;
-}
-
-static int resman_codec_mm_available(int issecure)
-{
-	int avail = 0;
-
-	dprintk(2, "issecure %d\n", issecure);
-	if (issecure == QUERY_NO_SECURE_BUFFER)
-		avail = codec_mm_get_free_size() >> 20;
-	if (issecure == QUERY_SECURE_BUFFER) {
-		avail = (codec_mm_get_free_size() +
-			codec_mm_get_tvp_free_size()) >> 20;
-	}
-	dprintk(2, "avail %d\n", avail);
-
-	return avail;
-}
-
 static long resman_ioctl_query(struct resman_session *sess, unsigned long para)
 {
 	long r = 0;
@@ -1253,39 +1224,37 @@ static long resman_ioctl_query(struct resman_session *sess, unsigned long para)
 	memset(usage, 0, sizeof(usage));
 
 	if (copy_from_user((void *)&resman, argp, sizeof(resman))) {
-		return -EINVAL;
-	}
-	selec_res = resman.k;
-	resource = resman_find_resource_by_id(selec_res);
-	if (resource) {
-		strncpy(resman.v.query.name,
-		resource->name, sizeof(resman.v.query.name));
-		resman.v.query.type = resource->type;
-
-	switch (resource->type) {
-	case RESMAN_TYPE_COUNTER:
-		resman.v.query.value = resource->value;
-		resman.v.query.avail =
-			resource->d.counter.avail;
-		break;
-	case RESMAN_TYPE_CODEC_MM:
-		resman.v.query.avail =
-			resman_codec_mm_available(resman.v.query.value);
-		break;
-	case RESMAN_TYPE_TVP:
-		resman.v.query.avail =
-			resman_estimate_tvp_available(resman.v.query.value);
-		break;
-	default:
-		break;
-	}
-
-	if (copy_to_user((void *)argp,
-			&resman, sizeof(resman)))
-		r = -EFAULT;
-	} else {
 		r = -EINVAL;
+	} else {
+		selec_res = resman.k;
+		resource = resman_find_resource_by_id(selec_res);
+		if (resource) {
+			strncpy(resman.v.query.name,
+				resource->name, sizeof(resman.v.query.name));
+			resman.v.query.value = resource->value;
+			resman.v.query.type = resource->type;
+
+			switch (resource->type) {
+			case RESMAN_TYPE_COUNTER:
+				resman.v.query.avail =
+						resource->d.counter.avail;
+				break;
+			case RESMAN_TYPE_CODEC_MM:
+				resman.v.query.avail =
+						resource->d.codec_mm.total;
+				break;
+			default:
+				break;
+			}
+
+			if (copy_to_user((void *)argp,
+					 &resman, sizeof(resman)))
+				r = -EFAULT;
+		} else {
+			r = -EINVAL;
+		}
 	}
+
 	return r;
 }
 
@@ -1296,10 +1265,7 @@ static long resman_ioctl_release(struct resman_session *sess,
 	int selec_res = (int)para;
 	struct resman_resource *resource;
 	struct resman_node  *node;
-	dprintk(2, "%d appname:%s, type=%d\n",
-			sess->id,
-			sess->app_name,
-			sess->app_type);
+
 	resource = resman_find_resource_by_id(selec_res);
 	if (!resource)
 		return -EINVAL;
@@ -1694,4 +1660,6 @@ void __exit resman_exit(void)
 	dprintk(1, "uninstall sourmanage module\n");
 }
 
+device_initcall(resman_init);
+module_exit(resman_exit);
 MODULE_LICENSE("GPL");

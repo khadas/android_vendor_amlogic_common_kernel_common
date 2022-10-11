@@ -1,17 +1,24 @@
+#
+# Input device configuration
+#
+
 menuconfig AMLOGIC_INPUT
-	bool "Amlogic input device support"
+	bool "Input Device Support"
 	default n
 	help
-	  Say Y here to enable Amlogic input
-	  devices. Include keyboard, third part
-	  touchscreen, sensor, gpio-key, adc-key,
-	  ir remote control etc.
+	  "Input devices include keyboard, touchscreen, remote, sensor, etc."
 
 if AMLOGIC_INPUT
 
-source "drivers/amlogic/input/ir/Kconfig"
+source "drivers/amlogic/input/avin_detect/Kconfig"
 
 source "drivers/amlogic/input/keyboard/Kconfig"
 
+source "drivers/amlogic/input/remote/Kconfig"
+
 source "drivers/amlogic/input/touchscreen/Kconfig"
+
+source "drivers/amlogic/input/sensor/Kconfig"
+
 endif
+

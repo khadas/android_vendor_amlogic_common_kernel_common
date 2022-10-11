@@ -1,4 +1,3 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
  * drivers/amlogic/media/enhancement/amvecm/util/base64.c
  *
@@ -81,8 +80,9 @@ static unsigned char base64de[] = {
 		49,  50,  51, 255, 255, 255, 255, 255
 };
 
-unsigned long base64_encode(unsigned char *in, unsigned int inlen,
-			    char *out)
+unsigned long base64_encode(
+		unsigned char *in, unsigned int inlen,
+		char *out)
 {
 	unsigned char *inptr = in;
 	int counter = 0, i;
@@ -129,8 +129,9 @@ unsigned long base64_encode(unsigned char *in, unsigned int inlen,
 	return counter;
 }
 
-unsigned long base64_decode(char *in, unsigned int inlen,
-			    unsigned char *out)
+unsigned long base64_decode(
+	char *in, unsigned int inlen,
+	unsigned char *out)
 {
 	char *inptr = in;
 	int counter = 0, i;

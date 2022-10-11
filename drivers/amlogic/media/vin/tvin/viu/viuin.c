@@ -1,6 +1,18 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/amlogic/media/vin/tvin/viu/viuin.c
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
 #include <linux/kernel.h>
@@ -67,26 +79,26 @@
 static unsigned int vsync_enter_line_curr;
 module_param(vsync_enter_line_curr, uint, 0664);
 MODULE_PARM_DESC(vsync_enter_line_curr,
-		 "\n encoder process line num when enter isr.\n");
+	"\n encoder process line num when enter isr.\n");
 
 static unsigned int vsync_enter_line_max;
 module_param(vsync_enter_line_max, uint, 0664);
 MODULE_PARM_DESC(vsync_enter_line_max,
-		 "\n max encoder process line num when enter isr.\n");
+	"\n max encoder process line num when enter isr.\n");
 
 static unsigned int vsync_enter_line_max_threshold = 10000;
 module_param(vsync_enter_line_max_threshold, uint, 0664);
 MODULE_PARM_DESC(vsync_enter_line_max_threshold,
-		 "\n max encoder process line num over threshold drop the frame.\n");
+	"\n max encoder process line num over threshold drop the frame.\n");
 
 static unsigned int vsync_enter_line_min_threshold = 10000;
 module_param(vsync_enter_line_min_threshold, uint, 0664);
 MODULE_PARM_DESC(vsync_enter_line_min_threshold,
-		 "\n max encoder process line num less threshold drop the frame.\n");
+	"\n max encoder process line num less threshold drop the frame.\n");
 static unsigned int vsync_enter_line_threshold_overflow_count;
 module_param(vsync_enter_line_threshold_overflow_count, uint, 0664);
 MODULE_PARM_DESC(vsync_enter_line_threshold_overflow_count,
-		 "\ncnt overflow encoder process line no over threshold drop the frame\n");
+	"\ncnt overflow encoder process line no over threshold drop the frame\n");
 
 static unsigned short v_cut_offset;
 module_param(v_cut_offset, ushort, 0664);
@@ -105,32 +117,33 @@ struct viuin_s {
 	unsigned int enc_info_addr;
 };
 
-static inline u32 rd_viu(u32 reg)
+
+static inline uint32_t rd_viu(uint32_t reg)
 {
-	return (u32)aml_read_vcbus(reg);
+	return (uint32_t)aml_read_vcbus(reg);
 }
 
-static inline void wr_viu(u32 reg,
-			  const u32 val)
+static inline void wr_viu(uint32_t reg,
+				 const uint32_t val)
 {
 	aml_write_vcbus(reg, val);
 }
 
-static inline void wr_bits_viu(u32 reg,
-			       const u32 value,
-			       const u32 start,
-			       const u32 len)
+static inline void wr_bits_viu(uint32_t reg,
+				    const uint32_t value,
+				    const uint32_t start,
+				    const uint32_t len)
 {
 	aml_write_vcbus(reg, ((aml_read_vcbus(reg) &
-			      ~(((1L << (len)) - 1) << (start))) |
-			      (((value) & ((1L << (len)) - 1)) << (start))));
+			     ~(((1L << (len)) - 1) << (start))) |
+			    (((value) & ((1L << (len)) - 1)) << (start))));
 }
 
-static inline u32 rd_bits_viu(u32 reg,
-			      const u32 start,
-			      const u32 len)
+static inline uint32_t rd_bits_viu(uint32_t reg,
+				    const uint32_t start,
+				    const uint32_t len)
 {
-	u32 val;
+	uint32_t val;
 
 	val = ((aml_read_vcbus(reg) >> (start)) & ((1L << (len)) - 1));
 
@@ -139,30 +152,27 @@ static inline u32 rd_bits_viu(u32 reg,
 
 static int viuin_support(struct tvin_frontend_s *fe, enum tvin_port_e port)
 {
-	if (port >= TVIN_PORT_VIU1 &&
-	    port <= TVIN_PORT_VIU2_ENCP)
+	if ((port >= TVIN_PORT_VIU1) &&
+		(port <= TVIN_PORT_VIU2_ENCP))
 		return 0;
 	else
 		return -1;
 }
-
 void viuin_check_venc_line(struct viuin_s *devp_local)
 {
 	unsigned int vencv_line_cur, cnt;
 
 	cnt = 0;
 	do {
-		vencv_line_cur =
-			(rd_viu(devp_local->enc_info_addr) >> 16) & 0x1fff;
-		udelay(9);
+		vencv_line_cur = (rd_viu(devp_local->enc_info_addr)>>16)&0x1fff;
+		udelay(10);
 		cnt++;
 		if (cnt > 100000)
 			break;
 	} while (vencv_line_cur != 1);
-
 	if (vencv_line_cur != 1)
 		pr_info("**************%s,vencv_line_cur:%d,cnt:%d***********\n",
-			__func__, vencv_line_cur, cnt);
+				__func__, vencv_line_cur, cnt);
 }
 
 /*g12a/g12b and before: use viu_loop encl/encp*/
@@ -173,13 +183,11 @@ static int viuin_open(struct tvin_frontend_s *fe, enum tvin_port_e port)
 	unsigned int viu_mux = 0, viu_sel = 0;
 
 	if (!memcpy(&devp->parm, fe->private_data,
-		    sizeof(struct vdin_parm_s))) {
+			sizeof(struct vdin_parm_s))) {
 		pr_info("[viuin..]%s memcpy error.\n", __func__);
 		return -1;
 	}
 	/*open the venc to vdin path*/
-	pr_info("viu1_sel_venc: %d\n", rd_bits_viu(VPU_VIU_VENC_MUX_CTRL, 0, 2));
-	pr_info("viu2_sel_venc: %d\n", rd_bits_viu(VPU_VIU_VENC_MUX_CTRL, 2, 2));
 	switch (rd_bits_viu(VPU_VIU_VENC_MUX_CTRL, 0, 2)) {
 	case 0: /* ENCL */
 		if (cpu_after_eq(MESON_CPU_MAJOR_ID_G12A))
@@ -206,62 +214,51 @@ static int viuin_open(struct tvin_frontend_s *fe, enum tvin_port_e port)
 	}
 	/*no need check here, will timeout sometimes*/
 	/*viuin_check_venc_line(devp);*/
-	if (port == TVIN_PORT_VIU1_VIDEO) {/*old chip*/
+	if (port == TVIN_PORT_VIU1_VIDEO) {
 		/* enable hsync for vdin loop */
 		wr_bits_viu(VIU_MISC_CTRL1, 1, 28, 1);
 		viu_mux = 0x4;
 	}
 	if (is_meson_gxbb_cpu() || is_meson_gxm_cpu() || is_meson_gxl_cpu()) {
-#ifndef CONFIG_AMLOGIC_REMOVE_OLD
 		if (devp->parm.v_active == 2160 && devp->parm.frame_rate > 30)
 			/* 1/2 down scaling */
 			wr_viu(VPU_VIU2VDIN_HDN_CTRL, 0x40f00);
-#endif
-	} else {
+	} else
 		wr_bits_viu(VPU_VIU2VDIN_HDN_CTRL, devp->parm.h_active, 0, 14);
-	}
 
 	if (cpu_after_eq(MESON_CPU_MAJOR_ID_G12A)) {
-		if (port >= TVIN_PORT_VIU1_WB0_VD1 &&
-		    port <= TVIN_PORT_VIU1_WB0_POST_BLEND) {
-			if (port == TVIN_PORT_VIU1_WB0_VDIN_BIST)
-				viu_mux = VIU_MUX_SEL_WB1;
-			else
-				viu_mux = VIU_MUX_SEL_WB0;
-		} else if ((port >= TVIN_PORT_VIU1_WB1_VD1) &&
+		if ((port >= TVIN_PORT_VIU1_WB0_VD1) &&
+		    (port <= TVIN_PORT_VIU1_WB0_POST_BLEND))
+			viu_mux = 8;
+		else if ((port >= TVIN_PORT_VIU1_WB1_VD1) &&
 			 (port <= TVIN_PORT_VIU1_WB1_POST_BLEND))
-			viu_mux = VIU_MUX_SEL_WB1;
+			viu_mux = 16;
 		else if (port == TVIN_PORT_VIU2_ENCL)
-			viu_mux = VIU_MUX_SEL_ENCL;
+			viu_mux = 4;
 		else if (port == TVIN_PORT_VIU2_ENCI)
-			viu_mux = VIU_MUX_SEL_ENCI;
+			viu_mux = 1;
 		else if (port == TVIN_PORT_VIU2_ENCP)
-			viu_mux = VIU_MUX_SEL_ENCP;
+			viu_mux = 2;
 
-		if (cpu_after_eq(MESON_CPU_MAJOR_ID_TM2)) {
+		switch (port & ~0xff) {
+		case TVIN_PORT_VIU1:
 			viu_sel = 1;
-		} else {
-			/*old chip*/
-			switch (port & ~0xff) {
-			case TVIN_PORT_VIU1:
-				viu_sel = 1;
-				break;
-			case TVIN_PORT_VIU2:
-				viu_sel = 2;
-				break;
-			default:
-				break;
-			}
+			break;
+		case TVIN_PORT_VIU2:
+			viu_sel = 2;
+			break;
+		default:
+			break;
 		}
 
 		if (viu_sel == 1) {
-			/* for vdi6 , vdin source 7*/
+			/* for vdi6 */
 			wr_bits_viu(VPU_VIU_VDIN_IF_MUX_CTRL, 0, 0, 5);
 			wr_bits_viu(VPU_VIU_VDIN_IF_MUX_CTRL, viu_mux, 0, 5);
 			wr_bits_viu(VPU_VIU_VDIN_IF_MUX_CTRL, 0, 8, 5);
 			wr_bits_viu(VPU_VIU_VDIN_IF_MUX_CTRL, viu_mux, 8, 5);
 
-			/* for vdi8 , vdin source 9*/
+			/* for vdi8 */
 			wr_bits_viu(VPU_VIU_VDIN_IF_MUX_CTRL, 0, 16, 5);
 			wr_bits_viu(VPU_VIU_VDIN_IF_MUX_CTRL, viu_mux, 16, 5);
 			wr_bits_viu(VPU_VIU_VDIN_IF_MUX_CTRL, 0, 24, 5);
@@ -274,19 +271,19 @@ static int viuin_open(struct tvin_frontend_s *fe, enum tvin_port_e port)
 		} else {
 			wr_viu(VPU_VIU_VDIN_IF_MUX_CTRL, 0);
 		}
-		/*wrbak_chan0_sel wb_chan_sel */
+
 		if (port == TVIN_PORT_VIU1_WB0_VD1) {
-			wr_bits_viu(VPP_WRBAK_CTRL, 1, 0, 4);
+			wr_bits_viu(VPP_WRBAK_CTRL, 1, 0, 3);
 		} else if (port == TVIN_PORT_VIU1_WB0_VD2) {
-			wr_bits_viu(VPP_WRBAK_CTRL, 2, 0, 4);
+			wr_bits_viu(VPP_WRBAK_CTRL, 2, 0, 3);
 		} else if (port == TVIN_PORT_VIU1_WB0_OSD1) {
-			wr_bits_viu(VPP_WRBAK_CTRL, 3, 0, 4);
+			wr_bits_viu(VPP_WRBAK_CTRL, 3, 0, 3);
 		} else if (port == TVIN_PORT_VIU1_WB0_OSD2) {
-			wr_bits_viu(VPP_WRBAK_CTRL, 4, 0, 4);
+			wr_bits_viu(VPP_WRBAK_CTRL, 4, 0, 3);
 		} else if (port == TVIN_PORT_VIU1_WB0_POST_BLEND) {
-			wr_bits_viu(VPP_WRBAK_CTRL, 5, 0, 4);
+			wr_bits_viu(VPP_WRBAK_CTRL, 5, 0, 3);
 		} else if (port == TVIN_PORT_VIU1_WB0_VPP) {
-			wr_bits_viu(VPP_WRBAK_CTRL, 6, 0, 4);
+			wr_bits_viu(VPP_WRBAK_CTRL, 6, 0, 3);
 
 			/* increase h banking in case vdin afifo overflow
 			 * pre chip has 8bits
@@ -296,34 +293,33 @@ static int viuin_open(struct tvin_frontend_s *fe, enum tvin_port_e port)
 		} else {
 			wr_bits_viu(VPP_WRBAK_CTRL, 0, 4, 3);
 		}
-		/*wrbak_chan0_sel wb_chan_sel*/
+
 		if (port == TVIN_PORT_VIU1_WB1_VD1)
-			wr_bits_viu(VPP_WRBAK_CTRL, 1, 4, 4);
+			wr_bits_viu(VPP_WRBAK_CTRL, 1, 4, 3);
 		else if (port == TVIN_PORT_VIU1_WB1_VD2)
-			wr_bits_viu(VPP_WRBAK_CTRL, 2, 4, 4);
+			wr_bits_viu(VPP_WRBAK_CTRL, 2, 4, 3);
 		else if (port == TVIN_PORT_VIU1_WB1_OSD1)
-			wr_bits_viu(VPP_WRBAK_CTRL, 3, 4, 4);
+			wr_bits_viu(VPP_WRBAK_CTRL, 3, 4, 3);
 		else if (port == TVIN_PORT_VIU1_WB1_OSD2)
-			wr_bits_viu(VPP_WRBAK_CTRL, 4, 4, 4);
+			wr_bits_viu(VPP_WRBAK_CTRL, 4, 4, 3);
 		else if (port == TVIN_PORT_VIU1_WB1_POST_BLEND)
-			wr_bits_viu(VPP_WRBAK_CTRL, 5, 4, 4);
+			wr_bits_viu(VPP_WRBAK_CTRL, 5, 4, 3);
 		else if (port == TVIN_PORT_VIU1_WB1_VPP)
-			wr_bits_viu(VPP_WRBAK_CTRL, 6, 4, 4);
+			wr_bits_viu(VPP_WRBAK_CTRL, 6, 4, 3);
 		else
-			wr_bits_viu(VPP_WRBAK_CTRL, 0, 4, 4);
+			wr_bits_viu(VPP_WRBAK_CTRL, 0, 4, 3);
 
 		/* wrback hsync en */
-		if (port >= TVIN_PORT_VIU1_WB0_VD1 &&
-		    port <= TVIN_PORT_VIU1_WB0_POST_BLEND) {
-			wr_bits_viu(WR_BACK_MISC_CTRL, 1, 0, 1);/*vd0 hsync*/
-			wr_bits_viu(WR_BACK_MISC_CTRL, 0, 1, 1);/*vd1 hsync*/
+		if ((port >= TVIN_PORT_VIU1_WB0_VD1) &&
+		    (port <= TVIN_PORT_VIU1_WB0_POST_BLEND)) {
+			wr_bits_viu(WR_BACK_MISC_CTRL, 1, 0, 1);
+			wr_bits_viu(WR_BACK_MISC_CTRL, 0, 1, 1);
 		} else if ((port >= TVIN_PORT_VIU1_WB1_VD1) &&
 			(port <= TVIN_PORT_VIU1_WB1_POST_BLEND)) {
-			wr_bits_viu(WR_BACK_MISC_CTRL, 0, 0, 1);/*vd0 hsync*/
-			wr_bits_viu(WR_BACK_MISC_CTRL, 1, 1, 1);/*vd1 hsync*/
-		} else {
+			wr_bits_viu(WR_BACK_MISC_CTRL, 0, 0, 1);
+			wr_bits_viu(WR_BACK_MISC_CTRL, 1, 1, 1);
+		} else
 			wr_bits_viu(WR_BACK_MISC_CTRL, 0, 0, 2);
-		}
 	} else {
 		wr_bits_viu(VPU_VIU_VENC_MUX_CTRL, viu_mux, 4, 4);
 		wr_bits_viu(VPU_VIU_VENC_MUX_CTRL, viu_mux, 8, 4);
@@ -332,7 +328,6 @@ static int viuin_open(struct tvin_frontend_s *fe, enum tvin_port_e port)
 	open_cnt++;
 	return 0;
 }
-
 static void viuin_close(struct tvin_frontend_s *fe)
 {
 	struct viuin_s *devp = container_of(fe, struct viuin_s, frontend);
@@ -389,18 +384,19 @@ static int viuin_isr(struct tvin_frontend_s *fe, unsigned int hcnt64)
 
 	curr_port = rd_bits_viu(VPU_VIU_VENC_MUX_CTRL, 0, 2);
 
-	vsync_enter_line_curr = (rd_viu(devp->enc_info_addr) >> 16) & 0x1fff;
+	vsync_enter_line_curr = (rd_viu(devp->enc_info_addr)>>16)&0x1fff;
 	if (vsync_enter_line_curr > vsync_enter_line_max)
 		vsync_enter_line_max = vsync_enter_line_curr;
-	if (vsync_enter_line_max_threshold > vsync_enter_line_min_threshold &&
-	    curr_port == 0) {
-		if (vsync_enter_line_curr > vsync_enter_line_max_threshold ||
-		    vsync_enter_line_curr < vsync_enter_line_min_threshold) {
+	if ((vsync_enter_line_max_threshold > vsync_enter_line_min_threshold) &&
+			(curr_port == 0)) {
+		if ((vsync_enter_line_curr > vsync_enter_line_max_threshold) ||
+		(vsync_enter_line_curr < vsync_enter_line_min_threshold)) {
 			vsync_enter_line_threshold_overflow_count++;
 			return TVIN_BUF_SKIP;
 		}
 	}
 	return 0;
+
 }
 
 static struct tvin_decoder_ops_s viu_dec_ops = {
@@ -413,11 +409,13 @@ static struct tvin_decoder_ops_s viu_dec_ops = {
 };
 
 static void viuin_sig_property(struct tvin_frontend_s *fe,
-			       struct tvin_sig_property_s *prop)
+		struct tvin_sig_property_s *prop)
 {
 	static const struct vinfo_s *vinfo;
 	struct viuin_s *devp = container_of(fe, struct viuin_s, frontend);
+#ifdef CONFIG_AMLOGIC_VOUT2_SERVE
 	unsigned int line_begin, line_end;
+#endif
 
 	switch (devp->parm.port) {
 	case TVIN_PORT_VIU1_VIDEO:
@@ -429,12 +427,13 @@ static void viuin_sig_property(struct tvin_frontend_s *fe,
 	case TVIN_PORT_VIU1_WB0_VPP:
 	case TVIN_PORT_VIU1_WB1_VPP:
 		vinfo = get_current_vinfo();
-		prop->color_format = (enum tvin_color_fmt_e)vinfo->viu_color_fmt;
+		prop->color_format = vinfo->viu_color_fmt;
 		break;
 
 	/* ENCL/ENCI/ENCP is only for viu2 loopback currently
 	 * though hw also support viu1 loopback through ENC
 	 */
+#ifdef CONFIG_AMLOGIC_VOUT2_SERVE
 	case TVIN_PORT_VIU2_ENCL:
 		vinfo = get_current_vinfo2();
 		line_begin = rd_viu(ENCL_VIDEO_VSO_BLINE);
@@ -447,14 +446,14 @@ static void viuin_sig_property(struct tvin_frontend_s *fe,
 		else
 			pr_err("error: TVIN_PORT_VIU2_ENCL line begin = end\n");
 
-		prop->color_format = (enum tvin_color_fmt_e)vinfo->viu_color_fmt;
+		prop->color_format = vinfo->viu_color_fmt;
 		break;
 	case TVIN_PORT_VIU2_ENCI:
 		vinfo = get_current_vinfo2();
 
 		/* always negative */
 		prop->polarity_vs = 1; /* negative */
-		prop->color_format = (enum tvin_color_fmt_e)vinfo->viu_color_fmt;
+		prop->color_format = vinfo->viu_color_fmt;
 		break;
 	case TVIN_PORT_VIU2_ENCP:
 		vinfo = get_current_vinfo2();
@@ -468,8 +467,9 @@ static void viuin_sig_property(struct tvin_frontend_s *fe,
 		else
 			pr_err("error: TVIN_PORT_VIU2_ENCP line begin = end\n");
 
-		prop->color_format = (enum tvin_color_fmt_e)vinfo->viu_color_fmt;
+		prop->color_format = vinfo->viu_color_fmt;
 		break;
+#endif
 	default:
 		prop->color_format = devp->parm.cfmt;
 		break;
@@ -508,19 +508,18 @@ static int viuin_probe(struct platform_device *pdev)
 {
 	struct viuin_s *viuin_devp;
 
-	viuin_devp = kmalloc(sizeof(*viuin_devp), GFP_KERNEL);
+	viuin_devp = kmalloc(sizeof(struct viuin_s), GFP_KERNEL);
 	if (!viuin_devp)
 		return -ENOMEM;
 	memset(viuin_devp, 0, sizeof(struct viuin_s));
 	sprintf(viuin_devp->frontend.name, "%s", DEVICE_NAME);
 	if (!tvin_frontend_init(&viuin_devp->frontend,
-				&viu_dec_ops, &viu_sm_ops, 0)) {
+		&viu_dec_ops, &viu_sm_ops, 0)) {
 		if (tvin_reg_frontend(&viuin_devp->frontend))
 			pr_info("[viuin..]%s register viu frontend error.\n",
-				__func__);
+					__func__);
 	}
 	platform_set_drvdata(pdev, viuin_devp);
-	pr_info("[viuin..]%s probe ok.\n", __func__);
 	return 0;
 }
 
@@ -545,13 +544,12 @@ static struct platform_driver viuin_driver = {
 
 static struct platform_device *viuin_device;
 
-int __init viuin_init_module(void)
+static int __init viuin_init_module(void)
 {
-	pr_info("[viuin..]%s viuin module init\n", __func__);
 	viuin_device = platform_device_alloc(DEVICE_NAME, 0);
 	if (!viuin_device) {
 		pr_err("[viuin..]%s failed to alloc viuin_device.\n",
-		       __func__);
+				__func__);
 		return -ENOMEM;
 	}
 
@@ -562,7 +560,7 @@ int __init viuin_init_module(void)
 	}
 	if (platform_driver_register(&viuin_driver)) {
 		pr_err("[viuin..]%sfailed to register viuin driver.\n",
-		       __func__);
+				__func__);
 		platform_device_del(viuin_device);
 		platform_device_put(viuin_device);
 		return -ENODEV;
@@ -572,13 +570,16 @@ int __init viuin_init_module(void)
 	return 0;
 }
 
-void __exit viuin_exit_module(void)
+static void __exit viuin_exit_module(void)
 {
 	pr_info("[viuin..]%s viuin module remove.\n", __func__);
 	platform_driver_unregister(&viuin_driver);
-	platform_device_unregister(viuin_device);
+		platform_device_unregister(viuin_device);
 }
 
-//MODULE_DESCRIPTION("AMLOGIC viu input driver");
-//MODULE_LICENSE("GPL");
-//MODULE_VERSION("3.0.0");
+
+module_init(viuin_init_module);
+module_exit(viuin_exit_module);
+MODULE_DESCRIPTION("AMLOGIC viu input driver");
+MODULE_LICENSE("GPL");
+MODULE_VERSION("3.0.0");

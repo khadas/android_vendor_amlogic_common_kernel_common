@@ -1,6 +1,18 @@
-/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/amlogic/ethernet/phy/phy_debug.h
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
 #ifndef _STMMAC_MESON_PHY_DEBUG_H
@@ -23,12 +35,11 @@
 #include <linux/pinctrl/consumer.h>
 #include <linux/net_tstamp.h>
 
-//#include "eth_reg.h"
+#include "eth_reg.h"
 /*add this to stop checking wol,which will reset phy*/
-//extern unsigned int enable_wol_check;
-//extern unsigned int tx_amp_bl2;
-//extern unsigned int enet_type;
-//extern void __iomem *ioaddr_dbg;
+extern unsigned int enable_wol_check;
+extern unsigned int  tx_amp_bl2;
+extern unsigned int  enet_type;
 int gmac_create_sysfs(struct phy_device *phydev, void __iomem *ioaddr);
 int gmac_remove_sysfs(struct phy_device *phydev);
 #endif

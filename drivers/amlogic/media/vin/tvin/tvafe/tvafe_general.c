@@ -1,6 +1,18 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/amlogic/media/vin/tvin/tvafe/tvafe_general.c
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
 #include <linux/module.h>
@@ -306,6 +318,7 @@ static void tvafe_pq_apb_reg_trust_write(unsigned int addr,
 			val, val, mask, mask);
 
 	cvd_reg87_pal = R_APB_REG(CVD2_REG_87);
+	acd_166 = R_APB_REG(ACD_REG_66);
 }
 
 enum tvafe_adc_ch_e tvafe_port_to_channel(enum tvin_port_e port,
@@ -318,7 +331,7 @@ enum tvafe_adc_ch_e tvafe_port_to_channel(enum tvin_port_e port,
 		return TVAFE_ADC_CH_NULL;
 	}
 
-	adc_ch = (enum tvafe_adc_ch_e)pinmux->pin[port - TVIN_PORT_CVBS0];
+	adc_ch = pinmux->pin[port - TVIN_PORT_CVBS0];
 
 	return adc_ch;
 }
@@ -334,22 +347,27 @@ int tvafe_adc_pin_muxing(enum tvafe_adc_ch_e adc_ch)
 	}
 
 	if (adc_ch == TVAFE_ADC_CH_0) {
+
 		W_APB_BIT(TVFE_VAFE_CTRL1, 1,
 			  VAFE_IN_SEL_BIT, VAFE_IN_SEL_WID);
 		if (tvafe_cpu_type() < TVAFE_CPU_TYPE_TL1)
 			W_APB_BIT(TVFE_VAFE_CTRL2, 3, 4, 3);
 
 	} else if (adc_ch == TVAFE_ADC_CH_1) {
+
 		W_APB_BIT(TVFE_VAFE_CTRL1, 2,
 			  VAFE_IN_SEL_BIT, VAFE_IN_SEL_WID);
 		if (tvafe_cpu_type() < TVAFE_CPU_TYPE_TL1)
 			W_APB_BIT(TVFE_VAFE_CTRL2, 5, 4, 3);
 
 	} else if (adc_ch == TVAFE_ADC_CH_2) {
+
 		W_APB_BIT(TVFE_VAFE_CTRL1, 3,
 			  VAFE_IN_SEL_BIT, VAFE_IN_SEL_WID);
 		W_APB_BIT(TVFE_VAFE_CTRL2, 6, 4, 3);
+
 	} else if (adc_ch == TVAFE_ADC_CH_ATV) {
+
 		/* atv demod data for cvd2 */
 		W_APB_REG(TVFE_ATV_DMD_CLP_CTRL, 0x1300010);
 		W_APB_BIT(TVFE_VAFE_CTRL2, 6, 4, 3);
@@ -425,15 +443,20 @@ static void tvafe_set_cvbs_default(struct tvafe_cvd2_s *cvd2,
 			cvbs_top_reg_default[i][1]);
 		i++;
 	}
-	if (tvafe_cpu_type() >= TVAFE_CPU_TYPE_TL1) {
-		if (IS_TVAFE_ATV_SRC(port)) {
-			W_APB_REG(TVFE_VAFE_CTRL0, 0x000d0710);
-			W_APB_REG(TVFE_VAFE_CTRL1, 0x00003000);
-			W_APB_REG(TVFE_VAFE_CTRL2, 0x1fe09e31);
-		} else if (IS_TVAFE_AVIN_SRC(port)) {
-			W_APB_REG(TVFE_VAFE_CTRL0, 0x00490710);
-			W_APB_REG(TVFE_VAFE_CTRL1, 0x0000110e);
-			W_APB_REG(TVFE_VAFE_CTRL2, 0x1fe09f83);
+	if (tvafe_cpu_type() == TVAFE_CPU_TYPE_TXL ||
+		tvafe_cpu_type() == TVAFE_CPU_TYPE_TXLX ||
+		tvafe_cpu_type() >= TVAFE_CPU_TYPE_TL1) {
+		if (tvafe_cpu_type() >= TVAFE_CPU_TYPE_TL1) {
+			if (IS_TVAFE_ATV_SRC(port)) {
+				adc_set_filter_ctrl(true,
+					FILTER_ATV_DEMOD, NULL);
+			} else if (IS_TVAFE_AVIN_SRC(port)) {
+				adc_set_filter_ctrl(true, FILTER_TVAFE, NULL);
+			}
+		} else {
+			W_APB_REG(TVFE_VAFE_CTRL0, 0x00090b00);
+			W_APB_REG(TVFE_VAFE_CTRL1, 0x00000110);
+			W_APB_REG(TVFE_VAFE_CTRL2, 0x0010ef93);
 		}
 
 #if (defined(CONFIG_ADC_DOUBLE_SAMPLING_FOR_CVBS) && defined(CRYSTAL_24M))
@@ -446,7 +469,9 @@ static void tvafe_set_cvbs_default(struct tvafe_cvd2_s *cvd2,
 			W_APB_REG(TVFE_AFC_CTRL3, 0x01fd8c36);
 			W_APB_REG(TVFE_AFC_CTRL4, 0x2de6d04f);
 			W_APB_REG(TVFE_AFC_CTRL5, 0x00000004);
-		} else {
+		} else
+#endif
+		{
 			W_APB_REG(TVFE_AAFILTER_CTRL1, 0x00182222);
 			W_APB_REG(TVFE_AAFILTER_CTRL2, 0x252b39c6);
 			W_APB_REG(TVFE_AFC_CTRL1, 0x05730459);
@@ -455,26 +480,20 @@ static void tvafe_set_cvbs_default(struct tvafe_cvd2_s *cvd2,
 			W_APB_REG(TVFE_AFC_CTRL4, 0x2de6d04f);
 			W_APB_REG(TVFE_AFC_CTRL5, 0x00000004);
 		}
-#else
-		W_APB_REG(TVFE_AAFILTER_CTRL1, 0x00182222);
-		W_APB_REG(TVFE_AAFILTER_CTRL2, 0x252b39c6);
-		W_APB_REG(TVFE_AFC_CTRL1, 0x05730459);
-		W_APB_REG(TVFE_AFC_CTRL2, 0xf4b9ac9);
-		W_APB_REG(TVFE_AFC_CTRL3, 0x1fd8c36);
-		W_APB_REG(TVFE_AFC_CTRL4, 0x2de6d04f);
-		W_APB_REG(TVFE_AFC_CTRL5, 0x00000004);
-#endif
 	}
 	/* init some variables  */
 	cvd2->vd_port = port;
 
 	/* set cvd2 default format to pal-i */
 	tvafe_cvd2_try_format(cvd2, mem, TVIN_SIG_FMT_CVBS_PAL_I);
+
 }
 
 void tvafe_enable_avout(enum tvin_port_e port, bool enable)
 {
-	if (tvafe_cpu_type() >= TVAFE_CPU_TYPE_TL1) {
+	if (tvafe_cpu_type() == TVAFE_CPU_TYPE_TXL ||
+		tvafe_cpu_type() == TVAFE_CPU_TYPE_TXLX ||
+		tvafe_cpu_type() >= TVAFE_CPU_TYPE_TL1) {
 		if (enable) {
 			tvafe_clk_gate_ctrl(1);
 			if (IS_TVAFE_ATV_SRC(port)) {
@@ -508,10 +527,10 @@ void tvafe_init_reg(struct tvafe_cvd2_s *cvd2, struct tvafe_cvd2_mem_s *mem,
 		module_sel = ADC_EN_TVAFE;
 
 	if (IS_TVAFE_SRC(port)) {
+
 #ifdef CRYSTAL_25M
-		if (tvafe_cpu_type() < TVAFE_CPU_TYPE_TL1)
-			/* can't write !!! */
-			W_HIU_REG(HHI_VAFE_CLKIN_CNTL, 0x703);
+	if (tvafe_cpu_type() < TVAFE_CPU_TYPE_TL1)
+		W_HIU_REG(HHI_VAFE_CLKIN_CNTL, 0x703);/* can't write !!! */
 #endif
 
 #if (defined(CONFIG_ADC_DOUBLE_SAMPLING_FOR_CVBS) && defined(CRYSTAL_24M))
@@ -521,16 +540,12 @@ void tvafe_init_reg(struct tvafe_cvd2_s *cvd2, struct tvafe_cvd2_mem_s *mem,
 			W_HIU_REG(HHI_ADC_PLL_CNTL, 0x08664220);
 			W_HIU_REG(HHI_ADC_PLL_CNTL2, 0x34e0bf80);
 			W_HIU_REG(HHI_ADC_PLL_CNTL3, 0x292a2110);
-		} else {
+		} else
+#endif
 #ifdef CONFIG_AMLOGIC_MEDIA_ADC
-			adc_set_pll_cntl(1, module_sel, NULL);
+		adc_set_pll_cntl(1, module_sel, NULL);
 #endif
-		}
-#else
-#ifdef CONFIG_AMLOGIC_MEDIA_ADC
-			adc_set_pll_cntl(1, module_sel, NULL);
-#endif
-#endif
+
 		tvafe_set_cvbs_default(cvd2, mem, port);
 		/*turn on/off av out*/
 		tvafe_enable_avout(port, user_param->avout_en);
@@ -538,6 +553,7 @@ void tvafe_init_reg(struct tvafe_cvd2_s *cvd2, struct tvafe_cvd2_mem_s *mem,
 	}
 
 	tvafe_pr_info("%s ok.\n", __func__);
+
 }
 
 /*
@@ -554,7 +570,7 @@ void tvafe_set_apb_bus_err_ctrl(void)
  */
 static void tvafe_reset_module(void)
 {
-	pr_info("%s: reset module\n", __func__);
+	pr_info("tvafe_reset_module.\n");
 	W_APB_BIT(TVFE_RST_CTRL, 1, ALL_CLK_RST_BIT, ALL_CLK_RST_WID);
 	W_APB_BIT(TVFE_RST_CTRL, 0, ALL_CLK_RST_BIT, ALL_CLK_RST_WID);
 	/*reset vdin asynchronous fifo*/
@@ -661,6 +677,7 @@ static void tvafe_top_enable_module(bool enable)
 	}
 	W_APB_BIT(TVFE_TOP_CTRL, 0, DCLK_ENABLE_BIT, DCLK_ENABLE_WID);
 	tvafe_pr_info("reset module\n");
+	mdelay(5);
 	W_APB_BIT(TVFE_RST_CTRL, 1, DCLK_RST_BIT, DCLK_RST_WID);
 	W_APB_BIT(TVFE_RST_CTRL, 0, DCLK_RST_BIT, DCLK_RST_WID);
 }
@@ -680,7 +697,14 @@ static void tvafe_top_init_reg(enum tvin_port_e port)
 void white_pattern_pga_reset(enum tvin_port_e port)
 {
 	tvafe_top_enable_module(false);
+	mdelay(80);
 	tvafe_top_init_reg(port);
+	mdelay(10);
 	W_APB_BIT(TVFE_CLAMP_INTF, 1, CLAMP_EN_BIT, CLAMP_EN_WID);
+	mdelay(10);
 }
 
+void tvafe_set_ddemod_default(void)
+{
+}
+EXPORT_SYMBOL(tvafe_set_ddemod_default);

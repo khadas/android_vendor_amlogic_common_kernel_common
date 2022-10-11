@@ -1,36 +1,42 @@
-/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/amlogic/drm/meson_hdcp.h
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
-#ifndef __MESON_HDCP_H__
-#define __MESON_HDCP_H__
+#ifndef __AM_MESON_HDCP_H
+#define __AM_MESON_HDCP_H
 
-
-enum {
-	HDCP_NULL = 0,
-	HDCP_MODE14 = 1 << 0,
-	HDCP_MODE22 = 1 << 1,
-	HDCP_KEY_UPDATE = 1 << 2
-};
+#define HDCP_SLAVE     0x3a
+#define HDCP2_VERSION  0x50
+#define HDCP_MODE14    1
+#define HDCP_MODE22    2
+#define HDCP_NULL      0
 
 enum {
-	HDCP_AUTH_FAIL = 0,
-	HDCP_AUTH_OK = 1,
-	HDCP_AUTH_UNKNOWN = 0xff,
+	HDCP_TX22_DISCONNECT,
+	HDCP_TX22_START,
+	HDCP_TX22_STOP
 };
 
-typedef void (*hdcp_notify)(int type, int auth_result);
-
-void meson_hdcp_init(void);
-void meson_hdcp_exit(void);
-
-void meson_hdcp_enable(int hdcp_type);
-void meson_hdcp_disable(void);
-void meson_hdcp_disconnect(void);
-
-unsigned int meson_hdcp_get_key_version(void);
-int meson_hdcp_get_valid_type(int request_type_mask);
-void meson_hdcp_reg_result_notify(hdcp_notify cb);
-
+int am_hdcp_init(struct am_hdmi_tx *am_hdmi);
+int get_hdcp_hdmitx_version(struct am_hdmi_tx *am_hdmi);
+int am_hdcp_disable(struct am_hdmi_tx *am_hdmi);
+int am_hdcp_disconnect(struct am_hdmi_tx *am_hdmi);
+void am_hdcp_enable(struct work_struct *work);
+int am_hdcp22_init(struct am_hdmi_tx *am_hdmi);
+void drm_hdcp14_on(ulong param);
+void drm_hdcp14_off(ulong param);
+void drm_hdcp22_init(void);
 #endif

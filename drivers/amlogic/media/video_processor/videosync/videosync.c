@@ -1,4 +1,3 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
  * drivers/amlogic/media/video_processor/videosync/videosync.c
  *
@@ -16,24 +15,21 @@
  *
  */
 
-#undef DEBUG
 #define DEBUG
 
 #include "videosync.h"
 #include <linux/amlogic/major.h>
 #include <linux/platform_device.h>
 #include <linux/uaccess.h>
-#include <linux/sched/clock.h>
-#ifdef CONFIG_AMLOGIC_MEDIA_FRAME_SYNC
 #include <linux/amlogic/media/frame_sync/timestamp.h>
 #include <linux/amlogic/media/frame_sync/tsync.h>
-#endif
+
 
 #define VIDEOSYNC_DEVICE_NAME   "videosync"
 #define RECEIVER_NAME "videosync"
 #define PROVIDER_NAME "videosync"
 
-bool videosync_inited;/*false*/
+static bool videosync_inited;/*false*/
 static bool show_nosync;/*false*/
 static bool smooth_sync_enable;
 static int enable_video_discontinue_report = 1;
@@ -45,6 +41,7 @@ static u32 vp_debug_flag;
 static bool no_render;/* default: false */
 static bool async_mode;/* default: false */
 /*static u32 video_early_threshold = 900;  default: 900=>10ms */
+
 
 /* video freerun mode */
 #define FREERUN_NONE    0	/* no freerun mode */
@@ -59,12 +56,14 @@ static int duration_gcd = DURATION_GCD;
 
 static int omx_pts_interval_upper = 11000;
 static int omx_pts_interval_lower = -5500;
+#define DUR2PTS(x) ((x) - ((x) >> 4))
 
 #define PRINT_ERROR			0X0
 #define PRINT_QUEUE_STATUS	0X0001
 #define PRINT_TIMESTAMP		0X0002
 #define PRINT_PATTERN		0X0004
 #define PRINT_OTHER			0X0008
+
 
 static struct videosync_dev *vp_dev;
 static uint show_first_frame_nosync;
@@ -98,15 +97,15 @@ static int pts_pattern_detected = -1;
 
 static int vp_print(char *name, int debug_flag, const char *fmt, ...)
 {
-	if ((vp_debug_flag & debug_flag) ||
-	    debug_flag == PRINT_ERROR) {
+	if ((vp_debug_flag & debug_flag)
+		|| (debug_flag == PRINT_ERROR)) {
 		unsigned char buf[512];
 		int len = 0;
 		va_list args;
 
 		va_start(args, fmt);
 		len = sprintf(buf, "[%s]", name);
-		vsnprintf(buf + len, 512 - len, fmt, args);
+		vsnprintf(buf + len, 512-len, fmt, args);
 		pr_info("%s", buf);
 		va_end(args);
 	}
@@ -125,14 +124,13 @@ static void ts_pcrscr_set(struct videosync_s *dev_s, u32 pts)
 {
 	dev_s->system_time = pts;
 	vp_print(dev_s->vf_receiver_name, PRINT_TIMESTAMP,
-		 "%s sys_time %u\n", __func__, dev_s->system_time);
+			"ts_pcrscr_set sys_time %u\n", dev_s->system_time);
 }
 
 static void ts_pcrscr_enable(struct videosync_s *dev_s, u32 enable)
 {
 	dev_s->system_time_up = enable;
 }
-
 static u32 ts_pcrscr_enable_state(struct videosync_s *dev_s)
 {
 	return dev_s->system_time_up;
@@ -159,8 +157,8 @@ static void log_vsync_video_pattern(int pattern)
 	}
 
 	/* update 3:2 or 2:2 mode detection */
-	if ((pre_pts_trace == factor1 && pts_trace == factor2) ||
-	    (pre_pts_trace == factor2 && pts_trace == factor1)) {
+	if (((pre_pts_trace == factor1) && (pts_trace == factor2)) ||
+	    ((pre_pts_trace == factor2) && (pts_trace == factor1))) {
 		if (pts_pattern[pattern] < pattern_range) {
 			pts_pattern[pattern]++;
 			if (pts_pattern[pattern] == pattern_range) {
@@ -188,9 +186,10 @@ static void vsync_video_pattern(void)
 	/*log_vsync_video_pattern(PTS_41_PATTERN);*/
 }
 
-static inline void vpts_perform_pulldown(struct videosync_s *dev_s,
-					 struct vframe_s *next_vf,
-					 bool *expired)
+static inline void vpts_perform_pulldown(
+	struct videosync_s *dev_s,
+	struct vframe_s *next_vf,
+	bool *expired)
 {
 	int pattern_range, expected_curr_interval;
 	int expected_prev_interval;
@@ -327,29 +326,33 @@ void videosync_pcrscr_update(s32 inc, u32 base)
 				if (dev_s->system_time_scale_remainder
 					>= system_time_scale_base) {
 					dev_s->system_time++;
-					dev_s->system_time_scale_remainder -=
-						system_time_scale_base;
+					dev_s->system_time_scale_remainder
+						-= system_time_scale_base;
 				}
 				vp_print(dev_s->vf_receiver_name, PRINT_OTHER,
-					 "update sys_time %u, system_time_scale_base %d, inc %d\n",
-					 dev_s->system_time,
-					 system_time_scale_base, inc);
+				"update sys_time %u, system_time_scale_base %d, inc %d\n",
+				dev_s->system_time,
+				system_time_scale_base,
+				inc);
 			}
 
 			/*check if need to correct pcr by omx_pts*/
-			current_omx_pts = dev_s->omx_pts;
-			diff = dev_s->system_time - current_omx_pts;
+			if (!dev_s->vmaster_mode) {
+				current_omx_pts = dev_s->omx_pts;
+				diff = dev_s->system_time - current_omx_pts;
 
-			if ((diff - omx_pts_interval_upper) > 0 ||
-			    (diff - omx_pts_interval_lower) < 0) {
-				vp_print(dev_s->vf_receiver_name,
-					 PRINT_TIMESTAMP,
-					 "sys_time=%d, omx_pts=%d, diff=%d\n",
-					 dev_s->system_time,
-					 current_omx_pts,
-					 diff);
-				ts_pcrscr_set(dev_s,
-					      current_omx_pts + duration_gcd);
+				if ((diff - omx_pts_interval_upper) > 0
+					|| (diff - omx_pts_interval_lower)
+					< 0) {
+					vp_print(dev_s->vf_receiver_name,
+						PRINT_TIMESTAMP,
+						"sys_time=%u, omx_pts=%u, diff=%d\n",
+						dev_s->system_time,
+						current_omx_pts,
+						diff);
+					ts_pcrscr_set(dev_s,
+						current_omx_pts + duration_gcd);
+				}
 			}
 		}
 	}
@@ -371,8 +374,7 @@ void videosync_pcrscr_inc(s32 inc)
 			if (dev_s->system_time_up) {
 				dev_s->system_time += inc + system_time_inc_adj;
 
-				vp_print
-				(dev_s->vf_receiver_name, PRINT_OTHER,
+				vp_print(dev_s->vf_receiver_name, PRINT_OTHER,
 				"update sys_time %u, system_time_inc_adj %d, inc %d\n",
 				dev_s->system_time,
 				system_time_inc_adj,
@@ -384,23 +386,23 @@ void videosync_pcrscr_inc(s32 inc)
 				current_omx_pts = dev_s->omx_pts;
 				diff = dev_s->system_time - current_omx_pts;
 
-				if ((diff - omx_pts_interval_upper) > 0 ||
-				    (diff - omx_pts_interval_lower)
-				    < 0) {
+				if ((diff - omx_pts_interval_upper) > 0
+					|| (diff - omx_pts_interval_lower)
+					< 0) {
 					vp_print(dev_s->vf_receiver_name,
-						 PRINT_TIMESTAMP,
-						 "sys_time=%u, omx_pts=%u, diff=%d\n",
-						 dev_s->system_time,
-						 current_omx_pts,
-						 diff);
-					ts_pcrscr_set
-						(dev_s,
+						PRINT_TIMESTAMP,
+						"sys_time=%u, omx_pts=%u, diff=%d\n",
+						dev_s->system_time,
+						current_omx_pts,
+						diff);
+					ts_pcrscr_set(dev_s,
 						current_omx_pts + duration_gcd);
 				}
 			}
 		}
 	}
 }
+
 
 /* -----------------------------------------------------------------
  *           videosync operations
@@ -424,6 +426,7 @@ static struct vframe_s *videosync_vf_get(void *op_arg)
 	if (vf) {
 		dev_s->cur_dispbuf = vf;
 		dev_s->first_frame_toggled = 1;
+		dev_s->get_vpts = vf->pts;
 	}
 	return vf;
 }
@@ -432,14 +435,12 @@ static void videosync_vf_put(struct vframe_s *vf, void *op_arg)
 {
 	struct videosync_s *dev_s = (struct videosync_s *)op_arg;
 
-	if (!IS_ERR_OR_NULL(vf)) {
-#ifdef CONFIG_AMLOGIC_MEDIA_VFM
+	if (vf != NULL) {
 		vf_put(vf, dev_s->vf_receiver_name);
-#endif
 		dev_s->put_frame_count++;
 	} else {
 		vp_print(dev_s->vf_receiver_name, 0,
-			 "videosync vf put: NULL!\n");
+			"videosync_vf_put: NULL!\n");
 	}
 }
 
@@ -472,7 +473,7 @@ static int videosync_event_cb(int type, void *data, void *private_data)
 }
 
 static int videosync_buffer_states(struct videosync_buffer_states *states,
-				   void *op_arg)
+	void *op_arg)
 {
 	struct videosync_s *dev_s = (struct videosync_s *)op_arg;
 
@@ -483,7 +484,7 @@ static int videosync_buffer_states(struct videosync_buffer_states *states,
 }
 
 static int videosync_buffer_states_vf(struct vframe_states *states,
-				      void *op_arg)
+	void *op_arg)
 {
 	struct videosync_s *dev_s = (struct videosync_s *)op_arg;
 
@@ -508,38 +509,34 @@ static const struct vframe_operations_s v4lvideo_vf_provider = {
 
 static void videosync_register(struct videosync_s *dev_s)
 {
-#ifdef CONFIG_AMLOGIC_MEDIA_VFM
 	vf_provider_init(&dev_s->video_vf_prov,
-			 dev_s->vf_provider_name,
-			 &v4lvideo_vf_provider, dev_s);
+				dev_s->vf_provider_name,
+				&v4lvideo_vf_provider, dev_s);
 	vf_reg_provider(&dev_s->video_vf_prov);
 	vf_notify_receiver(dev_s->vf_provider_name,
-			   VFRAME_EVENT_PROVIDER_START,
-			   NULL);
-#endif
+				VFRAME_EVENT_PROVIDER_START,
+				NULL);
 }
 
 static void videosync_unregister(struct videosync_s *dev_s)
 {
-#ifdef CONFIG_AMLOGIC_MEDIA_VFM
 	vf_unreg_provider(&dev_s->video_vf_prov);
-#endif
 }
 
 static ssize_t dump_queue_state_show(struct class *class,
-				     struct class_attribute *attr, char *buf)
+			struct class_attribute *attr, char *buf)
 {
 	int ret = 0;
 	int i = 0;
 	struct videosync_buffer_states states;
 	struct videosync_s *dev_s = NULL;
 
-	if (IS_ERR_OR_NULL(vp_dev))
+	if (vp_dev == NULL)
 		return -1;
 
-	if (vp_dev->active_dev_s_num == 0) {
+	if (vp_dev->active_dev_s_num == 0)
 		ret += sprintf(buf, "no active videosync\n");
-	} else {
+	else {
 		for (i = 0; i < VIDEOSYNC_S_COUNT; i++) {
 			dev_s = &vp_dev->video_prov[i];
 			if (dev_s->active_state == VIDEOSYNC_INACTIVE)
@@ -547,17 +544,17 @@ static ssize_t dump_queue_state_show(struct class *class,
 
 			if (videosync_buffer_states(&states, dev_s) == 0) {
 				ret += sprintf(buf + ret,
-					     "\n#------ %s state ------#\n",
+					    "\n#------ %s state ------#\n",
 						dev_s->vf_receiver_name);
 				ret += sprintf(buf + ret,
-					       "queued_q_size=%d\n",
+						"queued_q_size=%d\n",
 						states.buf_queued_num);
 				ret += sprintf(buf + ret,
-					       "ready_q_size=%d\n",
-					       states.buf_ready_num);
+						"ready_q_size=%d\n",
+						states.buf_ready_num);
 				ret += sprintf(buf + ret,
-					       "total frame count=%d\n",
-					       states.total_num);
+						"total frame count=%d\n",
+						states.total_num);
 			}
 		}
 	}
@@ -565,406 +562,108 @@ static ssize_t dump_queue_state_show(struct class *class,
 }
 
 static ssize_t dump_pts_show(struct class *class,
-			     struct class_attribute *attr, char *buf)
+			struct class_attribute *attr, char *buf)
 {
 	int ret = 0;
 	int i = 0;
 	struct videosync_s *dev_s = NULL;
 
-	if (IS_ERR_OR_NULL(vp_dev))
+	if (vp_dev == NULL)
 		return -1;
 
-	if (vp_dev->active_dev_s_num == 0) {
+	if (vp_dev->active_dev_s_num == 0)
 		ret += sprintf(buf, "no active videosync\n");
-	} else {
+	else {
 		for (i = 0; i < VIDEOSYNC_S_COUNT; i++) {
 			dev_s = &vp_dev->video_prov[i];
 			if (dev_s->active_state == VIDEOSYNC_INACTIVE)
 				continue;
 
 			ret += sprintf(buf + ret,
-				       "%s: ", dev_s->vf_receiver_name);
+					   "%s:  ", dev_s->vf_receiver_name);
 			ret += sprintf(buf + ret,
-				       "omx_pts=%d, ", dev_s->omx_pts);
+					   "omx_pts=%u, ", dev_s->omx_pts);
 			ret += sprintf(buf + ret,
-				       "system_time=%d\n", dev_s->system_time);
+					"system_time=%u\n", dev_s->system_time);
 		}
 	}
 	return ret;
 }
 
 static ssize_t dump_get_put_framecount_show(struct class *class,
-					    struct class_attribute *attr,
-					    char *buf)
+			struct class_attribute *attr, char *buf)
 {
 	int ret = 0;
 	int i = 0;
 	struct videosync_s *dev_s = NULL;
 
-	if (IS_ERR_OR_NULL(vp_dev))
+	if (vp_dev == NULL)
 		return -1;
 
-	if (vp_dev->active_dev_s_num == 0) {
+	if (vp_dev->active_dev_s_num == 0)
 		ret += sprintf(buf, "no active videosync\n");
-	} else {
+	else {
 		for (i = 0; i < VIDEOSYNC_S_COUNT; i++) {
 			dev_s = &vp_dev->video_prov[i];
 			if (dev_s->active_state == VIDEOSYNC_INACTIVE)
 				continue;
 
 			ret += sprintf(buf + ret,
-				       "%s: ", dev_s->vf_receiver_name);
+					   "%s:  ", dev_s->vf_receiver_name);
 			ret += sprintf(buf + ret,
-				       "get_frame_count=%d, put_frame_count=%d\n",
-				       dev_s->get_frame_count,
-				       dev_s->put_frame_count);
+						"get_frame_count=%d, put_frame_count=%d\n",
+						dev_s->get_frame_count,
+						dev_s->put_frame_count);
 		}
 	}
 	return ret;
 }
 
 static ssize_t dump_rect_show(struct class *class,
-			      struct class_attribute *attr, char *buf)
+			struct class_attribute *attr, char *buf)
 {
 	int ret = 0;
 	int i = 0;
 	struct videosync_s *dev_s = NULL;
 
-	if (IS_ERR_OR_NULL(vp_dev))
+	if (vp_dev == NULL)
 		return -1;
 
-	if (vp_dev->active_dev_s_num == 0) {
+	if (vp_dev->active_dev_s_num == 0)
 		ret += sprintf(buf, "no active videosync\n");
-	} else {
+	else {
 		for (i = 0; i < VIDEOSYNC_S_COUNT; i++) {
 			dev_s = &vp_dev->video_prov[i];
 			if (dev_s->active_state == VIDEOSYNC_INACTIVE)
 				continue;
 
 			ret += sprintf(buf + ret,
-				       "%s: ", dev_s->vf_receiver_name);
+					   "%s:  ", dev_s->vf_receiver_name);
 			ret += sprintf(buf + ret,
-				       "rect = [%d,%d,%d,%d], ",
-				       dev_s->rect.left,
-				       dev_s->rect.top,
-				       dev_s->rect.width,
-				       dev_s->rect.height);
+						"rect = [%d,%d,%d,%d], ",
+						dev_s->rect.left,
+						dev_s->rect.top,
+						dev_s->rect.width,
+						dev_s->rect.height);
 			ret += sprintf(buf + ret,
-				       "zorder = %d\n", dev_s->zorder);
+						"zorder = %d\n", dev_s->zorder);
 		}
 	}
 	return ret;
 }
 
-static ssize_t audio_mode_show(struct class *cla,
-			       struct class_attribute *attr, char *buf)
-{
-	return snprintf(buf, 80,
-			"current async_mode is %d\n",
-			async_mode);
-}
-
-static ssize_t audio_mode_store(struct class *cla,
-				struct class_attribute *attr,
-				const char *buf, size_t count)
-{
-	long tmp;
-	int ret;
-
-	ret = kstrtol(buf, 0, &tmp);
-	if (ret != 0) {
-		pr_info("ERROR converting %s to long int!\n", buf);
-		return ret;
-	}
-	async_mode = tmp;
-	return count;
-}
-
-static ssize_t not_rendor_show(struct class *cla,
-			       struct class_attribute *attr, char *buf)
-{
-	return snprintf(buf, 80,
-			"current no_render is %d\n",
-			no_render);
-}
-
-static ssize_t not_rendor_store(struct class *cla,
-				struct class_attribute *attr,
-				const char *buf, size_t count)
-{
-	long tmp;
-	int ret;
-
-	ret = kstrtol(buf, 0, &tmp);
-	if (ret != 0) {
-		pr_info("ERROR converting %s to long int!\n", buf);
-		return ret;
-	}
-	no_render = tmp;
-	return count;
-}
-
-static ssize_t current_omx_index_show(struct class *cla,
-				      struct class_attribute *attr, char *buf)
-{
-	return snprintf(buf, 80,
-			"current cur_omx_index is %d\n",
-			cur_omx_index);
-}
-
-static ssize_t current_omx_index_store(struct class *cla,
-				       struct class_attribute *attr,
-				       const char *buf, size_t count)
-{
-	long tmp;
-	int ret;
-
-	ret = kstrtol(buf, 0, &tmp);
-	if (ret != 0) {
-		pr_info("ERROR converting %s to long int!\n", buf);
-		return ret;
-	}
-	cur_omx_index = tmp;
-	return count;
-}
-
-static ssize_t vpts_align_show(struct class *cla,
-			       struct class_attribute *attr, char *buf)
-{
-	return snprintf(buf, 80,
-			"current vsync_pts_align is %d\n",
-			vsync_pts_align);
-}
-
-static ssize_t vpts_align_store(struct class *cla,
-				struct class_attribute *attr,
-				const char *buf, size_t count)
-{
-	long tmp;
-	int ret;
-
-	ret = kstrtol(buf, 0, &tmp);
-	if (ret != 0) {
-		pr_info("ERROR converting %s to long int!\n", buf);
-		return ret;
-	}
-	vsync_pts_align = tmp;
-	return count;
-}
-
-static ssize_t first_frame_nosync_show(struct class *cla,
-				       struct class_attribute *attr, char *buf)
-{
-	return snprintf(buf, 80,
-			"current show_first_frame_nosync is %d\n",
-			show_first_frame_nosync);
-}
-
-static ssize_t first_frame_nosync_store(struct class *cla,
-					struct class_attribute *attr,
-					const char *buf, size_t count)
-{
-	long tmp;
-	int ret;
-
-	ret = kstrtol(buf, 0, &tmp);
-	if (ret != 0) {
-		pr_info("ERROR converting %s to long int!\n", buf);
-		return ret;
-	}
-	show_first_frame_nosync = tmp;
-	return count;
-}
-
-static ssize_t delata_time_show(struct class *cla,
-				struct class_attribute *attr, char *buf)
-{
-	return snprintf(buf, 80,
-			"current max_delata_time is %d\n",
-			max_delata_time);
-}
-
-static ssize_t delata_time_store(struct class *cla,
-				 struct class_attribute *attr,
-				 const char *buf, size_t count)
-{
-	long tmp;
-	int ret;
-
-	ret = kstrtol(buf, 0, &tmp);
-	if (ret != 0) {
-		pr_info("ERROR converting %s to long int!\n", buf);
-		return ret;
-	}
-	max_delata_time = tmp;
-	return count;
-}
-
-static ssize_t no_sync_show(struct class *cla,
-			    struct class_attribute *attr, char *buf)
-{
-	return snprintf(buf, 80,
-			"current show_nosync is %d\n",
-			show_nosync);
-}
-
-static ssize_t no_sync_store(struct class *cla,
-			     struct class_attribute *attr,
-			     const char *buf, size_t count)
-{
-	long tmp;
-	int ret;
-
-	ret = kstrtol(buf, 0, &tmp);
-	if (ret != 0) {
-		pr_info("ERROR converting %s to long int!\n", buf);
-		return ret;
-	}
-	show_nosync = tmp;
-	return count;
-}
-
-static ssize_t is_smooth_sync_enable_show(struct class *cla,
-					  struct class_attribute *attr,
-					  char *buf)
-{
-	return snprintf(buf, 80,
-			"current smooth_sync_enable is %d\n",
-			smooth_sync_enable);
-}
-
-static ssize_t is_smooth_sync_enable_store(struct class *cla,
-					   struct class_attribute *attr,
-					   const char *buf, size_t count)
-{
-	long tmp;
-	int ret;
-
-	ret = kstrtol(buf, 0, &tmp);
-	if (ret != 0) {
-		pr_info("ERROR converting %s to long int!\n", buf);
-		return ret;
-	}
-	smooth_sync_enable = tmp;
-	return count;
-}
-
-static ssize_t vp_debug_show(struct class *cla,
-			     struct class_attribute *attr,
-			     char *buf)
-{
-	return snprintf(buf, 80,
-			"current vp_debug_flag is %d\n",
-			vp_debug_flag);
-}
-
-static ssize_t vp_debug_store(struct class *cla,
-			      struct class_attribute *attr,
-			      const char *buf, size_t count)
-{
-	long tmp;
-	int ret;
-
-	ret = kstrtol(buf, 0, &tmp);
-	if (ret != 0) {
-		pr_info("ERROR converting %s to long int!\n", buf);
-		return ret;
-	}
-	vp_debug_flag = tmp;
-	return count;
-}
-
-static ssize_t gcd_duration_show(struct class *cla,
-				 struct class_attribute *attr,
-				 char *buf)
-{
-	return snprintf(buf, 80,
-			"current duration_gcd is %d\n",
-			duration_gcd);
-}
-
-static ssize_t gcd_duration_store(struct class *cla,
-				  struct class_attribute *attr,
-				  const char *buf, size_t count)
-{
-	long tmp;
-	int ret;
-
-	ret = kstrtol(buf, 0, &tmp);
-	if (ret != 0) {
-		pr_info("ERROR converting %s to long int!\n", buf);
-		return ret;
-	}
-	duration_gcd = tmp;
-	return count;
-}
-
-static ssize_t pts_enforce_pull_down_show(struct class *cla,
-					  struct class_attribute *attr,
-					  char *buf)
-{
-	return snprintf(buf, 80,
-			"current pts_enforce_pulldown is %d\n",
-			pts_enforce_pulldown);
-}
-
-static ssize_t pts_enforce_pull_down_store(struct class *cla,
-					   struct class_attribute *attr,
-					   const char *buf, size_t count)
-{
-	long tmp;
-	int ret;
-
-	ret = kstrtol(buf, 0, &tmp);
-	if (ret != 0) {
-		pr_info("ERROR converting %s to long int!\n", buf);
-		return ret;
-	}
-	pts_enforce_pulldown = tmp;
-	return count;
-}
-
-static CLASS_ATTR_RO(dump_queue_state);
-static CLASS_ATTR_RO(dump_pts);
-static CLASS_ATTR_RO(dump_get_put_framecount);
-static CLASS_ATTR_RO(dump_rect);
-static CLASS_ATTR_RW(audio_mode);
-static CLASS_ATTR_RW(not_rendor);
-static CLASS_ATTR_RW(current_omx_index);
-static CLASS_ATTR_RW(vpts_align);
-static CLASS_ATTR_RW(first_frame_nosync);
-static CLASS_ATTR_RW(delata_time);
-static CLASS_ATTR_RW(no_sync);
-static CLASS_ATTR_RW(is_smooth_sync_enable);
-static CLASS_ATTR_RW(vp_debug);
-static CLASS_ATTR_RW(gcd_duration);
-static CLASS_ATTR_RW(pts_enforce_pull_down);
-
-static struct attribute *videosync_class_attrs[] = {
-	&class_attr_dump_queue_state.attr,
-	&class_attr_dump_pts.attr,
-	&class_attr_dump_get_put_framecount.attr,
-	&class_attr_dump_rect.attr,
-	&class_attr_audio_mode.attr,
-	&class_attr_not_rendor.attr,
-	&class_attr_current_omx_index.attr,
-	&class_attr_vpts_align.attr,
-	&class_attr_first_frame_nosync.attr,
-	&class_attr_delata_time.attr,
-	&class_attr_no_sync.attr,
-	&class_attr_is_smooth_sync_enable.attr,
-	&class_attr_vp_debug.attr,
-	&class_attr_gcd_duration.attr,
-	&class_attr_pts_enforce_pull_down.attr,
-	NULL
+static struct class_attribute videosync_class_attrs[] = {
+	__ATTR_RO(dump_queue_state),
+	__ATTR_RO(dump_pts),
+	__ATTR_RO(dump_get_put_framecount),
+	__ATTR_RO(dump_rect),
+	__ATTR_NULL
 };
-
-ATTRIBUTE_GROUPS(videosync_class);
-
 static struct class videosync_class = {
 	.name = "videosync",
-	.class_groups = videosync_class_groups,
+	.class_attrs = videosync_class_attrs,
 };
+
 
 int videosync_assign_map(char **receiver_name, int *inst)
 {
@@ -976,7 +675,7 @@ int videosync_assign_map(char **receiver_name, int *inst)
 		dev_s = &vp_dev->video_prov[i];
 		if (dev_s->inst == *inst) {
 			*receiver_name = dev_s->vf_receiver_name;
-			pr_info("videosync assign map %s %p\n",
+			pr_info("videosync_assign_map %s %p\n",
 				dev_s->vf_receiver_name, dev_s);
 			mutex_unlock(&vp_dev->vp_mutex);
 			return 0;
@@ -994,10 +693,10 @@ int videosync_alloc_map(int *inst)
 	mutex_lock(&vp_dev->vp_mutex);
 	for (i = 0; i < VIDEOSYNC_S_COUNT; i++) {
 		dev_s = &vp_dev->video_prov[i];
-		if (dev_s->inst >= 0  && !dev_s->mapped) {
+		if (dev_s->inst >= 0  && (!dev_s->mapped)) {
 			dev_s->mapped = true;
 			*inst = dev_s->inst;
-			pr_info("%s %d OK\n", __func__, dev_s->inst);
+			pr_info("videosync_alloc_map %d OK\n", dev_s->inst);
 			mutex_unlock(&vp_dev->vp_mutex);
 			return 0;
 		}
@@ -1008,21 +707,21 @@ int videosync_alloc_map(int *inst)
 
 void videosync_release_map(int inst)
 {
+
 	int i = 0;
 	struct videosync_s *dev_s  = NULL;
 
 	mutex_lock(&vp_dev->vp_mutex);
 	for (i = 0; i < VIDEOSYNC_S_COUNT; i++) {
 		dev_s = &vp_dev->video_prov[i];
-		if (dev_s->inst == inst  && dev_s->mapped) {
+		if (dev_s->inst == inst  && (dev_s->mapped)) {
 			dev_s->mapped = false;
-			pr_info("videosync release map %d OK\n", inst);
+			pr_info("videosync_release_map %d OK\n", inst);
 			break;
 		}
 	}
 	mutex_unlock(&vp_dev->vp_mutex);
 }
-
 void videosync_release_map_force(struct videosync_priv_s *priv)
 {
 	int i = 0;
@@ -1031,9 +730,9 @@ void videosync_release_map_force(struct videosync_priv_s *priv)
 	mutex_lock(&vp_dev->vp_mutex);
 	for (i = 0; i < VIDEOSYNC_S_COUNT; i++) {
 		dev_s = &vp_dev->video_prov[i];
-		if (dev_s->inst == priv->vp_id && dev_s->mapped) {
+		if (dev_s->inst == priv->vp_id && (dev_s->mapped)) {
 			dev_s->mapped = false;
-			pr_info("videosync release map force %d OK\n",
+			pr_info("videosync_release_map_force %d OK\n",
 				priv->vp_id);
 			break;
 		}
@@ -1045,15 +744,15 @@ static int videosync_open(struct inode *inode, struct file *file)
 {
 	struct videosync_priv_s *priv = NULL;
 
-	pr_info("videosync open\n");
-	priv = kzalloc(sizeof(*priv), GFP_KERNEL);
-	if (!priv)
-		return -ENOMEM;
-
-	priv->vp_id = -1;
-	priv->dev_s = NULL;
-	file->private_data = priv;
-
+	pr_info("videosync_open\n");
+	priv = kzalloc(sizeof(struct videosync_priv_s), GFP_KERNEL);
+	if (priv == NULL) {
+		pr_err("kzalloc videosync_priv_s failed!");
+	} else {
+		priv->vp_id = -1;
+		priv->dev_s = NULL;
+		file->private_data = priv;
+	}
 	return 0;
 }
 
@@ -1061,7 +760,7 @@ static int videosync_release(struct inode *inode, struct file *file)
 {
 	struct videosync_priv_s *priv = NULL;
 
-	pr_info("videosync release\n");
+	pr_info("videosync_release\n");
 	if (file && file->private_data) {
 		priv = file->private_data;
 
@@ -1072,6 +771,7 @@ static int videosync_release(struct inode *inode, struct file *file)
 		priv = NULL;
 		file->private_data = NULL;
 	}
+
 	return 0;
 }
 
@@ -1092,11 +792,12 @@ static int set_omx_pts(u32 *p)
 	if (dev_id < VIDEOSYNC_S_COUNT)
 		dev_s = &vp_dev->video_prov[dev_id];
 
-	if (!IS_ERR_OR_NULL(dev_s) && dev_s->mapped) {
+	if (dev_s != NULL && dev_s->mapped) {
 		mutex_lock(&dev_s->omx_mutex);
 		vp_print(dev_s->vf_receiver_name, PRINT_TIMESTAMP,
-			 "set omx_pts %d, hwc %d, not_reset %d, vf_num %d\n",
-			 tmp_pts, set_from_hwc, not_reset, frame_num);
+			"set omx_pts %u, hwc %d, not_reset %d, frame_num=%u\n",
+			tmp_pts, set_from_hwc, not_reset, frame_num);
+
 		if (dev_s->omx_check_previous_session) {
 			if (session != dev_s->omx_cur_session) {
 				dev_s->omx_cur_session = session;
@@ -1121,11 +822,12 @@ static int set_omx_pts(u32 *p)
 	} else {
 		ret = -EFAULT;
 		pr_err("[%s]cannot find dev_id %d device\n",
-		       dev_s->vf_receiver_name, dev_id);
+			dev_s->vf_receiver_name, dev_id);
 	}
-	return ret;
-}
 
+	return ret;
+
+}
 static int set_omx_zorder(u32 *p)
 {
 	struct videosync_s *dev_s = NULL;
@@ -1136,7 +838,7 @@ static int set_omx_zorder(u32 *p)
 	if (dev_id < VIDEOSYNC_S_COUNT)
 		dev_s = &vp_dev->video_prov[dev_id];
 
-	if (!IS_ERR_OR_NULL(dev_s) && dev_s->mapped) {
+	if (dev_s != NULL && dev_s->mapped) {
 		dev_s->zorder = p[0];
 		dev_s->rect.left = p[1];
 		dev_s->rect.top = p[2];
@@ -1144,14 +846,17 @@ static int set_omx_zorder(u32 *p)
 		dev_s->rect.height = p[4];
 
 		vp_print(dev_s->vf_receiver_name, PRINT_TIMESTAMP,
-			 "set zorder %d: %d %d %d %d\n",
-			 p[0], p[1], p[2], p[3], p[4]);
+			"set zorder %d: %d %d %d %d\n",
+			p[0], p[1], p[2], p[3], p[4]);
+
 	} else {
 		ret = -EFAULT;
 		pr_err("[%s]cannot find dev_id %d device\n",
-		       dev_s->vf_receiver_name, dev_id);
+			dev_s->vf_receiver_name, dev_id);
 	}
+
 	return ret;
+
 }
 
 static long videosync_ioctl(struct file *file,
@@ -1190,9 +895,9 @@ static long videosync_ioctl(struct file *file,
 	break;
 
 	case VIDEOSYNC_IOC_SET_FREERUN_MODE:
-		if (arg > FREERUN_DUR) {
+		if (arg > FREERUN_DUR)
 			ret = -EFAULT;
-		} else {
+		else {
 			if (file && file->private_data) {
 				priv = file->private_data;
 				if (priv && priv->dev_s)
@@ -1210,18 +915,20 @@ static long videosync_ioctl(struct file *file,
 			priv = file->private_data;
 			if (priv && priv->dev_s)
 				put_user(priv->dev_s->freerun_mode,
-					 (u32 __user *)argp);
+					(u32 __user *)argp);
 			else
 				ret = -EFAULT;
-		} else {
+
+		} else
 			ret = -EFAULT;
-		}
+
 	break;
 	case VIDEOSYNC_IOC_SET_OMX_VPTS:{
 		u32 pts[7];
 
 		if (copy_from_user(pts, argp, sizeof(pts)) == 0)
 			ret = set_omx_pts(pts);
+
 	}
 	break;
 	case VIDEOSYNC_IOC_SET_OMX_ZORDER:{
@@ -1229,6 +936,7 @@ static long videosync_ioctl(struct file *file,
 
 		if (copy_from_user(zorder, argp, sizeof(zorder)) == 0)
 			ret = set_omx_zorder(zorder);
+
 	}
 	break;
 	case VIDEOSYNC_IOC_GET_OMX_VPTS:
@@ -1236,7 +944,7 @@ static long videosync_ioctl(struct file *file,
 			priv = file->private_data;
 			if (priv && priv->dev_s)
 				put_user(priv->dev_s->omx_pts,
-					 (u32 __user *)argp);
+					(u32 __user *)argp);
 			else
 				ret = -EFAULT;
 		} else {
@@ -1265,6 +973,88 @@ static long videosync_ioctl(struct file *file,
 		}
 	}
 	break;
+	case VIDEOSYNC_IOC_SET_VPAUSE: {
+		u32 info[2];
+		struct videosync_s *dev_s = NULL;
+		u32 dev_id;
+
+		if (copy_from_user(info, argp, sizeof(info)) == 0) {
+			dev_id = info[0];
+			if (dev_id < VIDEOSYNC_S_COUNT)
+				dev_s = &vp_dev->video_prov[dev_id];
+
+			if (dev_s && dev_s->mapped) {
+				pr_info("set vpause:%d\n", info[1]);
+				ts_pcrscr_enable(dev_s, !info[1]);
+				if (!info[1]) {
+					dev_s->video_started = 1;
+					if (dev_s->first_frame_queued)
+						ts_pcrscr_set(dev_s,
+						dev_s->first_frame_vpts);
+				} else {
+					dev_s->video_started = 0;
+				}
+			}
+		}
+	}
+	break;
+	case VIDEOSYNC_IOC_SET_VMASTER: {
+		u32 info[2];
+		struct videosync_s *dev_s = NULL;
+		u32 dev_id;
+
+		if (copy_from_user(info, argp, sizeof(info)) == 0) {
+			dev_id = info[0];
+			if (dev_id < VIDEOSYNC_S_COUNT)
+				dev_s = &vp_dev->video_prov[dev_id];
+
+			if (dev_s && dev_s->mapped) {
+				pr_info("set vmaster:%d\n", info[1]);
+				dev_s->vmaster_mode = info[1];
+			}
+		}
+	}
+	break;
+	case VIDEOSYNC_IOC_GET_VPTS: {
+		u32 info[2];
+		struct videosync_s *dev_s = NULL;
+		u32 dev_id;
+
+		if (copy_from_user(info, argp, sizeof(info)) == 0) {
+			dev_id = info[0];
+			if (dev_id < VIDEOSYNC_S_COUNT)
+				dev_s = &vp_dev->video_prov[dev_id];
+
+			if (dev_s && dev_s->mapped) {
+				info[1] = dev_s->get_vpts;
+				if (copy_to_user(argp, &info[0],
+					sizeof(info)) != 0)
+					ret = -EFAULT;
+			} else
+			ret = -EFAULT;
+		}
+	}
+	break;
+	case VIDEOSYNC_IOC_GET_PCRSCR: {
+		u32 info[2];
+		struct videosync_s *dev_s = NULL;
+		u32 dev_id;
+
+		if (copy_from_user(info, argp, sizeof(info)) == 0) {
+			dev_id = info[0];
+			if (dev_id < VIDEOSYNC_S_COUNT)
+				dev_s = &vp_dev->video_prov[dev_id];
+
+			if (dev_s && dev_s->mapped) {
+				info[1] = ts_pcrscr_get(dev_s);
+				if (copy_to_user(argp, &info[0],
+					sizeof(info)) != 0)
+					ret = -EFAULT;
+			} else
+			ret = -EFAULT;
+		}
+	}
+	break;
 	default:
 		pr_info("ioctl invalid cmd 0x%x\n", cmd);
 		return -EINVAL;
@@ -1274,8 +1064,8 @@ static long videosync_ioctl(struct file *file,
 
 #ifdef CONFIG_COMPAT
 static long videosync_compat_ioctl(struct file *file,
-				   unsigned int cmd,
-				   ulong arg)
+				unsigned int cmd,
+				ulong arg)
 {
 	long ret = 0;
 
@@ -1289,16 +1079,14 @@ static void clear_queued_queue(struct videosync_s *dev_s)
 	struct vframe_s *vf = NULL;
 
 	vp_print(dev_s->vf_receiver_name, PRINT_QUEUE_STATUS,
-		 "clear queued queue: size %d!\n",
-		 vfq_level(&dev_s->queued_q));
+		"clear_queued_queue: size %d!\n", vfq_level(&dev_s->queued_q));
 
 	vf = vfq_pop(&dev_s->queued_q);
 	while (vf) {
-#ifdef CONFIG_AMLOGIC_MEDIA_VFM
 		vf_put(vf, dev_s->vf_receiver_name);
-#endif
 		vf = vfq_pop(&dev_s->queued_q);
 	}
+
 }
 
 static void clear_ready_queue(struct videosync_s *dev_s)
@@ -1306,13 +1094,11 @@ static void clear_ready_queue(struct videosync_s *dev_s)
 	struct vframe_s *vf = NULL;
 
 	vp_print(dev_s->vf_receiver_name, PRINT_QUEUE_STATUS,
-		 "clear ready queue: size %d!\n",
-		 vfq_level(&dev_s->ready_q));
+		"clear_ready_queue: size %d!\n",
+		vfq_level(&dev_s->ready_q));
 	vf = vfq_pop(&dev_s->ready_q);
 	while (vf) {
-#ifdef CONFIG_AMLOGIC_MEDIA_VFM
 		vf_put(vf, dev_s->vf_receiver_name);
-#endif
 		vf = vfq_pop(&dev_s->ready_q);
 	}
 }
@@ -1326,18 +1112,17 @@ static u64 func_div(u64 number, u32 divid)
 }
 
 static inline bool omx_vpts_expire(struct vframe_s *cur_vf,
-				   struct vframe_s *next_vf,
-				   struct videosync_s *dev_s,
-				   int toggled_cnt)
+			       struct vframe_s *next_vf,
+			       struct videosync_s *dev_s,
+			       int toggled_cnt)
+
 {
 	u32 pts;
 #ifdef VIDEO_PTS_CHASE
 	u32 vid_pts, scr_pts;
 #endif
 	u32 systime;
-#ifdef DDD
 	u32 adjust_pts, org_vpts;
-#endif
 	unsigned long delta = 0;
 	int delta_32 = 0;
 	/*u32 dur_pts = 0;*/
@@ -1354,7 +1139,8 @@ static inline bool omx_vpts_expire(struct vframe_s *cur_vf,
 	if (next_vf->duration == 0)
 		return true;
 
-	if (dev_s->show_first_frame_nosync || show_first_frame_nosync) {
+	if (dev_s->show_first_frame_nosync
+		|| show_first_frame_nosync) {
 		if (next_vf->omx_index == 0)
 			return true;
 	}
@@ -1366,39 +1152,44 @@ static inline bool omx_vpts_expire(struct vframe_s *cur_vf,
 	vp_print(dev_s->vf_receiver_name, PRINT_TIMESTAMP,
 		"sys_time=%u, vf->pts=%u, diff=%d, index=%d\n",
 		systime, pts, (int)(systime - pts), next_vf->omx_index);
+
+	if (0) {
+		pts =
+		    timestamp_vpts_get() +
+		    (cur_vf ? DUR2PTS(cur_vf->duration) : 0);
+	}
 	/* check video PTS discontinuity */
-	if (ts_pcrscr_enable_state(dev_s) > 0 &&
-	    enable_video_discontinue_report &&
-	    dev_s->first_frame_toggled &&
-#ifdef CONFIG_AMLOGIC_MEDIA_FRAME_SYNC
-	    (abs(systime - pts) > tsync_vpts_discontinuity_margin()) &&
-#endif
-	    ((next_vf->flag & VFRAME_FLAG_NO_DISCONTINUE) == 0 ||
-#ifdef CONFIG_AMLOGIC_MEDIA_FRAME_SYNC
-	    tsync_vpts_discontinuity_margin() <= 90000)) {
-#else
-	    0)) {
-#endif
+	else if (ts_pcrscr_enable_state(dev_s) > 0 &&
+		 (enable_video_discontinue_report) &&
+		 (dev_s->first_frame_toggled) &&
+		 (abs(systime - pts) > tsync_vpts_discontinuity_margin()) &&
+		 ((next_vf->flag & VFRAME_FLAG_NO_DISCONTINUE) == 0
+		 || tsync_vpts_discontinuity_margin() <= 90000)) {
+
 		vp_print(dev_s->vf_receiver_name, PRINT_TIMESTAMP,
-			 "discontinue, systime = %d, next_vf->pts = %d\n",
-			 systime, next_vf->pts);
+			"discontinue, systime = %u, next_vf->pts = %u\n",
+			systime, next_vf->pts);
 		return true;
-	} else if ((dev_s->omx_pts + omx_pts_interval_upper < next_vf->pts) &&
-		   dev_s->omx_pts_set_index >= next_vf->omx_index) {
-		pr_info("videosync, omx_pts=%d omx_pts_set_index=%d pts=%d omx_index=%d\n",
-			dev_s->omx_pts,
-			dev_s->omx_pts_set_index,
-			next_vf->pts,
-			next_vf->omx_index);
+	} else if ((!dev_s->vmaster_mode)
+			&& (dev_s->omx_pts + omx_pts_interval_upper
+			< next_vf->pts)
+			&& (dev_s->omx_pts_set_index >= next_vf->omx_index)) {
+		pr_info("videosync, omx_pts=%d omx_pts_set_index=%d pts=%d omx_index=%d pcr=%d\n",
+					dev_s->omx_pts,
+					dev_s->omx_pts_set_index,
+					next_vf->pts,
+					next_vf->omx_index,
+					ts_pcrscr_get(dev_s));
 		return true;
 	}
-#ifdef DDD
+
 	if (0/*smooth_sync_enable*/) {
 		org_vpts = timestamp_vpts_get();
-		if (abs(org_vpts + vsync_pts_inc - systime) <
-		    M_PTS_SMOOTH_MAX &&
-		    abs(org_vpts + vsync_pts_inc - systime) >
-			M_PTS_SMOOTH_MIN) {
+		if ((abs(org_vpts + vsync_pts_inc - systime) <
+			M_PTS_SMOOTH_MAX)
+		    && (abs(org_vpts + vsync_pts_inc - systime) >
+			M_PTS_SMOOTH_MIN)) {
+
 			if (!dev_s->video_frame_repeat_count) {
 				dev_s->vpts_ref = org_vpts;
 				dev_s->video_frame_repeat_count++;
@@ -1411,10 +1202,11 @@ static inline bool omx_vpts_expire(struct vframe_s *cur_vf,
 				    dev_s->video_frame_repeat_count;
 			} else {
 				adjust_pts =
-					dev_s->vpts_ref
-					+ (vsync_pts_inc + M_PTS_SMOOTH_ADJUST)
-					* dev_s->video_frame_repeat_count;
+				    dev_s->vpts_ref + (vsync_pts_inc +
+						M_PTS_SMOOTH_ADJUST) *
+				    dev_s->video_frame_repeat_count;
 			}
+
 			return (int)(adjust_pts - pts) >= 0;
 		}
 
@@ -1423,18 +1215,18 @@ static inline bool omx_vpts_expire(struct vframe_s *cur_vf,
 			dev_s->video_frame_repeat_count = 0;
 		}
 	}
-#endif
 	delta = func_div(sched_clock() - dev_s->time_update, 1000);
 	delta_32 = delta * 90 / 1000;
 	if (delta_32 > max_delata_time)
 		max_delata_time = delta_32;
 
-	expired = (systime + vsync_pts_align) >= pts;
+	expired = (int)(systime + vsync_pts_align - pts) >= 0;
+
 	vp_print(dev_s->vf_receiver_name, PRINT_PATTERN,
 		 "expired=%d, valid=%d, next_pts=%d, cnt=%d, systime=%d, inc=%d\n",
 		 expired,
 		 next_vf->next_vf_pts_valid,
-		 next_vf->next_vf_pts,
+		 next_vf->pts,
 		 toggled_cnt,
 		 systime,
 		 vsync_pts_inc);
@@ -1442,7 +1234,7 @@ static inline bool omx_vpts_expire(struct vframe_s *cur_vf,
 	if (expired && next_vf->next_vf_pts_valid &&
 	    pts_enforce_pulldown &&
 	    next_vf->next_vf_pts &&
-	    toggled_cnt > 0 &&
+	    (toggled_cnt > 0) &&
 	    ((int)(systime + vsync_pts_inc +
 	    vsync_pts_align - next_vf->next_vf_pts) < 0)) {
 		expired = false;
@@ -1462,6 +1254,7 @@ static inline bool omx_vpts_expire(struct vframe_s *cur_vf,
 	if (pts_enforce_pulldown)
 		vpts_perform_pulldown(dev_s, next_vf, &expired);
 	return expired;
+
 }
 
 void videosync_sync(struct videosync_s *dev_s)
@@ -1478,8 +1271,9 @@ void videosync_sync(struct videosync_s *dev_s)
 	vf = vfq_peek(&dev_s->queued_q);
 
 	while (vf) {
-		if (omx_vpts_expire(dev_s->cur_dispbuf,
-				    vf, dev_s, expire_count) || show_nosync) {
+		if (omx_vpts_expire(dev_s->cur_dispbuf, vf, dev_s, expire_count)
+			|| show_nosync) {
+
 			vf = vfq_pop(&dev_s->queued_q);
 			if (vf) {
 				if (async_mode)	{
@@ -1499,18 +1293,18 @@ void videosync_sync(struct videosync_s *dev_s)
 				vfq_push(&dev_s->ready_q, vf);
 				ready_q_size = vfq_level(&dev_s->ready_q);
 				vp_print(dev_s->vf_receiver_name,
-					 PRINT_QUEUE_STATUS,
-					 "add pts %u index 0x%x to ready_q, size %d\n",
-					 vf->pts, vf->index, ready_q_size);
-#ifdef CONFIG_AMLOGIC_MEDIA_VFM
-			vf_notify_receiver(dev_s->vf_provider_name,
-					   VFRAME_EVENT_PROVIDER_VFRAME_READY,
-					   NULL);
-#endif
+					PRINT_QUEUE_STATUS,
+					"add pts %u index 0x%x to ready_q, size %d\n",
+					vf->pts, vf->index, ready_q_size);
+
+				vf_notify_receiver(
+					dev_s->vf_provider_name,
+					VFRAME_EVENT_PROVIDER_VFRAME_READY,
+					NULL);
 				if (ready_q_size > VIDEOSYNC_S_POOL_SIZE - 1) {
 					vp_print(dev_s->vf_receiver_name,
-						 PRINT_QUEUE_STATUS,
-						 "ready_q full!\n");
+						PRINT_QUEUE_STATUS,
+						"ready_q full!\n");
 					break;
 				}
 			}
@@ -1522,15 +1316,15 @@ void videosync_sync(struct videosync_s *dev_s)
 			break;
 		}
 	}
+
 }
+
 
 static void prepare_queued_queue(struct videosync_dev *dev)
 {
 	int i = 0;
 	struct videosync_s *dev_s;
-#ifdef CONFIG_AMLOGIC_MEDIA_VFM
 	struct vframe_s *vf;
-#endif
 
 	for (i = 0; i < VIDEOSYNC_S_COUNT; i++) {
 		dev_s = &dev->video_prov[i];
@@ -1542,23 +1336,31 @@ static void prepare_queued_queue(struct videosync_dev *dev)
 				dev_s->vf_receiver_name);
 			continue;
 		}
-#ifdef CONFIG_AMLOGIC_MEDIA_VFM
+
 		while (vf_peek(dev_s->vf_receiver_name)) {
 			vf = vf_get(dev_s->vf_receiver_name);
 			if (vf) {
+				if (!dev_s->first_frame_queued) {
+					dev_s->first_frame_queued = 1;
+					dev_s->first_frame_vpts = vf->pts;
+					if (dev_s->video_started) {
+						ts_pcrscr_set(dev_s,
+						dev_s->first_frame_vpts);
+					}
+				}
 				vfq_push(&dev_s->queued_q, vf);
 				dev_s->get_frame_count++;
 				vp_print(dev_s->vf_receiver_name,
-					 PRINT_QUEUE_STATUS,
-					 "add pts %u index 0x%x to queued_q, size %d\n",
-					 vf->pts, vf->index,
-					 vfq_level(&dev_s->queued_q));
+					PRINT_QUEUE_STATUS,
+					"add pts %u index 0x%x to queued_q, size %d\n",
+					vf->pts,
+					vf->index,
+					vfq_level(&dev_s->queued_q));
 			}
 		}
-#endif
 	}
-}
 
+}
 static void prepare_ready_queue(struct videosync_dev *dev)
 {
 	int i = 0;
@@ -1578,7 +1380,9 @@ static void prepare_ready_queue(struct videosync_dev *dev)
 
 		if (no_render)
 			clear_ready_queue(dev_s);/*just for debug, not render*/
+
 	}
+
 }
 
 static void reinit_dev_s(struct videosync_s *dev_s)
@@ -1599,9 +1403,8 @@ static void reinit_dev_s(struct videosync_s *dev_s)
 	dev_s->rect.height = 0;
 	dev_s->zorder = 0;
 }
-
 static int videosync_receiver_event_fun(int type, void *data,
-					void *private_data)
+	void *private_data)
 {
 	struct videosync_s *dev_s = (struct videosync_s *)private_data;
 	unsigned long flags = 0;
@@ -1624,12 +1427,12 @@ static int videosync_receiver_event_fun(int type, void *data,
 			dev_s->active_state = VIDEOSYNC_INACTIVE_REQ;
 			dev->wakeup = 1;
 			wake_up_interruptible(&dev->videosync_wait);
-			time_left =
-			wait_for_completion_timeout(&dev_s->inactive_done,
-						    msecs_to_jiffies(100));
+			time_left = wait_for_completion_timeout(
+				&dev_s->inactive_done,
+				msecs_to_jiffies(100));
 			if (time_left == 0)
 				vp_print(RECEIVER_NAME, PRINT_OTHER,
-					 "videosync: unreg timeout\n");
+					"videosync: unreg timeout\n");
 		}
 		clear_ready_queue(dev_s);
 		clear_queued_queue(dev_s);
@@ -1647,15 +1450,16 @@ static int videosync_receiver_event_fun(int type, void *data,
 		dev_s->active_state = VIDEOSYNC_ACTIVE;
 		dev_s->omx_check_previous_session = true;
 		dev_s->omx_pts_set_index = 0;
+		dev_s->mapped = true;
 
 		spin_lock_irqsave(&dev->dev_s_num_slock, flags);
 		++dev->active_dev_s_num;
 		spin_unlock_irqrestore(&dev->dev_s_num_slock, flags);
 
 		vfq_init(&dev_s->queued_q, VIDEOSYNC_S_POOL_SIZE + 1,
-			 &dev_s->videosync_pool_queued[0]);
+				&dev_s->videosync_pool_queued[0]);
 		vfq_init(&dev_s->ready_q, VIDEOSYNC_S_POOL_SIZE + 1,
-			 &dev_s->videosync_pool_ready[0]);
+				&dev_s->videosync_pool_ready[0]);
 
 		init_completion(&dev_s->inactive_done);
 		complete(&dev->thread_active);
@@ -1665,7 +1469,12 @@ static int videosync_receiver_event_fun(int type, void *data,
 		pts_pattern_detected = -1;
 		pre_pts_trace = 0;
 		pts_escape_vsync = 0;
+		dev_s->first_frame_queued = 0;
+		dev_s->first_frame_vpts = 0;
+		dev_s->vmaster_mode = 0;
+		dev_s->video_started = 0;
 	} else if (type == VFRAME_EVENT_PROVIDER_VFRAME_READY) {
+
 	} else if (type == VFRAME_EVENT_PROVIDER_START) {
 		videosync_register(dev_s);
 		pr_info("videosync: start %p, %s\n",
@@ -1676,18 +1485,22 @@ static int videosync_receiver_event_fun(int type, void *data,
 		videosync_buffer_states(&states, dev_s);
 		if (states.buf_queued_num + states.buf_ready_num > 0)
 			return RECEIVER_ACTIVE;
-		vp_print(dev_s->vf_receiver_name, 0,
-			 "buf queue empty!!\n");
-		if (vf_notify_receiver(dev_s->vf_provider_name,
-				       VFRAME_EVENT_PROVIDER_QUREY_STATE,
-				       NULL) == RECEIVER_ACTIVE)
-			return RECEIVER_ACTIVE;
-		return RECEIVER_INACTIVE;
+		else {
+			vp_print(dev_s->vf_receiver_name, 0,
+				"buf queue empty!!\n");
+			if (vf_notify_receiver(
+				dev_s->vf_provider_name,
+				VFRAME_EVENT_PROVIDER_QUREY_STATE,
+				NULL) == RECEIVER_ACTIVE)
+				return RECEIVER_ACTIVE;
+			return RECEIVER_INACTIVE;
+		}
 	}
 	return 0;
 }
 
 static const struct file_operations videosync_fops = {
+
 	.owner = THIS_MODULE,
 	.open = videosync_open,
 	.release = videosync_release,
@@ -1720,7 +1533,8 @@ static int __init videosync_create_instance(int inst)
 	dev_s->ops = &videosync_vf_provider;
 	dev_s->active_state = VIDEOSYNC_INACTIVE;
 	dev_s->omx_cur_session = 0xffffffff;
-	pr_info("%s dev_s %p,dev_s->dev %p\n", __func__, dev_s, dev_s->dev);
+	pr_info("videosync_create_instance dev_s %p,dev_s->dev %p\n",
+		dev_s, dev_s->dev);
 
 	/* initialize locks */
 	mutex_init(&dev_s->omx_mutex);
@@ -1730,30 +1544,30 @@ static int __init videosync_create_instance(int inst)
 	dev_s->index = inst;
 	dev_s->mapped = true;
 	snprintf(dev_s->vf_receiver_name, VIDEOSYNC_S_VF_RECEIVER_NAME_SIZE,
-		 RECEIVER_NAME ".%x", inst & 0xff);
+		RECEIVER_NAME ".%x", inst & 0xff);
 	snprintf(dev_s->vf_provider_name, VIDEOSYNC_S_VF_RECEIVER_NAME_SIZE,
-		 PROVIDER_NAME ".%x", inst & 0xff);
+		PROVIDER_NAME ".%x", inst & 0xff);
 
-	pr_info("videosync create instance reg %s\n",
+	pr_info("videosync_create_instance reg %s\n",
 		dev_s->vf_receiver_name);
-#ifdef CONFIG_AMLOGIC_MEDIA_VFM
+
 	vf_receiver_init(&dev_s->vp_vf_receiver,
-			 dev_s->vf_receiver_name,
-			 &videosync_vf_receiver, dev_s);
+			dev_s->vf_receiver_name,
+			&videosync_vf_receiver, dev_s);
 
 	vf_reg_receiver(&dev_s->vp_vf_receiver);
-#endif
+
 	return 0;
+
 }
 
-static void videosync_destroy_instance(int inst)
+static void __init videosync_destroy_instance(int inst)
 {
-	pr_info("videosync destroy instance %s\n",
+	pr_info("videosync_destroy_instance %s\n",
 		vp_dev->video_prov[inst].vf_receiver_name);
-#ifdef CONFIG_AMLOGIC_MEDIA_VFM
 	vf_unreg_receiver(&vp_dev->video_prov[inst].vp_vf_receiver);
-#endif
 }
+
 
 static void videosync_thread_tick(struct videosync_dev *dev)
 {
@@ -1778,7 +1592,7 @@ static void videosync_thread_tick(struct videosync_dev *dev)
 	}
 
 	vp_print(RECEIVER_NAME, PRINT_OTHER,
-		 "active num %d\n", dev->active_dev_s_num);
+		"active num %d\n", dev->active_dev_s_num);
 
 	spin_lock_irqsave(&dev->dev_s_num_slock, flags);
 	if (dev->active_dev_s_num > 0) {
@@ -1788,13 +1602,12 @@ static void videosync_thread_tick(struct videosync_dev *dev)
 	} else {
 		spin_unlock_irqrestore(&dev->dev_s_num_slock, flags);
 		vp_print(RECEIVER_NAME, PRINT_OTHER,
-			 "videosync: no active dev, thread go to sleep\n");
-		time_left =
-			wait_for_completion_timeout(&dev->thread_active,
-						    msecs_to_jiffies(500));
+			"videosync: no active dev, thread go to sleep\n");
+		time_left = wait_for_completion_timeout(&dev->thread_active,
+			msecs_to_jiffies(500));
 		if (time_left == 0)
 			vp_print(RECEIVER_NAME, PRINT_OTHER,
-				 "videosync: thread tick timeout\n");
+				"videosync: thread_tick timeout\n");
 	}
 }
 
@@ -1808,18 +1621,19 @@ static int videosync_thread(void *data)
 {
 	struct videosync_dev *dev = (struct videosync_dev *)data;
 
-	pr_info("videosync thread started\n");
+	pr_info("videosync_thread started\n");
 
 	set_freezable();
 
 	while (!kthread_should_stop())
 		videosync_sleep(dev);
 
-	pr_info("videosync thread exit\n");
+	pr_info("videosync_thread exit\n");
 	return 0;
 }
 
-int __init videosync_init(void)
+
+static int __init videosync_init(void)
 {
 	int ret = -1, i;
 	struct device *devp;
@@ -1834,10 +1648,10 @@ int __init videosync_init(void)
 	}
 
 	devp = device_create(&videosync_class,
-			     NULL,
-			     MKDEV(VIDEOSYNC_MAJOR, 0),
-			     NULL,
-			     VIDEOSYNC_DEVICE_NAME);
+				NULL,
+				MKDEV(VIDEOSYNC_MAJOR, 0),
+				NULL,
+				VIDEOSYNC_DEVICE_NAME);
 	if (IS_ERR(devp)) {
 		pr_err("failed to create videosync device node\n");
 		ret = PTR_ERR(devp);
@@ -1848,9 +1662,9 @@ int __init videosync_init(void)
 	if (!vp_dev)
 		return -ENOMEM;
 
-	vp_dev->video_prov = kcalloc(VIDEOSYNC_S_COUNT,
-				     sizeof(struct videosync_s),
-				     GFP_KERNEL);
+	vp_dev->video_prov = kzalloc(
+		VIDEOSYNC_S_COUNT * sizeof(struct videosync_s),
+		GFP_KERNEL);
 	if (!vp_dev->video_prov)
 		return -ENOMEM;
 
@@ -1861,7 +1675,7 @@ int __init videosync_init(void)
 		ret = videosync_create_instance(i);
 		if (ret) {
 			pr_err("videosync: error %d while create instance\n",
-			       ret);
+				ret);
 			goto error1;
 		}
 	}
@@ -1872,6 +1686,7 @@ int __init videosync_init(void)
 	vp_dev->kthread = kthread_run(videosync_thread, vp_dev, "videosync");
 	videosync_inited = true;
 	return ret;
+
 error1:
 	kfree(vp_dev);
 	vp_dev = NULL;
@@ -1880,7 +1695,7 @@ error1:
 	return ret;
 }
 
-void __exit videosync_exit(void)
+static void __exit videosync_exit(void)
 {
 	int i, ret;
 
@@ -1902,8 +1717,44 @@ void __exit videosync_exit(void)
 
 	kfree(vp_dev);
 	vp_dev = NULL;
+
 	device_destroy(&videosync_class, MKDEV(VIDEOSYNC_MAJOR, 0));
 	unregister_chrdev(VIDEOSYNC_MAJOR, VIDEOSYNC_DEVICE_NAME);
 	class_unregister(&videosync_class);
 }
 
+module_init(videosync_init);
+module_exit(videosync_exit);
+
+MODULE_PARM_DESC(smooth_sync_enable, "\n smooth_sync_enable\n");
+module_param(smooth_sync_enable, bool, 0664);
+
+MODULE_PARM_DESC(vp_debug_flag, "\n vp_debug_flag\n");
+module_param(vp_debug_flag, uint, 0664);
+
+MODULE_PARM_DESC(show_nosync, "\n show_nosync\n");
+module_param(show_nosync, bool, 0664);
+
+MODULE_PARM_DESC(no_render, "\n no_render\n");
+module_param(no_render, bool, 0664);
+
+MODULE_PARM_DESC(async_mode, "\n async_mode\n");
+module_param(async_mode, bool, 0664);
+
+MODULE_PARM_DESC(vsync_pts_align, "\n vsync_pts_align\n");
+module_param(vsync_pts_align, int, 0664);
+
+MODULE_PARM_DESC(cur_omx_index, "\n cur_omx_index\n");
+module_param(cur_omx_index, uint, 0664);
+
+MODULE_PARM_DESC(show_first_frame_nosync, "\n show_first_frame_nosync\n");
+module_param(show_first_frame_nosync, uint, 0664);
+
+MODULE_PARM_DESC(max_delata_time, "\n max_delata_time\n");
+module_param(max_delata_time, uint, 0664);
+
+MODULE_PARM_DESC(duration_gcd, "\n duration_gcd\n");
+module_param(duration_gcd, uint, 0664);
+
+module_param(pts_enforce_pulldown, bool, 0644);
+MODULE_PARM_DESC(pts_enforce_pulldown, "enforce video frame pulldown if needed");

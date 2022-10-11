@@ -1,4 +1,3 @@
-// SPDX-License-Identifier: GPL-2.0
 /*
  * linux/drivers/scsi/scsi_proc.c
  *
@@ -27,7 +26,7 @@
 #include <linux/seq_file.h>
 #include <linux/mutex.h>
 #include <linux/gfp.h>
-#include <linux/uaccess.h>
+#include <asm/uaccess.h>
 
 #include <scsi/scsi.h>
 #include <scsi/scsi_device.h>
@@ -372,10 +371,15 @@ static ssize_t proc_scsi_write(struct file *file, const char __user *buf,
 	return err;
 }
 
+static int always_match(struct device *dev, void *data)
+{
+	return 1;
+}
+
 static inline struct device *next_scsi_device(struct device *start)
 {
-	struct device *next = bus_find_next_device(&scsi_bus_type, start);
-
+	struct device *next = bus_find_device(&scsi_bus_type, start, NULL,
+					      always_match);
 	put_device(start);
 	return next;
 }

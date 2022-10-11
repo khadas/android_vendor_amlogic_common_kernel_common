@@ -1,8 +1,5 @@
-// SPDX-License-Identifier: GPL-2.0
-#include <linux/ftrace.h>
 #include <linux/init.h>
 #include <linux/slab.h>
-#include <linux/mm_types.h>
 
 #include <asm/bugs.h>
 #include <asm/cacheflush.h>
@@ -32,22 +29,12 @@ int cpu_suspend(unsigned long arg, int (*fn)(unsigned long))
 		return -EINVAL;
 
 	/*
-	 * Function graph tracer state gets incosistent when the kernel
-	 * calls functions that never return (aka suspend finishers) hence
-	 * disable graph tracing during their execution.
-	 */
-	pause_graph_tracing();
-
-	/*
 	 * Provide a temporary page table with an identity mapping for
 	 * the MMU-enable code, required for resuming.  On successful
 	 * resume (indicated by a zero return code), we need to switch
 	 * back to the correct page tables.
 	 */
 	ret = __cpu_suspend(arg, fn, __mpidr);
-
-	unpause_graph_tracing();
-
 	if (ret == 0) {
 		cpu_switch_mm(mm->pgd, mm);
 		local_flush_bp_all();
@@ -61,13 +48,7 @@ int cpu_suspend(unsigned long arg, int (*fn)(unsigned long))
 int cpu_suspend(unsigned long arg, int (*fn)(unsigned long))
 {
 	u32 __mpidr = cpu_logical_map(smp_processor_id());
-	int ret;
-
-	pause_graph_tracing();
-	ret = __cpu_suspend(arg, fn, __mpidr);
-	unpause_graph_tracing();
-
-	return ret;
+	return __cpu_suspend(arg, fn, __mpidr);
 }
 #define	idmap_pgd	NULL
 #endif
@@ -93,7 +74,6 @@ void copy_pgd(void)
 	memcpy(pgd_i, pgd_k, size);
 }
 #endif
-
 /*
  * This is called by __cpu_suspend() to save the state, and do whatever
  * flushing is required to ensure that when the CPU goes to sleep we have
@@ -113,9 +93,8 @@ void __cpu_suspend_save(u32 *ptr, u32 ptrsz, u32 sp, u32 *save_ptr)
 		pr_debug("%s, ptr:%p, page:%lx, save_ptr:%x\n",
 			 __func__, ptr, page_to_pfn(page), *save_ptr);
 		copy_pgd();
-	} else {
+	} else
 		*save_ptr = virt_to_phys(ptr);
-	}
 #else
 	*save_ptr = virt_to_phys(ptr);
 #endif

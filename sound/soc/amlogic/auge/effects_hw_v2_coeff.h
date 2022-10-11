@@ -1,6 +1,18 @@
-/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * sound/soc/amlogic/auge/effects_hw_v2_coeff.h
+ *
+ * Copyright (C) 2018 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
 #ifndef __EFFECTS_HW_V2_COEFF_H__
@@ -129,7 +141,7 @@ static unsigned int multiband_drc_coeff[AED_MULTIBAND_DRC_SIZE] = {
 };
 
 #define AED_FULLBAND_DRC_SIZE        (18)
-#define AED_FULLBAND_DRC_BYTES       (70)
+#define AED_FULLBAND_DRC_BYTES       (72)
 #define AED_FULLBAND_DRC_OFFSET      (6)
 #define AED_FULLBAND_DRC_GROUP_SIZE  (3)
 
@@ -158,7 +170,7 @@ static int fullband_drc_coeff[AED_FULLBAND_DRC_SIZE] = {
 	0x00000090,	/* Delay time*/
 	0xdd000000,	/* THD_OUT0 */
 	0x00040000,	/* K1 */
-	0x00000000,	/* NULL */
+	0x00000000,	/* OFFSET */
 };
 
 #endif

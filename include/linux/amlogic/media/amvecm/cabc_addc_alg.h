@@ -1,6 +1,18 @@
-/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * include/linux/amlogic/media/amvecm/ve.h
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
 #ifndef CABC_AADC_ALG_H
@@ -83,7 +95,8 @@ struct aad_fw_param_s {
 	int aad_debug_mode;
 	struct aad_debug_param_s *dbg_param;
 
-	void (*aad_alg)(struct aad_fw_param_s *fw_aad_param,
+	void (*aad_alg)(
+		struct aad_fw_param_s *fw_aad_param,
 		int *aad_final_gain);
 };
 
@@ -98,7 +111,8 @@ struct cabc_fw_param_s {
 	int cabc_debug_mode;
 	struct cabc_debug_param_s *dbg_param;
 
-	void (*cabc_alg)(struct cabc_fw_param_s *fw_cabc_param,
+	void (*cabc_alg)(
+		struct cabc_fw_param_s *fw_cabc_param,
 		int *cabc_final_gain);
 };
 
@@ -108,7 +122,9 @@ struct pgm_param_s {
 	int *aad_gain;
 	int *cabc_gain;
 
-	void (*pre_gamma_proc)(struct pgm_param_s *pgm_param, int (*final_pre_gamma)[65]);
+	void (*pre_gamma_proc)(
+		struct pgm_param_s *pgm_param,
+		int (*final_pre_gamma)[65]);
 };
 
 struct aad_fw_param_s *aad_fw_param_get(void);

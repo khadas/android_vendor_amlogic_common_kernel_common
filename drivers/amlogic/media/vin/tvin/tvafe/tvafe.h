@@ -1,6 +1,18 @@
-/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/amlogic/media/vin/tvin/tvafe/tvafe.h
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
 #ifndef _TVAFE_H
@@ -20,7 +32,7 @@
 /* ************************************************* */
 /* *** macro definitions ********************************************* */
 /* *********************************************************** */
-#define TVAFE_VER "Ref.2020/12/02"
+#define TVAFE_VER "Ref.2021/09/01 txlx/tl1 add bringup"
 
 /* used to set the flag of tvafe_dev_s */
 #define TVAFE_FLAG_DEV_OPENED 0x00000010
@@ -79,6 +91,7 @@ struct tvafe_user_param_s {
 	unsigned int unlock_cnt_max;
 	unsigned int avout_en;
 	unsigned int nostd_bypass_iir;
+	unsigned int low_amp_level;
 
 	/* debug */
 	unsigned int cutwin_test_en;
@@ -95,7 +108,7 @@ struct tvafe_dev_s {
 	struct cdev cdev;
 	struct device *dev;
 
-	struct mutex afe_mutex; /* tvafe_dev_s lock */
+	struct mutex afe_mutex;
 	struct timer_list timer;
 
 	struct tvin_frontend_s frontend;
@@ -131,31 +144,31 @@ void tvafe_set_snow_cfg(bool cfg);
 struct tvafe_user_param_s *tvafe_get_user_param(void);
 struct tvafe_dev_s *tvafe_get_dev(void);
 
-int tvafe_reg_read(unsigned int reg, unsigned int *val);
-int tvafe_reg_write(unsigned int reg, unsigned int val);
-int tvafe_vbi_reg_read(unsigned int reg, unsigned int *val);
-int tvafe_vbi_reg_write(unsigned int reg, unsigned int val);
-int tvafe_hiu_reg_read(unsigned int reg, unsigned int *val);
-int tvafe_hiu_reg_write(unsigned int reg, unsigned int val);
-int tvafe_device_create_file(struct device *dev);
-void tvafe_remove_device_files(struct device *dev);
+extern int tvafe_reg_read(unsigned int reg, unsigned int *val);
+extern int tvafe_reg_write(unsigned int reg, unsigned int val);
+extern int tvafe_vbi_reg_read(unsigned int reg, unsigned int *val);
+extern int tvafe_vbi_reg_write(unsigned int reg, unsigned int val);
+extern int tvafe_hiu_reg_read(unsigned int reg, unsigned int *val);
+extern int tvafe_hiu_reg_write(unsigned int reg, unsigned int val);
+extern int tvafe_device_create_file(struct device *dev);
+extern void tvafe_remove_device_files(struct device *dev);
 int tvafe_pq_config_probe(struct meson_tvafe_data *tvafe_data);
 void cvd_set_shift_cnt(enum tvafe_cvd2_shift_cnt_e src, unsigned int val);
 unsigned int cvd_get_shift_cnt(enum tvafe_cvd2_shift_cnt_e src);
-int tvafe_bringup_detect_signal(struct tvafe_dev_s *devp, enum tvin_port_e port);
-
+int tvafe_bringup_detect_signal(struct tvafe_dev_s *devp,
+				enum tvin_port_e port);
 extern bool disableapi;
 extern bool force_stable;
 extern bool tvafe_atv_search_channel;
 
 extern unsigned int force_nostd;
 
-#define TVAFE_DBG_NORMAL     BIT(0)
-#define TVAFE_DBG_ISR        BIT(4)
-#define TVAFE_DBG_SMR        BIT(8)
-#define TVAFE_DBG_SMR2       BIT(9)
-#define TVAFE_DBG_NOSTD      BIT(12)
-#define TVAFE_DBG_NOSTD2     BIT(13)
+#define TVAFE_DBG_NORMAL     (1 << 0)
+#define TVAFE_DBG_ISR        (1 << 4)
+#define TVAFE_DBG_SMR        (1 << 8)
+#define TVAFE_DBG_SMR2       (1 << 9)
+#define TVAFE_DBG_NOSTD      (1 << 12)
+#define TVAFE_DBG_NOSTD2     (1 << 13)
 extern unsigned int tvafe_dbg_print;
 
 #endif  /* _TVAFE_H */

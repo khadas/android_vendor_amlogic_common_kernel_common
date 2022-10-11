@@ -1,6 +1,18 @@
-/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * include/linux/amlogic/media/rdma/rdma_mgr.h
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
 #ifndef RDMA_MGR_H_
@@ -12,34 +24,22 @@ struct rdma_op_s {
 };
 
 #define RDMA_TRIGGER_VSYNC_INPUT 0x1
-#define RDMA_TRIGGER_LINE_INPUT  BIT(5)
-#define RDMA_TRIGGER_VPP1_VSYNC_INPUT BIT(9)
-#define RDMA_TRIGGER_VPP2_VSYNC_INPUT BIT(19)
-#define RDMA_TRIGGER_PRE_VSYNC_INPUT  BIT(24)
-#define RDMA_TRIGGER_MANUAL	     0x100
-#define RDMA_TRIGGER_DEBUG1      0x101
-#define RDMA_TRIGGER_DEBUG2      0x102
-#define RDMA_AUTO_START_MASK     0x80000000
-
-/* rdma write: bit[30] = 0
- * rdma read:  bit[30] = 1
- */
-#define RDMA_READ_MASK 0x40000000
+#define RDMA_TRIGGER_LINE_INPUT (1 << 5)
+#define RDMA_TRIGGER_MANUAL	0x100
+#define RDMA_TRIGGER_DEBUG1 0x101
+#define RDMA_TRIGGER_DEBUG2 0x102
+#define RDMA_AUTO_START_MASK 0x80000
 
 enum rdma_ver_e {
 	RDMA_VER_1,
 	RDMA_VER_2,
-	RDMA_VER_3,
-	RDMA_VER_4,
 };
 
 enum cpu_ver_e {
 	CPU_NORMAL,
-	CPU_G12B_REVA,
-	CPU_G12B_REVB,
+	CPU_G12B,
 	CPU_TL1,
 	CPU_SC2,
-	CPU_T7,
 };
 
 struct rdma_device_data_s {
@@ -62,7 +62,7 @@ int rdma_register(struct rdma_op_s *rdma_op, void *op_arg, int table_size);
  */
 void rdma_unregister(int i);
 
-int rdma_config(int handle, u32 trigger_type);
+int rdma_config(int handle, int trigger_type);
 
 u32 rdma_read_reg(int handle, u32 adr);
 
@@ -71,8 +71,4 @@ int rdma_write_reg(int handle, u32 adr, u32 val);
 int rdma_write_reg_bits(int handle, u32 adr, u32 val, u32 start, u32 len);
 
 int rdma_clear(int handle);
-
-s32 rdma_add_read_reg(int handle, u32 adr);
-
-u32 *rdma_get_read_back_addr(int handle);
 #endif

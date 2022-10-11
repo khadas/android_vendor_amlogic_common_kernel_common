@@ -1,18 +1,24 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/amlogic/drm/vpu-hw/meson_osd_scaler.c
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
 #include "meson_vpu_pipeline.h"
 #include "meson_vpu_reg.h"
 #include "meson_vpu_util.h"
 #include "meson_osd_scaler.h"
-#include "meson_osd_afbc.h"
-
-
-static int osdscaler_force_update;
-module_param(osdscaler_force_update, int, 0664);
-MODULE_PARM_DESC(osdscaler_force_update, "osdscaler_force_update");
 
 static int osdscaler_v_filter_mode = -1;
 module_param(osdscaler_v_filter_mode, int, 0664);
@@ -73,18 +79,6 @@ static struct osd_scaler_reg_s osd_scaler_reg[HW_OSD_SCALER_NUM] = {
 	}
 };
 
-static unsigned int __osd_filter_coefs_bicubic_sharp[] = {
-	0x01fa008c, 0x01fa0100, 0xff7f0200, 0xfe7f0300,
-	0xfd7e0500, 0xfc7e0600, 0xfb7d0800, 0xfb7c0900,
-	0xfa7b0b00, 0xfa7a0dff, 0xf9790fff, 0xf97711ff,
-	0xf87613ff, 0xf87416fe, 0xf87218fe, 0xf8701afe,
-	0xf76f1dfd, 0xf76d1ffd, 0xf76b21fd, 0xf76824fd,
-	0xf76627fc, 0xf76429fc, 0xf7612cfc, 0xf75f2ffb,
-	0xf75d31fb, 0xf75a34fb, 0xf75837fa, 0xf7553afa,
-	0xf8523cfa, 0xf8503ff9, 0xf84d42f9, 0xf84a45f9,
-	0xf84848f8
-};
-
 static unsigned int __osd_filter_coefs_bicubic[] = { /* bicubic	coef0 */
 	0x00800000, 0x007f0100, 0xff7f0200, 0xfe7f0300, 0xfd7e0500, 0xfc7e0600,
 	0xfb7d0800, 0xfb7c0900, 0xfa7b0b00, 0xfa7a0dff, 0xf9790fff, 0xf97711ff,
@@ -92,15 +86,6 @@ static unsigned int __osd_filter_coefs_bicubic[] = { /* bicubic	coef0 */
 	0xf76b21fd, 0xf76824fd, 0xf76627fc, 0xf76429fc, 0xf7612cfc, 0xf75f2ffb,
 	0xf75d31fb, 0xf75a34fb, 0xf75837fa, 0xf7553afa, 0xf8523cfa, 0xf8503ff9,
 	0xf84d42f9, 0xf84a45f9, 0xf84848f8
-};
-
-static unsigned int __osd_filter_coefs_bilinear[] = { /* 2 point bilinear	coef1 */
-	0x00800000, 0x007e0200, 0x007c0400, 0x007a0600, 0x00780800, 0x00760a00,
-	0x00740c00, 0x00720e00, 0x00701000, 0x006e1200, 0x006c1400, 0x006a1600,
-	0x00681800, 0x00661a00, 0x00641c00, 0x00621e00, 0x00602000, 0x005e2200,
-	0x005c2400, 0x005a2600, 0x00582800, 0x00562a00, 0x00542c00, 0x00522e00,
-	0x00503000, 0x004e3200, 0x004c3400, 0x004a3600, 0x00483800, 0x00463a00,
-	0x00443c00, 0x00423e00, 0x00404000
 };
 
 static unsigned int __osd_filter_coefs_2point_binilear[] = {
@@ -111,31 +96,6 @@ static unsigned int __osd_filter_coefs_2point_binilear[] = {
 	0x5c240000, 0x5a260000, 0x58280000, 0x562a0000, 0x542c0000, 0x522e0000,
 	0x50300000, 0x4e320000, 0x4c340000, 0x4a360000, 0x48380000, 0x463a0000,
 	0x443c0000, 0x423e0000, 0x40400000
-};
-
-/* filt_triangle, point_num =3, filt_len =2.6, group_num = 64 */
-static unsigned int __osd_filter_coefs_3point_triangle_sharp[] = {
-	0x40400000, 0x3e420000, 0x3d430000, 0x3b450000,
-	0x3a460000, 0x38480000, 0x37490000, 0x354b0000,
-	0x344c0000, 0x324e0000, 0x314f0000, 0x2f510000,
-	0x2e520000, 0x2c540000, 0x2b550000, 0x29570000,
-	0x28580000, 0x265a0000, 0x245c0000, 0x235d0000,
-	0x215f0000, 0x20600000, 0x1e620000, 0x1d620100,
-	0x1b620300, 0x19630400, 0x17630600, 0x15640700,
-	0x14640800, 0x12640a00, 0x11640b00, 0x0f650c00,
-	0x0d660d00
-};
-
-static unsigned int __osd_filter_coefs_3point_triangle[] = {
-	0x40400000, 0x3f400100, 0x3d410200, 0x3c410300,
-	0x3a420400, 0x39420500, 0x37430600, 0x36430700,
-	0x35430800, 0x33450800, 0x32450900, 0x31450a00,
-	0x30450b00, 0x2e460c00, 0x2d460d00, 0x2c470d00,
-	0x2b470e00, 0x29480f00, 0x28481000, 0x27481100,
-	0x26491100, 0x25491200, 0x24491300, 0x234a1300,
-	0x224a1400, 0x214a1500, 0x204a1600, 0x1f4b1600,
-	0x1e4b1700, 0x1d4b1800, 0x1c4c1800, 0x1b4c1900,
-	0x1a4c1a00
 };
 
 static unsigned int __osd_filter_coefs_4point_triangle[] = {
@@ -150,33 +110,6 @@ static unsigned int __osd_filter_coefs_4point_triangle[] = {
 	0x10303010
 };
 
-/* 4th order (cubic) b-spline */
-/* filt_cubic point_num =4, filt_len =4, group_num = 64 */
-static unsigned int __vpp_filter_coefs_4point_bspline[] = {
-	0x15561500, 0x14561600, 0x13561700, 0x12561800,
-	0x11551a00, 0x11541b00, 0x10541c00, 0x0f541d00,
-	0x0f531e00, 0x0e531f00, 0x0d522100, 0x0c522200,
-	0x0b522300, 0x0b512400, 0x0a502600, 0x0a4f2700,
-	0x094e2900, 0x084e2a00, 0x084d2b00, 0x074c2c01,
-	0x074b2d01, 0x064a2f01, 0x06493001, 0x05483201,
-	0x05473301, 0x05463401, 0x04453601, 0x04433702,
-	0x04423802, 0x03413a02, 0x03403b02, 0x033f3c02,
-	0x033d3d03
-};
-
-/* filt_quadratic, point_num =3, filt_len =3, group_num = 64 */
-static unsigned int __osd_filter_coefs_3point_bspline[] = {
-	0x40400000, 0x3e420000, 0x3c440000, 0x3a460000,
-	0x38480000, 0x364a0000, 0x344b0100, 0x334c0100,
-	0x314e0100, 0x304f0100, 0x2e500200, 0x2c520200,
-	0x2a540200, 0x29540300, 0x27560300, 0x26570300,
-	0x24580400, 0x23590400, 0x215a0500, 0x205b0500,
-	0x1e5c0600, 0x1d5c0700, 0x1c5d0700, 0x1a5e0800,
-	0x195e0900, 0x185e0a00, 0x175f0a00, 0x15600b00,
-	0x14600c00, 0x13600d00, 0x12600e00, 0x11600f00,
-	0x10601000
-};
-
 static unsigned int __osd_filter_coefs_repeat[] = { /* repeat coef0 */
 	0x00800000, 0x00800000, 0x00800000, 0x00800000, 0x00800000, 0x00800000,
 	0x00800000, 0x00800000, 0x00800000, 0x00800000, 0x00800000, 0x00800000,
@@ -187,15 +120,9 @@ static unsigned int __osd_filter_coefs_repeat[] = { /* repeat coef0 */
 };
 
 static unsigned int *osd_scaler_filter_table[] = {
-	__osd_filter_coefs_bicubic_sharp,
 	__osd_filter_coefs_bicubic,
-	__osd_filter_coefs_bilinear,
 	__osd_filter_coefs_2point_binilear,
-	__osd_filter_coefs_3point_triangle_sharp,
-	__osd_filter_coefs_3point_triangle,
 	__osd_filter_coefs_4point_triangle,
-	__vpp_filter_coefs_4point_bspline,
-	__osd_filter_coefs_3point_bspline,
 	__osd_filter_coefs_repeat
 };
 
@@ -218,8 +145,8 @@ void osd_vsc_init_phase_set(struct osd_scaler_reg_s *reg,
 
 /*vsc control*/
 /*vsc enable last line repeate*/
-void osd_vsc_repate_last_line_enable_set(struct osd_scaler_reg_s *reg,
-					 bool flag)
+void osd_vsc_repate_last_line_enable_set(
+	struct osd_scaler_reg_s *reg, bool flag)
 {
 	meson_vpu_write_reg_bits(reg->vpp_osd_vsc_ctrl0, flag, 25, 1);
 }
@@ -477,10 +404,9 @@ void osd_sc_coef_set(struct osd_scaler_reg_s *reg, bool flag, u32 *coef)
 }
 
 /*********sc top ctrl end************/
-static void f2v_get_vertical_phase(u32 zoom_ratio,
-				   enum osd_scaler_f2v_vphase_type_e type,
-				   u8 bank_length,
-				   struct osd_scaler_f2v_vphase_s *vphase)
+static void f2v_get_vertical_phase(
+	u32 zoom_ratio, enum osd_scaler_f2v_vphase_type_e type,
+	u8 bank_length, struct osd_scaler_f2v_vphase_s *vphase)
 {
 	u8 f2v_420_in_pos_luma[OSD_SCALER_F2V_TYPE_MAX] = {
 		0, 2, 0, 2, 0, 0, 0, 2, 0};
@@ -536,7 +462,6 @@ void osd_scaler_config(struct osd_scaler_reg_s *reg,
 	u32 width_out = scaler_state->output_width;
 	u32 height_out = scaler_state->output_height;
 	u32 scan_mode_out = scaler_state->scan_mode_out;
-	u32 scaler_filter_mode = scaler_state->scaler_filter_mode;
 	u32 vsc_double_line_mode;
 	u32 *coef_h, *coef_v;
 	u64 phase_step_v, phase_step_h;
@@ -580,8 +505,9 @@ void osd_scaler_config(struct osd_scaler_reg_s *reg,
 			vsc_top_init_phase |= 0x8000;
 		}
 	} else {
-		f2v_get_vertical_phase(phase_step_v, OSD_SCALER_F2V_P2P,
-				       vsc_bank_length, &vphase);
+		f2v_get_vertical_phase(
+			phase_step_v, OSD_SCALER_F2V_P2P,
+			vsc_bank_length, &vphase);
 		vsc_top_init_rec_num = vphase.rcv_num;
 		vsc_top_rpt_l0_num = vphase.rpt_num;
 		vsc_top_init_phase = vphase.phase;
@@ -598,19 +524,12 @@ void osd_scaler_config(struct osd_scaler_reg_s *reg,
 	do_div(phase_step_h, width_out);
 	phase_step_h <<= (OSD_ZOOM_TOTAL_BITS - OSD_ZOOM_WIDTH_BITS);
 	/*check coef*/
-
-	if (vsc_double_line_mode == 1) {
-		coef_h = osd_scaler_filter_table[COEFS_BICUBIC];
-		coef_v = osd_scaler_filter_table[COEFS_2POINT_BINILEAR];
-	} else if (scan_mode_out && width_out <= 720) {
+	if (scan_mode_out && width_out <= 720) {
 		coef_h = osd_scaler_filter_table[COEFS_4POINT_TRIANGLE];
 		coef_v = osd_scaler_filter_table[COEFS_4POINT_TRIANGLE];
-	} else if (scaler_filter_mode >= DRM_SCALING_FILTER_BICUBIC_SHARP &&
-		   scaler_filter_mode <=  DRM_SCALING_FILTER_REPEATE){
-		coef_h = osd_scaler_filter_table[scaler_filter_mode -
-			DRM_SCALING_FILTER_BICUBIC_SHARP];
-		coef_v = osd_scaler_filter_table[scaler_filter_mode -
-			DRM_SCALING_FILTER_BICUBIC_SHARP];
+	} else if (vsc_double_line_mode == 1) {
+		coef_h = osd_scaler_filter_table[COEFS_BICUBIC];
+		coef_v = osd_scaler_filter_table[COEFS_2POINT_BINILEAR];
 	} else {
 		coef_h = osd_scaler_filter_table[COEFS_BICUBIC];
 		coef_v = osd_scaler_filter_table[COEFS_BICUBIC];
@@ -724,18 +643,6 @@ void scan_mode_check(struct meson_vpu_pipeline *pipeline,
 	}
 }
 
-void scaler_filter_mode_check(struct meson_vpu_block *vblk,
-		     struct meson_vpu_scaler_state *scaler_state,
-		struct meson_vpu_pipeline_state *mvps)
-{
-	u32 scaling_filter_mode = mvps->plane_info[vblk->index].scaling_filter;
-
-	if (scaler_state->scaler_filter_mode != scaling_filter_mode) {
-		scaler_state->scaler_filter_mode = scaling_filter_mode;
-		osdscaler_force_update = 1;
-	}
-}
-
 static int scaler_check_state(struct meson_vpu_block *vblk,
 			      struct meson_vpu_block_state *state,
 		struct meson_vpu_pipeline_state *mvps)
@@ -754,16 +661,9 @@ static int scaler_check_state(struct meson_vpu_block *vblk,
 static void scaler_set_state(struct meson_vpu_block *vblk,
 			     struct meson_vpu_block_state *state)
 {
-	struct meson_vpu_pipeline_state *mvps;
-
 	struct meson_vpu_scaler *scaler = to_scaler_block(vblk);
 	struct meson_vpu_scaler_state *scaler_state = to_scaler_state(state);
 	struct osd_scaler_reg_s *reg = scaler->reg;
-	struct meson_vpu_pipeline *pipeline = scaler->base.pipeline;
-
-	mvps = priv_to_pipeline_state(pipeline->obj.state);
-	/*todo:move afbc start to afbc block.*/
-	arm_fbc_start(mvps);
 
 	if (!scaler_state) {
 		DRM_DEBUG("scaler or scaler_state is NULL!!\n");
@@ -771,12 +671,10 @@ static void scaler_set_state(struct meson_vpu_block *vblk,
 	}
 	scaler_size_check(vblk, state);
 	scan_mode_check(vblk->pipeline, scaler_state);
-	scaler_filter_mode_check(vblk, scaler_state, mvps);
 	DRM_DEBUG("scaler_state=0x%x\n", scaler_state->state_changed);
-	if (scaler_state->state_changed || osdscaler_force_update) {
+	if (scaler_state->state_changed) {
 		osd_scaler_config(reg, scaler_state, vblk);
 		scaler_state->state_changed = 0;
-		osdscaler_force_update = 0;
 	}
 	DRM_DEBUG("scaler%d input/output w/h[%d, %d, %d, %d].\n",
 		  scaler->base.index,
@@ -787,7 +685,10 @@ static void scaler_set_state(struct meson_vpu_block *vblk,
 static void scaler_hw_enable(struct meson_vpu_block *vblk)
 {
 	struct meson_vpu_scaler *scaler = to_scaler_block(vblk);
+	struct osd_scaler_reg_s *reg = scaler->reg;
 
+	osd_sc_en_set(reg, 1);
+	osd_sc_path_en_set(reg, 1);
 	DRM_DEBUG("%s enable done.\n", scaler->base.name);
 }
 
@@ -797,7 +698,8 @@ static void scaler_hw_disable(struct meson_vpu_block *vblk)
 	struct osd_scaler_reg_s *reg = scaler->reg;
 
 	/*disable sc*/
-	meson_vpu_write_reg(reg->vpp_osd_sc_ctrl0, 0);
+	osd_sc_en_set(reg, 0);
+	osd_sc_path_en_set(reg, 0);
 	DRM_DEBUG("%s disable called.\n", scaler->base.name);
 }
 
@@ -857,7 +759,6 @@ static void scaler_hw_init(struct meson_vpu_block *vblk)
 	scaler->reg = &osd_scaler_reg[vblk->index];
 	scaler->linebuffer = OSD_SCALE_LINEBUFFER;
 	scaler->bank_length = OSD_SCALE_BANK_LENGTH;
-	scaler_hw_disable(vblk);
 	DRM_DEBUG("%s hw_init called.\n", scaler->base.name);
 }
 

@@ -1,4 +1,3 @@
-/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
  * drivers/amlogic/media/enhancement/amvecm/amcm.h
  *
@@ -19,8 +18,24 @@
 #ifndef __AM_CM_H
 #define __AM_CM_H
 
+
 #include <linux/amlogic/media/vfm/vframe.h>
 #include "linux/amlogic/media/amvecm/cm.h"
+
+struct cm_regs_s {
+	unsigned int val:32;
+	unsigned int reg:14;
+	unsigned int port:2;
+	/* 0    NA  NA direct access */
+		/* 1    VPP_CHROMA_ADDR_PORT */
+				/* VPP_CHROMA_DATA_PORT CM port registers */
+		/* 2    NA NA reserved */
+    /* 3    NA NA reserved */
+	unsigned int bit:5;
+	unsigned int wid:5;
+	unsigned int mode:1;
+	unsigned int rsv:5;
+};
 
 struct sr1_regs_s {
 	unsigned int addr;
@@ -40,14 +55,14 @@ extern unsigned int sr1_reg_val[101];
 /* *** IOCTL-oriented functions ****************************************** */
 /* *********************************************************************** */
 void am_set_regmap(struct am_regs_s *p);
-void amcm_disable(void);
-void amcm_enable(void);
-void amcm_level_sel(unsigned int cm_level);
-void cm2_frame_size_patch(unsigned int width, unsigned int height);
-void cm2_frame_switch_patch(void);
-void cm_latch_process(void);
-int cm_load_reg(struct am_regs_s *arg);
-void pd_combing_fix_patch(enum pd_comb_fix_lvl_e level);
+extern void amcm_disable(void);
+extern void amcm_enable(void);
+extern void amcm_level_sel(unsigned int cm_level);
+extern void cm2_frame_size_patch(unsigned int width, unsigned int height);
+extern void cm2_frame_switch_patch(void);
+extern void cm_latch_process(void);
+extern int cm_load_reg(struct am_regs_s *arg);
+extern void pd_combing_fix_patch(enum pd_comb_fix_lvl_e level);
 
 #endif
 

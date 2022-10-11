@@ -43,11 +43,6 @@ enum av_sync_mode {
 	AVS_MODE_FREE_RUN
 };
 
-enum src_flag {
-	SRC_V = 1,
-	SRC_A = 2,
-};
-
 struct session_sync_stat {
 	uint32_t v_active;
 	uint32_t a_active;
@@ -57,8 +52,6 @@ struct session_sync_stat {
 	uint32_t v_timeout;
 	/* in audio switching process */
 	uint32_t audio_switch;
-	/* input: query source src_flag */
-	uint32_t flag;
 };
 
 enum avs_event {
@@ -101,13 +94,6 @@ struct session_debug {
 	uint32_t pcr_init_mode;
 };
 
-struct ker_start_policy {
-	/* start policy */
-	uint32_t policy;
-	/* in audio timeout value for no video case, in ms */
-	int timeout;
-};
-
 #define AVS_INVALID_PTS 0xFFFFFFFFUL
 
 #define AMSYNC_START_V_FIRST 0x1
@@ -124,8 +110,8 @@ struct ker_start_policy {
 #define _A_M_SS  'S'
 #define AMSYNCS_IOC_SET_MODE		_IOW((_A_M_SS), 0x00, unsigned int)
 #define AMSYNCS_IOC_GET_MODE		_IOR((_A_M_SS), 0x01, unsigned int)
-#define AMSYNCS_IOC_SET_START_POLICY	_IOW((_A_M_SS), 0x02, struct ker_start_policy)
-#define AMSYNCS_IOC_GET_START_POLICY	_IOR((_A_M_SS), 0x03, struct ker_start_policy)
+#define AMSYNCS_IOC_SET_START_POLICY	_IOW((_A_M_SS), 0x02, unsigned int)
+#define AMSYNCS_IOC_GET_START_POLICY	_IOR((_A_M_SS), 0x03, unsigned int)
 #define AMSYNCS_IOC_SET_V_TS		_IOW((_A_M_SS), 0x04, struct pts_tri)
 #define AMSYNCS_IOC_GET_V_TS		_IOWR((_A_M_SS), 0x05, struct pts_tri)
 #define AMSYNCS_IOC_SET_A_TS		_IOW((_A_M_SS), 0x06, struct pts_tri)

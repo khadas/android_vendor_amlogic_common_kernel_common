@@ -1,6 +1,18 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/amlogic/dvb/aml_dvb_extern_driver.c
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
 #include <linux/kernel.h>
@@ -506,7 +518,7 @@ static ssize_t demod_debug_store(struct class *class,
 	struct dvb_frontend *fe = dev->demod_fe;
 	struct dtv_frontend_properties *c = &fe->dtv_property_cache;
 	struct dtv_property tvp;
-	enum fe_status s = FE_NONE;
+	enum fe_status s = 0;
 	enum fe_delivery_system delsys = 0;
 
 	buf_orig = kstrdup(buf, GFP_KERNEL);
@@ -1044,18 +1056,12 @@ static const struct file_operations demod_debug_fops = {
 	.release = single_release
 };
 
-static CLASS_ATTR_RW(tuner_debug);
-static CLASS_ATTR_RW(demod_debug);
-static CLASS_ATTR_RW(dvb_debug);
-
-static struct attribute *dvb_extern_class_attrs[] = {
-	&class_attr_tuner_debug.attr,
-	&class_attr_demod_debug.attr,
-	&class_attr_dvb_debug.attr,
-	NULL
+static struct class_attribute dvb_extern_class_attrs[] = {
+	__ATTR(tuner_debug, 0644, tuner_debug_show, tuner_debug_store),
+	__ATTR(demod_debug, 0644, demod_debug_show, demod_debug_store),
+	__ATTR(dvb_debug, 0644, dvb_debug_show, dvb_debug_store),
+	__ATTR_NULL
 };
-
-ATTRIBUTE_GROUPS(dvb_extern_class);
 
 static const struct of_device_id aml_dvb_extern_dt_match[] = {
 	{
@@ -1090,7 +1096,7 @@ static int aml_dvb_extern_probe(struct platform_device *pdev)
 	dvbdev->dev = &pdev->dev;
 	dvbdev->class.name = AML_DVB_EXTERN_DEVICE_NAME;
 	dvbdev->class.owner = THIS_MODULE;
-	dvbdev->class.class_groups = dvb_extern_class_groups;
+	dvbdev->class.class_attrs = dvb_extern_class_attrs;
 
 	dvbdev->debug_proc_dir = proc_mkdir(AML_DVB_EXTERN_DEVICE_NAME, NULL);
 	if (!dvbdev->debug_proc_dir)

@@ -1,4 +1,3 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
  * cm2_adj for pq module
  *
@@ -68,31 +67,31 @@ static char adj_luma_via_hue[NUM_COLOR_MAX][32];
 static char def_sat_via_hs[3][32];
 
 module_param_array(lpf_coef, uint,
-		   &lpf_coef_matrix_param, 0664);
+	&lpf_coef_matrix_param, 0664);
 MODULE_PARM_DESC(lpf_coef, "\n lpf_coef\n");
 
 module_param_array(color_key_pts, uint,
-		   &color_key_pts_matrix_param, 0664);
+	&color_key_pts_matrix_param, 0664);
 MODULE_PARM_DESC(color_key_pts, "\n color_key_pts\n");
 
 module_param_array(color_start, uint,
-		   &color_start_param, 0664);
+	&color_start_param, 0664);
 MODULE_PARM_DESC(color_start, "\n color_start\n");
 
 module_param_array(color_end, uint,
-		   &color_end_param, 0664);
+	&color_end_param, 0664);
 MODULE_PARM_DESC(color_end, "\n color_end\n");
 
 module_param_array(smth_coef_hue, uint,
-		   &smth_coef_hue_matrix_param, 0664);
+	&smth_coef_hue_matrix_param, 0664);
 MODULE_PARM_DESC(smth_coef_hue_matrix_param, "\n smth_coef_hue\n");
 
 module_param_array(smth_coef_luma, uint,
-		   &smth_coef_luma_matrix_param, 0664);
+	&smth_coef_luma_matrix_param, 0664);
 MODULE_PARM_DESC(smth_coef_luma_matrix_param, "\n smth_coef_luma\n");
 
 module_param_array(smth_coef_sat, uint,
-		   &smth_coef_sat_matrix_param, 0664);
+	&smth_coef_sat_matrix_param, 0664);
 MODULE_PARM_DESC(smth_coef_sat_matrix_param, "\n smth_coef_sat\n");
 
 /*static int lpf_coef[] = {
@@ -143,7 +142,7 @@ static int rsround(int val)
 }
 
 /**
- * [color_adj calculate lut table]
+ * [color_adj caculate lut table]
  * @param  inp_color     [0~6]
  * @param  inp_val       [-100~100]
  * @param  lpf_en        [1~0]
@@ -154,7 +153,7 @@ static int rsround(int val)
  * @return               [fail, true]
  */
 static void color_adj(int inp_color, int inp_val, int lpf_en,
-		      int *lpf_coef, int *color_key_pts,
+				int *lpf_coef, int *color_key_pts,
 				int *smth_coef, int *out_lut)
 {
 	/*int smth_win = 7;*/
@@ -168,23 +167,20 @@ static void color_adj(int inp_color, int inp_val, int lpf_en,
 
 	for (x = 0; x < NUM_SMTH_PARAM; x++) {
 		if (inp_val2 > 0) {
-			temp =
-			((smth_coef[x] * inp_val2 * 100 / 128) + 50) / 100;
+			temp = ((smth_coef[x] * inp_val2 * 100/128) + 50)/100;
 			smth_val[x] = temp;
 		} else if (inp_val2 < 0) {
-			temp =
-			((smth_coef[x] * inp_val2 * 100 / 128) - 50) / 100;
+			temp = ((smth_coef[x] * inp_val2 * 100/128) - 50)/100;
 			smth_val[x] = temp;
 		} else {
-			smth_val[x] =
-			((smth_coef[x] * inp_val2 * 100 / 128)) / 100;
+			smth_val[x] = ((smth_coef[x] * inp_val2 * 100/128))/100;
 		}
 	}
 
 	kpt = color_key_pts[inp_color];
 
 	for (x = 0; x < NUM_SMTH_PARAM; x++) {
-		inp_val2 = kpt + x - (NUM_SMTH_PARAM / 2);
+		inp_val2 = kpt + x - (NUM_SMTH_PARAM/2);
 		if (inp_val2 < 0)
 			inp_val2 = 32 - abs(inp_val2);
 
@@ -201,7 +197,7 @@ static void color_adj(int inp_color, int inp_val, int lpf_en,
 		for (x = 0; x < 32; x++) {
 			inp_val2 = 0;
 			for (k = 0; k < NUM_MATRIX_PARAM; k++) {
-				varargin_1 = (x + k) - (NUM_MATRIX_PARAM / 2);
+				varargin_1 = (x + k) - (NUM_MATRIX_PARAM/2);
 				if (varargin_1 < 0)
 					varargin_1 = 32 - abs(varargin_1);
 
@@ -247,8 +243,8 @@ void cm2_curve_update_hue_by_hs(enum ecm2colormd colormode)
 			i = i  - 32;
 		for (j = 0; j < 5; j++) {
 			WRITE_VPP_REG(VPP_CHROMA_ADDR_PORT,
-				      0x100 + i * 8 + j);
-			val1[j] = READ_VPP_REG(VPP_CHROMA_DATA_PORT);
+				0x100 + i*8 + j);
+		    val1[j] = READ_VPP_REG(VPP_CHROMA_DATA_PORT);
 
 			if (j == reg_node1) {
 				/*curve 0,1*/
@@ -262,14 +258,15 @@ void cm2_curve_update_hue_by_hs(enum ecm2colormd colormode)
 		}
 
 		for (j = 0; j < 5; j++) {
-			WRITE_VPP_REG(VPP_CHROMA_ADDR_PORT,
-				      0x100 + i * 8 + j);
+			WRITE_VPP_REG(
+				VPP_CHROMA_ADDR_PORT,
+				0x100 + i * 8 + j);
 			WRITE_VPP_REG(VPP_CHROMA_DATA_PORT, val1[j]);
 		}
 
 		for (j = 0; j < 5; j++) {
 			WRITE_VPP_REG(VPP_CHROMA_ADDR_PORT,
-				      0x100 + i * 8 + j);
+				0x100 + i*8 + j);
 			val2[j] = READ_VPP_REG(VPP_CHROMA_DATA_PORT);
 			if (j == reg_node2) {
 				/*curve 2,3,4*/
@@ -286,8 +283,9 @@ void cm2_curve_update_hue_by_hs(enum ecm2colormd colormode)
 		}
 
 		for (j = 0; j < 5; j++) {
-			WRITE_VPP_REG(VPP_CHROMA_ADDR_PORT,
-				      0x100 + i * 8 + j);
+			WRITE_VPP_REG(
+				VPP_CHROMA_ADDR_PORT,
+				0x100 + i * 8 + j);
 			WRITE_VPP_REG(VPP_CHROMA_DATA_PORT, val2[j]);
 		}
 	}
@@ -309,8 +307,8 @@ void cm2_curve_update_hue(enum ecm2colormd colormode)
 			i = i  - 32;
 		for (j = 0; j < 5; j++) {
 			WRITE_VPP_REG(VPP_CHROMA_ADDR_PORT,
-				      0x100 + i * 8 + j);
-			val1[j] = READ_VPP_REG(VPP_CHROMA_DATA_PORT);
+				0x100 + i*8 + j);
+		    val1[j] = READ_VPP_REG(VPP_CHROMA_DATA_PORT);
 			if (j == reg_node) {
 				/*curve 0*/
 				val1[j] &= 0xffffff00;
@@ -320,8 +318,9 @@ void cm2_curve_update_hue(enum ecm2colormd colormode)
 			}
 		}
 		for (j = 0; j < 5; j++) {
-			WRITE_VPP_REG(VPP_CHROMA_ADDR_PORT,
-				      0x100 + i * 8 + j);
+			WRITE_VPP_REG(
+				VPP_CHROMA_ADDR_PORT,
+				0x100 + i * 8 + j);
 			WRITE_VPP_REG(VPP_CHROMA_DATA_PORT, val1[j]);
 		}
 	}
@@ -357,8 +356,8 @@ void cm2_curve_update_luma(enum ecm2colormd colormode)
 			i = i  - 32;
 		for (j = 0; j < 5; j++) {
 			WRITE_VPP_REG(VPP_CHROMA_ADDR_PORT,
-				      CM2_ENH_COEF0_H00 + i * 8 + j);
-			val1[j] = READ_VPP_REG(VPP_CHROMA_DATA_PORT);
+				CM2_ENH_COEF0_H00 + i*8 + j);
+		    val1[j] = READ_VPP_REG(VPP_CHROMA_DATA_PORT);
 			if (j == reg_node) {
 				/*curve 0*/
 				val1[j] &= 0xffffff00;
@@ -368,8 +367,9 @@ void cm2_curve_update_luma(enum ecm2colormd colormode)
 			}
 		}
 		for (j = 0; j < 5; j++) {
-			WRITE_VPP_REG(VPP_CHROMA_ADDR_PORT,
-				      CM2_ENH_COEF0_H00 + i * 8 + j);
+			WRITE_VPP_REG(
+				VPP_CHROMA_ADDR_PORT,
+				CM2_ENH_COEF0_H00 + i * 8 + j);
 			WRITE_VPP_REG(VPP_CHROMA_DATA_PORT, val1[j]);
 		}
 	}
@@ -405,7 +405,7 @@ void cm2_curve_update_sat(enum ecm2colormd colormode)
 			i = i  - 32;
 		for (j = 0; j < 5; j++) {
 			WRITE_VPP_REG(VPP_CHROMA_ADDR_PORT,
-				      CM2_ENH_COEF0_H00 + i * 8 + j);
+				CM2_ENH_COEF0_H00 + i*8 + j);
 			val1[j] = READ_VPP_REG(VPP_CHROMA_DATA_PORT);
 			if (j == reg_node) {
 				val1[j] &= 0x000000ff;
@@ -425,8 +425,9 @@ void cm2_curve_update_sat(enum ecm2colormd colormode)
 			}
 		}
 		for (j = 0; j < 5; j++) {
-			WRITE_VPP_REG(VPP_CHROMA_ADDR_PORT,
-				      CM2_ENH_COEF0_H00 + i * 8 + j);
+			WRITE_VPP_REG(
+				VPP_CHROMA_ADDR_PORT,
+				CM2_ENH_COEF0_H00 + i * 8 + j);
 			WRITE_VPP_REG(VPP_CHROMA_DATA_PORT, val1[j]);
 		}
 	}
@@ -450,7 +451,7 @@ void default_sat_param(unsigned int reg, unsigned int value)
 {
 	unsigned int i;
 
-	if (reg < CM2_ENH_COEF0_H00 || reg >= 0x200)
+	if ((reg < CM2_ENH_COEF0_H00) || (reg >= 0x200))
 		return;
 
 	if ((reg - CM2_ENH_COEF0_H00) % 8 == 0) {
@@ -482,7 +483,7 @@ void cm2_hue_by_hs(enum ecm2colormd colormode, int hue_val, int lpf_en)
 	/*pr_info("color mode:%d, input val =%d\n", colormode, hue_val);*/
 
 	color_adj(inp_color, inp_val, lpf_en, lpf_coef,
-		  color_key_pts, smth_coef_hue, out_lut);
+				color_key_pts, smth_coef_hue, out_lut);
 
 	for (k = 0; k < 5; k++) {
 		/*pr_info("\n Adj_Hue via %d\n", k);*/
@@ -517,7 +518,7 @@ void cm2_hue(enum ecm2colormd colormode, int hue_val, int lpf_en)
 	/*pr_info("color mode:%d, input val =%d\n", colormode, hue_val);*/
 
 	color_adj(inp_color, inp_val, lpf_en, lpf_coef,
-		  color_key_pts, smth_coef_hue, out_lut);
+				color_key_pts, smth_coef_hue, out_lut);
 
 	for (i = 0; i < 32; i++) {
 		adj_hue_via_hue[colormode][i] = (char)out_lut[i];
@@ -544,7 +545,7 @@ void cm2_luma(enum ecm2colormd colormode, int luma_val, int lpf_en)
 	memset(out_luma_lut, 0, sizeof(int) * 32);
 
 	color_adj(inp_color, inp_val, lpf_en, lpf_coef, color_key_pts,
-		  smth_coef_luma, out_luma_lut);
+				smth_coef_luma, out_luma_lut);
 
 	for (i = 0; i < 32; i++) {
 		adj_luma_via_hue[colormode][i] = (char)out_luma_lut[i];
@@ -574,17 +575,18 @@ void cm2_sat(enum ecm2colormd colormode, int sat_val, int lpf_en)
 	memset(out_sat_lut, 0, sizeof(int) * 32);
 
 	color_adj(inp_color, inp_val, lpf_en, lpf_coef, color_key_pts,
-		  smth_coef_sat, out_sat_lut);
+		smth_coef_sat, out_sat_lut);
 
 	for (k = 0; k < 3; k++) {
 		/*pr_info("\n Adj_sat %d\n", k);*/
 		for (i = 0; i < 32; i++) {
 			temp = out_sat_lut[i] * satgain_via_sat3[inp_color][k];
 			adj_sat_via_hs[colormode][k][i] =
-				(char)(rsround(temp) / 100);
+				(char)(rsround(temp)/100);
 			/*pr_info("%d  ", reg_CM2_Adj_Sat_via_HS[k][i]);*/
 		}
 	}
 	/*pr_info("\n---end\n");*/
 }
+
 

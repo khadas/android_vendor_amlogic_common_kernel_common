@@ -1,4 +1,3 @@
-/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
  * drivers/amlogic/media/deinterlace/di_pqa.h
  *
@@ -167,19 +166,7 @@ bool di_attach_ops_mtn(const struct mtn_op_s **ops);
 
 #define DI_IC_ID_DEINTERLACE		(0xFF)
 
-#define DI_IC_REV_MAJOR		(0x0)
-#define DI_IC_REV_SUB		(0x1)
-
 /* is_meson_g12a_cpu */
-
-static inline bool is_ic_sub_ver(unsigned int crr_id, unsigned int ic_id,
-			     unsigned int crr_id1, unsigned int ic_id1)
-{
-	if (crr_id == ic_id && crr_id1 == ic_id1)
-		return true;
-	return false;
-}
-
 static inline bool is_ic_named(unsigned int crr_id, unsigned int ic_id)
 {
 	if (crr_id == ic_id)
@@ -425,8 +412,8 @@ struct afbcd_ctr_s {
 	unsigned int l_h;
 	unsigned int l_w;
 	unsigned int l_bitdepth;
-	ulong addr_h;
-	ulong addr_b;
+	unsigned int addr_h;
+	unsigned int addr_b;
 //	unsigned int mem_addr_h;
 //	unsigned int mem_addr_b;
 	unsigned int pst_in_vtp;

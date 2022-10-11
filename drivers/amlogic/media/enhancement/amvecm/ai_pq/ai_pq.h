@@ -1,4 +1,3 @@
-/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
  * drivers/amlogic/media/enhancement/amvecm/ai_pq/ai_pq.h
  *
@@ -58,8 +57,9 @@ int adaptive_param_init(void);
 
 /*temporary sulotion for base value*/
 int aipq_base_dnlp_param(unsigned int final_gain);
-int aipq_base_peaking_param(unsigned int reg,
-			    unsigned int mask,
-			    unsigned int value);
+int aipq_base_peaking_param(
+	unsigned int reg,
+	unsigned int mask,
+	unsigned int value);
 int aipq_base_satur_param(int value);
 #endif

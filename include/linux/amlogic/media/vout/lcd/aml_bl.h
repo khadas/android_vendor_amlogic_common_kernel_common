@@ -1,23 +1,30 @@
-/* SPDX-License-Identifier: GPL-2.0+ */
 /*
+ * include/linux/amlogic/media/vout/lcd/aml_bl.h
  *
- * Copyright (C) 2019 Amlogic, Inc. All rights reserved.
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
  *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
  *
  */
 
 #ifndef __INC_AML_BL_H
 #define __INC_AML_BL_H
 #include <linux/workqueue.h>
-#include <linux/cdev.h>
 #include <linux/amlogic/aml_gpio_consumer.h>
 #include <linux/pinctrl/consumer.h>
 #include <linux/pwm.h>
-#include <linux/amlogic/pwm-meson.h>
-#include <linux/amlogic/media/vout/lcd/aml_lcd.h>
+#include <linux/amlogic/pwm_meson.h>
 
-#define BLPR(fmt, args...)      pr_info("bl: " fmt "", ## args)
-#define BLERR(fmt, args...)     pr_err("bl error: " fmt "", ## args)
+#define BLPR(fmt, args...)      pr_info("bl: "fmt"", ## args)
+#define BLERR(fmt, args...)     pr_err("bl error: "fmt"", ## args)
 #define AML_BL_NAME		"aml-bl"
 
 #define BL_LEVEL_MAX		255
@@ -28,15 +35,33 @@
 #define BL_LEVEL_MID_MAPPED	BL_LEVEL_MID
 #define BL_LEVEL_DEFAULT	BL_LEVEL_MID
 
-#define XTAL_FREQ_HZ		(24 * 1000 * 1000) /* unit: Hz */
-#define XTAL_HALF_FREQ_HZ	(24 * 1000 * 500)  /* 24M/2 in HZ */
+#define XTAL_FREQ_HZ		(24*1000*1000) /* unit: Hz */
+#define XTAL_HALF_FREQ_HZ	(24*1000*500)  /* 24M/2 in HZ */
 
 #define BL_FREQ_DEFAULT		1000 /* unit: HZ */
 #define BL_FREQ_VS_DEFAULT	2    /* multiple 2 of vfreq */
 
+enum bl_chip_type_e {
+	BL_CHIP_GXL,
+	BL_CHIP_GXM,
+	BL_CHIP_TXL,
+	BL_CHIP_TXLX,
+	BL_CHIP_AXG,
+	BL_CHIP_G12A,
+	BL_CHIP_G12B,
+	BL_CHIP_TL1,
+	BL_CHIP_SM1,
+	BL_CHIP_TM2,
+	BL_CHIP_TM2B,
+	BL_CHIP_T5,
+	BL_CHIP_T5D,
+	BL_CHIP_MAX,
+};
+
 struct bl_data_s {
-	unsigned int chip_type;
+	enum bl_chip_type_e chip_type;
 	const char *chip_name;
+	unsigned int *pwm_reg;
 };
 
 /* for lcd backlight power */
@@ -62,15 +87,7 @@ enum bl_pwm_port_e {
 	BL_PWM_D,
 	BL_PWM_E,
 	BL_PWM_F,
-	BL_PWM_AO_A = 0x10,
-	BL_PWM_AO_B,
-	BL_PWM_AO_C,
-	BL_PWM_AO_D,
-	BL_PWM_AO_E,
-	BL_PWM_AO_F,
-	BL_PWM_AO_G,
-	BL_PWM_AO_H,
-	BL_PWM_VS = 0x20,
+	BL_PWM_VS,
 	BL_PWM_MAX,
 };
 
@@ -87,10 +104,14 @@ enum bl_off_policy_e {
 #define BL_POLICY_POWER_ON_BIT               12
 #define BL_POLICY_POWER_ON_MASK              3
 
+#define BL_GPIO_OUTPUT_LOW      0
+#define BL_GPIO_OUTPUT_HIGH     1
+#define BL_GPIO_INPUT           2
+
 #define BL_GPIO_MAX             0xff
 #define BL_GPIO_NUM_MAX         5
 struct bl_gpio_s {
-	char name[LCD_CPU_GPIO_NAME_MAX];
+	char name[15];
 	struct gpio_desc *gpio;
 	int probe_flag;
 	int register_flag;
@@ -98,6 +119,7 @@ struct bl_gpio_s {
 
 struct pwm_data_s {
 	unsigned int meson_index;
+	unsigned int port_index;
 	struct pwm_state state;
 	struct pwm_device *pwm;
 	struct meson_pwm *meson;
@@ -124,9 +146,7 @@ struct bl_pwm_config_s {
 
 #define BL_NAME_MAX    30
 struct bl_config_s {
-	unsigned int index;
 	char name[BL_NAME_MAX];
-	unsigned int level_uboot;
 	unsigned int level_default;
 	unsigned int level_min;
 	unsigned int level_max;
@@ -138,8 +158,8 @@ struct bl_config_s {
 	unsigned int en_gpio;
 	unsigned int en_gpio_on;
 	unsigned int en_gpio_off;
-	unsigned short power_on_delay;
-	unsigned short power_off_delay;
+	unsigned int power_on_delay;
+	unsigned int power_off_delay;
 	unsigned int dim_max;
 	unsigned int dim_min;
 	unsigned int en_sequence_reverse;
@@ -151,59 +171,56 @@ struct bl_config_s {
 	unsigned int pwm_off_delay;
 
 	struct bl_gpio_s bl_gpio[BL_GPIO_NUM_MAX];
+	struct pinctrl *pin;
+	unsigned int pinmux_flag;
 	unsigned int bl_extern_index;
 };
+
+#define BL_INDEX_DEFAULT     0
 
 /* backlight_properties: state */
 /* Flags used to signal drivers of state changes */
 /* Upper 4 bits in bl props are reserved for driver internal use */
-#define BL_STATE_DV_EN                BIT(4)
+#define BL_STATE_GD_EN                BIT(4)
 #define BL_STATE_LCD_ON               BIT(3)
 #define BL_STATE_BL_INIT_ON           BIT(2)
 #define BL_STATE_BL_POWER_ON          BIT(1)
 #define BL_STATE_BL_ON                BIT(0)
-
-/* #define BL_POWER_ON_DELAY_WORK */
 struct aml_bl_drv_s {
 	unsigned int index;
-	unsigned int key_valid;
-	unsigned int config_load;
-	unsigned int state;
 	unsigned int level;
-	unsigned int level_dv;
-	unsigned int level_init_on;
-
-	unsigned char brightness_bypass;
-	unsigned char step_on_flag;
-	unsigned char on_request; /* for lcd power sequence */
-	unsigned char off_policy_cnt; /* bl_off_policy support */
-	unsigned char pwm_bypass; /*debug flag*/
-	unsigned char pwm_duty_free; /*debug flag*/
-
-	struct bl_config_s        bconf;
-	struct cdev               cdev;
-	struct bl_data_s          *data;
+	unsigned int brightness_level;
+	unsigned int gd_level;
+	unsigned int state;
+	struct bl_data_s *data;
 	struct device             *dev;
+	struct bl_config_s        *bconf;
 	struct backlight_device   *bldev;
-	struct delayed_work       delayed_on_work;
+	struct workqueue_struct   *workqueue;
+	struct delayed_work       bl_delayed_work;
 	struct resource *res_ldim_vsync_irq;
-	struct resource *res_vsync_irq[3];
+	struct resource *res_bl_vsync_irq;
 	/*struct resource *res_ldim_rdma_irq;*/
-
-	struct pinctrl *pin;
-	unsigned int pinmux_flag;
 };
 
-struct aml_bl_drv_s *aml_bl_get_driver(int index);
-int aml_bl_index_add(int drv_index, int conf_index);
+extern struct aml_bl_drv_s *aml_bl_get_driver(void);
+extern void bl_pwm_config_init(struct bl_pwm_config_s *bl_pwm);
+extern enum bl_pwm_port_e bl_pwm_str_to_pwm(const char *str);
+extern void bl_pwm_ctrl(struct bl_pwm_config_s *bl_pwm, int status);
 
-void bl_pwm_config_init(struct bl_pwm_config_s *bl_pwm);
-enum bl_pwm_port_e bl_pwm_str_to_pwm(const char *str);
-void bl_pwm_ctrl(struct bl_pwm_config_s *bl_pwm, int status);
 
 #define BL_GPIO_OUTPUT_LOW		0
 #define BL_GPIO_OUTPUT_HIGH		1
 #define BL_GPIO_INPUT			2
+
+static inline unsigned int bl_do_div(unsigned long long num, unsigned int den)
+{
+	unsigned long long ret = num;
+
+	do_div(ret, den);
+
+	return (unsigned int)ret;
+}
 
 #endif
 

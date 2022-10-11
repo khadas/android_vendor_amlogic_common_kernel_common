@@ -1,4 +1,3 @@
-/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
  * include/linux/amlogic/media/amvecm/amvecm.h
  *
@@ -19,133 +18,93 @@
 #ifndef AMVECM_H
 #define AMVECM_H
 
-//#define T7_BRINGUP_MULTI_VPP
-
 #include "linux/amlogic/media/amvecm/ve.h"
 #include "linux/amlogic/media/amvecm/cm.h"
 #include "linux/amlogic/media/amvecm/hdr10_tmo_alg.h"
 #include <linux/amlogic/media/vfm/vframe.h>
 #include <linux/amlogic/media/utils/amstream.h>
-/* media module used media/registers/cpu_version.h since kernel 5.4 */
-#include <linux/amlogic/media/registers/cpu_version.h>
 #include <linux/amlogic/media/video_sink/vpp.h>
+#include <linux/amlogic/cpu_version.h>
 #include <drm/drmP.h>
 
-#ifndef CONFIG_AMLOGIC_MEDIA_ENHANCEMENT_DOLBYVISION
-bool is_dolby_vision_enable(void);
-bool is_dolby_vision_on(void);
-bool is_dolby_vision_stb_mode(void);
-bool for_dolby_vision_certification(void);
-bool is_dovi_frame(struct vframe_s *vf);
-void dolby_vision_set_toggle_flag(int flag);
-#endif
-
-#ifndef MAX
-#define MAX(a, b) ({ \
-	typeof(a) _a = a; \
-	typeof(b) _b = b; \
-	_a > _b ? _a : _b; \
-	})
-#endif // MAX
-
-#ifndef MIN
-#define MIN(c, d) ({ \
-	typeof(c) _c = c; \
-	typeof(d) _d = d; \
-	_c < _d ? _c : _d; \
-	})
-#endif // MIN
-
-#ifndef FMETER_SCORE
-#define FMETER_SCORE(x, y, z) ({ \
-			typeof(x) _x = x; \
-			typeof(y) _y = y; \
-			typeof(z) _z = z; \
-			MAX(MIN(100, MAX(0, (_x * 1000) / (_x + _y + _z))), \
-			MIN(100, MAX(0, (_x + _y) * 1000 / \
-			(_x + _y + _z) / 3))); \
-			})
-#endif // FMETER_SCORE
 
 /* struct ve_dnlp_s          video_ve_dnlp; */
-#define FLAG_RSV31              BIT(31)
-#define FLAG_VADJ1_COLOR        BIT(30)
-#define FLAG_VE_DNLP            BIT(29)
-#define FLAG_VE_NEW_DNLP        BIT(28)
-#define FLAG_VE_LC_CURV         BIT(27)
+#define FLAG_RSV31              (1 << 31)
+#define FLAG_VADJ1_COLOR        (1 << 30)
+#define FLAG_VE_DNLP            (1 << 29)
+#define FLAG_VE_NEW_DNLP        (1 << 28)
+#define FLAG_VE_LC_CURV         (1 << 27)
 #define FLAG_HDR_OOTF_LATCH     BIT(26)
-#define FLAG_3D_BLACK_DIS       BIT(25)
-#define FLAG_3D_BLACK_EN        BIT(24)
-#define FLAG_3D_SYNC_DIS        BIT(23)
-#define FLAG_3D_SYNC_EN         BIT(22)
-#define FLAG_VLOCK_DIS          BIT(21)
-#define FLAG_VLOCK_EN          BIT(20)
-#define FLAG_VE_DNLP_EN         BIT(19)
-#define FLAG_VE_DNLP_DIS        BIT(18)
-#define FLAG_VADJ1_CON			BIT(17)
-#define FLAG_VADJ1_BRI			BIT(16)
-#define FLAG_GAMMA_TABLE_EN     BIT(15)
-#define FLAG_GAMMA_TABLE_DIS    BIT(14)
-#define FLAG_GAMMA_TABLE_R      BIT(13)
-#define FLAG_GAMMA_TABLE_G      BIT(12)
-#define FLAG_GAMMA_TABLE_B      BIT(11)
-#define FLAG_RGB_OGO            BIT(10)
+#define FLAG_3D_BLACK_DIS       (1 << 25)
+#define FLAG_3D_BLACK_EN        (1 << 24)
+#define FLAG_3D_SYNC_DIS        (1 << 23)
+#define FLAG_3D_SYNC_EN         (1 << 22)
+#define FLAG_VLOCK_DIS          (1 << 21)
+#define FLAG_VLOCK_EN          (1 << 20)
+#define FLAG_VE_DNLP_EN         (1 << 19)
+#define FLAG_VE_DNLP_DIS        (1 << 18)
+#define FLAG_VADJ1_CON			(1 << 17)
+#define FLAG_VADJ1_BRI			(1 << 16)
+#define FLAG_GAMMA_TABLE_EN     (1 << 15)
+#define FLAG_GAMMA_TABLE_DIS    (1 << 14)
+#define FLAG_GAMMA_TABLE_R      (1 << 13)
+#define FLAG_GAMMA_TABLE_G      (1 << 12)
+#define FLAG_GAMMA_TABLE_B      (1 << 11)
+#define FLAG_RGB_OGO            (1 << 10)
 #define FLAG_VADJ_EN            BIT(9)
-#define FLAG_MATRIX_UPDATE      BIT(8)
-#define FLAG_BRI_CON            BIT(7)
-#define FLAG_LVDS_FREQ_SW       BIT(6)
-#define FLAG_REG_MAP5           BIT(5)
-#define FLAG_REG_MAP4           BIT(4)
-#define FLAG_REG_MAP3           BIT(3)
-#define FLAG_REG_MAP2           BIT(2)
-#define FLAG_REG_MAP1           BIT(1)
-#define FLAG_REG_MAP0           BIT(0)
+#define FLAG_MATRIX_UPDATE      (1 <<  8)
+#define FLAG_BRI_CON            (1 <<  7)
+#define FLAG_LVDS_FREQ_SW       (1 <<  6)
+#define FLAG_REG_MAP5           (1 <<  5)
+#define FLAG_REG_MAP4           (1 <<  4)
+#define FLAG_REG_MAP3           (1 <<  3)
+#define FLAG_REG_MAP2           (1 <<  2)
+#define FLAG_REG_MAP1           (1 <<  1)
+#define FLAG_REG_MAP0           (1 <<  0)
 
-/*
- *#define VPP_VADJ2_BLMINUS_EN        (1 << 3)
- *#define VPP_VADJ2_EN                (1 << 2)
- *#define VPP_VADJ1_BLMINUS_EN        (1 << 1)
- *#define VPP_VADJ1_EN                (1 << 0)
- */
+#define VPP_VADJ2_BLMINUS_EN        (1 << 3)
+#define VPP_VADJ2_EN                (1 << 2)
+#define VPP_VADJ1_BLMINUS_EN        (1 << 1)
+#define VPP_VADJ1_EN                (1 << 0)
 
-#define VPP_EYE_PROTECT_UPDATE      BIT(7)
 #define VPP_PRE_GAMMA_UPDATE        BIT(6)
 #define VPP_MARTIX_GET              BIT(5)
 #define VPP_MARTIX_UPDATE           BIT(4)
-#define VPP_DEMO_DNLP_DIS           BIT(3)
-#define VPP_DEMO_DNLP_EN            BIT(2)
-#define VPP_DEMO_CM_DIS             BIT(1)
-#define VPP_DEMO_CM_EN              BIT(0)
+#define VPP_DEMO_DNLP_DIS           (1 << 3)
+#define VPP_DEMO_DNLP_EN            (1 << 2)
+#define VPP_DEMO_CM_DIS             (1 << 1)
+#define VPP_DEMO_CM_EN              (1 << 0)
 
 /*PQ USER LATCH*/
+#define PQ_USER_CMS_SAT_HUE        BIT(24)
 #define PQ_USER_CMS_CURVE_HUE_HS   BIT(23)
 #define PQ_USER_CMS_CURVE_HUE      BIT(22)
 #define PQ_USER_CMS_CURVE_LUMA     BIT(21)
 #define PQ_USER_CMS_CURVE_SAT      BIT(20)
-#define PQ_USER_SR1_DERECTION_DIS  BIT(19)
-#define PQ_USER_SR1_DERECTION_EN   BIT(18)
-#define PQ_USER_SR0_DERECTION_DIS  BIT(17)
-#define PQ_USER_SR0_DERECTION_EN   BIT(16)
-#define PQ_USER_SR1_DEJAGGY_DIS    BIT(15)
-#define PQ_USER_SR1_DEJAGGY_EN     BIT(14)
-#define PQ_USER_SR0_DEJAGGY_DIS    BIT(13)
-#define PQ_USER_SR0_DEJAGGY_EN     BIT(12)
-#define PQ_USER_SR1_DERING_DIS     BIT(11)
-#define PQ_USER_SR1_DERING_EN      BIT(10)
-#define PQ_USER_SR0_DERING_DIS     BIT(9)
-#define PQ_USER_SR0_DERING_EN      BIT(8)
-#define PQ_USER_SR1_PK_DIS         BIT(7)
-#define PQ_USER_SR1_PK_EN          BIT(6)
-#define PQ_USER_SR0_PK_DIS         BIT(5)
-#define PQ_USER_SR0_PK_EN          BIT(4)
-#define PQ_USER_BLK_SLOPE          BIT(3)
-#define PQ_USER_BLK_START          BIT(2)
-#define PQ_USER_BLK_DIS            BIT(1)
-#define PQ_USER_BLK_EN             BIT(0)
+#define PQ_USER_SR1_DERECTION_DIS  (1 << 19)
+#define PQ_USER_SR1_DERECTION_EN   (1 << 18)
+#define PQ_USER_SR0_DERECTION_DIS  (1 << 17)
+#define PQ_USER_SR0_DERECTION_EN   (1 << 16)
+#define PQ_USER_SR1_DEJAGGY_DIS    (1 << 15)
+#define PQ_USER_SR1_DEJAGGY_EN     (1 << 14)
+#define PQ_USER_SR0_DEJAGGY_DIS    (1 << 13)
+#define PQ_USER_SR0_DEJAGGY_EN     (1 << 12)
+#define PQ_USER_SR1_DERING_DIS     (1 << 11)
+#define PQ_USER_SR1_DERING_EN      (1 << 10)
+#define PQ_USER_SR0_DERING_DIS     (1 << 9)
+#define PQ_USER_SR0_DERING_EN      (1 << 8)
+#define PQ_USER_SR1_PK_DIS         (1 << 7)
+#define PQ_USER_SR1_PK_EN          (1 << 6)
+#define PQ_USER_SR0_PK_DIS         (1 << 5)
+#define PQ_USER_SR0_PK_EN          (1 << 4)
+#define PQ_USER_BLK_SLOPE          (1 << 3)
+#define PQ_USER_BLK_START          (1 << 2)
+#define PQ_USER_BLK_DIS            (1 << 1)
+#define PQ_USER_BLK_EN             (1 << 0)
 
 /*white balance latch*/
-#define MTX_BYPASS_RGB_OGO			BIT(0)
-#define MTX_RGB2YUVL_RGB_OGO		BIT(1)
+#define MTX_BYPASS_RGB_OGO			(1 << 0)
+#define MTX_RGB2YUVL_RGB_OGO		(1 << 1)
 
 #define UNKNOWN_SOURCE		0
 #define HDR10_SOURCE		1
@@ -155,6 +114,8 @@ void dolby_vision_set_toggle_flag(int flag);
 #define HLG_SOURCE			5
 #define SDR_SOURCE			6
 #define MVC_SOURCE           7
+#define CUVA_HDR_SOURCE      8
+#define CUVA_HLG_SOURCE      9
 
 #define DNLP_PARAM_RD_UPDATE 0x1
 #define DNLP_CV_RD_UPDATE 0x2
@@ -196,7 +157,7 @@ enum pq_table_name_e {
 	TABLE_NAME_HDR = 0x20000,	/*in vpp*/
 	TABLE_NAME_DOLBY_VISION = 0x40000,/*in vpp*/
 	TABLE_NAME_OVERSCAN = 0x80000,
-	TABLE_NAME_SMOOTHPLUS = 0x100000, /*in di*/
+	TABLE_NAME_SMOOTHPLUS = 0x100000,/*in di*/
 	TABLE_NAME_RESERVED2 = 0x200000,
 	TABLE_NAME_RESERVED3 = 0x400000,
 	TABLE_NAME_RESERVED4 = 0x800000,
@@ -238,12 +199,12 @@ struct ve_pq_load_s {
 	enum pq_table_name_e param_id;
 	unsigned int length;
 	union {
-	void *param_ptr;
-	long long param_ptr_len;
+		void *param_ptr;
+		long long param_ptr_len;
 	};
 	union {
-	void *reserved;
-	long long reserved_len;
+		void *reserved;
+		long long reserved_len;
 	};
 };
 
@@ -260,7 +221,6 @@ enum dnlp_state_e {
 	DNLP_OFF = 0,
 	DNLP_ON,
 };
-
 /*DNLP IOCTL command list*/
 #define AMVECM_IOC_G_DNLP_STATE _IOR(_VE_CM, 0x53, enum dnlp_state_e)
 #define AMVECM_IOC_S_DNLP_STATE _IOW(_VE_CM, 0x54, enum dnlp_state_e)
@@ -268,7 +228,6 @@ enum pc_mode_e {
 	PCMODE_OFF = 0,
 	PCMODE_ON,
 };
-
 /*PCMODE IOCTL command list*/
 #define AMVECM_IOC_G_PQMODE _IOR(_VE_CM, 0x55, enum pc_mode_e)
 #define AMVECM_IOC_S_PQMODE _IOW(_VE_CM, 0x56, enum pc_mode_e)
@@ -324,7 +283,6 @@ enum meson_cpu_ver_e {
 	VER_C,
 	VER_MAX
 };
-
 /*cpu ver ioc*/
 #define AMVECM_IOC_S_MESON_CPU_VER _IOW(_VE_CM, 0x6b, enum meson_cpu_ver_e)
 
@@ -333,9 +291,7 @@ enum vpp_matrix_e {
 	MTX_NULL = 0,
 	VD1_MTX = 0x1,
 	POST2_MTX = 0x2,
-	POST_MTX = 0x4,
-	VPP1_POST2_MTX = 0x8,
-	VPP2_POST2_MTX = 0x10
+	POST_MTX = 0x4
 };
 
 struct matrix_coef_s {
@@ -367,13 +323,6 @@ struct pre_gamma_table_s {
 /*hdr10_tmo ioc*/
 #define AMVECM_IOC_S_HDR_TMO   _IOW(_VE_CM, 0x74, struct hdr_tmo_sw)
 #define AMVECM_IOC_G_HDR_TMO   _IOR(_VE_CM, 0x75, struct hdr_tmo_sw)
-
-struct eye_protect_s {
-	int en;
-	int rgb[3];
-};
-
-#define AMVECM_IOC_S_EYE_PROT   _IOW(_VE_CM, 0x78, struct eye_protect_s)
 
 struct am_vdj_mode_s {
 	int flag;
@@ -423,6 +372,7 @@ enum vpp_matrix_csc_e {
 	VPP_MATRIX_BT2020RGB_709RGB,
 	VPP_MATRIX_BT2020RGB_CUSRGB,
 	VPP_MATRIX_BT2020YUV_BT2020RGB_DYNAMIC = 0x50,
+	VPP_MATRIX_BT2020YUV_BT2020RGB_CUVA = 0x51,
 	VPP_MATRIX_DEFAULT_CSCTYPE = 0xffff,
 };
 
@@ -434,6 +384,8 @@ enum hdr_type_e {
 	HDRTYPE_HDR10PLUS = HDR10PLUS_SOURCE,
 	HDRTYPE_DOVI = DOVI_SOURCE,
 	HDRTYPE_MVC = MVC_SOURCE,
+	HDRTYPE_CUVA_HDR = CUVA_HDR_SOURCE,
+	HDRTYPE_CUVA_HLG = CUVA_HLG_SOURCE,
 };
 
 enum pd_comb_fix_lvl_e {
@@ -534,12 +486,12 @@ struct am_pq_parm_s {
 	unsigned int table_name;
 	unsigned int table_len;
 	union {
-	void *table_ptr;
-	long long l_table;
+		void *table_ptr;
+		long long l_table;
 	};
 	union {
-	void *reserved;
-	long long l_reserved;
+		void *reserved;
+		long long l_reserved;
 	};
 };
 
@@ -560,8 +512,8 @@ enum vlk_chiptype {
 	vlock_chip_tl1,
 	vlock_chip_tm2,
 	vlock_chip_sm1,
-	vlock_chip_t5,/*same as t5d*/
-	vlock_chip_t7,
+	vlock_chip_t5,
+	vlock_chip_t5d,
 };
 
 enum vlock_hw_ver_e {
@@ -592,22 +544,19 @@ struct vecm_match_data_s {
 	enum vlock_hw_ver_e vlk_hwver;
 	u32 vlk_phlock_en;
 	u32 vlk_pll_sel;/*independent panel pll and hdmitx pll*/
-	u32 reg_addr_vlock;
-	u32 reg_addr_hiu;
-	u32 reg_addr_anactr;
 };
 
 enum vd_path_e {
 	VD1_PATH = 0,
 	VD2_PATH = 1,
-	VD3_PATH = 2,
-	VD_PATH_MAX = 3
+	VD_PATH_MAX = 2
 };
 
 extern signed int vd1_brightness, vd1_contrast;
 extern bool gamma_en;
 extern unsigned int atv_source_flg;
 extern unsigned int sr_demo_flag;
+extern unsigned int sr_offset[2];
 extern enum hdr_type_e hdr_source_type;
 extern unsigned int pd_detect_en;
 extern bool wb_en;
@@ -617,27 +566,30 @@ extern bool wb_en;
 extern struct pq_ctrl_s pq_cfg;
 extern struct pq_ctrl_s dv_cfg_bypass;
 extern unsigned int lc_offset;
+extern int bs_3dlut_en;
 
 #define CSC_FLAG_TOGGLE_FRAME	1
 #define CSC_FLAG_CHECK_OUTPUT	2
 #define CSC_FLAG_FORCE_SIGNAL	4
 
-int amvecm_on_vs(struct vframe_s *display_vf,
-		 struct vframe_s *toggle_vf,
-		 int flags,
-		 unsigned int sps_h_en,
-		 unsigned int sps_v_en,
-		 unsigned int sps_w_in,
-		 unsigned int sps_h_in,
-		 unsigned int cm_in_w,
-		 unsigned int cm_in_h,
-		 enum vd_path_e vd_path);
-void refresh_on_vs(struct vframe_s *vf);
-void pc_mode_process(void);
-void pq_user_latch_process(void);
-void vlock_process(struct vframe_s *vf,
-		   struct vpp_frame_par_s *cur_video_sts);
+extern int amvecm_on_vs(
+	struct vframe_s *display_vf,
+	struct vframe_s *toggle_vf,
+	int flags,
+	unsigned int sps_h_en,
+	unsigned int sps_v_en,
+	unsigned int sps_w_in,
+	unsigned int sps_h_in,
+	unsigned int cm_in_w,
+	unsigned int cm_in_h,
+	enum vd_path_e vd_path);
+void refresh_on_vs(struct vframe_s *vf, struct vframe_s *rpt_vf);
+extern void pc_mode_process(void);
+extern void pq_user_latch_process(void);
+extern void vlock_process(struct vframe_s *vf,
+		struct vpp_frame_par_s *cur_video_sts);
 void get_hdr_process_name(int id, char *name, char *output_fmt);
+bool is_hdr_tvmode(void);
 
 /* master_display_info for display device */
 struct hdr_metadata_info_s {
@@ -646,36 +598,34 @@ struct hdr_metadata_info_s {
 	u32 luminance[2];		/* max/min lumin, normalized 10000 */
 };
 
-void vpp_vd_adj1_saturation_hue(signed int sat_val,
-				signed int hue_val, struct vframe_s *vf);
-void amvecm_sharpness_enable(int sel);
-int metadata_read_u32(uint32_t *value);
-int metadata_wait(struct vframe_s *vf);
-int metadata_sync(u32 frame_id, uint64_t pts);
-void amvecm_wakeup_queue(void);
-void lc_load_curve(struct ve_lc_curve_parm_s *p);
+extern void vpp_vd_adj1_saturation_hue(signed int sat_val,
+	signed int hue_val, struct vframe_s *vf);
+extern void amvecm_sharpness_enable(int sel);
+extern int metadata_read_u32(uint32_t *value);
+extern int metadata_wait(struct vframe_s *vf);
+extern int metadata_sync(uint32_t frame_id, uint64_t pts);
+extern void amvecm_wakeup_queue(void);
+extern void lc_load_curve(struct ve_lc_curve_parm_s *p);
 
-int amvecm_drm_get_gamma_size(u32 index);
-void amvecm_drm_init(u32 index);
-int amvecm_drm_gamma_set(u32 index,
+extern int amvecm_drm_get_gamma_size(u32 index);
+extern void amvecm_drm_init(u32 index);
+extern int amvecm_drm_gamma_set(u32 index,
 			 struct drm_color_lut *lut, int lut_size);
-int amvecm_drm_gamma_get(u32 index, u16 *red, u16 *green, u16 *blue);
-int amvecm_drm_gamma_enable(u32 index);
-int amvecm_drm_gamma_disable(u32 index);
-int am_meson_ctm_set(u32 index, struct drm_color_ctm *ctm);
-int am_meson_ctm_disable(void);
+extern int amvecm_drm_gamma_get(u32 index, u16 *red, u16 *green, u16 *blue);
+extern int amvecm_drm_gamma_enable(u32 index);
+extern int amvecm_drm_gamma_disable(u32 index);
+extern int am_meson_ctm_set(u32 index, struct drm_color_ctm *ctm);
+extern int am_meson_ctm_disable(void);
 
-void enable_osd1_mtx(unsigned int en);
+extern void enable_osd1_mtx(unsigned int en);
 void set_cur_hdr_policy(uint policy);
 bool di_api_mov_sel(unsigned int mode,
 		    unsigned int *pdate);
 enum hdr_type_e get_cur_source_type(enum vd_path_e vd_path);
 
 int amvecm_set_saturation_hue(int mab);
-
-#ifdef CONFIG_AMLOGIC_MEDIA_FRC
-int frc_set_seg_display(u8 enable, u8 seg1, u8 seg2, u8 seg3);
-#endif
+u32 hdr_set(u32 module_sel, u32 hdr_process_select);
+int vinfo_lcd_support(void);
 
 /*ai detected scenes*/
 enum detect_scene_e {
@@ -696,7 +646,6 @@ struct single_scene_s {
 };
 
 extern struct single_scene_s detected_scenes[SCENE_MAX];
-u32 hdr_set(u32 module_sel, u32 hdr_process_select);
+
 int dv_pq_ctl(enum dv_pq_ctl_e ctl);
 #endif /* AMVECM_H */
-

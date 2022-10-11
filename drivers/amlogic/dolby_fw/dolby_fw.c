@@ -1,6 +1,18 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/amlogic/dolby_fw/dolby_fw.c
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
 #include <linux/cdev.h>
@@ -15,13 +27,11 @@
 #include <linux/delay.h>
 #include <linux/platform_device.h>
 #include <linux/of.h>
+#include <linux/amlogic/secmon.h>
 #include <linux/dma-mapping.h>
 #include <asm/cacheflush.h>
 #include <linux/arm-smccc.h>
 #include "dolby_fw.h"
-#ifdef CONFIG_AMLOGIC_SEC
-#include <linux/amlogic/secmon.h>
-#endif
 
 #define DOLBY_FW_DEVICE_NAME   "dolby_fw"
 #define DOLBY_FW_DRIVER_NAME   "dolby_fw"
@@ -51,13 +61,13 @@ void __iomem *sharemem_out_base;
 #define DOLBY_FW_CRITICAL_MAX_SIZE 0x400
 
 struct dolby_fw_args {
-	u64 src_addr;
+	uint64_t src_addr;
 	unsigned int src_len;
-	u64 dest_addr;
+	uint64_t dest_addr;
 	unsigned int dest_len;
-	u64 arg1;
-	u64 arg2;
-	u64 arg3;
+	uint64_t arg1;
+	uint64_t arg2;
+	uint64_t arg3;
 };
 
 static int dolby_fw_smc_call(u64 function_id, u64 arg1, u64 arg2, u64 arg3)
@@ -83,7 +93,7 @@ static int dolby_fw_signature(struct dolby_fw_args *info)
 {
 	int ret = -1;
 
-	meson_sm_mutex_lock();
+	sharemem_mutex_lock();
 
 	if (info->src_len > mem_size)
 		goto sig_err;
@@ -97,7 +107,7 @@ static int dolby_fw_signature(struct dolby_fw_args *info)
 	}
 	ret = dolby_fw_smc_call(DOLBY_FW_SIGNATURE, info->src_len, 0, 0);
 sig_err:
-	meson_sm_mutex_unlock();
+	sharemem_mutex_unlock();
 
 	return ret;
 }
@@ -105,7 +115,10 @@ sig_err:
 static int dolby_fw_decrypt(struct dolby_fw_args *info)
 {
 	int ret = -1;
+	void __iomem *mem_in_virt = NULL, *mem_out_virt = NULL;
 	int i, data_size, size, process_size;
+	phys_addr_t in_phy, out_phy;
+	dma_addr_t dma_in_handle, dma_out_handle;
 
 	if (info->src_len != info->dest_len) {
 		pr_err("%s:%d: args are error!\n",
@@ -114,47 +127,74 @@ static int dolby_fw_decrypt(struct dolby_fw_args *info)
 	}
 	data_size = info->src_len;
 
-	meson_sm_mutex_lock();
+	mem_in_virt = devm_kzalloc(device, mem_size, GFP_KERNEL);
+	if (!mem_in_virt)
+		goto err;
+	mem_out_virt = devm_kzalloc(device, mem_size, GFP_KERNEL);
+	if (!mem_out_virt)
+		goto err1;
 
-	for (i = 0, size = 0; i <= data_size / mem_size; i++) {
+	in_phy = virt_to_phys(mem_in_virt);
+	out_phy = virt_to_phys(mem_out_virt);
+
+	dma_in_handle = dma_map_single(device, mem_in_virt,
+			mem_size, DMA_TO_DEVICE);
+	dma_out_handle = dma_map_single(device, mem_out_virt,
+			mem_size, DMA_FROM_DEVICE);
+
+	for (i = 0, size = 0; i <= data_size/mem_size; i++) {
 		if (size + mem_size <= data_size)
 			process_size = mem_size;
 		else
 			process_size = data_size - size;
 
 		if (process_size > mem_size)
-			goto err;
-		ret = copy_from_user(sharemem_in_base,
-				(void *)(uintptr_t)(info->src_addr + size),
+			goto err2;
+		ret = copy_from_user(mem_in_virt,
+				(void *)(uintptr_t)(info->src_addr+size),
 				process_size);
 		if (ret != 0) {
 			pr_err("%s:%d: decrypt copy data fail!\n",
 					__func__, __LINE__);
-			goto err;
+			goto err2;
 		}
 
+		dma_sync_single_for_device(device, dma_in_handle,
+					process_size, DMA_TO_DEVICE);
+		dma_sync_single_for_device(device, dma_out_handle,
+					process_size, DMA_FROM_DEVICE);
+
 		ret = dolby_fw_smc_call(DOLBY_FW_DECRYPT,
-				0, 0, process_size);
+				in_phy, out_phy, process_size);
 		if (ret) {
 			pr_err("%s:%d: audio firmware decrypt fail!\n",
 					__func__, __LINE__);
-			goto err;
+			goto err2;
 		}
-		if (process_size > info->dest_len)
-			goto err;
 
-		ret = copy_to_user((void *)(uintptr_t)(info->dest_addr + size),
-				sharemem_out_base, process_size);
+		dma_sync_single_for_cpu(device, dma_out_handle,
+				process_size, DMA_FROM_DEVICE);
+		if (process_size > info->dest_len)
+			goto err2;
+		ret = copy_to_user(
+				(void *)(uintptr_t)(info->dest_addr+size),
+				mem_out_virt, process_size);
 		if (ret != 0) {
 			pr_err("%s:%d: decrypt write data fail!\n",
 					__func__, __LINE__);
-			goto err;
+			goto err2;
 		}
 		size += process_size;
 	}
 	ret = 0;
+
+err2:
+	dma_unmap_single(device, dma_out_handle, mem_size, DMA_FROM_DEVICE);
+	dma_unmap_single(device, dma_in_handle, mem_size, DMA_TO_DEVICE);
+	devm_kfree(device, mem_out_virt);
+err1:
+	devm_kfree(device, mem_in_virt);
 err:
-	meson_sm_mutex_unlock();
 	return ret;
 }
 
@@ -162,7 +202,10 @@ static int dolby_fw_verify(struct dolby_fw_args *info)
 {
 	int ret = -1;
 	int i, data_size, size, process_size, cnt;
+	void __iomem *mem_in_virt = NULL;
+	phys_addr_t in_phy;
 	unsigned char pre_shared[32];
+	dma_addr_t dma_in_handle;
 
 	if (info->dest_len < 0x20) {
 		pr_err("%s:%d: verify dest len erro!\n",
@@ -176,20 +219,29 @@ static int dolby_fw_verify(struct dolby_fw_args *info)
 	}
 
 	data_size = info->src_len;
-	cnt = (data_size / mem_size);
+	cnt = (data_size/mem_size);
 
-	meson_sm_mutex_lock();
+	mem_in_virt = devm_kzalloc(device, mem_size, GFP_KERNEL);
+	if (!mem_in_virt)
+		goto err;
+
+	in_phy = virt_to_phys(mem_in_virt);
+	dma_in_handle = dma_map_single(device,
+			mem_in_virt, mem_size, DMA_TO_DEVICE);
+
 	for (i = 0, size = 0; i < cnt; i++) {
-		ret = copy_from_user(sharemem_in_base,
-				(void *)(uintptr_t)(info->src_addr + size),
+		ret = copy_from_user(mem_in_virt,
+				(void *)(uintptr_t)(info->src_addr+size),
 				mem_size);
 		if (ret != 0) {
 			pr_err("%s:%d: verify copy data fail!\n",
 					__func__, __LINE__);
 			goto err1;
 		}
+		dma_sync_single_for_device(device, dma_in_handle,
+				mem_size, DMA_TO_DEVICE);
 		ret = dolby_fw_smc_call(DOLBY_FW_VERIFY_UPDATE,
-				0, mem_size, 0);
+				in_phy, mem_size, 0);
 		if (ret) {
 			pr_err("%s:%d: audio firmware verify update fail!\n",
 				__func__, __LINE__);
@@ -199,20 +251,23 @@ static int dolby_fw_verify(struct dolby_fw_args *info)
 	}
 
 	process_size = data_size - size;
+	sharemem_mutex_lock();
 	if (process_size) {
 		if (process_size > mem_size)
 			goto err2;
-		ret = copy_from_user(sharemem_in_base,
-				(void *)(uintptr_t)(info->src_addr + size),
+		ret = copy_from_user(mem_in_virt,
+				(void *)(uintptr_t)(info->src_addr+size),
 				process_size);
 		if (ret != 0) {
 			pr_err("%s:%d: verify copy data fail!\n",
 					__func__, __LINE__);
 			goto err2;
 		}
+		dma_sync_single_for_device(device, dma_in_handle,
+					process_size, DMA_TO_DEVICE);
 	}
 
-	ret = dolby_fw_smc_call(DOLBY_FW_VERIFY_FINAL, 0, process_size, 0);
+	ret = dolby_fw_smc_call(DOLBY_FW_VERIFY_FINAL, in_phy, process_size, 0);
 	if (ret) {
 		pr_err("%s:%d: audio firmware verify fail!\n",
 				__func__, __LINE__);
@@ -249,8 +304,10 @@ static int dolby_fw_verify(struct dolby_fw_args *info)
 	}
 
 err2:
+	sharemem_mutex_unlock();
 err1:
-	meson_sm_mutex_unlock();
+	dma_unmap_single(device, dma_in_handle, mem_size, DMA_TO_DEVICE);
+	devm_kfree(device, mem_in_virt);
 err:
 	return ret;
 }
@@ -259,16 +316,17 @@ static int dolby_fw_get_session_id(struct dolby_fw_args *info)
 {
 	int ret = -1;
 
-	meson_sm_mutex_lock();
+	sharemem_mutex_lock();
 	dolby_fw_smc_call(DOLBY_FW_GET_SESSION_ID, 0, 0, 0);
-	ret = copy_to_user((void *)(uintptr_t)(info->dest_addr),
-				sharemem_out_base, 16 + 4);
+	ret = copy_to_user(
+				(void *)(uintptr_t)(info->dest_addr),
+				sharemem_out_base, 16+4);
 	if (ret != 0) {
 		pr_err("%s:%d: get session id fail!\n",
 				__func__, __LINE__);
 		ret = -1;
 	}
-	meson_sm_mutex_unlock();
+	sharemem_mutex_unlock();
 	return ret;
 }
 
@@ -276,7 +334,7 @@ static int dolby_fw_verify_lib_resp(struct dolby_fw_args *info)
 {
 	int ret = -1;
 
-	if (info->src_len < (16 + 32) || info->src_len > 0x1000) {
+	if (info->src_len < (16+32) || (info->src_len > 0x1000)) {
 		pr_err("verify lib resp input len error!\n");
 		goto err;
 	}
@@ -285,7 +343,7 @@ static int dolby_fw_verify_lib_resp(struct dolby_fw_args *info)
 		goto err;
 	}
 
-	meson_sm_mutex_lock();
+	sharemem_mutex_lock();
 	ret = copy_from_user(sharemem_in_base,
 				(void *)(uintptr_t)info->src_addr,
 				info->src_len);
@@ -309,7 +367,7 @@ static int dolby_fw_verify_lib_resp(struct dolby_fw_args *info)
 		ret = -1;
 	}
 err1:
-	meson_sm_mutex_unlock();
+	sharemem_mutex_unlock();
 err:
 	return ret;
 }
@@ -326,7 +384,7 @@ static unsigned int dolby_fw_audio_license_query(struct dolby_fw_args *info)
 		goto err;
 	}
 
-	meson_sm_mutex_lock();
+	sharemem_mutex_lock();
 	ret = copy_from_user(sharemem_in_base,
 			(void *)(uintptr_t)info->src_addr,
 			info->src_len);
@@ -338,7 +396,7 @@ static unsigned int dolby_fw_audio_license_query(struct dolby_fw_args *info)
 	}
 	outlen = dolby_fw_smc_call(DOLBY_FW_AUDIO_LICENSE_QUERY,
 			info->src_len, info->dest_len, 0);
-	if (!outlen || info->dest_len < outlen) {
+	if (!outlen || (info->dest_len < outlen)) {
 		pr_err("%s:%d: audio license query fail!\n",
 			__func__, __LINE__);
 		goto err1;
@@ -352,7 +410,7 @@ static unsigned int dolby_fw_audio_license_query(struct dolby_fw_args *info)
 	}
 	ret = outlen;
 err1:
-	meson_sm_mutex_unlock();
+	sharemem_mutex_unlock();
 err:
 	return ret;
 }
@@ -371,7 +429,7 @@ static int dolby_fw_critical_query(struct dolby_fw_args *info)
 		}
 	}
 
-	meson_sm_mutex_lock();
+	sharemem_mutex_lock();
 
 	if (info->src_len) {
 		ret = copy_from_user(sharemem_in_base,
@@ -398,7 +456,8 @@ static int dolby_fw_critical_query(struct dolby_fw_args *info)
 				__func__, __LINE__);
 		goto err1;
 	}
-	ret = copy_to_user((void *)(uintptr_t)(info->dest_addr),
+	ret = copy_to_user(
+				(void *)(uintptr_t)(info->dest_addr),
 				sharemem_out_base, size);
 	if (ret != 0) {
 		pr_err("%s:%d: get critical fail!\n",
@@ -408,16 +467,18 @@ static int dolby_fw_critical_query(struct dolby_fw_args *info)
 	ret = size;
 
 err1:
-	meson_sm_mutex_unlock();
+	sharemem_mutex_unlock();
 err:
 	return ret;
 }
 
-static long dolby_fw_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
+
+static long dolby_fw_ioctl(struct file *file, unsigned int cmd,
+			  unsigned long arg)
 {
 	void __user	*argp = (void __user *)arg;
 	struct dolby_fw_args info;
-	int ret;
+	int			ret;
 
 	if (!argp) {
 		pr_err("%s:%d,wrong param\n",
@@ -474,7 +535,6 @@ static int dolby_fw_probe(struct platform_device *pdev)
 {
 	int ret = 0;
 	unsigned int val;
-	int sharemem_in, sharemem_out;
 
 	device = &pdev->dev;
 	platform_set_drvdata(pdev, NULL);
@@ -510,16 +570,9 @@ static int dolby_fw_probe(struct platform_device *pdev)
 		goto err3;
 	}
 	mem_size = val;
-	sharemem_in = get_secmon_sharemem_in_size();
-	sharemem_out = get_secmon_sharemem_out_size();
-	if (mem_size > sharemem_in)
-		mem_size = sharemem_in;
-	if (mem_size > sharemem_out)
-		mem_size = sharemem_out;
-	sharemem_in_base = get_meson_sm_input_base();
-	sharemem_out_base = get_meson_sm_output_base();
-	if (!sharemem_in_base || !sharemem_out_base)
-		goto err3;
+
+	sharemem_in_base = get_secmon_sharemem_input_base();
+	sharemem_out_base = get_secmon_sharemem_output_base();
 
 	return 0;
 
@@ -547,7 +600,6 @@ static const struct of_device_id amlogic_dolby_fw_dt_match[] = {
 	},
 	{},
 };
-
 static struct platform_driver dolby_fw_driver = {
 	.probe = dolby_fw_probe,
 	.remove = dolby_fw_remove,
@@ -557,7 +609,6 @@ static struct platform_driver dolby_fw_driver = {
 		.owner = THIS_MODULE,
 	},
 };
-
 static int __init dolby_fw_init(void)
 {
 	int ret = -1;
@@ -569,12 +620,12 @@ static int __init dolby_fw_init(void)
 	}
 	return ret;
 }
-
 /* module unload */
 static  void __exit dolby_fw_exit(void)
 {
 	platform_driver_unregister(&dolby_fw_driver);
 }
+
 
 MODULE_LICENSE("GPL");
 MODULE_DESCRIPTION("Amlogic DOLBY FW Interface driver");

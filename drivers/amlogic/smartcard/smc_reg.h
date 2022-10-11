@@ -1,6 +1,18 @@
-/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/amlogic/smartcard/smc_reg.h
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
 #ifndef _SMC_REG_H
@@ -32,7 +44,7 @@
 #define BWI_DEFAULT 4
 #define BGT_DEFAULT 22
 
-struct SMCCARD_HW_REG0 {
+struct SMCCARD_HW_Reg0 {
 #ifdef __LITTLE_ENDIAN__
 	unsigned etu_divider:16;	/* Bit 15:0*/
 	unsigned first_etu_offset:3;	/* Bit 18:16*/
@@ -80,7 +92,7 @@ struct SMC_ANSWER_TO_RST {
 #endif
 };
 
-struct SMCCARD_HW_REG2 {
+struct SMCCARD_HW_Reg2 {
 #ifdef __LITTLE_ENDIAN__
 	unsigned xmit_invert:1;		/* Bit 0*/
 	unsigned xmit_lsb_msb:1;	/* Bit 1*/
@@ -118,7 +130,7 @@ struct SMCCARD_HW_REG2 {
 #endif
 };
 
-struct SMC_STATUS_REG {
+struct SMC_STATUS_Reg {
 #ifdef __LITTLE_ENDIAN__
 	unsigned recv_fifo_threshold_status:1;	/* Bit 0*/
 	unsigned send_fifo_last_byte_status:1;	/* Bit 1*/
@@ -166,7 +178,7 @@ struct SMC_STATUS_REG {
 #endif
 };
 
-struct SMC_INTERRUPT_REG {
+struct SMC_INTERRUPT_Reg {
 #ifdef __LITTLE_ENDIAN__
 	unsigned recv_fifo_bytes_threshold_int:1;	/* Bit 0*/
 	unsigned send_fifo_last_byte_int:1;	/* Bit 1*/
@@ -216,7 +228,7 @@ struct SMC_INTERRUPT_REG {
 #endif
 };
 
-struct SMCCARD_HW_REG5 {
+struct SMCCARD_HW_Reg5 {
 #ifdef __LITTLE_ENDIAN__
 	unsigned bwt_base_time_gnt:16;	/* Bit 15:0*/
 	unsigned btw_detect_en:1;	/* Bit 16*/
@@ -234,7 +246,7 @@ struct SMCCARD_HW_REG5 {
 #endif
 };
 
-struct SMCCARD_HW_REG6 {
+struct SMCCARD_HW_Reg6 {
 #ifdef __LITTLE_ENDIAN__
 	unsigned N_parameter:8;		/* Bit 7:0*/
 	unsigned cwi_value:4;			/* Bit 11:8*/

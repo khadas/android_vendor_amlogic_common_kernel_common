@@ -1,4 +1,3 @@
-/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
  * drivers/amlogic/media/enhancement/amvecm/set_hdr2_v0.h
  *
@@ -22,10 +21,7 @@
 #include "amcsc.h"
 
 #ifndef MAX
-#define MAX(x1, x2) ({ \
-	typeof(x1) _x1 = x1; \
-	typeof(x2) _x2 = x2; \
-	(double)(_x1 > _x2 ? _x1 : _x2); })
+#define MAX(x1, x2) (double)(x1 > x2 ? x1 : x2)
 #endif
 
 #ifndef POW
@@ -33,9 +29,7 @@
 #endif
 
 #ifndef LOG2
-#define LOG2(x)  ({ \
-	typeof(x) _x = x; \
-	(int)((_x) == 0 ? 0 : log2((long long)(_x)))
+#define LOG2(x) (int)(x == 0 ? 0 : log2((long long)x))
 #endif
 
 #define FLTZERO 0xfc000/*float zero*/
@@ -55,16 +49,16 @@
 #define maxbit     33/*freeze*/
 #define OGAIN_BW   12/*freeze*/
 
+int64_t FloatRev(int64_t iA);
+int64_t FloatCon(int64_t iA, int MOD);
+
 enum hdr_module_sel {
 	VD1_HDR = 1,
 	VD2_HDR = 2,
-	VD3_HDR = 3,
-	OSD1_HDR = 4,
-	OSD2_HDR = 5,
-	VDIN0_HDR = 6,
-	VDIN1_HDR = 7,
-	DI_HDR = 8,
-	DI_M2M_HDR = 9,
+	OSD1_HDR = 3,
+	VDIN0_HDR = 4,
+	VDIN1_HDR = 5,
+	DI_HDR = 6,
 	HDR_MAX
 };
 
@@ -98,8 +92,15 @@ enum hdr_process_sel {
 	HDR10P_SDR = BIT(11),
 	SDR_GMT_CONVERT = BIT(12),
 	IPT_MAP = BIT(13),
-	IPT_SDR = BIT(14),
-	PROCESS_MAX = BIT(15),
+	CUVA_BYPASS = BIT(14),
+	CUVA_SDR = BIT(15),
+	CUVA_HDR = BIT(16),
+	CUVA_HLG = BIT(17),
+	CUVA_IPT = BIT(18),
+	SDR_CUVA = BIT(19),
+	HDR_CUVA = BIT(20),
+	HLG_CUVA = BIT(21),
+	PROCESS_MAX = BIT(22),
 	/* reserved  several bits for additional info */
 	RGB_OSD = BIT(29),
 	RGB_VDIN = BIT(30),
@@ -129,6 +130,7 @@ enum hdr_hist_sel {
 #define HDR2_OETF_LUT_SIZE 149
 #define HDR2_CGAIN_LUT_SIZE 65
 
+
 #define MTX_NUM_PARAM 16
 struct hdr_proc_mtx_param_s {
 	int mtx_only;
@@ -152,20 +154,24 @@ struct hdr_proc_mtx_param_s {
 #define OO_NOR			(OO_BITS - OO_GAIN_SHIFT)
 
 struct hdr_proc_lut_param_s {
-	s64 eotf_lut[143];
-	s64 oetf_lut[149];
-	s64 ogain_lut[149];
-	s64 cgain_lut[65];
+	int64_t eotf_lut[143];
+	int64_t oetf_lut[149];
+	int64_t ogain_lut[149];
+	int64_t cgain_lut[65];
 	unsigned int lut_on;
 	unsigned int bitdepth;
 	unsigned int cgain_en;
 	unsigned int hist_en;
 };
 
-enum hdr_process_sel hdr_func(enum hdr_module_sel module_sel,
-			      u32 hdr_process_select,
-			      struct vinfo_s *vinfo,
-			      struct matrix_s *gmt_mtx);
+typedef int64_t(*MenuFun)(int64_t);
+void eotf_float_gen(int64_t *o_out, MenuFun eotf);
+void oetf_float_gen(int64_t *bin_e, MenuFun oetf);
+void nolinear_lut_gen(int64_t *bin_c, MenuFun cgain);
+extern enum hdr_process_sel hdr_func(enum hdr_module_sel module_sel,
+	u32 hdr_process_select,
+	struct vinfo_s *vinfo,
+	struct matrix_s *gmt_mtx);
 
 enum mtx_csc_e {
 	MATRIX_NULL = 0,
@@ -193,36 +199,47 @@ enum mtx_csc_e {
 	MATRIX_BT2020RGB_CUSRGB,
 };
 
-void mtx_setting(enum vpp_matrix_e mtx_sel,
-		 enum mtx_csc_e mtx_csc,
+extern void mtx_setting(enum vpp_matrix_e mtx_sel,
+	enum mtx_csc_e mtx_csc,
 	int mtx_on);
 
 unsigned int _log2(unsigned int value);
-int hdr10p_ebzcurve_update(enum hdr_module_sel module_sel,
-			   enum hdr_process_sel hdr_process_select,
-			   struct hdr10pgen_param_s *hdr10pgen_param);
-enum hdr_process_sel hdr10p_func(enum hdr_module_sel module_sel,
-				 u32 hdr_process_select,
-				 struct vinfo_s *vinfo,
-				 struct matrix_s *gmt_mtx);
-void set_ootf_lut(enum hdr_module_sel module_sel,
-		  struct hdr_proc_lut_param_s *hdr_lut_param);
+int hdr10p_ebzcurve_update(
+	enum hdr_module_sel module_sel,
+	enum hdr_process_sel hdr_process_select,
+	struct hdr10pgen_param_s *hdr10pgen_param);
+enum hdr_process_sel hdr10p_func(
+	enum hdr_module_sel module_sel,
+	u32 hdr_process_select,
+	struct vinfo_s *vinfo,
+	struct matrix_s *gmt_mtx);
+extern void set_ootf_lut(
+	enum hdr_module_sel module_sel,
+	struct hdr_proc_lut_param_s *hdr_lut_param);
 extern struct hdr_proc_lut_param_s hdr_lut_param;
 extern int oo_y_lut_hdr_sdr_def[149];
 extern int oo_y_lut_hdr_sdr[149];
 extern int oo_y_lut_hlg_sdr[149];
-void eo_clip_proc(struct vframe_master_display_colour_s *master_info,
-		  unsigned int eo_sel);
-int hdr10_tm_update(enum hdr_module_sel module_sel,
-		    enum hdr_process_sel hdr_process_select);
+void eo_clip_proc(
+	struct vframe_master_display_colour_s *master_info,
+	unsigned int eo_sel);
+int hdr10_tm_update(
+	enum hdr_module_sel module_sel,
+	enum hdr_process_sel hdr_process_select);
 extern int cgain_lut_bypass[65];
 extern unsigned int hdr10_pr;
 extern unsigned int hdr10_clip_disable;
 extern unsigned int hdr10_clip_luma;
 extern unsigned int hdr10_clip_margin;
-void get_hist(enum vd_path_e vd_path,
-	      enum hdr_hist_sel hist_sel);
+void get_hist(
+	enum vd_path_e vd_path,
+	enum hdr_hist_sel hist_sel);
 #define NUM_HDR_HIST 16
 extern u32 hdr_hist[NUM_HDR_HIST][128];
 extern u32 percentile[9];
 extern u32 disable_flush_flag;
+struct aml_gain_reg *get_cuva_gain(void);
+int cuva_hdr_update(
+	enum hdr_module_sel module_sel,
+	enum hdr_process_sel hdr_process_select);
+void mtx_init(enum vpp_matrix_e mtx_sel, enum mtx_csc_e mtx_csc, int mtx_on);

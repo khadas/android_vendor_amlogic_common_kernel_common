@@ -1,8 +1,10 @@
 #!/usr/bin/perl -W
-# SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 #
-# Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+# licence_check.pl V0.10
 #
+# jianxin.pan@2016-11-25
+
+
 use File::Basename;
 use File::Find;
 
@@ -35,11 +37,24 @@ for(@ARGV)
 }
 
 
-my $licence_start="// SPDX-License-Identifier: (GPL-2.0+ OR MIT)\n";
-my $licence_end=
+my $licence=
 "/*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * File_name_here
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */\n\n";
+
 
 #print $licence;
 
@@ -50,8 +65,22 @@ sub licence_process
 	my $f = basename($file_name);
 	#print "\n Abs <$d>,  f_ $f";
 	#print "\n Top: <$top>  ";
-
-	$licence_0=$licence_start.$licence_end;
+	my $log_name = File::Spec->abs2rel($d, $top);
+	$log_name =$log_name."\/";
+	$log_name .=basename($file_name);
+	my $len = length($log_name);
+	if($len > 76)
+	{
+		$log_name =basename($file_name);
+		$len = length($log_name);
+		if($len > 76)
+		{
+			$log_name ="";
+		}
+	}
+	#print "\n Process: ",$log_name;
+	$licence_0=$licence;
+	$licence_0=~s/File_name_here/$log_name/;
 	my $count = 0;
 	my $text_0="";
 	my $text_all=$licence_0;
@@ -131,18 +160,21 @@ sub process
     my $file = $File::Find::name;
     if (-f $file)
      {
-		if(($file =~ /.*\.[Cc]$/i) || ($file =~ /.*\.dtsi$/i) || ($file =~ /.*\.dts$/i))
-		{
-			$c_cnt++;
-			$licence_start="// SPDX-License-Identifier: (GPL-2.0+ OR MIT)\n";
-			licence_process($file);
-		}
-		if(($file =~ /.*\.[hH]$/i))
-		{
-			$c_cnt++;
-			$licence_start="/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */\n";
-			licence_process($file);
-		}
+		if(($file =~ /.*\.[CchH]$/i))
+				{
+					$c_cnt++;
+				licence_process($file);
+			}
+		if(($file =~ /.*\.dts$/i))
+				{
+					$c_cnt++;
+				licence_process($file);
+			}
+		if(($file =~ /.*\.dtsi$/i))
+				{
+					$c_cnt++;
+				licence_process($file);
+			}
 	}
 }
 

@@ -1,4 +1,3 @@
-/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
  * drivers/amlogic/media/video_processor/ppmgr/ppmgr_dev.h
  *
@@ -20,6 +19,7 @@
 #define PPMGR_DEV_INCLUDE_H
 #include <linux/amlogic/media/vfm/vframe.h>
 #include <linux/semaphore.h>
+
 struct ppmgr_device_t {
 	struct class *cla;
 	struct device *dev;
@@ -76,6 +76,7 @@ struct ppmgr_device_t {
 	struct platform_device *pdev;
 	unsigned int ppmgr_debug;
 	unsigned int debug_first_frame;
+	unsigned int debug_10bit_frame;
 	unsigned int debug_ppmgr_flag;
 	unsigned int get_count;
 	unsigned int put_count;
@@ -85,12 +86,6 @@ struct ppmgr_device_t {
 	char dump_path[32];
 	struct semaphore ppmgr_sem;
 	struct semaphore tb_sem;
-	unsigned int decontour_addr;
-	int dump_grid;
-	int bypass_decontour;
-	int debug_decontour;
-	int i_do_decontour;
-	bool reg_dct_irq_success;
 };
 
 struct ppmgr_dev_reg_s {
@@ -112,16 +107,20 @@ struct ppframe_s {
 
 extern struct ppmgr_device_t ppmgr_device;
 
-#ifdef CONFIG_AMLOGIC_POST_PROCESS_MANAGER_PPSCALER
-int video_scaler_notify(int flag);
-void amvideo_set_scaler_para(int x, int y, int w, int h, int flag);
+#ifdef CONFIG_AMLOGIC_POST_PROCESS_MANAGER_3D_PROCESS
+extern void Reset3Dclear(void);
+extern void Set3DProcessPara(unsigned int mode);
 #endif
 
-int vf_ppmgr_get_states(struct vframe_states *states);
-int get_property_change(void);
-void set_property_change(int flag);
-int get_buff_change(void);
-void set_buff_change(int flag);
-enum platform_type_t get_platform_type(void);
+#ifdef CONFIG_AMLOGIC_POST_PROCESS_MANAGER_PPSCALER
+extern int video_scaler_notify(int flag);
+extern void amvideo_set_scaler_para(int x, int y, int w, int h, int flag);
+
+extern int video_scaler_notify(int flag);
+extern void amvideo_set_scaler_para(int x, int y, int w, int h, int flag);
+
+#endif
+
+extern int vf_ppmgr_get_states(struct vframe_states *states);
 
 #endif /* PPMGR_DEV_INCLUDE_H. */

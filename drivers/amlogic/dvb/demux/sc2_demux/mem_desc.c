@@ -1,6 +1,18 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/amlogic/dvb/demux/sc2_demux/mem_desc.c
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
 #include <linux/dma-mapping.h>
@@ -368,6 +380,9 @@ int _alloc_buff(unsigned int len, int sec_level,
 
 	iret = cache_malloc(len, &buf_start_virt, &buf_start);
 	if (iret == 0) {
+		pr_dbg("init cache phy:0x%lx, virt:0x%lx, len:%d\n",
+				buf_start, buf_start_virt, len);
+		memset((char *)buf_start_virt, 0, len);
 		if (sec_level) {
 			sec_level = sec_level == 1 ? 0 : sec_level;
 			ret = tee_protect_mem(TEE_MEM_TYPE_DEMUX, sec_level,
@@ -393,6 +408,10 @@ int _alloc_buff(unsigned int len, int sec_level,
 		dprint("%s fail\n", __func__);
 		return -1;
 	}
+	buf_start_virt = (unsigned long)codec_mm_phys_to_virt(buf_start);
+	pr_dbg("init phy:0x%lx, virt:0x%lx, len:%d\n",
+			buf_start, buf_start_virt, len);
+	memset((char *)buf_start_virt, 0, len);
 	if (sec_level) {
 		sec_level = sec_level == 1 ? 0 : sec_level;
 		//ret = tee_protect_tvp_mem(buf_start, len, handle);
@@ -401,7 +420,6 @@ int _alloc_buff(unsigned int len, int sec_level,
 		pr_dbg("%s, protect 0x%lx, len:%d, ret:0x%x\n",
 				__func__, buf_start, len, ret);
 	}
-	buf_start_virt = (unsigned long)codec_mm_phys_to_virt(buf_start);
 
 	*vir_mem = buf_start_virt;
 	*phy_mem = buf_start;
@@ -598,7 +616,7 @@ static void check_packet_alignm(unsigned int start, unsigned int end)
 	//detect packet alignm
 	for (n = 0; n < detect_len / 188; n++) {
 		if (p[n * 188] != 0x47) {
-			dprint_i("packet not alignm at %d,header:0x%0x\n",
+		dprint_i("packet not alignm at %d,header:0x%0x\n",
 				n * 188, p[n * 188]);
 			break;
 		}
@@ -823,7 +841,8 @@ int SC2_bufferid_read(struct chan_id *pchan, char **pread, unsigned int len,
 		if (w_offset > pchan->r_offset) {
 			data_len = min((w_offset - pchan->r_offset), buf_len);
 			if (!is_secure)
-				dma_sync_single_for_cpu(aml_get_device(),
+				dma_sync_single_for_cpu(
+						aml_get_device(),
 						(dma_addr_t)(pchan->mem_phy +
 							      pchan->r_offset),
 						data_len, DMA_FROM_DEVICE);
@@ -839,7 +858,8 @@ int SC2_bufferid_read(struct chan_id *pchan, char **pread, unsigned int len,
 				data_len = min(w_offset, buf_len);
 				pchan->r_offset = 0;
 				if (!is_secure)
-					dma_sync_single_for_cpu(aml_get_device(),
+					dma_sync_single_for_cpu(
+							aml_get_device(),
 							(dma_addr_t)
 							(pchan->mem_phy +
 							 pchan->r_offset),
@@ -854,7 +874,8 @@ int SC2_bufferid_read(struct chan_id *pchan, char **pread, unsigned int len,
 					pchan->mem + pchan->r_offset);
 			if (data_len < part1_len) {
 				if (!is_secure)
-					dma_sync_single_for_cpu(aml_get_device(),
+					dma_sync_single_for_cpu(
+							aml_get_device(),
 							(dma_addr_t)
 							(pchan->mem_phy +
 							 pchan->r_offset),
@@ -864,7 +885,8 @@ int SC2_bufferid_read(struct chan_id *pchan, char **pread, unsigned int len,
 			} else {
 				data_len = part1_len;
 				if (!is_secure)
-					dma_sync_single_for_cpu(aml_get_device(),
+					dma_sync_single_for_cpu(
+							aml_get_device(),
 							(dma_addr_t)
 							(pchan->mem_phy +
 							 pchan->r_offset),
@@ -913,7 +935,7 @@ int SC2_bufferid_write(struct chan_id *pchan, const char __user *buf,
 	while (r) {
 		if (isphybuf) {
 			pchan->enable = 1;
-			if (copy_from_user((char *)&ts_data,
+			if (copy_from_user((char *)(&ts_data),
 				p, sizeof(struct dmx_sec_ts_data))) {
 				dprint("copy_from user error\n");
 				return -EFAULT;
@@ -952,7 +974,7 @@ int SC2_bufferid_write(struct chan_id *pchan, const char __user *buf,
 				len = pchan->mem_size;
 			else
 				len = r;
-			if (copy_from_user((char *)pchan->mem, p, len)) {
+			if (copy_from_user((char *)(pchan->mem), p, len)) {
 				dprint("copy_from user error\n");
 				return -EFAULT;
 			}

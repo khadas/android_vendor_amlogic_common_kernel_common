@@ -1,8 +1,11 @@
-// SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (C) 2013 Advanced Micro Devices, Inc.
  *
  * Author: Jacob Shin <jacob.shin@amd.com>
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
  */
 
 #include <linux/perf_event.h>
@@ -20,20 +23,12 @@
 
 #define NUM_COUNTERS_NB		4
 #define NUM_COUNTERS_L2		4
-#define NUM_COUNTERS_L3		6
-#define MAX_COUNTERS		6
+#define MAX_COUNTERS		NUM_COUNTERS_NB
 
 #define RDPMC_BASE_NB		6
 #define RDPMC_BASE_LLC		10
 
 #define COUNTER_SHIFT		16
-
-#undef pr_fmt
-#define pr_fmt(fmt)	"amd_uncore: " fmt
-
-static int num_counters_llc;
-static int num_counters_nb;
-static bool l3_mask;
 
 static HLIST_HEAD(uncore_unused_list);
 
@@ -196,25 +191,17 @@ static int amd_uncore_event_init(struct perf_event *event)
 	 * out. So we do not support sampling and per-thread events via
 	 * CAP_NO_INTERRUPT, and we do not enable counter overflow interrupts:
 	 */
+
+	/* NB and Last level cache counters do not have usr/os/guest/host bits */
+	if (event->attr.exclude_user || event->attr.exclude_kernel ||
+	    event->attr.exclude_host || event->attr.exclude_guest)
+		return -EINVAL;
+
 	hwc->config = event->attr.config & AMD64_RAW_EVENT_MASK_NB;
 	hwc->idx = -1;
 
 	if (event->cpu < 0)
 		return -EINVAL;
-
-	/*
-	 * SliceMask and ThreadMask need to be set for certain L3 events in
-	 * Family 17h. For other events, the two fields do not affect the count.
-	 */
-	if (l3_mask && is_llc_event(event)) {
-		int thread = 2 * (cpu_data(event->cpu).cpu_core_id % 4);
-
-		if (smp_num_siblings > 1)
-			thread += cpu_data(event->cpu).apicid & 1;
-
-		hwc->config |= (1ULL << (AMD64_L3_THREAD_SHIFT + thread) &
-				AMD64_L3_THREAD_MASK) | AMD64_L3_SLICE_MASK;
-	}
 
 	uncore = event_to_amd_uncore(event);
 	if (!uncore)
@@ -256,65 +243,50 @@ static struct attribute_group amd_uncore_attr_group = {
 	.attrs = amd_uncore_attrs,
 };
 
-/*
- * Similar to PMU_FORMAT_ATTR but allowing for format_attr to be assigned based
- * on family
- */
-#define AMD_FORMAT_ATTR(_dev, _name, _format)				     \
-static ssize_t								     \
-_dev##_show##_name(struct device *dev,					     \
-		struct device_attribute *attr,				     \
-		char *page)						     \
-{									     \
-	BUILD_BUG_ON(sizeof(_format) >= PAGE_SIZE);			     \
-	return sprintf(page, _format "\n");				     \
-}									     \
-static struct device_attribute format_attr_##_dev##_name = __ATTR_RO(_dev);
+PMU_FORMAT_ATTR(event, "config:0-7,32-35");
+PMU_FORMAT_ATTR(umask, "config:8-15");
 
-/* Used for each uncore counter type */
-#define AMD_ATTRIBUTE(_name)						     \
-static struct attribute *amd_uncore_format_attr_##_name[] = {		     \
-	&format_attr_event_##_name.attr,				     \
-	&format_attr_umask.attr,					     \
-	NULL,								     \
-};									     \
-static struct attribute_group amd_uncore_format_group_##_name = {	     \
-	.name = "format",						     \
-	.attrs = amd_uncore_format_attr_##_name,			     \
-};									     \
-static const struct attribute_group *amd_uncore_attr_groups_##_name[] = {    \
-	&amd_uncore_attr_group,						     \
-	&amd_uncore_format_group_##_name,				     \
-	NULL,								     \
+static struct attribute *amd_uncore_format_attr[] = {
+	&format_attr_event.attr,
+	&format_attr_umask.attr,
+	NULL,
 };
 
-AMD_FORMAT_ATTR(event, , "config:0-7,32-35");
-AMD_FORMAT_ATTR(umask, , "config:8-15");
-AMD_FORMAT_ATTR(event, _df, "config:0-7,32-35,59-60");
-AMD_FORMAT_ATTR(event, _l3, "config:0-7");
-AMD_ATTRIBUTE(df);
-AMD_ATTRIBUTE(l3);
+static struct attribute_group amd_uncore_format_group = {
+	.name = "format",
+	.attrs = amd_uncore_format_attr,
+};
+
+static const struct attribute_group *amd_uncore_attr_groups[] = {
+	&amd_uncore_attr_group,
+	&amd_uncore_format_group,
+	NULL,
+};
 
 static struct pmu amd_nb_pmu = {
 	.task_ctx_nr	= perf_invalid_context,
+	.attr_groups	= amd_uncore_attr_groups,
+	.name		= "amd_nb",
 	.event_init	= amd_uncore_event_init,
 	.add		= amd_uncore_add,
 	.del		= amd_uncore_del,
 	.start		= amd_uncore_start,
 	.stop		= amd_uncore_stop,
 	.read		= amd_uncore_read,
-	.capabilities	= PERF_PMU_CAP_NO_EXCLUDE | PERF_PMU_CAP_NO_INTERRUPT,
+	.capabilities	= PERF_PMU_CAP_NO_INTERRUPT,
 };
 
 static struct pmu amd_llc_pmu = {
 	.task_ctx_nr	= perf_invalid_context,
+	.attr_groups	= amd_uncore_attr_groups,
+	.name		= "amd_l2",
 	.event_init	= amd_uncore_event_init,
 	.add		= amd_uncore_add,
 	.del		= amd_uncore_del,
 	.start		= amd_uncore_start,
 	.stop		= amd_uncore_stop,
 	.read		= amd_uncore_read,
-	.capabilities	= PERF_PMU_CAP_NO_EXCLUDE | PERF_PMU_CAP_NO_INTERRUPT,
+	.capabilities	= PERF_PMU_CAP_NO_INTERRUPT,
 };
 
 static struct amd_uncore *amd_uncore_alloc(unsigned int cpu)
@@ -332,7 +304,7 @@ static int amd_uncore_cpu_up_prepare(unsigned int cpu)
 		if (!uncore_nb)
 			goto fail;
 		uncore_nb->cpu = cpu;
-		uncore_nb->num_counters = num_counters_nb;
+		uncore_nb->num_counters = NUM_COUNTERS_NB;
 		uncore_nb->rdpmc_base = RDPMC_BASE_NB;
 		uncore_nb->msr_base = MSR_F15H_NB_PERF_CTL;
 		uncore_nb->active_mask = &amd_nb_active_mask;
@@ -346,7 +318,7 @@ static int amd_uncore_cpu_up_prepare(unsigned int cpu)
 		if (!uncore_llc)
 			goto fail;
 		uncore_llc->cpu = cpu;
-		uncore_llc->num_counters = num_counters_llc;
+		uncore_llc->num_counters = NUM_COUNTERS_L2;
 		uncore_llc->rdpmc_base = RDPMC_BASE_LLC;
 		uncore_llc->msr_base = MSR_F16H_L2I_PERF_CTL;
 		uncore_llc->active_mask = &amd_llc_active_mask;
@@ -513,39 +485,11 @@ static int __init amd_uncore_init(void)
 {
 	int ret = -ENODEV;
 
-	if (boot_cpu_data.x86_vendor != X86_VENDOR_AMD &&
-	    boot_cpu_data.x86_vendor != X86_VENDOR_HYGON)
-		return -ENODEV;
+	if (boot_cpu_data.x86_vendor != X86_VENDOR_AMD)
+		goto fail_nodev;
 
 	if (!boot_cpu_has(X86_FEATURE_TOPOEXT))
-		return -ENODEV;
-
-	if (boot_cpu_data.x86 == 0x17 || boot_cpu_data.x86 == 0x18) {
-		/*
-		 * For F17h or F18h, the Northbridge counters are
-		 * repurposed as Data Fabric counters. Also, L3
-		 * counters are supported too. The PMUs are exported
-		 * based on family as either L2 or L3 and NB or DF.
-		 */
-		num_counters_nb		  = NUM_COUNTERS_NB;
-		num_counters_llc	  = NUM_COUNTERS_L3;
-		amd_nb_pmu.name		  = "amd_df";
-		amd_llc_pmu.name	  = "amd_l3";
-		format_attr_event_df.show = &event_show_df;
-		format_attr_event_l3.show = &event_show_l3;
-		l3_mask			  = true;
-	} else {
-		num_counters_nb		  = NUM_COUNTERS_NB;
-		num_counters_llc	  = NUM_COUNTERS_L2;
-		amd_nb_pmu.name		  = "amd_nb";
-		amd_llc_pmu.name	  = "amd_l2";
-		format_attr_event_df	  = format_attr_event;
-		format_attr_event_l3	  = format_attr_event;
-		l3_mask			  = false;
-	}
-
-	amd_nb_pmu.attr_groups	= amd_uncore_attr_groups_df;
-	amd_llc_pmu.attr_groups = amd_uncore_attr_groups_l3;
+		goto fail_nodev;
 
 	if (boot_cpu_has(X86_FEATURE_PERFCTR_NB)) {
 		amd_uncore_nb = alloc_percpu(struct amd_uncore *);
@@ -557,13 +501,11 @@ static int __init amd_uncore_init(void)
 		if (ret)
 			goto fail_nb;
 
-		pr_info("%s NB counters detected\n",
-			boot_cpu_data.x86_vendor == X86_VENDOR_HYGON ?
-				"HYGON" : "AMD");
+		pr_info("perf: AMD NB counters detected\n");
 		ret = 0;
 	}
 
-	if (boot_cpu_has(X86_FEATURE_PERFCTR_LLC)) {
+	if (boot_cpu_has(X86_FEATURE_PERFCTR_L2)) {
 		amd_uncore_llc = alloc_percpu(struct amd_uncore *);
 		if (!amd_uncore_llc) {
 			ret = -ENOMEM;
@@ -573,9 +515,7 @@ static int __init amd_uncore_init(void)
 		if (ret)
 			goto fail_llc;
 
-		pr_info("%s LLC counters detected\n",
-			boot_cpu_data.x86_vendor == X86_VENDOR_HYGON ?
-				"HYGON" : "AMD");
+		pr_info("perf: AMD LLC counters detected\n");
 		ret = 0;
 	}
 
@@ -583,16 +523,16 @@ static int __init amd_uncore_init(void)
 	 * Install callbacks. Core will call them for each online cpu.
 	 */
 	if (cpuhp_setup_state(CPUHP_PERF_X86_AMD_UNCORE_PREP,
-			      "perf/x86/amd/uncore:prepare",
+			      "PERF_X86_AMD_UNCORE_PREP",
 			      amd_uncore_cpu_up_prepare, amd_uncore_cpu_dead))
 		goto fail_llc;
 
 	if (cpuhp_setup_state(CPUHP_AP_PERF_X86_AMD_UNCORE_STARTING,
-			      "perf/x86/amd/uncore:starting",
+			      "AP_PERF_X86_AMD_UNCORE_STARTING",
 			      amd_uncore_cpu_starting, NULL))
 		goto fail_prep;
 	if (cpuhp_setup_state(CPUHP_AP_PERF_X86_AMD_UNCORE_ONLINE,
-			      "perf/x86/amd/uncore:online",
+			      "AP_PERF_X86_AMD_UNCORE_ONLINE",
 			      amd_uncore_cpu_online,
 			      amd_uncore_cpu_down_prepare))
 		goto fail_start;
@@ -611,6 +551,7 @@ fail_nb:
 	if (amd_uncore_nb)
 		free_percpu(amd_uncore_nb);
 
+fail_nodev:
 	return ret;
 }
 device_initcall(amd_uncore_init);

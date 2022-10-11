@@ -1,4 +1,3 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
  * drivers/amlogic/media/video_sink/video_keeper.c
  *
@@ -29,6 +28,9 @@
 #include <linux/mutex.h>
 #include <linux/platform_device.h>
 #include <linux/ctype.h>
+#include <linux/amlogic/media/frame_sync/ptsserv.h>
+#include <linux/amlogic/media/frame_sync/timestamp.h>
+#include <linux/amlogic/media/frame_sync/tsync.h>
 
 #include <linux/amlogic/media/vfm/vframe.h>
 #include <linux/amlogic/media/vfm/vframe_provider.h>
@@ -47,12 +49,6 @@
 #include <linux/amlogic/media/ge2d/ge2d.h>
 #include <linux/amlogic/media/canvas/canvas_mgr.h>
 #endif
-#ifdef CONFIG_AMLOGIC_MEDIA_FRAME_SYNC
-#include <linux/amlogic/media/frame_sync/ptsserv.h>
-#include <linux/amlogic/media/frame_sync/timestamp.h>
-#include <linux/amlogic/media/frame_sync/tsync.h>
-#endif
-
 #include <linux/amlogic/media/codec_mm/codec_mm.h>
 #include <linux/amlogic/media/codec_mm/codec_mm_keeper.h>
 
@@ -69,7 +65,6 @@ static DEFINE_MUTEX(video_keeper_mutex);
 static unsigned long keep_y_addr, keep_u_addr, keep_v_addr;
 static int keep_video_on;
 static int keep_video_pip_on;
-static int keep_video_pip2_on;
 static int keep_id;
 static int keep_head_id;
 static int keep_dw_id;
@@ -82,9 +77,6 @@ static int keep_el_dw_id;
 static int keep_pip_el_id;
 static int keep_pip_el_head_id;
 static int keep_pip_el_dw_id;
-static int keep_pip2_id;
-static int keep_pip2_head_id;
-static int keep_pip2_dw_id;
 
 #define Y_BUFFER_SIZE   0x600000	/* for 1920*1088 */
 #define U_BUFFER_SIZE   0x100000	/* compatible with NV21 */
@@ -107,10 +99,10 @@ static int ge2d_videotask_init(void)
 {
 	const char *keep_owner = "keepframe";
 
-	if (!ge2d_video_context)
+	if (ge2d_video_context == NULL)
 		ge2d_video_context = create_ge2d_work_queue();
 
-	if (!ge2d_video_context) {
+	if (ge2d_video_context == NULL) {
 		pr_info("create_ge2d_work_queue video task failed\n");
 		return -1;
 	}
@@ -124,6 +116,8 @@ static int ge2d_videotask_init(void)
 
 	return 0;
 }
+
+
 
 static int ge2d_videotask_release(void)
 {
@@ -154,20 +148,21 @@ static int ge2d_store_frame_S_YUV444(u32 cur_index)
 
 	ydupindex = display_canvas_y_dup;
 
-	pr_info("%s cur_index:s:0x%x\n", __func__, cur_index);
+	pr_info("ge2d_store_frame_S_YUV444 cur_index:s:0x%x\n", cur_index);
 	/* pr_info("ge2d_store_frame cur_index:d:0x%x\n", canvas_tab[0]); */
 	y_index = cur_index & 0xff;
 	canvas_read(y_index, &cs);
 
 	yaddr = keep_phy_addr(keep_y_addr);
 	canvas_config(ydupindex,
-		      (ulong)yaddr,
+		      (ulong) yaddr,
 		      cs.width, cs.height, CANVAS_ADDR_NOWRAP, cs.blkmode);
 
 	canvas_read(ydupindex, &cd);
 	src_index = y_index;
 	des_index = ydupindex;
-
+	if (cs.addr == cd.addr)
+		return 1;
 	pr_info("ge2d_canvas_dup ADDR srcy[0x%lx] des[0x%lx] des_index[0x%x]\n",
 		cs.addr, cd.addr, des_index);
 
@@ -227,23 +222,23 @@ static int ge2d_store_frame_YUV444(u32 cur_index)
 
 	ydupindex = display_canvas_y_dup;
 
-	pr_info("%s cur_index:s:0x%x\n", __func__, cur_index);
+	pr_info("ge2d_store_frame_YUV444 cur_index:s:0x%x\n", cur_index);
 	/* pr_info("ge2d_store_frame cur_index:d:0x%x\n", canvas_tab[0]); */
 	y_index = cur_index & 0xff;
 	canvas_read(y_index, &cs);
 
 	yaddr = keep_phy_addr(keep_y_addr);
 	canvas_config(ydupindex,
-		      (ulong)yaddr,
-		      cs.width, cs.height,
-		      CANVAS_ADDR_NOWRAP, cs.blkmode);
+		(ulong) yaddr,
+		cs.width, cs.height,
+		CANVAS_ADDR_NOWRAP, cs.blkmode);
 
 	canvas_read(ydupindex, &cd);
 	src_index = y_index;
 	des_index = ydupindex;
 
-	pr_info("ge2d_canvas_dup ADDR srcy[0x%lx] des[0x%lx]\n",
-		cs.addr, cd.addr);
+	pr_info("ge2d_canvas_dup ADDR srcy[0x%lx] des[0x%lx]\n", cs.addr,
+	       cd.addr);
 
 	ge2d_config.alu_const_color = 0;
 	ge2d_config.bitmask_en = 0;
@@ -285,8 +280,8 @@ static int ge2d_store_frame_YUV444(u32 cur_index)
 	}
 
 	stretchblt_noalpha(ge2d_video_context,
-			   0, 0, cs.width, cs.height,
-			   0, 0, cs.width, cs.height);
+		0, 0, cs.width, cs.height,
+		0, 0, cs.width, cs.height);
 
 	return 0;
 }
@@ -305,7 +300,7 @@ static int ge2d_store_frame_NV21(u32 cur_index)
 	ydupindex = display_canvas_y_dup;
 	udupindex = display_canvas_u_dup;
 
-	pr_info("%s cur_index:s:0x%x\n", __func__, cur_index);
+	pr_info("ge2d_store_frame_NV21 cur_index:s:0x%x\n", cur_index);
 
 	/* pr_info("ge2d_store_frame cur_index:d:0x%x\n", canvas_tab[0]); */
 	yaddr = keep_phy_addr(keep_y_addr);
@@ -316,14 +311,11 @@ static int ge2d_store_frame_NV21(u32 cur_index)
 
 	canvas_read(y_index, &cs0);
 	canvas_read(u_index, &cs1);
-	canvas_config(ydupindex,
-		      (ulong)yaddr,
-		      cs0.width, cs0.height,
-		      CANVAS_ADDR_NOWRAP, cs0.blkmode);
-	canvas_config(udupindex,
-		      (ulong)uaddr,
-		      cs1.width, cs1.height,
-		      CANVAS_ADDR_NOWRAP, cs1.blkmode);
+
+	canvas_config_ex(ydupindex, (ulong)yaddr, cs0.width, cs0.height,
+			 CANVAS_ADDR_NOWRAP, cs0.blkmode, cs0.endian);
+	canvas_config_ex(udupindex, (ulong)uaddr, cs1.width, cs1.height,
+			 CANVAS_ADDR_NOWRAP, cs1.blkmode, cs1.endian);
 
 	canvas_read(ydupindex, &cd);
 	src_index = ((y_index & 0xff) | ((u_index << 8) & 0x0000ff00));
@@ -374,8 +366,8 @@ static int ge2d_store_frame_NV21(u32 cur_index)
 	}
 
 	stretchblt_noalpha(ge2d_video_context,
-			   0, 0, cs0.width, cs0.height,
-			   0, 0, cs0.width, cs0.height);
+		0, 0, cs0.width, cs0.height,
+		0, 0, cs0.width, cs0.height);
 
 	return 0;
 }
@@ -395,7 +387,7 @@ static int ge2d_store_frame_YUV420(u32 cur_index)
 	udupindex = display_canvas_u_dup;
 	vdupindex = display_canvas_v_dup;
 
-	pr_info("%s cur_index:s:0x%x\n", __func__, cur_index);
+	pr_info("ge2d_store_frame_YUV420 cur_index:s:0x%x\n", cur_index);
 	/* operation top line */
 	/* Y data */
 	ge2d_config.alu_const_color = 0;
@@ -416,9 +408,9 @@ static int ge2d_store_frame_YUV420(u32 cur_index)
 
 	yaddr = keep_phy_addr(keep_y_addr);
 	canvas_config(ydupindex,
-		      (ulong)yaddr,
-		      cs.width, cs.height,
-		      CANVAS_ADDR_NOWRAP, cs.blkmode);
+		(ulong) yaddr,
+		cs.width, cs.height,
+		CANVAS_ADDR_NOWRAP, cs.blkmode);
 
 	canvas_read(ydupindex, &cd);
 	ge2d_config.dst_planes[0].addr = cd.addr;
@@ -468,8 +460,8 @@ static int ge2d_store_frame_YUV420(u32 cur_index)
 		return -1;
 	}
 	stretchblt_noalpha(ge2d_video_context,
-			   0, 0, cs.width, cs.height,
-			   0, 0, cs.width, cs.height);
+		0, 0, cs.width, cs.height,
+		0, 0, cs.width, cs.height);
 
 	/* U data */
 	ge2d_config.alu_const_color = 0;
@@ -490,9 +482,9 @@ static int ge2d_store_frame_YUV420(u32 cur_index)
 
 	uaddr = keep_phy_addr(keep_u_addr);
 	canvas_config(udupindex,
-		      (ulong)uaddr,
-		      cs.width, cs.height,
-		      CANVAS_ADDR_NOWRAP, cs.blkmode);
+		(ulong) uaddr,
+		cs.width, cs.height,
+		CANVAS_ADDR_NOWRAP, cs.blkmode);
 
 	canvas_read(udupindex, &cd);
 	ge2d_config.dst_planes[0].addr = cd.addr;
@@ -542,8 +534,8 @@ static int ge2d_store_frame_YUV420(u32 cur_index)
 		return -1;
 	}
 	stretchblt_noalpha(ge2d_video_context,
-			   0, 0, cs.width, cs.height,
-			   0, 0, cs.width, cs.height);
+		0, 0, cs.width, cs.height,
+		0, 0, cs.width, cs.height);
 
 	/* operation top line */
 	/* V data */
@@ -565,9 +557,9 @@ static int ge2d_store_frame_YUV420(u32 cur_index)
 
 	vaddr = keep_phy_addr(keep_v_addr);
 	canvas_config(vdupindex,
-		      (ulong)vaddr,
-		      cs.width, cs.height,
-		      CANVAS_ADDR_NOWRAP, cs.blkmode);
+		(ulong) vaddr,
+		cs.width, cs.height,
+		CANVAS_ADDR_NOWRAP, cs.blkmode);
 
 	ge2d_config.dst_planes[0].addr = cd.addr;
 	ge2d_config.dst_planes[0].w = cd.width;
@@ -616,8 +608,8 @@ static int ge2d_store_frame_YUV420(u32 cur_index)
 		return -1;
 	}
 	stretchblt_noalpha(ge2d_video_context,
-			   0, 0, cs.width, cs.height,
-			   0, 0, cs.width, cs.height);
+		0, 0, cs.width, cs.height,
+		0, 0, cs.width, cs.height);
 	return 0;
 }
 
@@ -627,6 +619,7 @@ static void ge2d_keeplastframe_block(int cur_index, int format)
 #ifdef CONFIG_AMLOGIC_MEDIA_VSYNC_RDMA
 	u32 y_index2, u_index2, v_index2;
 #endif
+	int ret = -1;
 
 	video_module_lock();
 
@@ -650,7 +643,9 @@ static void ge2d_keeplastframe_block(int cur_index, int format)
 	switch (format) {
 	case GE2D_FORMAT_S24_YUV444:
 		pr_info("GE2D_FORMAT_S24_YUV444\n");
-		ge2d_store_frame_S_YUV444(cur_index);
+		ret = ge2d_store_frame_S_YUV444(cur_index);
+		if (ret > 0)
+			break;
 		canvas_update_addr(y_index, keep_phy_addr(keep_y_addr));
 #ifdef CONFIG_AMLOGIC_MEDIA_VSYNC_RDMA
 		canvas_update_addr(y_index2, keep_phy_addr(keep_y_addr));
@@ -659,6 +654,7 @@ static void ge2d_keeplastframe_block(int cur_index, int format)
 #endif
 		pr_info("cur_index: [0x%x],keep_y_addr: [0x%lx]\n",
 			cur_index, keep_y_addr);
+
 		break;
 	case GE2D_FORMAT_M24_YUV444:
 		pr_info("GE2D_FORMAT_M24_YUV444\n");
@@ -695,11 +691,11 @@ static void ge2d_keeplastframe_block(int cur_index, int format)
 		break;
 	}
 	video_module_unlock();
+
 }
 #endif
-
 #ifndef CONFIG_AMLOGIC_MEDIA_GE2D
-#define FETCHBUF_SIZE (64 * 1024) /*DEBUG_TMP*/
+#define FETCHBUF_SIZE (64*1024) /*DEBUG_TMP*/
 static int canvas_dup(ulong dst, ulong src_paddr, ulong size)
 {
 	void *src_addr = codec_mm_phys_to_virt(src_paddr);
@@ -707,14 +703,14 @@ static int canvas_dup(ulong dst, ulong src_paddr, ulong size)
 
 	if (src_paddr && dst && src_addr && dst_addr) {
 		dma_addr_t dma_addr = 0;
-
 		memcpy(dst_addr, src_addr, size);
 		dma_addr = dma_map_single(get_video_device(), dst_addr,
-					  size, DMA_TO_DEVICE);
+			size, DMA_TO_DEVICE);
 		dma_unmap_single(get_video_device(), dma_addr,
-				 FETCHBUF_SIZE, DMA_TO_DEVICE);
+			FETCHBUF_SIZE, DMA_TO_DEVICE);
 		return 1;
 	}
+
 	return 0;
 }
 #endif
@@ -722,8 +718,8 @@ static int canvas_dup(ulong dst, ulong src_paddr, ulong size)
 static int free_alloced_keep_buffer(void)
 {
 	/*pr_info("free_alloced_keep_buffer %p.%p.%p\n",
-	 *(void *)keep_y_addr, (void *)keep_u_addr, (void *)keep_v_addr);
-	 */
+		(void *)keep_y_addr, (void *)keep_u_addr, (void *)keep_v_addr);
+		*/
 	if (keep_y_addr) {
 		codec_mm_free_for_dma(MEM_NAME, keep_y_addr);
 		keep_y_addr = 0;
@@ -741,6 +737,7 @@ static int free_alloced_keep_buffer(void)
 	return 0;
 }
 
+#ifdef CONFIG_AMLOGIC_MEDIA_GE2D
 static int alloc_keep_buffer(void)
 {
 	int flags = CODEC_MM_FLAGS_DMA |
@@ -753,14 +750,14 @@ static int alloc_keep_buffer(void)
 	flags = CODEC_MM_FLAGS_DMA | CODEC_MM_FLAGS_FOR_VDECODER;
 #endif
 	if ((flags & CODEC_MM_FLAGS_FOR_VDECODER) &&
-	    codec_mm_video_tvp_enabled())
+		codec_mm_video_tvp_enabled())
 		/*TVP TODO for MULTI*/
 		flags |= CODEC_MM_FLAGS_TVP;
 
 	if (!keep_y_addr) {
-		keep_y_addr = codec_mm_alloc_for_dma
-			(MEM_NAME,
-			PAGE_ALIGN(Y_BUFFER_SIZE) / PAGE_SIZE, 0, flags);
+		keep_y_addr = codec_mm_alloc_for_dma(
+			MEM_NAME,
+			PAGE_ALIGN(Y_BUFFER_SIZE)/PAGE_SIZE, 0, flags);
 		if (!keep_y_addr) {
 			pr_err("%s: failed to alloc y addr\n", __func__);
 			goto err1;
@@ -768,9 +765,9 @@ static int alloc_keep_buffer(void)
 	}
 
 	if (!keep_u_addr) {
-		keep_u_addr = codec_mm_alloc_for_dma
-			(MEM_NAME,
-			PAGE_ALIGN(U_BUFFER_SIZE) / PAGE_SIZE, 0, flags);
+		keep_u_addr = codec_mm_alloc_for_dma(
+			MEM_NAME,
+			PAGE_ALIGN(U_BUFFER_SIZE)/PAGE_SIZE, 0, flags);
 		if (!keep_u_addr) {
 			pr_err("%s: failed to alloc u addr\n", __func__);
 			goto err1;
@@ -778,9 +775,9 @@ static int alloc_keep_buffer(void)
 	}
 
 	if (!keep_v_addr) {
-		keep_v_addr = codec_mm_alloc_for_dma
-			(MEM_NAME,
-			PAGE_ALIGN(V_BUFFER_SIZE) / PAGE_SIZE, 0, flags);
+		keep_v_addr = codec_mm_alloc_for_dma(
+			MEM_NAME,
+			PAGE_ALIGN(V_BUFFER_SIZE)/PAGE_SIZE, 0, flags);
 		if (!keep_v_addr) {
 			pr_err("%s: failed to alloc v addr\n", __func__);
 			goto err1;
@@ -792,10 +789,12 @@ static int alloc_keep_buffer(void)
 		(void *)keep_v_addr,
 		codec_mm_video_tvp_enabled());
 	return 0;
+
  err1:
 	free_alloced_keep_buffer();
 	return -ENOMEM;
 }
+#endif
 
 /*
  *flags,used per bit:
@@ -817,7 +816,7 @@ void try_free_keep_video(int flags)
 		layer2_used = true;
 
 	if (keep_video_on || free_scatter_keeper) {
-		/*pr_info("disabled keep video before free keep buffer.\n");*/
+		/*pr_info("disbled keep video before free keep buffer.\n");*/
 		keep_video_on = 0;
 		if (layer1_used) {
 			if (!get_video_enabled()) {
@@ -832,7 +831,7 @@ void try_free_keep_video(int flags)
 		if (layer2_used) {
 			if (!get_videopip_enabled()) {
 				pr_info("disabled amvideo on vd2 for next before free keep buffer!\n");
-				_videopip_set_disable(1, flags ?
+				_videopip_set_disable(flags ?
 					VIDEO_DISABLE_NORMAL :
 					VIDEO_DISABLE_FORNEXT);
 			} else {
@@ -853,7 +852,6 @@ void try_free_keep_videopip(int flags)
 	int free_scatter_keeper = flags & 0x1;
 	bool layer1_used = false;
 	bool layer2_used = false;
-	bool layer3_used = false;
 
 	if (vd_layer[0].dispbuf_mapping
 		== &cur_pipbuf)
@@ -861,12 +859,9 @@ void try_free_keep_videopip(int flags)
 	if (vd_layer[1].dispbuf_mapping
 		== &cur_pipbuf)
 		layer2_used = true;
-	if (vd_layer[2].dispbuf_mapping
-		== &cur_pipbuf2)
-		layer3_used = true;
 
 	if (keep_video_pip_on || free_scatter_keeper) {
-		/*pr_info("disabled keep video before free keep buffer.\n");*/
+		/*pr_info("disbled keep video before free keep buffer.\n");*/
 		keep_video_pip_on = 0;
 		if (layer1_used) {
 			if (!get_video_enabled()) {
@@ -881,21 +876,11 @@ void try_free_keep_videopip(int flags)
 		if (layer2_used) {
 			if (!get_videopip_enabled()) {
 				pr_info("disabled pip on vd2 for next before free keep buffer!\n");
-				_videopip_set_disable(1, flags ?
+				_videopip_set_disable(flags ?
 					VIDEO_DISABLE_NORMAL :
 					VIDEO_DISABLE_FORNEXT);
 			} else {
 				safe_switch_videolayer(1, false, false);
-			}
-		}
-		if (layer3_used) {
-			if (!get_videopip2_enabled()) {
-				pr_info("disabled pip on vd3 for next before free keep buffer!\n");
-				_videopip_set_disable(2, flags ?
-					VIDEO_DISABLE_NORMAL :
-					VIDEO_DISABLE_FORNEXT);
-			} else {
-				safe_switch_videolayer(2, false, false);
 			}
 		}
 	}
@@ -905,66 +890,9 @@ void try_free_keep_videopip(int flags)
 }
 EXPORT_SYMBOL(try_free_keep_videopip);
 
-void try_free_keep_videopip2(int flags)
-{
-	int free_scatter_keeper = flags & 0x1;
-	bool layer1_used = false;
-	bool layer2_used = false;
-	bool layer3_used = false;
-
-	if (vd_layer[0].dispbuf_mapping
-		== &cur_pipbuf)
-		layer1_used = true;
-	if (vd_layer[1].dispbuf_mapping
-		== &cur_pipbuf)
-		layer2_used = true;
-	if (vd_layer[2].dispbuf_mapping
-		== &cur_pipbuf2)
-		layer3_used = true;
-
-	if (keep_video_pip2_on || free_scatter_keeper) {
-		/*pr_info("disabled keep video before free keep buffer.\n");*/
-		keep_video_pip2_on = 0;
-		if (layer1_used) {
-			if (!get_video_enabled()) {
-				pr_info("disabled pip on vd1 for next before free keep buffer!\n");
-				_video_set_disable(flags ?
-					VIDEO_DISABLE_NORMAL :
-					VIDEO_DISABLE_FORNEXT);
-			} else {
-				safe_switch_videolayer(0, false, false);
-			}
-		}
-		if (layer2_used) {
-			if (!get_videopip_enabled()) {
-				pr_info("disabled pip on vd2 for next before free keep buffer!\n");
-				_videopip_set_disable(1, flags ?
-					VIDEO_DISABLE_NORMAL :
-					VIDEO_DISABLE_FORNEXT);
-			} else {
-				safe_switch_videolayer(1, false, false);
-			}
-		}
-		if (layer3_used) {
-			if (!get_videopip2_enabled()) {
-				pr_info("disabled pip on vd3 for next before free keep buffer!\n");
-				_videopip_set_disable(2, flags ?
-					VIDEO_DISABLE_NORMAL :
-					VIDEO_DISABLE_FORNEXT);
-			} else {
-				safe_switch_videolayer(2, false, false);
-			}
-		}
-	}
-	mutex_lock(&video_keeper_mutex);
-	video_pip2_keeper_new_frame_notify();
-	mutex_unlock(&video_keeper_mutex);
-}
-EXPORT_SYMBOL(try_free_keep_videopip2);
-
-static void video_keeper_update_keeper_mem(void *mem_handle,
-					   int type,
-					   int *id)
+static void video_keeper_update_keeper_mem(
+	void *mem_handle, int type,
+	int *id)
 {
 	int ret;
 	int old_id = *id;
@@ -972,7 +900,7 @@ static void video_keeper_update_keeper_mem(void *mem_handle,
 	if (!mem_handle)
 		return;
 	ret = codec_mm_keeper_mask_keep_mem(mem_handle,
-					    type);
+		type);
 	if (ret > 0) {
 		if (old_id > 0 && ret != old_id) {
 			/*wait 80 ms for vsync post.*/
@@ -982,23 +910,24 @@ static void video_keeper_update_keeper_mem(void *mem_handle,
 	}
 }
 
-static int video_keeper_frame_keep_locked(struct vframe_s *cur_buf,
-					  struct vframe_s *cur_buf_el)
+static int video_keeper_frame_keep_locked(
+	struct vframe_s *cur_buf,
+	struct vframe_s *cur_buf_el)
 {
 	int type = MEM_TYPE_CODEC_MM;
 
 	if (cur_buf->type & VIDTYPE_SCATTER)
 		type = MEM_TYPE_CODEC_MM_SCATTER;
-	video_keeper_update_keeper_mem
-		(cur_buf->mem_handle,
+	video_keeper_update_keeper_mem(
+		cur_buf->mem_handle,
 		type,
 		&keep_id);
-	video_keeper_update_keeper_mem
-		(cur_buf->mem_head_handle,
+	video_keeper_update_keeper_mem(
+		cur_buf->mem_head_handle,
 		MEM_TYPE_CODEC_MM,
 		&keep_head_id);
-	video_keeper_update_keeper_mem
-		(cur_buf->mem_dw_handle,
+	video_keeper_update_keeper_mem(
+		cur_buf->mem_dw_handle,
 		MEM_TYPE_CODEC_MM,
 		&keep_dw_id);
 	if (cur_buf_el) {
@@ -1006,40 +935,41 @@ static int video_keeper_frame_keep_locked(struct vframe_s *cur_buf,
 			type = MEM_TYPE_CODEC_MM_SCATTER;
 		else
 			type = MEM_TYPE_CODEC_MM;
-		video_keeper_update_keeper_mem
-			(cur_buf_el->mem_handle,
+		video_keeper_update_keeper_mem(
+			cur_buf_el->mem_handle,
 			type,
 			&keep_el_id);
-		video_keeper_update_keeper_mem
-			(cur_buf_el->mem_head_handle,
+		video_keeper_update_keeper_mem(
+			cur_buf_el->mem_head_handle,
 			MEM_TYPE_CODEC_MM,
 			&keep_el_head_id);
-		video_keeper_update_keeper_mem
-			(cur_buf_el->mem_dw_handle,
+		video_keeper_update_keeper_mem(
+			cur_buf_el->mem_dw_handle,
 			MEM_TYPE_CODEC_MM,
 			&keep_el_dw_id);
 	}
 	return (keep_id + keep_head_id + keep_dw_id) > 0;
 }
 
-static int video_pip_keeper_frame_keep_locked(struct vframe_s *cur_buf,
-					      struct vframe_s *cur_buf_el)
+static int video_pip_keeper_frame_keep_locked(
+	struct vframe_s *cur_buf,
+	struct vframe_s *cur_buf_el)
 {
 	int type = MEM_TYPE_CODEC_MM;
 
 	if (cur_buf) {
 		if (cur_buf->type & VIDTYPE_SCATTER)
 			type = MEM_TYPE_CODEC_MM_SCATTER;
-		video_keeper_update_keeper_mem
-			(cur_buf->mem_handle,
+		video_keeper_update_keeper_mem(
+			cur_buf->mem_handle,
 			type,
 			&keep_pip_id);
-		video_keeper_update_keeper_mem
-			(cur_buf->mem_head_handle,
+		video_keeper_update_keeper_mem(
+			cur_buf->mem_head_handle,
 			MEM_TYPE_CODEC_MM,
 			&keep_pip_head_id);
-		video_keeper_update_keeper_mem
-			(cur_buf->mem_dw_handle,
+		video_keeper_update_keeper_mem(
+			cur_buf->mem_dw_handle,
 			MEM_TYPE_CODEC_MM,
 			&keep_pip_dw_id);
 	}
@@ -1048,44 +978,20 @@ static int video_pip_keeper_frame_keep_locked(struct vframe_s *cur_buf,
 			type = MEM_TYPE_CODEC_MM_SCATTER;
 		else
 			type = MEM_TYPE_CODEC_MM;
-		video_keeper_update_keeper_mem
-			(cur_buf_el->mem_handle,
+		video_keeper_update_keeper_mem(
+			cur_buf_el->mem_handle,
 			type,
 			&keep_pip_el_id);
-		video_keeper_update_keeper_mem
-			(cur_buf_el->mem_head_handle,
+		video_keeper_update_keeper_mem(
+			cur_buf_el->mem_head_handle,
 			MEM_TYPE_CODEC_MM,
 			&keep_pip_el_head_id);
-		video_keeper_update_keeper_mem
-			(cur_buf_el->mem_dw_handle,
+		video_keeper_update_keeper_mem(
+			cur_buf_el->mem_dw_handle,
 			MEM_TYPE_CODEC_MM,
 			&keep_pip_el_dw_id);
 	}
 	return (keep_pip_id + keep_pip_head_id + keep_pip_el_dw_id) > 0;
-}
-
-static int video_pip2_keeper_frame_keep_locked(struct vframe_s *cur_buf,
-					      struct vframe_s *cur_buf_el)
-{
-	int type = MEM_TYPE_CODEC_MM;
-
-	if (cur_buf) {
-		if (cur_buf->type & VIDTYPE_SCATTER)
-			type = MEM_TYPE_CODEC_MM_SCATTER;
-		video_keeper_update_keeper_mem
-			(cur_buf->mem_handle,
-			type,
-			&keep_pip2_id);
-		video_keeper_update_keeper_mem
-			(cur_buf->mem_head_handle,
-			MEM_TYPE_CODEC_MM,
-			&keep_pip2_head_id);
-		video_keeper_update_keeper_mem
-			(cur_buf->mem_dw_handle,
-			MEM_TYPE_CODEC_MM,
-			&keep_pip2_dw_id);
-	}
-	return (keep_pip2_id + keep_pip2_head_id) > 0;
 }
 
 /*
@@ -1172,29 +1078,6 @@ void video_pip_keeper_new_frame_notify(void)
 
 }
 
-void video_pip2_keeper_new_frame_notify(void)
-{
-	if (keep_video_pip2_on) {
-		pr_info("new frame show, pip2 free keeper\n");
-		keep_video_pip2_on = 0;
-	}
-	if (keep_pip2_id > 0) {
-		/*wait 80 ms for vsync post.*/
-		codec_mm_keeper_unmask_keeper(keep_pip2_id, 120);
-		keep_pip2_id = 0;
-	}
-	if (keep_pip2_head_id > 0) {
-		/*wait 80 ms for vsync post.*/
-		codec_mm_keeper_unmask_keeper(keep_pip2_head_id, 120);
-		keep_pip2_head_id = 0;
-	}
-	if (keep_pip2_dw_id > 0) {
-		/*wait 80 ms for vsync post.*/
-		codec_mm_keeper_unmask_keeper(keep_pip2_dw_id, 120);
-		keep_pip2_dw_id = 0;
-	}
-}
-
 #ifdef CONFIG_AMLOGIC_MEDIA_GE2D
 static unsigned int vf_ge2d_keep_frame_locked(struct vframe_s *ge2d_buf)
 {
@@ -1240,8 +1123,8 @@ static unsigned int vf_ge2d_keep_frame_locked(struct vframe_s *ge2d_buf)
 	v_index = (cur_index >> 16) & 0xff;
 	canvas_read(y_index, &cd);
 
-	if ((cd.width * cd.height) <= 1920 * 1088 * 3 &&
-	    !keep_y_addr) {
+	if ((cd.width * cd.height) <= 1920 * 1088 * 3
+		&& !keep_y_addr) {
 		alloc_keep_buffer();
 	}
 	if (!keep_y_addr) {
@@ -1251,7 +1134,7 @@ static unsigned int vf_ge2d_keep_frame_locked(struct vframe_s *ge2d_buf)
 	}
 
 	if (get_video_debug_flags() & DEBUG_FLAG_BASIC_INFO) {
-		pr_info("%s keep_y_addr=%p %lx\n",
+		pr_info("%s keep_y_addr=%p %x\n",
 			__func__, (void *)keep_y_addr,
 			canvas_get_addr(y_index));
 	}
@@ -1274,8 +1157,8 @@ static unsigned int vf_ge2d_keep_frame_locked(struct vframe_s *ge2d_buf)
 	} else if ((ge2d_buf->type & VIDTYPE_VIU_NV21) == VIDTYPE_VIU_NV21) {
 		canvas_read(y_index, &cs0);
 		canvas_read(u_index, &cs1);
-		if ((Y_BUFFER_SIZE < (cs0.width * cs0.height)) ||
-		    (U_BUFFER_SIZE < (cs1.width * cs1.height))) {
+		if ((Y_BUFFER_SIZE < (cs0.width * cs0.height))
+			|| (U_BUFFER_SIZE < (cs1.width * cs1.height))) {
 			pr_info("## [%s::%d] error: yuv data size larger",
 				__func__, __LINE__);
 			return 0;
@@ -1288,9 +1171,9 @@ static unsigned int vf_ge2d_keep_frame_locked(struct vframe_s *ge2d_buf)
 		canvas_read(u_index, &cs1);
 		canvas_read(v_index, &cs2);
 
-		if ((Y_BUFFER_SIZE < (cs0.width * cs0.height)) ||
-		    (U_BUFFER_SIZE < (cs1.width * cs1.height)) ||
-		    (V_BUFFER_SIZE < (cs2.width * cs2.height))) {
+		if ((Y_BUFFER_SIZE < (cs0.width * cs0.height))
+			|| (U_BUFFER_SIZE < (cs1.width * cs1.height))
+			|| (V_BUFFER_SIZE < (cs2.width * cs2.height))) {
 			pr_info("## [%s::%d] error: yuv data size larger",
 				__func__, __LINE__);
 			return 0;
@@ -1301,11 +1184,13 @@ static unsigned int vf_ge2d_keep_frame_locked(struct vframe_s *ge2d_buf)
 	}
 	pr_info("%s: use ge2d keep video\n", __func__);
 	return 1;
+
 }
 #endif
 
-static unsigned int vf_keep_current_locked(struct vframe_s *cur_buf,
-					   struct vframe_s *cur_buf_el)
+static unsigned int vf_keep_current_locked(
+	struct vframe_s *cur_buf,
+	struct vframe_s *cur_buf_el)
 {
 	int ret = 0;
 
@@ -1329,11 +1214,12 @@ static unsigned int vf_keep_current_locked(struct vframe_s *cur_buf,
 		return 0;
 	}
 
+#if 1
 	if (IS_DI_PROCESSED(cur_buf->type)) {
 		ret = 2;
 		if (cur_buf->flag & VFRAME_FLAG_DOUBLE_FRAM) {
-			ret = video_keeper_frame_keep_locked
-				((struct vframe_s *)cur_buf->vf_ext,
+			ret = video_keeper_frame_keep_locked(
+				(struct vframe_s *)cur_buf->vf_ext,
 				cur_buf_el);
 			pr_info("keep di_dec buffer\n");
 		}
@@ -1342,13 +1228,24 @@ static unsigned int vf_keep_current_locked(struct vframe_s *cur_buf,
 			"post write" : "post");
 		return ret;
 	}
-
+#else
+	if (VSYNC_RD_MPEG_REG(DI_IF1_GEN_REG) & 0x1) {
+		pr_info("keep exit is di\n");
+		return 0;
+	}
+#endif
 	if (cur_buf->source_type == VFRAME_SOURCE_TYPE_PPMGR) {
 		pr_info("ppmgr use ge2d keep frame!\n");
+#ifdef CONFIG_AMLOGIC_MEDIA_GE2D
 		ret = vf_ge2d_keep_frame_locked(cur_buf);
+#else
+		ret = 0;
+#endif
 	} else {
 		pr_info("use keep buffer keep frame!\n");
-		ret = video_keeper_frame_keep_locked(cur_buf, cur_buf_el);
+		ret = video_keeper_frame_keep_locked(
+			cur_buf,
+			cur_buf_el);
 	}
 
 	if (ret) {
@@ -1361,8 +1258,9 @@ static unsigned int vf_keep_current_locked(struct vframe_s *cur_buf,
 	return ret;
 }
 
-unsigned int vf_keep_pip_current_locked(struct vframe_s *cur_buf,
-					struct vframe_s *cur_buf_el)
+unsigned int vf_keep_pip_current_locked(
+	struct vframe_s *cur_buf,
+	struct vframe_s *cur_buf_el)
 {
 	int ret = 0;
 
@@ -1389,8 +1287,8 @@ unsigned int vf_keep_pip_current_locked(struct vframe_s *cur_buf,
 	if (IS_DI_PROCESSED(cur_buf->type)) {
 		ret = 2;
 		if (cur_buf->flag & VFRAME_FLAG_DOUBLE_FRAM) {
-			ret = video_pip_keeper_frame_keep_locked
-				((struct vframe_s *)cur_buf->vf_ext,
+			ret = video_pip_keeper_frame_keep_locked(
+				(struct vframe_s *)cur_buf->vf_ext,
 				cur_buf_el);
 			pr_info("pip keep di_dec buffer\n");
 		}
@@ -1400,7 +1298,9 @@ unsigned int vf_keep_pip_current_locked(struct vframe_s *cur_buf,
 		return ret;
 	}
 
-	ret = video_pip_keeper_frame_keep_locked(cur_buf, cur_buf_el);
+	ret = video_pip_keeper_frame_keep_locked(
+		cur_buf,
+		cur_buf_el);
 
 	if (ret) {
 		/*keeped ok with codec keeper!*/
@@ -1413,65 +1313,15 @@ unsigned int vf_keep_pip_current_locked(struct vframe_s *cur_buf,
 	return 0;
 }
 
-unsigned int vf_keep_pip2_current_locked(struct vframe_s *cur_buf,
-					struct vframe_s *cur_buf_el)
-{
-	int ret = 0;
-
-	if (!cur_buf) {
-		pr_info("keep pip2 exit without cur_buf\n");
-		return 0;
-	}
-
-	if (get_video_debug_flags() &
-		DEBUG_FLAG_TOGGLE_SKIP_KEEP_CURRENT) {
-		pr_info("flag: keep pip2 exit is skip current\n");
-		return 0;
-	}
-
-#ifdef CONFIG_AMLOGIC_MEDIA_VIDEOCAPTURE
-	ext_frame_capture_poll(1); /*pull  if have capture end frame */
-#endif
-
-	if (get_blackout_pip2_policy()) {
-		pr_info("policy: keep exit is skip current\n");
-		return 0;
-	}
-
-	if (IS_DI_PROCESSED(cur_buf->type)) {
-		ret = 2;
-		if (cur_buf->flag & VFRAME_FLAG_DOUBLE_FRAM) {
-			ret = video_pip2_keeper_frame_keep_locked
-				((struct vframe_s *)cur_buf->vf_ext,
-				cur_buf_el);
-			pr_info("pip2 keep di_dec buffer\n");
-		}
-		pr_info("pip2 keep exit is di %s\n",
-			IS_DI_POSTWRTIE(cur_buf->type) ?
-			"post write" : "post");
-		return ret;
-	}
-
-	ret = video_pip2_keeper_frame_keep_locked(cur_buf, cur_buf_el);
-
-	if (ret) {
-		/*keeped ok with codec keeper!*/
-		pr_info("keep pip2 buffer on!\n");
-		keep_video_pip2_on = 1;
-		return 1;
-	}
-
-	keep_video_pip2_on = 0;
-	return 0;
-}
-
-unsigned int vf_keep_current(struct vframe_s *cur_buf,
-			     struct vframe_s *cur_buf2)
+unsigned int vf_keep_current(
+	struct vframe_s *cur_buf,
+	struct vframe_s *cur_buf2)
 {
 	unsigned int ret;
 
 	mutex_lock(&video_keeper_mutex);
-	ret = vf_keep_current_locked(cur_buf, cur_buf2);
+	ret = vf_keep_current_locked(
+		cur_buf, cur_buf2);
 	mutex_unlock(&video_keeper_mutex);
 	return ret;
 }
@@ -1484,10 +1334,10 @@ int video_keeper_init(void)
 #endif
 	return 0;
 }
-
 void video_keeper_exit(void)
 {
 #ifdef CONFIG_AMLOGIC_MEDIA_GE2D
 	ge2d_videotask_release();
 #endif
 }
+

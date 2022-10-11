@@ -1,6 +1,19 @@
 // SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/amlogic/media/di_multi/di_interlace.c
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
 #include <linux/semaphore.h>
@@ -98,7 +111,8 @@ void ins_2_doing(struct di_ch_s *pch, bool bypass, struct di_buf_s *pstdi_buf)
 		return;
 
 	di_buf = di_que_peek(ch, QUE_POST_NOBUF);
-	dim_print("%s:1:%p,buf[%d],t[%d]\n", __func__, di_buf, di_buf->index, di_buf->type);
+	dim_print("%s:1:%p,buf[%d],t[%d]\n", __func__, di_buf,
+		  di_buf->index, di_buf->type);
 	trace_buf(di_buf, DIM_QUE_PEEK, QUE_POST_NOBUF,
 		(DIM_DBG_MARK | 0x00000001));
 	ret = di_que_out(ch, QUE_POST_NOBUF, di_buf);
@@ -312,7 +326,7 @@ void dim_dbg_buffer2(struct di_buffer *buffer, unsigned int id)
 	}
 	dbg_nq("%s:%d:%px\n", __func__, id, buffer);
 	if (buffer->vf) {
-		dbg_nq("\t:0x%px, 0x%lx,0x%lx\n", buffer,
+		dbg_nq("\t:0x%px, 0x%x,0x%x\n", buffer,
 			buffer->vf->canvas0_config[0].phy_addr,
 			buffer->vf->canvas0_config[1].phy_addr);
 	} else {
@@ -576,10 +590,7 @@ enum DI_ERRORTYPE di_empty_input_buffer(int index, struct di_buffer *buffer)
 		/* @ary_note: eos may be no vf */
 		memcpy(&pins->c.vfm_cp, buffer->vf, sizeof(pins->c.vfm_cp));
 	}
-	if (get_datal()->dct_op && get_datal()->dct_op->is_en(pch))
-		flg_q = qbuf_in(pbufq, QBF_NINS_Q_DCT, index);
-	else
-		flg_q = qbuf_in(pbufq, QBF_NINS_Q_CHECK, index);
+	flg_q = qbuf_in(pbufq, QBF_NINS_Q_CHECK, index);
 	sum_g_inc(ch);
 	if (!flg_q) {
 		PR_ERR("%s:qin check\n", __func__);

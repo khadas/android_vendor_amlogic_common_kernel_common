@@ -1,4 +1,3 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
  * drivers/amlogic/media/deinterlace/film_mode_fmw/film_fw1.c
  *
@@ -21,6 +20,7 @@
 #include <linux/amlogic/media/vfm/vframe.h>
 #include "film_vof_soft.h"
 #include "../deinterlace.h"
+
 
 static int DIweavedetec(struct sFlmSftPar *pPar, int nDif01);
 /* Software parameters (registers) */
@@ -244,7 +244,7 @@ static int nflagch5_ratio = 2;
 module_param(nflagch5_ratio,  int, 0644);
 MODULE_PARM_DESC(nflagch5_ratio, "nflagch5_ratio");
 
-static int nflagch4_th;
+static int nflagch4_th; /*0*/
 module_param(nflagch4_th,  int, 0644);
 MODULE_PARM_DESC(nflagch4_th, "nflagch4_th");
 
@@ -259,6 +259,8 @@ MODULE_PARM_DESC(dif02_flag, "dif02_flag");
 static int dif02_ratio = 20;
 module_param(dif02_ratio,  int, 0644);
 MODULE_PARM_DESC(dif02_ratio, "dif02_ratio");
+
+
 
 int comsum;
 
@@ -903,9 +905,8 @@ int Flm32DetSft(struct sFlmDatSt *pRDat, int *nDif02,
 		((nMx + nMn / 2) / (nMn + 1)) < flm32_dif02_gap &&
 		pFlg32[HISDETNUM - 1] > 1)
 		nSTP = 0;
-
-		/*bias static similar to pulldown, max02 must bigger than min02*/
-		/*suggest from vlsi yanling*/
+	/*bias static similar to pulldown, max02 must bigger than min02*/
+	/*suggest from vlsi yanling*/
 	if (nMx < (1 << 14) && nMx < (nMn << 7) && pFlg32[HISDETNUM - 1] > 1)
 		nSTP = 0;
 	/*---------------*/
@@ -1102,6 +1103,7 @@ int Cal32Flm01(UINT8 *pFlm01, int *nDif01, int iDx,
 
 	for (nT0 = 0; nT0 < 5; nT0++)
 		dDif05[nT0] = 8 * dDif05[nT0] / (nSP + 1024);
+
 
 	if (iDx == 5) {
 		/* Last three */

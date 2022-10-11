@@ -1,15 +1,25 @@
-// SPDX-License-Identifier: GPL-2.0
 /*
- * Copyright (C) 2019 Amlogic, Inc. All rights reserved.
+ * sound/soc/amlogic/auge/sharebuffer.c
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
  *
  */
 
-#include <sound/pcm.h>
-#include <linux/amlogic/media/vout/hdmi_tx_ext.h>
 #include <linux/amlogic/media/sound/aout_notify.h>
-
+#include <linux/amlogic/media/vout/hdmi_tx/hdmi_tx_ext.h>
 #include "sharebuffer.h"
 #include "ddr_mngr.h"
+
 #include "spdif_hw.h"
 #include "earc.h"
 
@@ -39,34 +49,33 @@ static int sharebuffer_spdifout_prepare(struct snd_pcm_substream *substream,
 	struct snd_pcm_runtime *runtime = substream->runtime;
 	int bit_depth;
 	struct iec958_chsts chsts;
-	struct aud_para aud_param;
-
-	memset(&aud_param, 0, sizeof(aud_param));
+	struct snd_pcm_substream substream_tmp;
+	struct snd_pcm_runtime runtime_tmp;
 
 	bit_depth = snd_pcm_format_width(runtime->format);
 
 	spdifout_samesource_set(spdif_id,
-				aml_frddr_get_fifo_id(fr),
-				bit_depth,
-				runtime->channels,
-				true,
-				lane_i2s);
+		aml_frddr_get_fifo_id(fr),
+		bit_depth,
+		runtime->channels,
+		true,
+		lane_i2s);
 
 	/* spdif to hdmitx */
-	enable_spdifout_to_hdmitx(separated);
+	spdifout_to_hdmitx_ctrl(separated, spdif_id);
 	/* check and set channel status */
 	iec_get_channel_status_info(&chsts,
 				    type, runtime->rate);
 	spdif_set_channel_status_info(&chsts, spdif_id);
 
 	/* for samesource case, always 2ch substream to hdmitx */
-	aud_param.rate = runtime->rate;
-	aud_param.size = runtime->sample_bits;
-	aud_param.chs = 2;
+	substream_tmp.runtime = &runtime_tmp;
+	memcpy((void *)&runtime_tmp, (void *)(substream->runtime),
+	       sizeof(struct snd_pcm_runtime));
+	runtime_tmp.channels = 2;
 
 	/* notify hdmitx audio */
-	if (get_spdif_to_hdmitx_id() == spdif_id)
-		aout_notifier_call_chain(AOUT_EVENT_IEC_60958_PCM, &aud_param);
+	aout_notifier_call_chain(AOUT_EVENT_IEC_60958_PCM, &substream_tmp);
 
 	return 0;
 }
@@ -81,9 +90,11 @@ static int sharebuffer_spdifout_free(struct snd_pcm_substream *substream,
 
 	/* spdif b is always on */
 	if (spdif_id != 1)
-		spdifout_samesource_set
-			(spdif_id, aml_frddr_get_fifo_id(fr),
-			 bit_depth, runtime->channels, false, 0);
+		spdifout_samesource_set(spdif_id,
+			aml_frddr_get_fifo_id(fr),
+			bit_depth,
+			runtime->channels,
+			false, 0);
 
 	return 0;
 }
@@ -103,9 +114,16 @@ void sharebuffer_enable(int sel, bool enable, bool reenable)
 	}
 }
 
+void *p_frddr;
+int same_src_on;
+
 int sharebuffer_prepare(struct snd_pcm_substream *substream,
-			void *pfrddr, int samesource_sel,
-			int lane_i2s, enum aud_codec_types type, int share_lvl, int separated)
+			void *pfrddr,
+			int samesource_sel,
+			int lane_i2s,
+			enum aud_codec_types type,
+			int share_lvl,
+			int separated)
 {
 	struct frddr *fr = (struct frddr *)pfrddr;
 
@@ -117,18 +135,19 @@ int sharebuffer_prepare(struct snd_pcm_substream *substream,
 		// TODO: same with tdm
 	} else if (samesource_sel <= SHAREBUFFER_SPDIFB) {
 		/* same source with spdif a/b */
-		sharebuffer_spdifout_prepare
-		(substream, fr, samesource_sel - 3, lane_i2s, type, separated);
+		sharebuffer_spdifout_prepare(substream,
+			fr, samesource_sel - 3,
+			lane_i2s, type, separated);
 	} else if (samesource_sel == SHAREBUFFER_EARCTX) {
-		sharebuffer_earctx_prepare(substream, fr, type, lane_i2s);
+		sharebuffer_earctx_prepare(substream, fr, type);
 		if (!aml_get_earctx_enable())
 			return 0;
 	}
 
 	/* frddr, share buffer, src_sel1 */
 	aml_frddr_select_dst_ss(fr, samesource_sel, share_lvl, true);
-	samesrc_ops_table[samesource_sel]->fr = fr;
-	samesrc_ops_table[samesource_sel]->share_lvl = share_lvl;
+	p_frddr = pfrddr;
+	same_src_on = 1;
 
 	return 0;
 }
@@ -153,6 +172,15 @@ int sharebuffer_free(struct snd_pcm_substream *substream,
 
 	/* frddr, share buffer, src_sel1 */
 	aml_frddr_select_dst_ss(fr, samesource_sel, share_lvl, false);
+	same_src_on = 0;
+
+	return 0;
+}
+
+int release_spdif_same_src(struct snd_pcm_substream *substream)
+{
+	if (same_src_on)
+		sharebuffer_free(substream, p_frddr, 3, 1);
 
 	return 0;
 }

@@ -1,6 +1,18 @@
-/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/amlogic/media/dtv_demod/include/dvbt_func.h
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
 #ifndef __DVBT_FUNC_H__
@@ -105,9 +117,6 @@ enum ldpc_ite_md {
 /* XP70_CONF1 */
 #define	R368TER_XP70_CONF1		0x0041
 
-/* AD12_CONF */
-#define R368TER_AD12_CONF		0x003C
-
 /* SERIAL_XP70_DBG0 */
 #define	R368TER_SERIAL_XP70_DBG0		0x004D
 
@@ -158,60 +167,6 @@ enum ldpc_ite_md {
 
 /* SIGD3 */
 #define	R368TER_SIGD3		0x0087
-
-/* GPIO_AGC_IF */
-#define R368TER_GPIO_AGC_IF		0x0098
-
-/* GPIO_AGC_RF */
-#define R368TER_GPIO_AGC_RF		0x0099
-
-/* GPIO_ANT_CTRL */
-#define R368TER_GPIO_ANT_CTRL		0x009A
-
-/* GPIO_SDAT */
-#define R368TER_GPIO_SDAT		0x009B
-
-/* GPIO_SCLT */
-#define R368TER_GPIO_SCLT		0x009C
-
-/* GPIO_AUX_CLK */
-#define R368TER_GPIO_AUX_CLK		0x009D
-
-/* GPIO_TS0_CLK_OUT */
-#define R368TER_GPIO_TS0_CLK_OUT		0x00C5
-
-/* GPIO_TS0_D_NOT_P */
-#define R368TER_GPIO_TS0_D_NOT_P		0x00C6
-
-/* GPIO_TS0_ERROR */
-#define R368TER_GPIO_TS0_ERROR		0x00C7
-
-/* GPIO_TS0_STR_OUT */
-#define R368TER_GPIO_TS0_STR_OUT		0x00C8
-
-/* P1_TSDLYSET2 */
-#define R368TER_P1_TSDLYSET2		0x0592
-
-/* P1_TSDLYSET1 */
-#define R368TER_P1_TSDLYSET1		0x0593
-
-/* P1_TSDLYSET0 */
-#define R368TER_P1_TSDLYSET0		0x0594
-
-/* P1_SFDLYSETH */
-#define R368TER_P1_SFDLYSETH		0x05D0
-
-/* P1_SFDLYSET1 */
-#define R368TER_P1_SFDLYSET1		0x05D1
-
-/* P1_SFDLYSET0 */
-#define R368TER_P1_SFDLYSET0		0x05D2
-
-/* RAMCFGM */
-#define R368TER_RAMCFGM		0x0634
-
-/* RAMCFGL */
-#define R368TER_RAMCFGL		0x0635
 
 /* MB4 */
 #define	R368TER_MB4		0x00D0
@@ -291,59 +246,8 @@ enum ldpc_ite_md {
 /* AGC_CONF6 */
 #define	R368TER_AGC_CONF6		0x156D
 
-/* LOCK_DET1_0 */
-#define R368TER_LOCK_DET1_0		0x1570
-
-/* LOCK_DET1_1 */
-#define R368TER_LOCK_DET1_1		0x1571
-
-/* LOCK_DET2_0 */
-#define R368TER_LOCK_DET2_0		0x1572
-
-/* LOCK_DET2_1 */
-#define R368TER_LOCK_DET2_1		0x1573
-
-/* LOCK_DET3_0 */
-#define R368TER_LOCK_DET3_0		0x1574
-
-/* LOCK_DET3_1 */
-#define R368TER_LOCK_DET3_1		0x1575
-
-/* LOCK_DET4_0 */
-#define R368TER_LOCK_DET4_0		0x1576
-
-/* LOCK_DET4_1 */
-#define R368TER_LOCK_DET4_1		0x1577
-
 /* LOCK_N */
 #define	R368TER_LOCK_N		0x1578
-
-/* FEPATH_CONF0 */
-#define R368TER_FEPATH_CONF0		0x1594
-
-/* INC_CONF0 */
-#define R368TER_INC_CONF0		0x15A0
-
-/* INC_CONF1 */
-#define R368TER_INC_CONF1		0x15A1
-
-/* INC_CONF2 */
-#define R368TER_INC_CONF2		0x15A2
-
-/* INC_CONF3 */
-#define R368TER_INC_CONF3		0x15A3
-
-/* INC_CONF4 */
-#define R368TER_INC_CONF4		0x15A4
-
-/* INC_BRSTCNT0 */
-#define R368TER_INC_BRSTCNT0		0x15A5
-
-/* INC_BRSTCNT1 */
-#define R368TER_INC_BRSTCNT1		0x15A6
-
-/* DCCOMP */
-#define R368TER_DCCOMP		0x15A8
 
 /* SRC_CONF1 */
 #define	R368TER_SRC_CONF1		0x15B3
@@ -378,44 +282,8 @@ enum ldpc_ite_md {
 /* P1_CFG */
 #define	R368TER_P1_CFG		0x283C
 
-/* TFO_GAIN */
-#define R368TER_TFO_GAIN		0x2895
-
-/* TFO_GAIN_CONV */
-#define R368TER_TFO_GAIN_CONV		0x2896
-
-/* CFO_GAIN */
-#define R368TER_CFO_GAIN		0x2897
-
-/* CFO_GAIN_CONV */
-#define R368TER_CFO_GAIN_CONV		0x2898
-
-/* TFO_COEFF0 */
-#define R368TER_TFO_COEFF0		0x2899
-
-/* TFO_COEFF1 */
-#define R368TER_TFO_COEFF1		0x289A
-
-/* TFO_COEFF2 */
-#define R368TER_TFO_COEFF2		0x289B
-
-/* CFO_COEFF0 */
-#define R368TER_CFO_COEFF0		0x289C
-
-/* CFO_COEFF1 */
-#define R368TER_CFO_COEFF1		0x289D
-
-/* CFO_COEFF2 */
-#define R368TER_CFO_COEFF2		0x289E
-
 /* DVBT_CTRL */
 #define	R368TER_DVBT_CTRL		0x2900
-
-/* CORREL_CTL */
-#define R368TER_CORREL_CTL		0x2906
-
-/* TPS_RCVD3 */
-#define R368TER_TPS_RCVD3		0x2913
 
 /* SCENARII_CFG */
 #define	R368TER_SCENARII_CFG		0x2920
@@ -447,23 +315,11 @@ enum ldpc_ite_md {
 /* CHC_TRIG6 */
 #define	R368TER_CHC_TRIG6		0x2A2E
 
-/* CHC_TRIG7 */
-#define R368TER_CHC_TRIG7		0x2A2F
-
-/* CHC_TRIG8 */
-#define R368TER_CHC_TRIG8		0x2A30
-
-/* CHC_TRIG9 */
-#define R368TER_CHC_TRIG9		0x2A31
-
 /* CHC_SNR10 */
 #define	R368TER_CHC_SNR10		0x2A5E
 
 /* CHC_SNR11 */
 #define	R368TER_CHC_SNR11		0x2A5F
-
-/* DVBT_CONF */
-#define R368TER_DVBT_CONF		0x3760
 
 /* NSCALE_DVBT_0 */
 #define	R368TER_NSCALE_DVBT_0		0x3761
@@ -498,15 +354,15 @@ enum ldpc_ite_md {
 #define CHC_CIR_SNR1	0x2a09
 
 extern const unsigned int minimum_snr_x10[4][6];
-void dvbt2_init(struct aml_dtvdemod *demod, struct dvb_frontend *fe);
+void dvbt2_init(void);
 unsigned int dtvdemod_calcul_get_field(unsigned int memory_base, unsigned int nb_bits_shift,
 					unsigned int var_size);
 void dtvdemod_get_plp(struct amldtvdemod_device_s *devp, struct dtv_property *tvp);
 void dtvdemod_get_plp_dbg(void);
 void dtvdemod_set_plpid(char id);
-void dvbt_reg_initial(unsigned int bw, struct dvb_frontend *fe);
-void dvbt2_reset(struct aml_dtvdemod *demod, struct dvb_frontend *fe);
-void dvbt2_riscv_init(struct aml_dtvdemod *demod, struct dvb_frontend *fe);
+void dvbt_reg_initial(unsigned int bw);
+void dvbt2_reset(struct amldtvdemod_device_s *devp);
+void dvbt2_riscv_init(struct amldtvdemod_device_s *devp);
 void dvbt2_info(struct seq_file *seq);
-void dvbt_info(struct aml_dtvdemod *demod, struct seq_file *seq);
+void dvbt_info(struct amldtvdemod_device_s *devp, struct seq_file *seq);
 #endif

@@ -1,6 +1,18 @@
-/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/amlogic/soc_info/soc_info.h
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
 #ifndef __SOC_INFO_H
@@ -14,18 +26,14 @@
 #define CMD_POC_DATA  _IO('s', 0x03)
 #define CMD_NOCSDATA_READ  _IO('s', 0x04)
 #define CMD_NOCSDATA_WRITE  _IO('s', 0x05)
-#define CMD_AUTH_REGION_SET  _IO('s', 0x06)
-#define CMD_AUTH_REGION_RST  _IO('s', 0x07)
-#define CMD_AUTH_REGION_GET_ALL  _IO('s', 0x08)
 
 #define EFUSE_HAL_NOCS_API_READ	 4
 #define EFUSE_HAL_NOCS_API_WRITE 5
-#define AUTH_REG_NUM (16)
-#define AUTH_REG_MAGIC 0x4152
-#define AUTH_REG_SET_IDX 1
-#define AUTH_REG_SET_RST 2
-#define AUTH_REG_GET_ALL 3
 
+extern unsigned int read_nocsdata_cmd;
+extern unsigned int write_nocsdata_cmd;
+ssize_t nocsdata_read(char *buf, size_t count, loff_t *ppos);
+ssize_t nocsdata_write(const char *buf, size_t count, loff_t *ppos);
 
 /* efuse HAL_API arg */
 struct efuse_hal_api_arg {
@@ -35,20 +43,4 @@ struct efuse_hal_api_arg {
 	unsigned long buffer;
 	unsigned long retcnt;
 };
-
-struct authnt_region {
-	u64 base;
-	u64 size;
-	u32 attr;
-} __attribute__((__packed__));
-
-extern unsigned int read_nocsdata_cmd;
-extern unsigned int write_nocsdata_cmd;
-extern unsigned int auth_reg_ops_cmd;
-ssize_t nocsdata_read(char *buf, size_t count, loff_t *ppos);
-ssize_t nocsdata_write(const char *buf, size_t count, loff_t *ppos);
-int auth_region_set(void *auth_input);
-int auth_region_get_all(void *auth_input);
-int auth_region_rst(void);
-
 #endif

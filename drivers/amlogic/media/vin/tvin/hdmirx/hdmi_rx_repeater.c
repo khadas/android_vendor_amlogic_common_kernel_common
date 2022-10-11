@@ -1,6 +1,18 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/amlogic/media/vin/tvin/hdmirx/hdmirx_repeater.c
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
 #include <linux/version.h>
@@ -92,7 +104,7 @@ void rx_check_repeat(void)
 		/* rx_set_cur_hpd(0, 3); */
 		rx_send_hpd_pulse();
 		rx_pr("firm_change:%d,repeat_plug:%d,repeat:%d\n",
-		      rx.firm_change, repeat_plug, rx.hdcp.repeat);
+			rx.firm_change, repeat_plug, rx.hdcp.repeat);
 		rx_set_repeat_signal(repeat_plug);
 		if (!repeat_plug) {
 			edid_len = 0;
@@ -105,12 +117,12 @@ void rx_check_repeat(void)
 			/* rx_set_cur_hpd(1, 3); */
 			/*rx.firm_change = 0;*/
 			rx_pr("1firm_change:%d,repeat_plug:%d,repeat:%d\n",
-			      rx.firm_change, repeat_plug, rx.hdcp.repeat);
+				rx.firm_change, repeat_plug, rx.hdcp.repeat);
 		}
 	}
 
 	/*this is addition for the downstream edid too late*/
-	if (new_edid && rx.hdcp.repeat && !rx.firm_change) {
+	if (new_edid && rx.hdcp.repeat && (!rx.firm_change)) {
 		/*check downstream plug when new plug occur*/
 		/*check receive change*/
 		/*it's contained in hwconfig*/
@@ -125,15 +137,15 @@ void rx_check_repeat(void)
 		case REPEATER_STATE_START:
 			rx_pr("[RX] receive aksv\n");
 			hdmirx_wr_bits_dwc(DWC_HDCP_RPT_CTRL,
-					   KSVLIST_TIMEOUT, 0);
+						KSVLIST_TIMEOUT, 0);
 			hdmirx_wr_bits_dwc(DWC_HDCP_RPT_CTRL,
-					   KSVLIST_LOSTAUTH, 0);
+						KSVLIST_LOSTAUTH, 0);
 			hdmirx_wr_bits_dwc(DWC_HDCP_RPT_CTRL,
-					   KSVLIST_READY, 0);
+						KSVLIST_READY, 0);
 			hdmirx_wr_bits_dwc(DWC_HDCP_RPT_BSTATUS,
-					   MAX_CASCADE_EXCEEDED, 0);
+				MAX_CASCADE_EXCEEDED, 0);
 			hdmirx_wr_bits_dwc(DWC_HDCP_RPT_BSTATUS,
-					   MAX_DEVS_EXCEEDED, 0);
+				MAX_DEVS_EXCEEDED, 0);
 			rx.hdcp.state = REPEATER_STATE_WAIT_KSV;
 		break;
 
@@ -150,15 +162,14 @@ void rx_check_repeat(void)
 				break;
 			} else if (rx.hdcp.delay >= KSV_LIST_WAIT_DELAY) {
 				hdmirx_wr_bits_dwc(DWC_HDCP_RPT_CTRL,
-						   KSVLIST_TIMEOUT, 1);
+						KSVLIST_TIMEOUT, 1);
 				rx.hdcp.state = REPEATER_STATE_IDLE;
 				rx_pr("[RX] receive ksv wait timeout\n");
 			}
 			if (rx_set_repeat_aksv(topo_data->ksv_list,
-					       topo_data->device_count,
-					       topo_data->depth,
-					       topo_data->max_devs_exceeded,
-					       topo_data->max_cascade_exceeded)) {
+				topo_data->device_count,
+				topo_data->depth, topo_data->max_devs_exceeded,
+				topo_data->max_cascade_exceeded)) {
 				rx.hdcp.state = REPEATER_STATE_IDLE;
 			}
 		}
@@ -202,7 +213,6 @@ void rx_firm_reset_end(void)
 	}
 	rx.firm_change = 0;
 }
-
 unsigned char *rx_get_dw_edid_addr(void)
 {
 	return receive_edid;
@@ -210,10 +220,10 @@ unsigned char *rx_get_dw_edid_addr(void)
 
 int rx_set_receiver_edid(const char *data, int len)
 {
-	if (!data || !len)
+	if ((data == NULL) || (len == 0))
 		return false;
 
-	if (len > MAX_RECEIVE_EDID || len < 3) {
+	if ((len > MAX_RECEIVE_EDID) || (len < 3)) {
 		memset(receive_edid, 0, sizeof(receive_edid));
 		edid_len = 0;
 	} else {
@@ -227,9 +237,10 @@ int rx_set_receiver_edid(const char *data, int len)
 void rx_hdcp14_resume(void)
 {
 	hdcp22_kill_esm = 0;
-	//extcon_set_state_sync(rx.rx_excton_rx22, EXTCON_DISP_HDMI, 0);
-	hdmirx_wr_dwc(DWC_HDCP22_CONTROL, 0x1000);
-	//extcon_set_state_sync(rx.rx_excton_rx22, EXTCON_DISP_HDMI, 1);
+	extcon_set_state_sync(rx.rx_excton_rx22, EXTCON_DISP_HDMI, 0);
+	hdmirx_wr_dwc(DWC_HDCP22_CONTROL,
+				0x1000);
+	extcon_set_state_sync(rx.rx_excton_rx22, EXTCON_DISP_HDMI, 1);
 	hpd_to_esm = 1;
 	rx_pr("hdcp14 on\n");
 }
@@ -242,12 +253,12 @@ void rx_set_repeater_support(bool enable)
 }
 EXPORT_SYMBOL(rx_set_repeater_support);
 
-bool rx_poll_dwc(u16 addr, u32 exp_data,
-		 u32 mask, u32 max_try)
+bool rx_poll_dwc(uint16_t addr, uint32_t exp_data,
+			uint32_t mask, uint32_t max_try)
 {
-	u32 rd_data;
-	u32 cnt = 0;
-	u8 done = 0;
+	uint32_t rd_data;
+	uint32_t cnt = 0;
+	uint8_t done = 0;
 
 	rd_data = hdmirx_rd_dwc(addr);
 	while (((cnt < max_try) || (max_try == 0)) && (done != 1)) {
@@ -269,37 +280,37 @@ bool rx_poll_dwc(u16 addr, u32 exp_data,
 }
 
 bool rx_set_repeat_aksv(unsigned char *data, int len, int depth,
-			bool dev_exceed, bool cascade_exceed)
+	bool dev_exceed, bool cascade_exceed)
 {
 	int i;
 	bool ksvlist_ready = 0;
 
-	if (data == 0 || ((depth == 0 || len == 0) &&
-			  !dev_exceed && !cascade_exceed))
+	if ((data == 0) || (((depth == 0) || (len == 0))
+		&& (!dev_exceed) && (!cascade_exceed)))
 		return false;
 	rx_pr("set ksv list len:%d,depth:%d, exceed count:%d,cascade:%d\n",
-	      len, depth, dev_exceed, cascade_exceed);
+					len, depth, dev_exceed, cascade_exceed);
 	/*set repeat depth*/
-	if (depth <= MAX_REPEAT_DEPTH && !cascade_exceed) {
-		hdmirx_wr_bits_dwc(DWC_HDCP_RPT_BSTATUS,
-				   MAX_CASCADE_EXCEEDED, 0);
+	if ((depth <= MAX_REPEAT_DEPTH) && (!cascade_exceed)) {
+		hdmirx_wr_bits_dwc(DWC_HDCP_RPT_BSTATUS, MAX_CASCADE_EXCEEDED,
+		0);
 		hdmirx_wr_bits_dwc(DWC_HDCP_RPT_BSTATUS, DEPTH, depth);
 		rx.hdcp.depth = depth;
 	} else {
-		hdmirx_wr_bits_dwc(DWC_HDCP_RPT_BSTATUS,
-				   MAX_CASCADE_EXCEEDED, 1);
+		hdmirx_wr_bits_dwc(DWC_HDCP_RPT_BSTATUS, MAX_CASCADE_EXCEEDED,
+		1);
 		rx.hdcp.depth = 0;
 	}
 	/*set repeat count*/
-	if (len <= HDCP14_KSV_MAX_COUNT && !dev_exceed) {
-		hdmirx_wr_bits_dwc(DWC_HDCP_RPT_BSTATUS,
-				   MAX_DEVS_EXCEEDED, 0);
+	if ((len <= HDCP14_KSV_MAX_COUNT) && (!dev_exceed)) {
+		hdmirx_wr_bits_dwc(DWC_HDCP_RPT_BSTATUS, MAX_DEVS_EXCEEDED,
+		0);
 		rx.hdcp.count = len;
 		hdmirx_wr_bits_dwc(DWC_HDCP_RPT_BSTATUS, DEVICE_COUNT,
-				   rx.hdcp.count);
+								rx.hdcp.count);
 	} else {
-		hdmirx_wr_bits_dwc(DWC_HDCP_RPT_BSTATUS,
-				   MAX_DEVS_EXCEEDED, 1);
+		hdmirx_wr_bits_dwc(DWC_HDCP_RPT_BSTATUS, MAX_DEVS_EXCEEDED,
+		1);
 		rx.hdcp.count = 0;
 	}
 	/*set repeat status*/
@@ -316,17 +327,18 @@ bool rx_set_repeat_aksv(unsigned char *data, int len, int depth,
 	/*write ksv list to fifo*/
 	for (i = 0; i < rx.hdcp.count; i++) {
 		if (rx_poll_dwc(DWC_HDCP_RPT_CTRL, ~KSV_HOLD, KSV_HOLD,
-				KSV_LIST_WR_TH)) {
+		KSV_LIST_WR_TH)) {
 			/*check fifo can be written*/
 			hdmirx_wr_dwc(DWC_HDCP_RPT_KSVFIFOCTRL, i);
 			hdmirx_wr_dwc(DWC_HDCP_RPT_KSVFIFO1,
-				      *(data + i * MAX_KSV_SIZE + 4));
+				*(data + i*MAX_KSV_SIZE + 4));
 			hdmirx_wr_dwc(DWC_HDCP_RPT_KSVFIFO0,
-				      *((u32 *)(data + i * MAX_KSV_SIZE)));
+				*((uint32_t *)(data + i*MAX_KSV_SIZE)));
 			if (log_level & VIDEO_LOG)
-				rx_pr("[RX]write ksv list index:%d, ksv hi:%#x, low:%#x\n",
-				      i, *(data + i * MAX_KSV_SIZE + 4),
-				      *((u32 *)(data + i * MAX_KSV_SIZE)));
+				rx_pr(
+				"[RX]write ksv list index:%d, ksv hi:%#x, low:%#x\n",
+				i, *(data + i*MAX_KSV_SIZE +
+				4), *((uint32_t *)(data + i*MAX_KSV_SIZE)));
 		} else {
 			return false;
 		}
@@ -338,7 +350,7 @@ bool rx_set_repeat_aksv(unsigned char *data, int len, int depth,
 	/* Wait for HW completion of V value*/
 	if (ksvlist_ready)
 		rx_poll_dwc(DWC_HDCP_RPT_CTRL, FIFO_READY,
-			    FIFO_READY, KSV_V_WR_TH);
+						FIFO_READY, KSV_V_WR_TH);
 	rx_pr("[RX]write Ready signal! ready:%u\n",
 	      (unsigned int)ksvlist_ready);
 
@@ -352,7 +364,7 @@ void rx_set_repeat_signal(bool repeat)
 }
 
 bool rx_set_receive_hdcp(unsigned char *data, int len, int depth,
-			 bool cas_exceed, bool devs_exceed)
+	bool cas_exceed, bool devs_exceed)
 {
 	return true;
 }

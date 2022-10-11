@@ -1,4 +1,3 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
  * drivers/amlogic/media/vin/tvin/vdin/vdin_sm.c
  *
@@ -66,7 +65,7 @@ static int sm_print_prestable;
 static unsigned int sm_debug_enable = VDIN_SM_LOG_L_1;
 module_param(sm_debug_enable, uint, 0664);
 MODULE_PARM_DESC(sm_debug_enable,
-		 "enable/disable state machine debug message");
+		"enable/disable state machine debug message");
 
 static int back_nosig_max_cnt = BACK_NOSIG_MAX_CNT;
 static int atv_unstable_in_cnt = 45;
@@ -109,11 +108,10 @@ u32 vdin_re_cfg_drop_cnt = 8;
 module_param(vdin_re_cfg_drop_cnt, int, 0664);
 MODULE_PARM_DESC(vdin_re_cfg_drop_cnt, "vdin_re_cfg_drop_cnt");
 
-/*#define DEBUG_SUPPORT*/
 #ifdef DEBUG_SUPPORT
 module_param(back_nosig_max_cnt, int, 0664);
 MODULE_PARM_DESC(back_nosig_max_cnt,
-		 "unstable enter nosignal state max count");
+		"unstable enter nosignal state max count");
 
 module_param(atv_unstable_in_cnt, int, 0664);
 MODULE_PARM_DESC(atv_unstable_in_cnt, "atv_unstable_in_cnt");
@@ -164,13 +162,13 @@ static unsigned int vdin_hdr_chg_cnt = 1;
 module_param(vdin_hdr_chg_cnt, uint, 0664);
 MODULE_PARM_DESC(vdin_hdr_chg_cnt, "vdin_hdr_chg_cnt");
 
-enum tvin_color_fmt_range_e
-	tvin_get_force_fmt_range(enum tvin_color_fmt_e color_fmt)
+enum tvin_color_fmt_range_e tvin_get_force_fmt_range(
+	enum tvin_color_fmt_e color_fmt)
 {
 	u32 fmt_range = TVIN_YUV_FULL;
 
 	if (color_fmt == TVIN_YUV444 ||
-	    color_fmt == TVIN_YUV422) {
+		color_fmt == TVIN_YUV422) {
 		if (color_range_force == COLOR_RANGE_FULL)
 			fmt_range = TVIN_YUV_FULL;
 		else if (color_range_force == COLOR_RANGE_LIMIT)
@@ -227,11 +225,11 @@ static enum tvin_sg_chg_flg vdin_hdmirx_fmt_chg_detect(struct vdin_dev_s *devp)
 	sm_ops = devp->frontend->sm_ops;
 	port = devp->parm.port;
 
-	if (port < TVIN_PORT_HDMI0 || port > TVIN_PORT_HDMI7)
+	if ((port < TVIN_PORT_HDMI0) || (port > TVIN_PORT_HDMI7))
 		return signal_chg;
 
 	if ((devp->flags & VDIN_FLAG_DEC_STARTED) &&
-	    sm_ops->get_sig_property) {
+		(sm_ops->get_sig_property)) {
 		/*if (!(devp->flags & VDIN_FLAG_ISR_EN))*/
 		/*	sm_ops->get_sig_property(devp->frontend, prop);*/
 
@@ -334,8 +332,8 @@ static enum tvin_sg_chg_flg vdin_hdmirx_fmt_chg_detect(struct vdin_dev_s *devp)
 			devp->parm.info.fps = devp->prop.fps;
 		}
 
-		if (devp->pre_prop.aspect_ratio !=
-		     devp->prop.aspect_ratio &&
+		if ((devp->pre_prop.aspect_ratio !=
+		     devp->prop.aspect_ratio) &&
 		    IS_HDMI_SRC(devp->parm.port)) {
 			if (devp->sg_chg_afd_cnt > 1) {
 				signal_chg |= TVIN_SIG_CHG_AFD;
@@ -357,9 +355,9 @@ static enum tvin_sg_chg_flg vdin_hdmirx_fmt_chg_detect(struct vdin_dev_s *devp)
 		vdin_fmt_range = prop->color_fmt_range;
 		pre_vdin_fmt_range = pre_prop->color_fmt_range;
 
-		if (cur_color_fmt != pre_color_fmt ||
+		if ((cur_color_fmt != pre_color_fmt) ||
 		    /*(vdin_hdr_flag != pre_vdin_hdr_flag) ||*/
-		    vdin_fmt_range != pre_vdin_fmt_range) {
+		    (vdin_fmt_range != pre_vdin_fmt_range)) {
 			if (sm_debug_enable & VDIN_SM_LOG_L_2)
 				pr_info("[smr.%d] fmt(%d->%d), hdr_flag(%d->%d), csc_cfg:0x%x\n",
 					devp->index,
@@ -393,7 +391,7 @@ void vdin_auto_de_handler(struct vdin_dev_s *devp)
 	prop = &devp->prop;
 	sm_ops = devp->frontend->sm_ops;
 	if ((devp->flags & VDIN_FLAG_DEC_STARTED) &&
-	    sm_ops->get_sig_property) {
+		(sm_ops->get_sig_property)) {
 		sm_ops->get_sig_property(devp->frontend, prop);
 		cur_vs = prop->vs;
 		cur_ve = prop->ve;
@@ -403,12 +401,12 @@ void vdin_auto_de_handler(struct vdin_dev_s *devp)
 		pre_ve = prop->pre_ve;
 		pre_hs = prop->pre_hs;
 		pre_he = prop->pre_he;
-		if (pre_vs != cur_vs || pre_ve != cur_ve ||
-		    pre_hs != cur_hs || pre_he != cur_he) {
+		if ((pre_vs != cur_vs) || (pre_ve != cur_ve) ||
+			(pre_hs != cur_hs) || (pre_he != cur_he)) {
 			if (sm_debug_enable & VDIN_SM_LOG_L_4)
 				pr_info("[smr.%d] pre_vs(%d->%d),pre_ve(%d->%d),pre_hs(%d->%d),pre_he(%d->%d),cutwindow_cfg:0x%x\n",
-					devp->index, pre_vs, cur_vs, pre_ve, cur_ve,
-					pre_hs, cur_hs, pre_he, cur_he,
+					devp->index, pre_vs, cur_vs, pre_ve,
+					cur_ve, pre_hs, cur_hs, pre_he, cur_he,
 					devp->cutwindow_cfg);
 			devp->cutwindow_cfg = 1;
 		}
@@ -477,9 +475,9 @@ u32 tvin_hdmirx_signal_type_check(struct vdin_dev_s *devp)
 			signal_type = ((1 << 8) | (signal_type & (~0xFF00)));
 		} else {
 			devp->prop.vdin_hdr_flag = true;
-			if (prop->hdr_info.hdr_data.eotf ==
-			    EOTF_SMPTE_ST_2048 ||
-			    prop->hdr_info.hdr_data.eotf == EOTF_HDR) {
+			if ((prop->hdr_info.hdr_data.eotf ==
+			    EOTF_SMPTE_ST_2048) ||
+			    (prop->hdr_info.hdr_data.eotf == EOTF_HDR)) {
 				signal_type |= (1 << 29);
 				signal_type |= (0 << 25);/* 0:limit */
 				signal_type = ((9 << 16) |
@@ -626,7 +624,6 @@ void tvin_smr(struct vdin_dev_s *devp)
 	struct tvin_frontend_s *fe;
 	struct tvin_sig_property_s *prop, *pre_prop;
 	enum tvin_sg_chg_flg signal_chg = TVIN_SIG_CHG_NONE;
-	unsigned int cnt;
 
 	if (!devp) {
 		return;
@@ -635,8 +632,8 @@ void tvin_smr(struct vdin_dev_s *devp)
 		return;
 	}
 
-	if (devp->flags & VDIN_FLAG_SM_DISABLE ||
-	    devp->flags & VDIN_FLAG_SUSPEND)
+	if ((devp->flags & VDIN_FLAG_SM_DISABLE) ||
+		(devp->flags & VDIN_FLAG_SUSPEND))
 		return;
 
 	if (!(devp->flags & VDIN_FLAG_DEC_OPENED))
@@ -670,7 +667,7 @@ void tvin_smr(struct vdin_dev_s *devp)
 					info->fmt = TVIN_SIG_FMT_NULL;
 				if (sm_debug_enable && !sm_print_nosig) {
 					pr_info("[smr.%d] no signal\n",
-						devp->index);
+							devp->index);
 					sm_print_nosig = 1;
 				}
 				sm_print_unstable = 0;
@@ -682,7 +679,7 @@ void tvin_smr(struct vdin_dev_s *devp)
 				sm_p->state = TVIN_SM_STATUS_UNSTABLE;
 				if (sm_debug_enable)
 					pr_info("[smr.%d] no signal --> unstable\n",
-						devp->index);
+							devp->index);
 				sm_print_nosig  = 0;
 				sm_print_unstable = 0;
 			}
@@ -703,7 +700,7 @@ void tvin_smr(struct vdin_dev_s *devp)
 					info->fmt = TVIN_SIG_FMT_NULL;
 				if (sm_debug_enable)
 					pr_info("[smr.%d] unstable --> no signal\n",
-						devp->index);
+							devp->index);
 				sm_print_nosig  = 0;
 				sm_print_unstable = 0;
 			}
@@ -724,9 +721,9 @@ void tvin_smr(struct vdin_dev_s *devp)
 					/*info->fmt = TVIN_SIG_FMT_NULL;*/
 
 					if (sm_debug_enable &&
-					    !sm_print_unstable) {
+						!sm_print_unstable) {
 						pr_info("[smr.%d] unstable\n",
-							devp->index);
+								devp->index);
 						sm_print_unstable = 1;
 					}
 					sm_print_nosig  = 0;
@@ -738,25 +735,24 @@ void tvin_smr(struct vdin_dev_s *devp)
 					unstb_in = sm_p->atv_unstable_out_cnt;
 				else if (IS_TVAFE_ATV_SRC(port) && manual_flag)
 					unstb_in = manual_unstable_out_cnt;
-				else if (port >= TVIN_PORT_HDMI0 &&
-					 port <= TVIN_PORT_HDMI7)
+				else if ((port >= TVIN_PORT_HDMI0) &&
+					 (port <= TVIN_PORT_HDMI7))
 					unstb_in = sm_p->hdmi_unstable_out_cnt;
 				else
 					unstb_in = other_unstable_out_cnt;
-
-				cnt = sizeof(struct tvin_sig_property_s);
 				 /* must wait enough time for cvd signal lock */
 				if (sm_p->back_stable_cnt >= unstb_in) {
 					sm_p->back_stable_cnt = 0;
 					sm_p->state_cnt = 0;
 					if (sm_ops->get_fmt &&
-					    sm_ops->get_sig_property) {
+						sm_ops->get_sig_property) {
 						info->fmt =
 							sm_ops->get_fmt(fe);
 						/*sm_ops->get_sig_property(fe,*/
 						/*prop);*/
 						info->cfmt = prop->color_format;
-						memcpy(pre_prop, prop, cnt);
+						memcpy(pre_prop, prop,
+					sizeof(struct tvin_sig_property_s));
 						devp->parm.info.trans_fmt =
 							prop->trans_fmt;
 						devp->parm.info.is_dvi =
@@ -774,9 +770,9 @@ void tvin_smr(struct vdin_dev_s *devp)
 
 					if (sm_debug_enable) {
 						pr_info("[smr.%d]unstable-->prestable",
-							devp->index);
+						devp->index);
 						pr_info("and format is %d(%s)\n",
-							info->fmt,
+						info->fmt,
 						tvin_sig_fmt_str(info->fmt));
 					}
 
@@ -790,9 +786,9 @@ void tvin_smr(struct vdin_dev_s *devp)
 					info->status = TVIN_SIG_STATUS_UNSTABLE;
 
 					if (sm_debug_enable &&
-					    !sm_print_notsup) {
+						!sm_print_notsup) {
 						pr_info("[smr.%d] unstable --> not support\n",
-							devp->index);
+								devp->index);
 						sm_print_notsup = 1;
 					}
 				}
@@ -802,7 +798,6 @@ void tvin_smr(struct vdin_dev_s *devp)
 	case TVIN_SM_STATUS_PRESTABLE: {
 		bool nosig = false, fmt_changed = false;
 		unsigned int prestable_out_cnt = 0;
-
 		devp->unstable_flag = true;
 #ifdef CONFIG_AMLOGIC_MEDIA_TVIN_AFE
 		if (IS_TVAFE_ATV_SRC(port) &&
@@ -811,19 +806,19 @@ void tvin_smr(struct vdin_dev_s *devp)
 #endif
 		if (sm_ops->nosig(devp->frontend)) {
 			nosig = true;
-			if (sm_debug_enable && !(sm_print_prestable & 0x1)) {
+			if (sm_debug_enable && !(sm_print_prestable&0x1)) {
 				pr_info("[smr.%d] warning: no signal\n",
-					devp->index);
+						devp->index);
 				sm_print_prestable |= 1;
 			}
 		}
 
 		if (sm_ops->fmt_changed(devp->frontend)) {
 			fmt_changed = true;
-			if (sm_debug_enable && !(sm_print_prestable & 0x2)) {
+			if (sm_debug_enable && !(sm_print_prestable&0x2)) {
 				pr_info("[smr.%d] warning: format changed\n",
-					devp->index);
-				sm_print_prestable |= (1 << 1);
+						devp->index);
+				sm_print_prestable |= (1<<1);
 			}
 		}
 
@@ -839,7 +834,7 @@ void tvin_smr(struct vdin_dev_s *devp)
 				sm_p->state = TVIN_SM_STATUS_UNSTABLE;
 				if (sm_debug_enable)
 					pr_info("[smr.%d] prestable --> unstable\n",
-						devp->index);
+							devp->index);
 				sm_print_nosig  = 0;
 				sm_print_notsup = 0;
 				sm_print_unstable = 0;
@@ -853,7 +848,7 @@ void tvin_smr(struct vdin_dev_s *devp)
 			    (devp->flags & VDIN_FLAG_SNOW_FLAG)) {
 				++sm_p->exit_prestable_cnt;
 				if (sm_p->exit_prestable_cnt <
-				    atv_prestable_out_cnt)
+					atv_prestable_out_cnt)
 					break;
 				else
 					sm_p->exit_prestable_cnt = 0;
@@ -864,7 +859,8 @@ void tvin_smr(struct vdin_dev_s *devp)
 			vdin_update_prop(devp);
 			if (sm_debug_enable)
 				pr_info("[smr.%d] %ums prestable --> stable\n",
-					devp->index, jiffies_to_msecs(jiffies));
+						devp->index,
+						jiffies_to_msecs(jiffies));
 			sm_print_nosig  = 0;
 			sm_print_notsup = 0;
 			sm_print_prestable = 0;
@@ -875,13 +871,13 @@ void tvin_smr(struct vdin_dev_s *devp)
 		bool nosig = false, fmt_changed = false;
 		unsigned int stable_out_cnt = 0;
 		unsigned int stable_fmt = 0;
-
 		devp->unstable_flag = true;
+
 		if (sm_ops->nosig(devp->frontend)) {
 			nosig = true;
 			if (sm_debug_enable && !sm_print_fmt_nosig) {
 				pr_info("[smr.%d] warning: no signal\n",
-					devp->index);
+						devp->index);
 				sm_print_fmt_nosig = 1;
 			}
 		}
@@ -890,7 +886,7 @@ void tvin_smr(struct vdin_dev_s *devp)
 			fmt_changed = true;
 			if (sm_debug_enable && !sm_print_fmt_chg) {
 				pr_info("[smr.%d] warning: format changed\n",
-					devp->index);
+						devp->index);
 				sm_print_fmt_chg = 1;
 			}
 		}
@@ -909,14 +905,14 @@ void tvin_smr(struct vdin_dev_s *devp)
 			    (devp->flags & VDIN_FLAG_SNOW_FLAG))
 				stable_out_cnt = sm_p->atv_stable_out_cnt;
 			else if ((port >= TVIN_PORT_HDMI0) &&
-				 (port <= TVIN_PORT_HDMI7))
+					(port <= TVIN_PORT_HDMI7))
 				stable_out_cnt = hdmi_stable_out_cnt;
 			else
 				stable_out_cnt = other_stable_out_cnt;
 			/*add for atv snow*/
-			if (sm_p->state_cnt >= atv_stable_fmt_check_cnt &&
-			    IS_TVAFE_ATV_SRC(port) &&
-			    (devp->flags & VDIN_FLAG_SNOW_FLAG))
+			if ((sm_p->state_cnt >= atv_stable_fmt_check_cnt) &&
+				IS_TVAFE_ATV_SRC(port) &&
+				(devp->flags & VDIN_FLAG_SNOW_FLAG))
 				atv_stable_fmt_check_enable = 1;
 			if (sm_p->state_cnt >= stable_out_cnt) {
 				tvin_smr_init_counter(devp->index);
@@ -936,18 +932,16 @@ void tvin_smr(struct vdin_dev_s *devp)
 			/*add for atv snow*/
 			if (IS_TVAFE_ATV_SRC(port) &&
 			    atv_stable_fmt_check_enable &&
-				(devp->flags & VDIN_FLAG_SNOW_FLAG) &&
-				(sm_ops->get_fmt && sm_ops->get_sig_property)) {
+			    (devp->flags & VDIN_FLAG_SNOW_FLAG) &&
+			    (sm_ops->get_fmt && sm_ops->get_sig_property)) {
 				sm_p->state_cnt = 0;
-				stable_fmt =
-					sm_ops->get_fmt(fe);
-				if (sm_atv_prestable_fmt != stable_fmt &&
-				    stable_fmt != TVIN_SIG_FMT_NULL) {
+				stable_fmt = sm_ops->get_fmt(fe);
+				if ((sm_atv_prestable_fmt != stable_fmt) &&
+					(stable_fmt != TVIN_SIG_FMT_NULL)) {
 					/*cvbs in*/
 					sm_ops->get_sig_property(fe, prop);
 					memcpy(pre_prop, prop,
-					       sizeof(struct
-						      tvin_sig_property_s));
+					sizeof(struct tvin_sig_property_s));
 					devp->parm.info.trans_fmt =
 						prop->trans_fmt;
 					devp->parm.info.is_dvi =
@@ -1027,12 +1021,12 @@ int tvin_get_av_status(void)
 
 	return false;
 }
-EXPORT_SYMBOL_GPL(tvin_get_av_status);
+EXPORT_SYMBOL(tvin_get_av_status);
 
 void vdin_send_event(struct vdin_dev_s *devp, enum tvin_sg_chg_flg sts)
 {
 	/*pr_info("%s :0x%x\n", __func__, sts);*/
-	/*devp->extcon_event->state = sts;*/
+	devp->extcon_event->state = sts;
 	schedule_delayed_work(&devp->event_dwork, 0);
 }
 

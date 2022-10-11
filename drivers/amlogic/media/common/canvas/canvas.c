@@ -1,9 +1,19 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/amlogic/media/common/canvas/canvas.c
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
-
-#define pr_fmt(fmt) "Canvas: " fmt
 
 #include <linux/version.h>
 #include <linux/kernel.h>
@@ -13,10 +23,10 @@
 #include <linux/spinlock.h>
 #include <linux/major.h>
 #include <linux/io.h>
+#include <linux/amlogic/cpu_version.h>
+#include <linux/amlogic/media/old_cpu_version.h>
 #include <linux/kernel.h>
-#include <linux/slab.h>
-/* media module used media/registers/cpu_version.h since kernel 5.4 */
-#include <linux/amlogic/media/registers/cpu_version.h>
+
 #include <linux/amlogic/media/canvas/canvas.h>
 #include <linux/amlogic/media/canvas/canvas_mgr.h>
 
@@ -37,7 +47,7 @@
 
 struct canvas_device_info {
 	const char *device_name;
-	spinlock_t lock; /* spinlock for canvas */
+	spinlock_t lock;
 	struct resource res;
 	unsigned char __iomem *reg_base;
 	struct canvas_s canvasPool[CANVAS_MAX_NUM];
@@ -46,15 +56,13 @@ struct canvas_device_info {
 	ulong flags;
 	ulong fiq_flag;
 };
-
-static struct canvas_device_info *canvas_info;
+static struct canvas_device_info canvas_info;
 
 #define CANVAS_VALID(n) ((n) < canvas_pool_canvas_num())
 
 static void
-canvas_lut_data_build(ulong addr, u32 width, u32 height,
-		      u32 wrap, u32 blkmode,
-		      u32 endian, u32 *data_l, u32 *data_h)
+canvas_lut_data_build(ulong addr, u32 width, u32 height, u32 wrap, u32 blkmode,
+	u32 endian, u32 *data_l, u32 *data_h)
 {
 	/*
 	 *DMC_CAV_LUT_DATAL/DMC_CAV_LUT_DATAH
@@ -83,14 +91,14 @@ canvas_lut_data_build(ulong addr, u32 width, u32 height,
 	 *32bytes boundary. that means last 2bits must be 0.
 	 */
 
-#define CANVAS_WADDR_LBIT       0
-#define CANVAS_WIDTH_LBIT       29
-#define CANVAS_WIDTH_HBIT       0
-#define CANVAS_HEIGHT_HBIT      (41 - 32)
-#define CANVAS_WRAPX_HBIT       (54 - 32)
-#define CANVAS_WRAPY_HBIT       (55 - 32)
-#define CANVAS_BLKMODE_HBIT     (56 - 32)
-#define CANVAS_ENDIAN_HBIT      (58 - 32)
+#define CANVAS_WADDR_LBIT 0
+#define CANVAS_WIDTH_LBIT 29
+#define CANVAS_WIDTH_HBIT 0
+#define CANVAS_HEIGHT_HBIT (41 - 32)
+#define CANVAS_WRAPX_HBIT  (54 - 32)
+#define CANVAS_WRAPY_HBIT  (55 - 32)
+#define CANVAS_BLKMODE_HBIT (56 - 32)
+#define CANVAS_ENDIAN_HBIT (58 - 32)
 
 	u32 addr_bits_l = ((addr + 7) >> 3 & CANVAS_ADDR_LMASK)
 		<< CANVAS_WADDR_LBIT;
@@ -116,8 +124,8 @@ canvas_lut_data_build(ulong addr, u32 width, u32 height,
 	*data_h = width_h | height_h | wrap_h | blkmod_h | switch_bits_ctl;
 }
 
-static void canvas_lut_data_parser(struct canvas_s *canvas,
-				   u32 data_l, u32 data_h)
+static void canvas_lut_data_parser(struct canvas_s *canvas, u32 data_l,
+	u32 data_h)
 {
 	ulong addr;
 	u32 width;
@@ -146,46 +154,49 @@ static void canvas_lut_data_parser(struct canvas_s *canvas,
 
 static void canvas_config_locked(u32 index, struct canvas_s *p)
 {
-	struct canvas_device_info *info = canvas_info;
+	struct canvas_device_info *info = &canvas_info;
 	u32 datal, datah;
-	int reg_add = -DC_CAV_LUT_DATAL;
+	u32 reg_add = 0;
 
-	if (!hw_canvas_support)
-		return;
 	canvas_lut_data_build(p->addr,
-			      p->width,
-			      p->height,
-			      p->wrap,
-			      p->blkmode,
-			      p->endian, &datal, &datah);
+			p->width,
+			p->height,
+			p->wrap,
+			p->blkmode,
+			p->endian, &datal, &datah);
+
+	if ((get_cpu_type() == MESON_CPU_MAJOR_ID_M8M2) ||
+		(get_cpu_type() >= MESON_CPU_MAJOR_ID_GXBB))
+		reg_add = DC_CAV_LUT_DATAL_M8M2 - DC_CAV_LUT_DATAL;
 
 	canvas_io_write(info->reg_base + reg_add + DC_CAV_LUT_DATAL, datal);
 
 	canvas_io_write(info->reg_base + reg_add + DC_CAV_LUT_DATAH, datah);
 
 	canvas_io_write(info->reg_base + reg_add + DC_CAV_LUT_ADDR,
-			CANVAS_LUT_WR_EN | index);
+		CANVAS_LUT_WR_EN | index);
 
 	canvas_io_read(info->reg_base + reg_add + DC_CAV_LUT_DATAH);
 
 	p->dataL = datal;
 	p->dataH = datah;
+
 }
 
 int canvas_read_hw(u32 index, struct canvas_s *canvas)
 {
-	struct canvas_device_info *info = canvas_info;
+	struct canvas_device_info *info = &canvas_info;
 	u32 datal, datah;
-	int reg_add = -DC_CAV_LUT_DATAL;
+	int reg_add = 0;
 
-	if (!hw_canvas_support)
-		return 0;
 	if (!CANVAS_VALID(index))
 		return -1;
-	datal = 0;
-	datah = 0;
+	datal = datah = 0;
+	if ((get_cpu_type() == MESON_CPU_MAJOR_ID_M8M2) ||
+		(get_cpu_type() >= MESON_CPU_MAJOR_ID_GXBB))
+		reg_add = DC_CAV_LUT_DATAL_M8M2 - DC_CAV_LUT_DATAL;
 	canvas_io_write(info->reg_base + reg_add + DC_CAV_LUT_ADDR,
-			CANVAS_LUT_RD_EN | (index & 0xff));
+		CANVAS_LUT_RD_EN | (index & 0xff));
 	datal = canvas_io_read(info->reg_base + reg_add + DC_CAV_LUT_RDATAL);
 	datah = canvas_io_read(info->reg_base + reg_add + DC_CAV_LUT_RDATAH);
 	canvas->dataL = datal;
@@ -195,17 +206,25 @@ int canvas_read_hw(u32 index, struct canvas_s *canvas)
 }
 EXPORT_SYMBOL(canvas_read_hw);
 
-#define canvas_lock(info, f) spin_lock_irqsave(&(info)->lock, f)
+#define canvas_lock(info, f, f2) do {\
+		spin_lock_irqsave(&info->lock, f);\
+		raw_local_save_flags(f2);\
+		local_fiq_disable();\
+	} while (0)
 
-#define canvas_unlock(info, f) spin_unlock_irqrestore(&(info)->lock, f)
+#define canvas_unlock(info, f, f2) do {\
+		raw_local_irq_restore(f2);\
+		spin_unlock_irqrestore(&info->lock, f);\
+	} while (0)
 
-void canvas_config_ex(u32 index, ulong addr, u32 width,
-		      u32 height, u32 wrap, u32 blkmode, u32 endian)
+
+
+void canvas_config_ex(u32 index, ulong addr, u32 width, u32 height, u32 wrap,
+	u32 blkmode, u32 endian)
 {
-	struct canvas_device_info *info = canvas_info;
+	struct canvas_device_info *info = &canvas_info;
 	struct canvas_s *canvas;
-	unsigned long flags;
-
+	unsigned long flags, fiqflags;
 	if (!CANVAS_VALID(index))
 		return;
 
@@ -214,7 +233,7 @@ void canvas_config_ex(u32 index, ulong addr, u32 width,
 		dump_stack();
 		return;
 	}
-	canvas_lock(info, flags);
+	canvas_lock(info, flags, fiqflags);
 	canvas = &info->canvasPool[index];
 	canvas->addr = addr;
 	canvas->width = width;
@@ -223,21 +242,20 @@ void canvas_config_ex(u32 index, ulong addr, u32 width,
 	canvas->blkmode = blkmode;
 	canvas->endian = endian;
 	canvas_config_locked(index, canvas);
-	canvas_unlock(info, flags);
+	canvas_unlock(info, flags, fiqflags);
 }
 EXPORT_SYMBOL(canvas_config_ex);
 
 void canvas_config_config(u32 index, struct canvas_config_s *cfg)
 {
 	canvas_config_ex(index, cfg->phy_addr,
-			 cfg->width, cfg->height,
-			 CANVAS_ADDR_NOWRAP,
-			 cfg->block_mode, cfg->endian);
+		cfg->width, cfg->height, CANVAS_ADDR_NOWRAP,
+		cfg->block_mode, cfg->endian);
 }
 EXPORT_SYMBOL(canvas_config_config);
 
-void canvas_config(u32 index, ulong addr, u32 width,
-		   u32 height, u32 wrap, u32 blkmode)
+void canvas_config(u32 index, ulong addr, u32 width, u32 height, u32 wrap,
+	u32 blkmode)
 {
 	return canvas_config_ex(index, addr, width, height, wrap, blkmode, 0);
 }
@@ -245,7 +263,7 @@ EXPORT_SYMBOL(canvas_config);
 
 void canvas_read(u32 index, struct canvas_s *p)
 {
-	struct canvas_device_info *info = canvas_info;
+	struct canvas_device_info *info = &canvas_info;
 
 	if (CANVAS_VALID(index))
 		*p = info->canvasPool[index];
@@ -254,23 +272,23 @@ EXPORT_SYMBOL(canvas_read);
 
 void canvas_copy(u32 src, u32 dst)
 {
-	struct canvas_device_info *info = canvas_info;
+	struct canvas_device_info *info = &canvas_info;
 	struct canvas_s *canvas_src = &info->canvasPool[src];
 	struct canvas_s *canvas_dst = &info->canvasPool[dst];
-	unsigned long flags;
+	unsigned long flags, fiqflags;
 
 	if (!CANVAS_VALID(src) || !CANVAS_VALID(dst))
 		return;
 
-	if (!canvas_pool_canvas_alloced(src) ||
-	    !canvas_pool_canvas_alloced(dst)) {
-		pr_info("!%s without alloc,src=%d,dst=%d\n",
-			__func__, src, dst);
+	if (!canvas_pool_canvas_alloced(src)
+		|| !canvas_pool_canvas_alloced(dst)) {
+		pr_info("!canvas_copy  without alloc,src=%d,dst=%d\n",
+			src, dst);
 		dump_stack();
 		return;
 	}
 
-	canvas_lock(info, flags);
+	canvas_lock(info, flags, fiqflags);
 	canvas_dst->addr = canvas_src->addr;
 	canvas_dst->width = canvas_src->width;
 	canvas_dst->height = canvas_src->height;
@@ -280,15 +298,15 @@ void canvas_copy(u32 src, u32 dst)
 	canvas_dst->dataH = canvas_src->dataH;
 	canvas_dst->dataL = canvas_src->dataL;
 	canvas_config_locked(dst, canvas_dst);
-	canvas_unlock(info, flags);
+	canvas_unlock(info, flags, fiqflags);
 }
 EXPORT_SYMBOL(canvas_copy);
 
-void canvas_update_addr(u32 index, ulong addr)
+void canvas_update_addr(u32 index, u32 addr)
 {
-	struct canvas_device_info *info = canvas_info;
+	struct canvas_device_info *info = &canvas_info;
 	struct canvas_s *canvas;
-	unsigned long flags;
+	unsigned long flags, fiqflags;
 
 	if (!CANVAS_VALID(index))
 		return;
@@ -299,16 +317,18 @@ void canvas_update_addr(u32 index, ulong addr)
 		dump_stack();
 		return;
 	}
-	canvas_lock(info, flags);
+	canvas_lock(info, flags, fiqflags);
 	canvas->addr = addr;
 	canvas_config_locked(index, canvas);
-	canvas_unlock(info, flags);
+	canvas_unlock(info, flags, fiqflags);
+
+	return;
 }
 EXPORT_SYMBOL(canvas_update_addr);
 
-ulong canvas_get_addr(u32 index)
+unsigned int canvas_get_addr(u32 index)
 {
-	struct canvas_device_info *info = canvas_info;
+	struct canvas_device_info *info = &canvas_info;
 
 	return info->canvasPool[index].addr;
 }
@@ -316,7 +336,7 @@ EXPORT_SYMBOL(canvas_get_addr);
 
 unsigned int canvas_get_width(u32 index)
 {
-	struct canvas_device_info *info = canvas_info;
+	struct canvas_device_info *info = &canvas_info;
 
 	if (!CANVAS_VALID(index))
 		return 0;
@@ -327,7 +347,7 @@ EXPORT_SYMBOL(canvas_get_width);
 
 unsigned int canvas_get_height(u32 index)
 {
-	struct canvas_device_info *info = canvas_info;
+	struct canvas_device_info *info = &canvas_info;
 
 	if (!CANVAS_VALID(index))
 		return 0;
@@ -336,43 +356,45 @@ unsigned int canvas_get_height(u32 index)
 }
 EXPORT_SYMBOL(canvas_get_height);
 /*********************************************************/
-static int __init canvas_probe(struct platform_device *pdev)
+/* static int __devinit canvas_probe(struct platform_device *pdev) */
+static int canvas_probe(struct platform_device *pdev)
 {
-	int r = 0;
-	struct canvas_device_info *info = NULL;
+
+	int r;
+	struct canvas_device_info *info = &canvas_info;
 	struct resource *res;
 	int size;
 
-	info = devm_kzalloc(&pdev->dev, sizeof(*info), GFP_KERNEL);
-	if (!info)
-		return -ENOMEM;
+	r = 0;
 
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	if (!res) {
-		dev_err(&pdev->dev, "I/O memory region is not used\n");
-		r = -ENOMEM;
-		goto err1;
-	} else {
-		info->res = *res;
-		size = (int)resource_size(res);
-		info->reg_base = devm_ioremap_resource(&pdev->dev, res);
-		if (!info->reg_base) {
-			dev_err(&pdev->dev,
-				"devm_ioremap_nocache canvas failed!\n");
-			goto err1;
-		}
+		dev_err(&pdev->dev, "cannot obtain I/O memory region");
+		return -ENODEV;
 	}
+	info->res = *res;
+	size = (int)resource_size(res);
+	pr_info("canvas_probe reg=%p,size=%x\n",
+			(void *)res->start, size);
+	if (!devm_request_mem_region(&pdev->dev,
+		res->start, size, pdev->name)) {
+		dev_err(&pdev->dev, "Memory region busy\n");
+		return -EBUSY;
+	}
+	info->reg_base = devm_ioremap_nocache(&pdev->dev, res->start, size);
+	if (info->reg_base == NULL) {
+		dev_err(&pdev->dev, "devm_ioremap_nocache canvas failed!\n");
+		goto err1;
+	}
+	pr_info("canvas maped reg_base =%p\n", info->reg_base);
 	amcanvas_manager_init();
+	memset(info->canvasPool, 0, CANVAS_MAX_NUM * sizeof(struct canvas_s));
 	info->max_canvas_num = canvas_pool_canvas_num();
 	spin_lock_init(&info->lock);
 	info->canvas_dev = pdev;
-	canvas_info = info;
-
-	pr_info("%s ok, reg=%lx, size=%x base =%px\n", __func__,
-		(unsigned long)res->start, size, info->reg_base);
 	return 0;
 err1:
-	devm_kfree(&pdev->dev, info);
+	devm_release_mem_region(&pdev->dev, res->start, size);
 	pr_error("Canvas driver probe failed\n");
 	return r;
 }
@@ -381,7 +403,7 @@ err1:
 static int canvas_remove(struct platform_device *pdev)
 {
 	int i;
-	struct canvas_device_info *info = canvas_info;
+	struct canvas_device_info *info = &canvas_info;
 
 	for (i = 0; i < info->max_canvas_num; i++)
 		kobject_put(&info->canvasPool[i].kobj);
@@ -390,8 +412,6 @@ static int canvas_remove(struct platform_device *pdev)
 	devm_release_mem_region(&pdev->dev,
 				info->res.start,
 				resource_size(&info->res));
-	kfree(info);
-	info = NULL;
 	pr_error("Canvas driver removed.\n");
 
 	return 0;
@@ -400,35 +420,42 @@ static int canvas_remove(struct platform_device *pdev)
 static const struct of_device_id canvas_dt_match[] = {
 	{
 			.compatible = "amlogic, meson, canvas",
-	},
+		},
 	{},
 };
 
 static struct platform_driver canvas_driver = {
+	.probe = canvas_probe,
 	.remove = canvas_remove,
 	.driver = {
 			.name = "amlogic-canvas",
 			.of_match_table = canvas_dt_match,
-	},
+		},
 };
 
-int __init amcanvas_init(void)
+static int __init amcanvas_init(void)
 {
 	int r;
 
-	r = platform_driver_probe(&canvas_driver, canvas_probe);
+	r = platform_driver_register(&canvas_driver);
 	if (r) {
 		pr_error("Unable to register canvas driver\n");
 		return r;
 	}
+	pr_info("register canvas platform driver\n");
+
 	return 0;
 }
 
-void __exit amcanvas_exit(void)
+static void __exit amcanvas_exit(void)
 {
+
 	platform_driver_unregister(&canvas_driver);
 }
 
-//MODULE_DESCRIPTION("AMLOGIC Canvas management driver");
-//MODULE_LICENSE("GPL");
-//MODULE_AUTHOR("Tim Yao <timyao@amlogic.com>");
+postcore_initcall(amcanvas_init);
+module_exit(amcanvas_exit);
+
+MODULE_DESCRIPTION("AMLOGIC Canvas management driver");
+MODULE_LICENSE("GPL");
+MODULE_AUTHOR("Tim Yao <timyao@amlogic.com>");

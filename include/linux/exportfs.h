@@ -1,4 +1,3 @@
-/* SPDX-License-Identifier: GPL-2.0 */
 #ifndef LINUX_EXPORTFS_H
 #define LINUX_EXPORTFS_H 1
 
@@ -139,7 +138,7 @@ struct fid {
  * @get_parent:     find the parent of a given directory
  * @commit_metadata: commit metadata changes to stable storage
  *
- * See Documentation/filesystems/nfs/exporting.rst for details on how to use
+ * See Documentation/filesystems/nfs/Exporting for details on how to use
  * this interface correctly.
  *
  * encode_fh:

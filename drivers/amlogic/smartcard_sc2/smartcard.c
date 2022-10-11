@@ -1,6 +1,18 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/amlogic/smartcard_sc2/smartcard.c
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
 #include <linux/version.h>
@@ -21,9 +33,6 @@
 #include <linux/platform_device.h>
 #include <linux/pinctrl/pinmux.h>
 #include <linux/gpio/consumer.h>
-#include <linux/amlogic/cpu_version.h>
-#include <linux/sched/clock.h>
-#include <linux/of.h>
 #ifndef MESON_CPU_TYPE
 #define MESON_CPU_TYPE 0x50
 #endif
@@ -39,7 +48,7 @@
 /*#include < mach/gpio.h > */
 #include <linux/platform_device.h>
 #include <linux/slab.h>
-//#include <linux/amlogic/aml_gpio_consumer.h>
+#include <linux/amlogic/aml_gpio_consumer.h>
 #define OWNER_NAME "smc"
 #if MESON_CPU_TYPE >= MESON_CPU_TYPE_MESON6
 #include <mach/mod_gate.h>
@@ -47,13 +56,12 @@
 #endif
 
 #include <linux/version.h>
-//#include <linux/amlogic/aml_gpio_consumer.h>
+#include <linux/amlogic/aml_gpio_consumer.h>
 #include <linux/amlogic/amsmc.h>
 #include <linux/clk.h>
 #include <linux/reset.h>
 #include <linux/amlogic/media/utils/vdec_reg.h>
-#include <linux/mod_devicetable.h>
-#include <linux/ktime.h>
+#include <linux/platform_device.h>
 
 #include "c_stb_regs_define.h"
 #include "smc_reg.h"
@@ -120,7 +128,7 @@ do { \
 #define Ipr		 Fpr
 
 #else
-//#if 1
+#if 1
 #define pr_dbg(fmt, args...) \
 do {\
 	if (smc_debug > 0) \
@@ -129,10 +137,10 @@ do {\
 while (0)
 #define Fpr(a...)	do { if (smc_debug > 1) printk(a); } while (0)
 #define Ipr		 Fpr
-//#else
-//#define pr_dbg(fmt, args...)
-//#define Fpr(a...)
-//#endif
+#else
+#define pr_dbg(fmt, args...)
+#define Fpr(a...)
+#endif
 #endif
 
 #define pr_error(fmt, args...) pr_err("Smartcard: " fmt, ## args)
@@ -151,15 +159,6 @@ static struct clk *aml_smartcard_clk;
 
 #define REG_READ 0
 #define REG_WRITE 1
-
-#define MEASURE_GUARD_TIME_BY_SW
-
-#ifdef MEASURE_GUARD_TIME_BY_SW
-static s64 etu_nsec;
-static s64 total_guard_time_nsec;
-static s64 prev_transmit_time_nsec;
-
-#endif
 
 static void debug_write(const char __user *buf, size_t count)
 {
@@ -321,7 +320,7 @@ struct smc_dev {
 	struct gpio_desc *enable_5v3v_pin;
 #define SMC_ENABLE_5V3V_PIN_NAME "smc:5V3V"
 	int enable_5v3v_level;
-	int (*reset)(void *smc, int value);
+	int (*reset)(void *, int);
 	int irq_num;
 	int reset_level;
 
@@ -427,7 +426,7 @@ static int smc_hw_deactive(struct smc_dev *smc);
 static int smc_hw_get_status(struct smc_dev *smc, int *sret);
 static void smc_clk_enable(int enable);
 
-static ssize_t gpio_pull_show(struct class *class,
+static ssize_t show_gpio_pull(struct class *class,
 			      struct class_attribute *attr, char *buf)
 {
 	if (ENA_GPIO_PULL > 0)
@@ -482,7 +481,7 @@ static int sc2_smc_addr(struct platform_device *pdev)
 #define SMC_READ_REG(a)          READ_CBUS_REG(SMARTCARD_##a)
 #define SMC_WRITE_REG(a, b)      WRITE_CBUS_REG(SMARTCARD_##a, b)
 
-static ssize_t gpio_pull_store(struct class *class,
+static ssize_t set_gpio_pull(struct class *class,
 			     struct class_attribute *attr,
 			     const char *buf, size_t count)
 {
@@ -495,8 +494,8 @@ static ssize_t gpio_pull_store(struct class *class,
 	return count;
 }
 
-static ssize_t ctrl_5v3v_show(struct class *class,
-			      struct class_attribute *attr, char *buf)
+static ssize_t show_5v3v(struct class *class,
+			 struct class_attribute *attr, char *buf)
 {
 	struct smc_dev *smc = NULL;
 	int enable_5v3v = 0;
@@ -509,9 +508,9 @@ static ssize_t ctrl_5v3v_show(struct class *class,
 	return sprintf(buf, "5v3v_pin level = %d\n", enable_5v3v);
 }
 
-static ssize_t ctrl_5v3v_store(struct class *class,
-			       struct class_attribute *attr,
-			       const char *buf, size_t count)
+static ssize_t store_5v3v(struct class *class,
+			  struct class_attribute *attr,
+			  const char *buf, size_t count)
 {
 	unsigned int enable_5v3v = 0;
 	struct smc_dev *smc = NULL;
@@ -534,7 +533,7 @@ static ssize_t ctrl_5v3v_store(struct class *class,
 	return count;
 }
 
-static ssize_t debug_reset_store(struct class *class,
+static ssize_t store_debug_reset(struct class *class,
 				 struct class_attribute *attr,
 				 const char *buf, size_t count)
 {
@@ -553,7 +552,7 @@ static ssize_t debug_reset_store(struct class *class,
 	return count;
 }
 
-static ssize_t enable_reset_store(struct class *class,
+static ssize_t store_enable_reset(struct class *class,
 				  struct class_attribute *attr,
 				  const char *buf, size_t count)
 {
@@ -573,7 +572,7 @@ static ssize_t enable_reset_store(struct class *class,
 	return count;
 }
 
-static ssize_t enable_cmd_store(struct class *class,
+static ssize_t store_enable_cmd(struct class *class,
 				struct class_attribute *attr,
 				const char *buf, size_t count)
 {
@@ -595,7 +594,7 @@ static ssize_t enable_cmd_store(struct class *class,
 	return count;
 }
 
-static ssize_t enable_clk_store(struct class *class,
+static ssize_t store_enable_clk(struct class *class,
 				struct class_attribute *attr,
 				const char *buf, size_t count)
 {
@@ -615,13 +614,13 @@ static ssize_t enable_clk_store(struct class *class,
 	return count;
 }
 
-static ssize_t freq_show(struct class *class,
+static ssize_t show_freq(struct class *class,
 			 struct class_attribute *attr, char *buf)
 {
 	return sprintf(buf, "%dKHz\n", smc_dev[0].param.freq);
 }
 
-static ssize_t freq_store(struct class *class,
+static ssize_t store_freq(struct class *class,
 			  struct class_attribute *attr,
 			  const char *buf, size_t count)
 {
@@ -637,13 +636,13 @@ static ssize_t freq_store(struct class *class,
 	return count;
 }
 
-static ssize_t div_smc_show(struct class *class,
+static ssize_t show_div_smc(struct class *class,
 			    struct class_attribute *attr, char *buf)
 {
 	return sprintf(buf, "div -> %d\n", DIV_SMC);
 }
 
-static ssize_t div_smc_store(struct class *class,
+static ssize_t store_div_smc(struct class *class,
 			     struct class_attribute *attr,
 			     const char *buf, size_t count)
 {
@@ -660,7 +659,7 @@ static ssize_t div_smc_store(struct class *class,
 }
 
 #ifdef MEM_DEBUG
-static ssize_t debug_show(struct class *class,
+static ssize_t show_debug(struct class *class,
 			  struct class_attribute *attr, char *buf)
 {
 	pr_inf("Usage:\n");
@@ -670,7 +669,7 @@ static ssize_t debug_show(struct class *class,
 	return 0;
 }
 
-static ssize_t debug_store(struct class *class,
+static ssize_t store_debug(struct class *class,
 			   struct class_attribute *attr,
 			   const char *buf, size_t count)
 {
@@ -678,14 +677,12 @@ static ssize_t debug_store(struct class *class,
 
 	switch (buf[0]) {
 	case '2':
+		smc_debug_level++;
 	case '1':{
 			void *p =
 			    krealloc((const void *)dbuf, DBUF_SIZE, GFP_KERNEL);
 
 			smc_debug_level++;
-			if (buf[0] == '2')
-				smc_debug_level++;
-
 			if (p) {
 				dbuf = (char *)p;
 				smc_debug = smc_debug_level;
@@ -724,7 +721,6 @@ static ssize_t debug_store(struct class *class,
 	return count;
 }
 #endif
-
 /*0: I/O
  *1: GPIO as H
  *2: GPIO as L
@@ -733,8 +729,8 @@ static int c7_pins_mode;
 static int c4_pins_mode = -1;
 static int c8_pins_mode = -1;
 
-static ssize_t pins_mode_show(struct class *class, struct class_attribute *attr,
-			      char *buf)
+static ssize_t show_pins_mode(struct class *class,
+			  struct class_attribute *attr, char *buf)
 {
 	int r, total = 0;
 
@@ -744,17 +740,17 @@ static ssize_t pins_mode_show(struct class *class, struct class_attribute *attr,
 	}
 
 	r = sprintf(buf, "C4:%c ",
-		    (c4_pins_mode) ? ((c4_pins_mode == 1) ? 'H' : 'L') : '0');
+		(c4_pins_mode) ? ((c4_pins_mode == 1) ? 'H' : 'L') : '0');
 	buf += r;
 	total += r;
 
 	r = sprintf(buf, "C7:%c ",
-		    (c7_pins_mode) ? ((c7_pins_mode == 1) ? 'H' : 'L') : '0');
+		(c7_pins_mode) ? ((c7_pins_mode == 1) ? 'H' : 'L') : '0');
 	buf += r;
 	total += r;
 
 	r = sprintf(buf, "C8:%c\n",
-		    (c8_pins_mode) ? ((c8_pins_mode == 1) ? 'H' : 'L') : '0');
+		(c8_pins_mode) ? ((c8_pins_mode == 1) ? 'H' : 'L') : '0');
 	buf += r;
 	total += r;
 
@@ -841,15 +837,15 @@ static int save_pin_mode(const char *buf)
 		else if (buf[3] == 'L')
 			c8_pins_mode = 2;
 	}
-	pr_inf("c4:%d, c7:%d, c8:%d\n", c4_pins_mode, c7_pins_mode,
-	       c8_pins_mode);
+	pr_inf("c4:%d, c7:%d, c8:%d\n", c4_pins_mode,
+		c7_pins_mode, c8_pins_mode);
 
 	return 0;
 }
 
-static ssize_t pins_mode_store(struct class *class,
-			       struct class_attribute *attr, const char *buf,
-			       size_t count)
+static ssize_t store_pins_mode(struct class *class,
+			   struct class_attribute *attr,
+			   const char *buf, size_t count)
 {
 	char name[32];
 	int valid = 0;
@@ -897,7 +893,8 @@ static ssize_t pins_mode_store(struct class *class,
 	if (valid) {
 		mutex_lock(&smc_lock);
 		smc = &smc_dev[0];
-		if (smc->pinctrl && pins_set(smc->pinctrl, name) == 0) {
+		if (smc->pinctrl &&
+			pins_set(smc->pinctrl, name) == 0) {
 			save_pin_mode(buf);
 		}
 		mutex_unlock(&smc_lock);
@@ -905,41 +902,25 @@ static ssize_t pins_mode_store(struct class *class,
 	return count;
 }
 
-static CLASS_ATTR_RW(gpio_pull);
-static CLASS_ATTR_RW(ctrl_5v3v);
-static CLASS_ATTR_RW(freq);
-static CLASS_ATTR_RW(div_smc);
-static CLASS_ATTR_WO(debug_reset);
-static CLASS_ATTR_WO(enable_reset);
-static CLASS_ATTR_WO(enable_cmd);
-static CLASS_ATTR_WO(enable_clk);
-static CLASS_ATTR_RW(pins_mode);
+static struct class_attribute smc_class_attrs[] = {
+	__ATTR(smc_gpio_pull, 0644, show_gpio_pull, set_gpio_pull),
+	__ATTR(ctrl_5v3v, 0644, show_5v3v, store_5v3v),
+	__ATTR(debug_reset, 0644, NULL, store_debug_reset),
+	__ATTR(freq, 0644, show_freq, store_freq),
+	__ATTR(div_smc, 0644, show_div_smc, store_div_smc),
+	__ATTR(enable_reset, 0644, NULL, store_enable_reset),
+	__ATTR(enable_cmd, 0644, NULL, store_enable_cmd),
+	__ATTR(enable_clk, 0644, NULL, store_enable_clk),
+	__ATTR(pins_mode, 0644, show_pins_mode, store_pins_mode),
 #ifdef MEM_DEBUG
-static CLASS_ATTR_RW(debug);
+	__ATTR(debug, 0644, show_debug, store_debug),
 #endif
-
-static struct attribute *smc_class_attrs[] = {
-	&class_attr_gpio_pull.attr,
-	&class_attr_ctrl_5v3v.attr,
-	&class_attr_freq.attr,
-	&class_attr_div_smc.attr,
-	&class_attr_debug_reset.attr,
-	&class_attr_enable_reset.attr,
-	&class_attr_enable_cmd.attr,
-	&class_attr_enable_clk.attr,
-	&class_attr_pins_mode.attr,
-
-#ifdef MEM_DEBUG
-	&class_attr_debug.attr,
-#endif
-	NULL,
+	__ATTR_NULL
 };
-
-ATTRIBUTE_GROUPS(smc_class);
 
 static struct class smc_class = {
 	.name = SMC_CLASS_NAME,
-	.class_groups = smc_class_groups,
+	.class_attrs = smc_class_attrs,
 };
 
 #ifndef CONFIG_OF
@@ -1097,13 +1078,7 @@ static int smc_hw_set_param(struct smc_dev *smc)
 	reg6->cwi_value = smc->param.cwi;
 	reg6->bwi = smc->param.bwi;
 	reg6->bgt = smc->param.bgt - 2;
-#ifdef MEASURE_GUARD_TIME_BY_SW
-	etu_nsec = div64_s64((s64)smc->param.f * 1000000,
-			     ((s64)smc->param.d * (s64)smc->param.freq));
-	total_guard_time_nsec = (12 + smc->param.n) * etu_nsec;
-#else
 	reg6->N_parameter = smc->param.n;
-#endif
 	SMC_WRITE_REG(REG6, v);
 	pr_error("REG6: 0x%08lx\n", v);
 	pr_error("N	  :%d\n", smc->param.n);
@@ -1111,10 +1086,6 @@ static int smc_hw_set_param(struct smc_dev *smc)
 	pr_error("bgt	 :%d\n", smc->param.bgt);
 	pr_error("bwi	 :%d\n", smc->param.bwi);
 
-#ifdef MEASURE_GUARD_TIME_BY_SW
-	pr_error("etu (ns)   :%lld\n", etu_nsec);
-	pr_error("total guard time	:%lld", total_guard_time_nsec);
-#endif
 	return 0;
 }
 
@@ -1252,23 +1223,12 @@ static int smc_hw_setup(struct smc_dev *smc)
 	reg6->cwi_value = smc->param.cwi;
 	reg6->bgt = smc->param.bgt - 2;
 	reg6->bwi = smc->param.bwi;
-
-#ifdef MEASURE_GUARD_TIME_BY_SW
-	prev_transmit_time_nsec = 0;
-	etu_nsec = div64_s64((s64)smc->param.f * 1000000,
-			     ((s64)smc->param.d * (s64)smc->param.freq));
-	total_guard_time_nsec = (12 + smc->param.n) * etu_nsec;
-#endif
 	SMC_WRITE_REG(REG6, v);
 	pr_error("REG6: 0x%08lx\n", v);
 	pr_error("N	  :%d\n", smc->param.n);
 	pr_error("cwi	 :%d\n", smc->param.cwi);
 	pr_error("bgt	 :%d\n", smc->param.bgt);
 	pr_error("bwi	 :%d\n", smc->param.bwi);
-#ifdef MEASURE_GUARD_TIME_BY_SW
-	pr_error("etu(ns)    :%lld\n", etu_nsec);
-	pr_error("total guard time	:%lld", total_guard_time_nsec);
-#endif
 	return 0;
 }
 
@@ -1375,7 +1335,8 @@ static int smc_hw_deactive(struct smc_dev *smc)
 			pr_dbg("call reset(1) in bsp.\n");
 		} else {
 			if (smc->use_enable_pin)
-				_gpio_out(smc->enable_pin, !smc->enable_level,
+				_gpio_out(smc->enable_pin,
+					  !smc->enable_level,
 					  SMC_ENABLE_PIN_NAME);
 		}
 		if (ENA_GPIO_PULL > 0) {
@@ -1776,12 +1737,12 @@ static int smc_hw_hot_reset(struct smc_dev *smc)
 			SMC_WRITE_REG(REG0, sc_reg0);
 			smc_clk_enable(sc_reg0_reg->clk_en);
 #ifdef RST_FROM_PIO
-			_gpio_out(smc->reset_pin, RESET_ENABLE,
-				  SMC_RESET_PIN_NAME);
+			_gpio_out(smc->reset_pin,
+				  RESET_ENABLE, SMC_RESET_PIN_NAME);
 #endif
 			/*te <= 400/f*/
 			usleep_range(400 * 1000 / smc->param.freq - 20,
-				     400 * 1000 / smc->param.freq);
+				400 * 1000 / smc->param.freq);
 
 			/*disable receive interrupt */
 			sc_int = SMC_READ_REG(INTR);
@@ -1793,12 +1754,12 @@ static int smc_hw_hot_reset(struct smc_dev *smc)
 			sc_reg0_reg->enable = 1;
 			SMC_WRITE_REG(REG0, sc_reg0);
 #ifdef RST_FROM_PIO
-			_gpio_out(smc->reset_pin, RESET_DISABLE,
-				  SMC_RESET_PIN_NAME);
+			_gpio_out(smc->reset_pin,
+				  RESET_DISABLE, SMC_RESET_PIN_NAME);
 #endif
 			/*tf >= 400/f && <= 40000/f*/
 			usleep_range(400 * 1000 / smc->param.freq + 20,
-				     40000 * 1000 / smc->param.freq);
+				40000 * 1000 / smc->param.freq);
 		}
 #if defined(ATR_FROM_INT)
 		/*enable receive interrupt */
@@ -1823,7 +1784,7 @@ static int smc_hw_hot_reset(struct smc_dev *smc)
 
 		/*Disable ATR */
 		sc_reg0 = SMC_READ_REG(REG0);
-		//              sc_reg0_reg->start_atr_en = 0;
+//              sc_reg0_reg->start_atr_en = 0;
 		sc_reg0_reg->start_atr = 0;
 		SMC_WRITE_REG(REG0, sc_reg0);
 
@@ -1839,24 +1800,24 @@ static int smc_hw_hot_reset(struct smc_dev *smc)
 static int smc_hw_get_status(struct smc_dev *smc, int *sret)
 {
 	unsigned long flags;
-	int cardin;
 #ifndef DET_FROM_PIO
 	unsigned int reg_val;
 	struct smccard_hw_reg0 *reg = (struct smccard_hw_reg0 *)&reg_val;
 #endif
+	spin_lock_irqsave(&smc->slock, flags);
 
 #ifdef DET_FROM_PIO
-	cardin = _gpio_in(smc->detect_pin, OWNER_NAME);
-	//	pr_dbg("get_status: card detect: %d\n", smc->cardin);
-	if (!cardin) {
+	smc->cardin = _gpio_in(smc->detect_pin, OWNER_NAME);
+//	pr_dbg("get_status: card detect: %d\n", smc->cardin);
+	if (!smc->cardin) {
 		if (smc->use_enable_pin)
 			_gpio_out(smc->enable_pin,
 				  !smc->enable_level, SMC_ENABLE_PIN_NAME);
-		cardin = _gpio_in(smc->detect_pin, OWNER_NAME);
+		smc->cardin = _gpio_in(smc->detect_pin, OWNER_NAME);
 	}
 #else
 	reg_val = SMC_READ_REG(REG0);
-	cardin = reg->card_detect;
+	smc->cardin = reg->card_detect;
 	/* pr_error("get_status: smc reg0 %08x,
 	 * card detect: %d\n", reg_val, reg->card_detect);
 	 */
@@ -1864,8 +1825,6 @@ static int smc_hw_get_status(struct smc_dev *smc, int *sret)
 	/* pr_dbg("det:%d, det_invert:%d\n",
 	 * smc->cardin, smc->detect_invert);
 	 */
-	spin_lock_irqsave(&smc->slock, flags);
-	smc->cardin = cardin;
 	if (smc->detect_invert)
 		smc->cardin = !smc->cardin;
 
@@ -1927,7 +1886,6 @@ static int smc_hw_start_send(struct smc_dev *smc)
 #endif
 		SMC_WRITE_REG(FIFO, byte);
 		pr_dbg("send 1st byte to hw\n");
-		prev_transmit_time_nsec = ktime_to_ns(ktime_get());
 	}
 
 	return 0;
@@ -2063,14 +2021,6 @@ static int transmit_chars(struct smc_dev *smc)
 #ifdef SW_INVERT
 		if (smc->sc_type == SC_INVERSE)
 			byte = inv_table[byte];
-#endif
-#ifdef MEASURE_GUARD_TIME_BY_SW
-		//just wait until current time > prev time + total guard time if necessary
-		while ((ktime_to_ns(ktime_get()) - prev_transmit_time_nsec) <
-		       total_guard_time_nsec)
-			usleep_range(1, 10);
-
-		prev_transmit_time_nsec = ktime_to_ns(ktime_get());
 #endif
 		SMC_WRITE_REG(FIFO, byte);
 		cnt++;
@@ -2460,19 +2410,12 @@ static int smc_dev_init(struct smc_dev *smc, int id)
 
 	request_fiq(smc->irq_num, &smc_irq_handler);
 #else
-#ifdef MEASURE_GUARD_TIME_BY_SW
-	smc->irq_num = request_threaded_irq(smc->irq_num,
-		NULL, smc_irq_handler, //smc_irq_thread_handler,
-		IRQF_ONESHOT | IRQF_SHARED | IRQF_TRIGGER_RISING,
-		"smc", smc);
-#else
 	smc->irq_num = request_irq(smc->irq_num,
 				   (irq_handler_t)smc_irq_handler,
 				   IRQF_SHARED | IRQF_TRIGGER_RISING,
 				   "smc", smc);
-#endif
 	if (smc->irq_num < 0) {
-		pr_error("request irq error %d!\n", smc->irq_num);
+		pr_error("request irq error!\n");
 		smc_dev_deinit(smc);
 		return -1;
 	}
@@ -2718,17 +2661,20 @@ static long smc_ioctl(struct file *file, unsigned int cmd, ulong arg)
 				cr = copy_to_user((void *)arg, &smc->atr,
 						  sizeof(struct am_smc_atr));
 			mutex_unlock(&smc->lock);
-	} break;
-	case AMSMC_IOC_HOT_RESET: {
-		ret = mutex_lock_interruptible(&smc->lock);
-		if (ret)
-			return ret;
-		ret = smc_hw_hot_reset(smc);
-		if (ret >= 0)
-			cr = copy_to_user((void *)arg, &smc->atr,
-					  sizeof(struct am_smc_atr));
-		mutex_unlock(&smc->lock);
-	} break;
+		}
+		break;
+	case AMSMC_IOC_HOT_RESET:
+		{
+			ret = mutex_lock_interruptible(&smc->lock);
+			if (ret)
+				return ret;
+			ret = smc_hw_hot_reset(smc);
+			if (ret >= 0)
+				cr = copy_to_user((void *)arg, &smc->atr,
+						  sizeof(struct am_smc_atr));
+			mutex_unlock(&smc->lock);
+		}
+		break;
 	case AMSMC_IOC_GET_STATUS:
 		{
 			int status;
@@ -2856,7 +2802,6 @@ static int smc_probe(struct platform_device *pdev)
 		if (ret < 0)
 			smc = NULL;
 	}
-
 	mutex_unlock(&smc_lock);
 
 	return smc ? 0 : -1;
@@ -2885,7 +2830,7 @@ static struct platform_driver smc_driver = {
 	},
 };
 
-static int __init smc_sc2_mod_init(void)
+static int __init smc_mod_init(void)
 {
 	int ret = -1;
 
@@ -2916,7 +2861,7 @@ error_register_chrdev:
 	return ret;
 }
 
-static void __exit smc_sc2_mod_exit(void)
+static void __exit smc_mod_exit(void)
 {
 	platform_driver_unregister(&smc_driver);
 	class_unregister(&smc_class);
@@ -2924,9 +2869,9 @@ static void __exit smc_sc2_mod_exit(void)
 	mutex_destroy(&smc_lock);
 }
 
-module_init(smc_sc2_mod_init);
+module_init(smc_mod_init);
 
-module_exit(smc_sc2_mod_exit);
+module_exit(smc_mod_exit);
 
 MODULE_AUTHOR("AMLOGIC");
 

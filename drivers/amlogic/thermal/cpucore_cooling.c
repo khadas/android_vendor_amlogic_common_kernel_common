@@ -1,6 +1,18 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/amlogic/thermal/cpucore_cooling.c
+ *
+ * Copyright (C) 2016 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
 #include <linux/module.h>
@@ -9,11 +21,10 @@
 #include <linux/err.h>
 #include <linux/slab.h>
 #include <linux/cpu.h>
-#include "cpucore_cooling.h"
+#include <linux/amlogic/cpucore_cooling.h>
 #include <linux/amlogic/cpu_hotplug.h>
 #include <linux/cpumask.h>
 #include <linux/amlogic/meson_cooldev.h>
-#include "../../thermal/thermal_core.h"
 
 /**
  * struct cpucore_cooling_device - data for cooling device with cpucore
@@ -129,10 +140,7 @@ static int cpucore_set_cur_state(struct thermal_cooling_device *cdev,
 				 unsigned long state)
 {
 	struct cpucore_cooling_device *cpucore_device = cdev->devdata;
-	int set_max_num, id;
-
-	if (WARN_ON(state >= cpucore_device->max_cpu_core_num))
-		return -EINVAL;
+	int set_max_num, id, i, core_num;
 
 	mutex_lock(&cooling_cpucore_lock);
 	if (cpucore_device->stop_flag) {
@@ -141,15 +149,31 @@ static int cpucore_set_cur_state(struct thermal_cooling_device *cdev,
 	}
 	if ((state & CPU_STOP) == CPU_STOP) {
 		cpucore_device->stop_flag = 1;
-		state = state & (~CPU_STOP);
+		state = state&(~CPU_STOP);
 	}
 	mutex_unlock(&cooling_cpucore_lock);
 	if (cpucore_device->max_cpu_core_num - state > 0) {
 		cpucore_device->cpucore_state = state;
 		set_max_num = cpucore_device->max_cpu_core_num - state;
 		id = cpucore_device->cluster_id;
-		pr_debug("set max cpu num=%d,state=%ld\n", set_max_num, state);
-		cpufreq_set_max_cpu_num(set_max_num, id);
+		if (id != CLUSTER_FLAG) {
+			pr_debug("set max cpu num=%d,state=%ld\n",
+				set_max_num, state);
+			cpufreq_set_max_cpu_num(set_max_num, id);
+		} else {
+			for (i = 0; i < MAX_CLUSTER; i++) {
+				pr_debug("%s, set max num: %d, cluster: %d\n",
+					__func__, set_max_num, i);
+				core_num = cpucore_device->core_num[i];
+				if (set_max_num < core_num) {
+					cpufreq_set_max_cpu_num(set_max_num, i);
+					set_max_num = 0;
+				} else {
+					set_max_num = set_max_num - core_num;
+					cpufreq_set_max_cpu_num(core_num, i);
+				}
+			}
+		}
 	}
 
 	return 0;
@@ -185,63 +209,33 @@ static int cpucore_power2state(struct thermal_cooling_device *cdev,
 	return 0;
 }
 
-static int cpucore_notify_state(void *thermal_instance,
-				int trip,
+static int cpucore_notify_state(struct thermal_cooling_device *cdev,
+				struct thermal_zone_device *tz,
 				enum thermal_trip_type type)
 {
-	struct thermal_instance *ins = thermal_instance;
-	struct thermal_zone_device *tz;
-	struct thermal_cooling_device *cdev;
-	struct cpucore_cooling_device *cpucore_device;
 	unsigned long  ins_upper, target_upper = 0;
-	long cur_state = -1;
+	long cur_state;
 	long upper = -1;
-	int hyst = 0, trip_temp;
-
-	if (!ins)
-		return -EINVAL;
-
-	tz = ins->tz;
-	cdev = ins->cdev;
-
-	if (!tz || !cdev)
-		return -EINVAL;
-
-	cpucore_device = cdev->devdata;
-
-	tz->ops->get_trip_hyst(tz, trip, &hyst);
-	tz->ops->get_trip_temp(tz, trip, &trip_temp);
-
-	/* increase each hyst step */
-	if (tz->temperature >= (trip_temp + cpucore_device->hot_step * hyst)) {
-		cpucore_device->hot_step++;
-		pr_info("temp:%d increase, hyst:%d, trip_temp:%d, hot:%x\n",
-			tz->temperature, hyst, trip_temp, cpucore_device->hot_step);
-	}
-	/* reserve a step gap */
-	if (tz->temperature <= (trip_temp + (cpucore_device->hot_step - 2) * hyst) &&
-	    cpucore_device->hot_step) {
-		cpucore_device->hot_step--;
-		pr_info("temp:%d decrease, hyst:%d, trip_temp:%d, hot:%x\n",
-			tz->temperature, hyst, trip_temp, cpucore_device->hot_step);
-	}
+	int i;
 
 	switch (type) {
 	case THERMAL_TRIP_HOT:
-		ins_upper = ins->upper;
-		if (!IS_ERR_VALUE(ins_upper) &&
-				ins_upper >= target_upper) {
-			target_upper = ins_upper;
-			upper = target_upper;
+		for (i = 0; i < tz->trips; i++) {
+			ins_upper = thermal_get_upper(tz, cdev, i);
+			if (!IS_ERR_VALUE(ins_upper)
+				&& (ins_upper >= target_upper)) {
+				target_upper = ins_upper;
+				upper = target_upper;
+			}
 		}
-		cur_state = cpucore_device->hot_step;
+		cur_state = tz->hot_step;
 		/* do not exceed levels */
 		if (upper != -1 && cur_state > upper)
 			cur_state = upper;
 		if (cur_state < 0)
 			cur_state = 0;
 		pr_debug("%s, cur_state:%ld, upper:%ld, step:%d\n",
-			 __func__, cur_state, upper, cpucore_device->hot_step);
+			 __func__, cur_state, upper, tz->hot_step);
 		cdev->ops->set_cur_state(cdev, cur_state);
 		break;
 	default:
@@ -249,6 +243,7 @@ static int cpucore_notify_state(void *thermal_instance,
 	}
 	return 0;
 }
+
 
 /* Bind cpucore callbacks to thermal cooling device ops */
 static struct thermal_cooling_device_ops const cpucore_cooling_ops = {
@@ -277,10 +272,11 @@ cpucore_cooling_register(struct device_node *np, int cluster_id)
 	struct thermal_cooling_device *cool_dev;
 	struct cpucore_cooling_device *cpucore_dev = NULL;
 	char dev_name[THERMAL_NAME_LENGTH];
-	int ret = 0, cpu;
+	int ret = 0, cpu, i;
 	int cores = 0;
 
-	cpucore_dev = kzalloc(sizeof(*cpucore_dev), GFP_KERNEL);
+	cpucore_dev = kzalloc(sizeof(struct cpucore_cooling_device),
+			      GFP_KERNEL);
 	if (!cpucore_dev)
 		return ERR_PTR(-ENOMEM);
 
@@ -290,7 +286,8 @@ cpucore_cooling_register(struct device_node *np, int cluster_id)
 		return ERR_PTR(-EINVAL);
 	}
 
-	if (topology_physical_package_id(0) != -1) {
+	if ((topology_physical_package_id(0) != -1)
+		&& (cluster_id != CLUSTER_FLAG)) {
 		for_each_possible_cpu(cpu) {
 			if (topology_physical_package_id(cpu) == cluster_id)
 				cores++;
@@ -302,12 +299,23 @@ cpucore_cooling_register(struct device_node *np, int cluster_id)
 	pr_info("%s, max_cpu_core_num:%d\n", __func__, cores);
 	snprintf(dev_name, sizeof(dev_name), "thermal-cpucore-%d",
 		 cpucore_dev->id);
+
+	if (cluster_id == CLUSTER_FLAG) {
+		for (i = MAX_CLUSTER - 1; i >= 0; i--) {
+			cores = 0;
+			for_each_possible_cpu(cpu) {
+				if (topology_physical_package_id(cpu) == i)
+					cores++;
+			}
+		cpucore_dev->core_num[i] = cores;
+		pr_info("%s, clutser[%d] core num:%d\n", __func__, i, cores);
+		}
+	}
 	cool_dev = thermal_of_cooling_device_register(np, dev_name, cpucore_dev,
 						      &cpucore_cooling_ops);
 	if (!cool_dev) {
 		release_idr(&cpucore_idr, cpucore_dev->id);
 		kfree(cpucore_dev);
-		pr_info("%s cpucore cooling devices register fail\n", __func__);
 		return ERR_PTR(-EINVAL);
 	}
 	cpucore_dev->cool_dev = cool_dev;

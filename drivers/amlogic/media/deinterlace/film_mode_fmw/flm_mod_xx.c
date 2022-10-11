@@ -1,4 +1,3 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
  * drivers/amlogic/media/deinterlace/film_mode_fmw/flm_mod_xx.c
  *
@@ -170,6 +169,7 @@ int	FlmModsDet(struct sFlmDatSt *pRDat, int nDif01, int nDif02)
 	prt_flg = ((pr_pd >> 4) & 0x1);
 	if (prt_flg)
 		sprintf(debug_str, "#DbgXx:\n");
+
 
 	for (nT0 = 1; nT0 < HISDETNUM; nT0++) {
 		pFlgXx[nT0 - 1] = pFlgXx[nT0];
@@ -403,6 +403,7 @@ int	FlmModsDet(struct sFlmDatSt *pRDat, int nDif01, int nDif02)
 			 *	nModCnt[tT0] = 0;
 			 */
 
+
 			/* Distance between maximum-2 dif01*/
 			if (aXMI01[1] > aXMI01[0])
 				nT3 = aXMI01[1] - aXMI01[0];
@@ -414,6 +415,7 @@ int	FlmModsDet(struct sFlmDatSt *pRDat, int nDif01, int nDif02)
 				nT4 = aXMI02[1] - aXMI02[0];
 			else
 				nT4 = aXMI02[0] - aXMI02[1];
+
 
 			if ((uT01 == tModFlg01[tT0]) &&
 				(uT02 == tModFlg02[tT0]) &&
@@ -483,7 +485,8 @@ int	FlmModsDet(struct sFlmDatSt *pRDat, int nDif01, int nDif02)
 			sModFlg01[tT0] = tModFlg01[tT0];
 			sModFlg02[tT0] = tModFlg02[tT0];
 
-			/*bias static similar to pulldown 32322, max02 must bigger than min02*/
+			/*bias static similar to pulldown 32322*/
+			/*max02 must bigger than min02*/
 			/*suggest from vlsi yanling*/
 			if (nMax02 < (1 << 11))
 				nModLvl[tT0] = 0;

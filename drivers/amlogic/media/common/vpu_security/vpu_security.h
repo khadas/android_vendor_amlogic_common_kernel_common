@@ -1,20 +1,31 @@
-/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/amlogic/media/common/vpu_security/vpu_security.h
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
 #ifndef VPU_SECURITY_H_
 #define VPU_SECURITY_H_
 
-#include <linux/amlogic/media/vpu_secure/vpu_secure.h>
-
+#define MODULE_NUM  6
 struct vpu_secure_ins {
 	struct mutex secure_lock;/*vpu secure mutex*/
 	unsigned char registered;
 	unsigned char secure_enable;
 	unsigned char secure_status;
 	unsigned char config_delay;
-	int (*reg_wr_op[VPP_TOP_MAX])(u32 addr, u32 val, u32 start, u32 len);
+	int (*reg_wr_op)(u32 addr, u32 val);
 	void (*secure_cb)(u32 arg);
 };
 
@@ -27,25 +38,13 @@ struct vpu_security_device_info {
 	struct vpu_secure_ins ins[MODULE_NUM];
 };
 
-enum vpu_security_version_e {
-	VPU_SEC_V1 = 1,
-	VPU_SEC_V2
-};
-
-struct vpu_sec_reg_s {
-	u32 reg;
-	u32 en;
-	u32 start;
-	u32 len;
-};
-
-struct vpu_sec_bit_s {
-	u32 bit_changed; /* the changed src bit */
-	u32 current_val; /* reg val after being chagned */
+enum cpu_type_e {
+	MESON_CPU_MAJOR_ID_SC2_ = 0x1,
+	MESON_CPU_MAJOR_ID_UNKNOWN,
 };
 
 struct sec_dev_data_s {
-	enum vpu_security_version_e version;
+	enum cpu_type_e cpu_type;
 };
 
 #endif

@@ -1,6 +1,18 @@
-/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/amlogic/dvb/demux/sw_demux/swdemux.h
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
 #ifndef _SWDEMUX_H
@@ -26,7 +38,8 @@ extern "C" {
 #define SWDMX_ERR -1
 
 /**Section data callback function.*/
-typedef void (*swdmx_sec_cb)(u8   *data,
+typedef void (*swdmx_sec_cb)(
+			u8   *data,
 			int     len,
 			void      *udata);
 
@@ -92,7 +105,8 @@ enum {
 };
 
 /**TS packet callback function.*/
-typedef void (*swdmx_tspacket_cb)(struct swdmx_tspacket  *pkt,
+typedef void (*swdmx_tspacket_cb)(
+			struct swdmx_tspacket  *pkt,
 			void        *udata);
 
 /**
@@ -110,7 +124,8 @@ swdmx_ts_parser_new(void);
  * \retval SWDMX_ERR On error.
  */
 extern int
-swdmx_ts_parser_set_packet_size(struct swdmx_ts_parser *tsp,
+swdmx_ts_parser_set_packet_size(
+			struct swdmx_ts_parser *tsp,
 			int       size);
 
 /**
@@ -122,7 +137,8 @@ swdmx_ts_parser_set_packet_size(struct swdmx_ts_parser *tsp,
  * \retval SWDMX_ERR On error.
  */
 extern int
-swdmx_ts_parser_add_ts_packet_cb(struct swdmx_ts_parser   *tsp,
+swdmx_ts_parser_add_ts_packet_cb(
+			struct swdmx_ts_parser   *tsp,
 			swdmx_tspacket_cb  cb,
 			void          *data);
 
@@ -135,7 +151,8 @@ swdmx_ts_parser_add_ts_packet_cb(struct swdmx_ts_parser   *tsp,
  * \retval SWDMX_ERR On error.
  */
 extern int
-swdmx_ts_parser_remove_ts_packet_cb(struct swdmx_ts_parser   *tsp,
+swdmx_ts_parser_remove_ts_packet_cb(
+			struct swdmx_ts_parser   *tsp,
 			swdmx_tspacket_cb  cb,
 			void          *data);
 
@@ -147,7 +164,8 @@ swdmx_ts_parser_remove_ts_packet_cb(struct swdmx_ts_parser   *tsp,
  * \return Parse data length in bytes.
  */
 extern int
-swdmx_ts_parser_run(struct swdmx_ts_parser *tsp,
+swdmx_ts_parser_run(
+			struct swdmx_ts_parser *tsp,
 			u8    *data,
 			int       len);
 
@@ -187,7 +205,8 @@ swdmx_demux_alloc_sec_filter(struct swdmx_demux *dmx);
  * \param dmx The demux.
  */
 extern void
-swdmx_demux_ts_packet_cb(struct swdmx_tspacket *pkt,
+swdmx_demux_ts_packet_cb(
+			struct swdmx_tspacket *pkt,
 			void        *dmx);
 
 /**
@@ -205,7 +224,8 @@ swdmx_demux_free(struct swdmx_demux *dmx);
  * \retval SWDMX_ERR On error.
  */
 extern int
-swdmx_ts_filter_set_params(struct swdmx_tsfilter       *filter,
+swdmx_ts_filter_set_params(
+			struct swdmx_tsfilter       *filter,
 			struct swdmx_tsfilter_params *params);
 
 /**
@@ -217,7 +237,8 @@ swdmx_ts_filter_set_params(struct swdmx_tsfilter       *filter,
  * \retval SWDMX_ERR On error.
  */
 extern int
-swdmx_ts_filter_add_ts_packet_cb(struct swdmx_tsfilter   *filter,
+swdmx_ts_filter_add_ts_packet_cb(
+			struct swdmx_tsfilter   *filter,
 			swdmx_tspacket_cb  cb,
 			void          *data);
 
@@ -230,7 +251,8 @@ swdmx_ts_filter_add_ts_packet_cb(struct swdmx_tsfilter   *filter,
  * \retval SWDMX_ERR On error.
  */
 extern int
-swdmx_ts_filter_remove_ts_packet_cb(struct swdmx_tsfilter   *filter,
+swdmx_ts_filter_remove_ts_packet_cb(
+			struct swdmx_tsfilter   *filter,
 			swdmx_tspacket_cb  cb,
 			void          *data);
 
@@ -267,7 +289,8 @@ swdmx_ts_filter_free(struct swdmx_tsfilter *filter);
  * \retval SWDMX_ERR On error.
  */
 extern int
-swdmx_sec_filter_set_params(struct swdmx_secfilter       *filter,
+swdmx_sec_filter_set_params(
+			struct swdmx_secfilter       *filter,
 			struct swdmx_secfilter_params *params);
 
 /**
@@ -279,7 +302,8 @@ swdmx_sec_filter_set_params(struct swdmx_secfilter       *filter,
  * \retval SWDMX_ERR On error.
  */
 extern int
-swdmx_sec_filter_add_section_cb(struct swdmx_secfilter *filter,
+swdmx_sec_filter_add_section_cb(
+			struct swdmx_secfilter *filter,
 			swdmx_sec_cb      cb,
 			void         *data);
 
@@ -292,7 +316,8 @@ swdmx_sec_filter_add_section_cb(struct swdmx_secfilter *filter,
  * \retval SWDMX_ERR On error.
  */
 extern int
-swdmx_sec_filter_remove_section_cb(struct swdmx_secfilter *filter,
+swdmx_sec_filter_remove_section_cb(
+			struct swdmx_secfilter *filter,
 			swdmx_sec_cb      cb,
 			void         *data);
 

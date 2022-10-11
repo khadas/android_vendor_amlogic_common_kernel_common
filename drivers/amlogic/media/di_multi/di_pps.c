@@ -27,13 +27,6 @@
 
 #include <linux/seq_file.h>
 
-#undef module_param
-#define module_param(x...)
-#undef module_param_named
-#define module_param_named(x...)
-#undef module_param_array
-#define module_param_array(x...)
-
 #ifdef MARK_HIS
 /* pps filter coefficients */
 #define COEF_BICUBIC         0

@@ -24,8 +24,8 @@
 #include <linux/amlogic/media/vfm/vframe_provider.h>
 #include <linux/amlogic/media/di/di.h>
 
-#include "../di_local/di_local.h"
-//#include "di_local.h"
+//#include "../di_local/di_local.h"
+#include "di_local.h"
 #include <linux/clk.h>
 #include <linux/atomic.h>
 #include "deinterlace_hw.h"
@@ -40,7 +40,7 @@
 /************************************************
  * from t7 cvs address is ulong
  ************************************************/
-//#define CVS_UINT	(1)
+#define CVS_UINT	(1)
 
 /*trigger_pre_di_process param*/
 #define TRIGGER_PRE_BY_PUT			'p'
@@ -64,7 +64,7 @@
 
 /* buffer management related */
 #define MAX_IN_BUF_NUM				(15)	/*change 4 to 8*/
-#define MAX_LOCAL_BUF_NUM			(5)//(7)
+#define MAX_LOCAL_BUF_NUM			(5)
 #define MAX_POST_BUF_NUM			(20)//(11)	/*(5)*/ /* 16 */
 #define POST_BUF_NUM				(11)
 #define VFRAME_TYPE_IN				1
@@ -75,8 +75,10 @@
 #define DI_POST_GET_LIMIT			8
 #define DI_PRE_READY_LIMIT			4
 
-#define MAX_CRC_COUNT_NUM				(10)
 #define LOCAL_META_BUFF_SIZE 0x800 /* 2K size */
+
+/* nrcrc count for slt */
+#define MAX_CRC_COUNT_NUM				(10)
 
 /*vframe define*/
 #define vframe_t struct vframe_s
@@ -424,12 +426,6 @@ struct di_dev_s {
 	void *data_l;
 	u8 *local_meta_addr;
 	u32 local_meta_size;
-
-	struct vpu_dev_s *dim_vpu_clk_gate_dev;
-	struct vpu_dev_s *dim_vpu_pd_dec;
-	struct vpu_dev_s *dim_vpu_pd_dec1;
-	struct vpu_dev_s *dim_vpu_pd_vd1;
-	struct vpu_dev_s *dim_vpu_pd_post;
 	unsigned int di_pre_nrcrc[MAX_CRC_COUNT_NUM];
 	unsigned int getcrccount;
 	unsigned int setcrccount;
@@ -781,7 +777,6 @@ void dim_get_default(unsigned int *h, unsigned int *w);
 void dbg_h_w(unsigned int ch, unsigned int nub);
 void di_set_default(unsigned int ch);
 //bool dim_dbg_is_cnt(void);
-bool pre_dbg_is_run(void);
 
 /*---------------------*/
 const struct afd_ops_s *dim_afds(void);

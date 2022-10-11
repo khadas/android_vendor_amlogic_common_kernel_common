@@ -19,7 +19,7 @@
 #ifndef _DI_HW_H
 #define _DI_HW_H
 #include <linux/amlogic/media/amvecm/amvecm.h>
-#include <linux/amlogic/media/di/di.h>
+
 #include "../deinterlace/di_pqa.h"
 //#include "di_pqa.h"
 
@@ -29,7 +29,6 @@
 #define MIN_BLEND_WIDTH	27
 
 #define	SKIP_CTRE_NUM	16
-#define	SC2_OVERLAP_NUM	9
 
 /* from sc2 */
 enum DI_MIF0_ID {
@@ -114,11 +113,6 @@ enum EDPST_MODE {
 	EDPST_MODE_422_10BIT,
 	EDPST_MODE_422_8BIT,
 	EDPST_MODE_420_10BIT /* add 2020-11-26 */
-};
-
-struct SC2_OVERLAP_REG_s {
-	unsigned int addr;
-	unsigned int value;
 };
 
 struct AFBCD_S {
@@ -712,7 +706,7 @@ void hpre_gl_sw(bool on);
 
 void dim_init_setting_once(void);
 void dim_hw_init_reg(void);
-void dim_vpu_vmod_mem_pd_on_off(unsigned int mode, bool on);
+
 /******************************************************************
  * hw ops
  *****************************************************************/
@@ -776,7 +770,7 @@ struct dim_hw_opsv_s {
 				       struct DI_MC_MIF_s *mcvecwr_mif,
 				       unsigned char mcdi_en);
 	/* from t3:*/
-	bool (*aisr_pre)(struct DI_SIM_MIF_s *mif, bool sel);
+	bool (*aisr_pre)(struct DI_SIM_MIF_s *mif, bool sel, bool para);
 	void (*aisr_disable)(void);
 	void (*wrmif_trig)(enum EDI_MIFSM mifsel);
 	void (*wr_rst_protect)(bool on);
@@ -902,7 +896,4 @@ bool dim_dbg_cfg_post_byapss(void);
 void dbg_reg_mem(unsigned int dbgid);
 bool dim_aisr_test(struct DI_SIM_MIF_s *mif, bool sel);//test only
 
-void set_sc2overlap_table(unsigned int addr, unsigned int value,
-			  unsigned int start,
-			  unsigned int len);
 #endif

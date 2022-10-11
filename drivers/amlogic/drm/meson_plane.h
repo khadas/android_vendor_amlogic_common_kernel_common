@@ -1,6 +1,18 @@
-/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/amlogic/drm/meson_plane.h
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
 #ifndef __MESON_PLANE_H
@@ -21,6 +33,7 @@
 
 struct am_meson_plane_state {
 	struct drm_plane_state base;
+	u32 premult_en;
 };
 
 enum meson_plane_type {
@@ -39,6 +52,7 @@ struct am_osd_plane {
 	/*osd extend*/
 	u32 osd_reverse;
 	u32 osd_blend_bypass;
+	struct drm_property *prop_premult_en;
 };
 
 struct am_video_plane {
@@ -48,7 +62,6 @@ struct am_video_plane {
 	struct dentry *plane_debugfs_dir;
 	int plane_index;
 	int plane_type;
-	struct meson_vpu_pipeline *pipeline;
 
 	/*video exted*/
 };
@@ -61,20 +74,5 @@ struct am_video_plane {
 	struct am_video_plane, base)
 
 int am_meson_plane_create(struct meson_drm *priv);
-
-/*For async commit on kernel 4.9, and can be reused on kernel 5.4.*/
-int meson_video_plane_async_check(struct drm_plane *plane,
-	struct drm_plane_state *state);
-void meson_video_plane_async_update(struct drm_plane *plane,
-	struct drm_plane_state *new_state);
-
-int meson_osd_plane_async_check(struct drm_plane *plane,
-	struct drm_plane_state *state);
-void meson_osd_plane_async_update(struct drm_plane *plane,
-	struct drm_plane_state *new_state);
-
-struct drm_property *
-meson_create_scaling_filter_prop(struct drm_device *dev,
-			       unsigned int supported_filters);
 
 #endif

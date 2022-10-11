@@ -1,8 +1,19 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/amlogic/media/dtv_demod/dvbs_diseqc.c
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
-
 #include <linux/types.h>
 #include <linux/init.h>
 #include <linux/kernel.h>
@@ -161,10 +172,9 @@ u32 aml_diseqc_send_cmd(struct dvb_diseqc_master_cmd *cmd)
 	}
 
 	/* Is tone on, need set tone on */
-	if (lnb->tone_on)
-		mdelay(16);
-	aml_diseqc_tone_on(lnb->tone_on);
-
+	/*if (lnb->tone_on)*/
+	/*	mdelay(16);*/
+	/*aml_diseqc_tone_on(lnb->tone_on);*/
 
 cmd_exit:
 	dprintk(0, "%s burst_on:%d\n", __func__, sendburst_on);

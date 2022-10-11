@@ -1,8 +1,20 @@
-// SPDX-License-Identifier: GPL-2.0
 /*
- * ALSA SoC Amlogic t9015c interenl codec driver
+ * linux/sound/soc/codecs/tlv320adc3101.c
  *
- * Copyright (C) 2019 Amlogic,inc
+ * Copyright 2011 Amlogic
+ * Author: Alex Deng <alex.deng@amlogic.com>
+ * Based on sound/soc/codecs/tlv320aic320x and
+ * TI driver for kernel 2.6.27.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
  *
  */
 
@@ -49,7 +61,7 @@ struct adc3101_priv {
 	u32 micpga_routing;
 	bool swapdacs;
 	int rstn_gpio;
-	struct snd_soc_component *component;
+	struct snd_soc_codec *codec;
 	/* for more control */
 	int codec_cnt;
 	int codec_mask;
@@ -252,8 +264,10 @@ static inline int adc3101_get_divs(int mclk, int rate)
 	int i;
 
 	for (i = 0; i < ARRAY_SIZE(adc3101_divs); i++) {
-		if (dc3101_divs[i].rate == rate && adc3101_divs[i].mclk == mclk)
+		if ((adc3101_divs[i].rate == rate)
+		    && (adc3101_divs[i].mclk == mclk)) {
 			return i;
+		}
 	}
 
 	pr_err("adc3101: master clock and sample rate is not supported\n");
@@ -263,8 +277,8 @@ static inline int adc3101_get_divs(int mclk, int rate)
 static int adc3101_set_dai_sysclk(struct snd_soc_dai *codec_dai,
 				  int clk_id, unsigned int freq, int dir)
 {
-	struct snd_soc_component *component = codec_dai->component;
-	struct adc3101_priv *adc3101 = snd_soc_component_get_drvdata(component);
+	struct snd_soc_codec *codec = codec_dai->codec;
+	struct adc3101_priv *adc3101 = snd_soc_codec_get_drvdata(codec);
 
 	pr_info("%s freq:%d\n", __func__, freq);
 	switch (freq) {
@@ -286,23 +300,23 @@ static int adc3101_set_dai_sysclk(struct snd_soc_dai *codec_dai,
 
 static int adc3101_set_dai_fmt(struct snd_soc_dai *codec_dai, unsigned int fmt)
 {
-	struct snd_soc_component *component = codec_dai->component;
+	struct snd_soc_codec *codec = codec_dai->codec;
 	struct adc3101_priv *adc3101 = NULL;
 	u8 iface_reg_1;
 	u8 dsp_a_val;
 	u8 iface_reg_2;
 
-	adc3101 = snd_soc_component_get_drvdata(component);
-	if (!adc3101)
+	adc3101 = snd_soc_codec_get_drvdata(codec);
+	if (adc3101 == NULL)
 		return -EINVAL;
 
 	pr_info("[%s]:slot_number=%d\n", __func__, adc3101->slot_number);
 
-	iface_reg_1 = snd_soc_component_read32(component, ADC3101_IFACE1);
+	iface_reg_1 = snd_soc_read(codec, ADC3101_IFACE1);
 	iface_reg_1 = iface_reg_1 & ~(3 << 6 | 3 << 2);
-	dsp_a_val = snd_soc_component_read32(component, ADC3101_DATASLOTOFFSETCTL);
+	dsp_a_val = snd_soc_read(codec, ADC3101_DATASLOTOFFSETCTL);
 	dsp_a_val = 0;
-	iface_reg_2 = snd_soc_component_read32(component, ADC3101_IFACE3);
+	iface_reg_2 = snd_soc_read(codec, ADC3101_IFACE3);
 	iface_reg_2 = iface_reg_2 & ~(1 << 3);
 
 	/* set master/slave audio interface */
@@ -337,7 +351,7 @@ static int adc3101_set_dai_fmt(struct snd_soc_dai *codec_dai, unsigned int fmt)
 		iface_reg_1 |= (ADC3101_DSP_MODE << ADC3101_PLLJ_SHIFT);
 		iface_reg_2 |= (1 << 3); /* invert bit clock */
 
-		/* set bclk offset according to different adc */
+		/* set bclk offset according to diffrent adc */
 		if (adc3101->slot_number == 0)
 			dsp_a_val = 0;
 		else if (adc3101->slot_number == 1)
@@ -366,15 +380,15 @@ static int adc3101_set_dai_fmt(struct snd_soc_dai *codec_dai, unsigned int fmt)
 		return -EINVAL;
 	}
 
-	snd_soc_component_write(component, ADC3101_IFACE1, iface_reg_1);
-	snd_soc_component_write(component, ADC3101_DATASLOTOFFSETCTL, dsp_a_val);
-	snd_soc_component_write(component, ADC3101_IFACE3, iface_reg_2);
+	snd_soc_write(codec, ADC3101_IFACE1, iface_reg_1);
+	snd_soc_write(codec, ADC3101_DATASLOTOFFSETCTL, dsp_a_val);
+	snd_soc_write(codec, ADC3101_IFACE3, iface_reg_2);
 
 	return 0;
 }
 
-static int __maybe_unused adc3101_hw_high_pass_filter
-	(struct snd_soc_component *component)
+static int __maybe_unused adc3101_hw_high_pass_filter(
+	struct snd_soc_codec *codec)
 {
 	/*page 4*/
 	char datas[4][31] = {
@@ -424,38 +438,42 @@ static int __maybe_unused adc3101_hw_high_pass_filter
 	int i = 0, j = 0, c = 0;
 	int ret = 0;
 	int nums[] = {31, 21, 31, 21};
-	struct adc3101_priv *adc3101 = snd_soc_component_get_drvdata(component);
+	struct adc3101_priv *adc3101 = snd_soc_codec_get_drvdata(codec);
 
 	pr_info("%s ...\n", __func__);
 
-	snd_soc_component_write(component, 0x3D, 2);
-	snd_soc_component_write(component, 0x51, 0);
+	snd_soc_write(codec, 0x3D, 2);
+	snd_soc_write(codec, 0x51, 0);
 	/* page 4 */
-	snd_soc_component_write(component, ADC3101_PSEL, 0x4);
+	snd_soc_write(codec, ADC3101_PSEL, 0x4);
 
 	for (i = 0; i < adc3101->codec_cnt; i++) {
 		for (c = 0; c < 4; c++) {
 			for (j = 0; j < nums[c]; j++) {
-				ret = i2c_smbus_write_byte(adc3101->client[i], datas[c][j]);
+				ret = i2c_smbus_write_byte(
+						adc3101->client[i],
+						datas[c][j]);
 				if (ret < 0)
-					pr_err("%x write error\n", adc3101->client[i]->addr);
+					pr_err("%x write error\n",
+						adc3101->client[i]->addr);
 			}
 		}
 	}
 
-	snd_soc_component_write(component, 0x51, 0xC0);
-	snd_soc_component_write(component, 0x52, 0x00);
+	snd_soc_write(codec, 0x51, 0xC0);
+	snd_soc_write(codec, 0x52, 0x00);
 	pr_info("%s done\n", __func__);
 
 	return 0;
 }
 
+
 static int adc3101_hw_params(struct snd_pcm_substream *substream,
 			     struct snd_pcm_hw_params *params,
 			     struct snd_soc_dai *dai)
 {
-	struct snd_soc_component *component = dai->component;
-	struct adc3101_priv *adc3101 = snd_soc_component_get_drvdata(component);
+	struct snd_soc_codec *codec = dai->codec;
+	struct adc3101_priv *adc3101 = snd_soc_codec_get_drvdata(codec);
 	u8 data;
 	int i;
 
@@ -468,46 +486,46 @@ static int adc3101_hw_params(struct snd_pcm_substream *substream,
 	}
 
 	/* Use PLL as CODEC_CLKIN and DAC_MOD_CLK as BDIV_CLKIN */
-	snd_soc_component_write(component, ADC3101_CLKMUX, 0);
+	snd_soc_write(codec, ADC3101_CLKMUX, 0);
 
 	/* We will fix R value to 1 and will make P & J=K.D as varialble */
-	data = snd_soc_component_read32(component, ADC3101_PLLPR);
+	data = snd_soc_read(codec, ADC3101_PLLPR);
 	data &= ~(7 << 4);
 
-	snd_soc_component_write(component, ADC3101_PLLPR,
+	snd_soc_write(codec, ADC3101_PLLPR,
 		      (data | (adc3101_divs[i].p_val << 4) | 0x01));
 
-	snd_soc_component_write(component, ADC3101_PLLJ, adc3101_divs[i].pll_j);
+	snd_soc_write(codec, ADC3101_PLLJ, adc3101_divs[i].pll_j);
 
-	snd_soc_component_write(component, ADC3101_PLLDMSB, (adc3101_divs[i].pll_d >> 8));
-	snd_soc_component_write(component, ADC3101_PLLDLSB,
+	snd_soc_write(codec, ADC3101_PLLDMSB, (adc3101_divs[i].pll_d >> 8));
+	snd_soc_write(codec, ADC3101_PLLDLSB,
 		      (adc3101_divs[i].pll_d & 0xff));
 	/* NADC divider value */
-	data = snd_soc_component_read32(component, ADC3101_NADC);
+	data = snd_soc_read(codec, ADC3101_NADC);
 	data &= ~(0x7f);
 	data |= 0x80;
-	snd_soc_component_write(component, ADC3101_NADC, data | adc3101_divs[i].nadc);
+	snd_soc_write(codec, ADC3101_NADC, data | adc3101_divs[i].nadc);
 
 	pr_info("%s NADC = 0x%02x\n",
 		__func__,
-		snd_soc_component_read32(component, ADC3101_NADC));
+		snd_soc_read(codec, ADC3101_NADC));
 
 	/* MADC divider value */
-	data = snd_soc_component_read32(component, ADC3101_MADC);
+	data = snd_soc_read(codec, ADC3101_MADC);
 	data &= ~(0x7f);
 	data |= 0x80;
-	snd_soc_component_write(component, ADC3101_MADC, data | adc3101_divs[i].madc);
+	snd_soc_write(codec, ADC3101_MADC, data | adc3101_divs[i].madc);
 	pr_info("%s MADC = 0x%02x\n",
 		__func__,
-		snd_soc_component_read32(component, ADC3101_MADC));
+		snd_soc_read(codec, ADC3101_MADC));
 
 	/* AOSR value */
-	snd_soc_component_write(component, ADC3101_AOSR, adc3101_divs[i].aosr);
+	snd_soc_write(codec, ADC3101_AOSR, adc3101_divs[i].aosr);
 	pr_info("%s AOSR=%02x\n",
 		__func__,
-		snd_soc_component_read32(component, ADC3101_AOSR));
+		snd_soc_read(codec, ADC3101_AOSR));
 
-	data = snd_soc_component_read32(component, ADC3101_IFACE1);
+	data = snd_soc_read(codec, ADC3101_IFACE1);
 	data = data & ~(3 << 4);
 	switch (params_format(params)) {
 	case SNDRV_PCM_FORMAT_S16_LE:
@@ -523,81 +541,81 @@ static int adc3101_hw_params(struct snd_pcm_substream *substream,
 		data |= (ADC3101_WORD_LEN_32BITS << ADC3101_DOSRMSB_SHIFT);
 		break;
 	}
-	snd_soc_component_write(component, ADC3101_IFACE1, data);
+	snd_soc_write(codec, ADC3101_IFACE1, data);
 	pr_info("%s iface1 = %02x\n", __func__, data);
 
-	snd_soc_component_write(component, ADC3101_MICBIAS, 0x50);
+	snd_soc_write(codec, ADC3101_MICBIAS, 0x50);
 
 	if (adc3101->differential_pair == 1) {
 		pr_info("%s differential pair\n", __func__);
-		snd_soc_component_write(component, ADC3101_LMICPGANIN, 0x33); //54
-		snd_soc_component_write(component, ADC3101_RMICPGANIN, 0x33); //57
-		snd_soc_component_write(component, ADC3101_LMICPGAPIN, 0x3F); //52
-		snd_soc_component_write(component, ADC3101_RMICPGAPIN, 0x3F); //55
+		snd_soc_write(codec, ADC3101_LMICPGANIN, 0x33); //54
+		snd_soc_write(codec, ADC3101_RMICPGANIN, 0x33); //57
+		snd_soc_write(codec, ADC3101_LMICPGAPIN, 0x3F); //52
+		snd_soc_write(codec, ADC3101_RMICPGAPIN, 0x3F); //55
 	} else {
 		pr_info("%s single end\n", __func__);
-		snd_soc_component_write(component, ADC3101_LMICPGANIN, 0x3F); //54
-		snd_soc_component_write(component, ADC3101_RMICPGANIN, 0x3F); //57
-		snd_soc_component_write(component, ADC3101_LMICPGAPIN, 0xCF); //52
-		snd_soc_component_write(component, ADC3101_RMICPGAPIN, 0xCF); //55
+		snd_soc_write(codec, ADC3101_LMICPGANIN, 0x3F); //54
+		snd_soc_write(codec, ADC3101_RMICPGANIN, 0x3F); //57
+		snd_soc_write(codec, ADC3101_LMICPGAPIN, 0xCF); //52
+		snd_soc_write(codec, ADC3101_RMICPGAPIN, 0xCF); //55
 	}
-	snd_soc_component_write(component, ADC3101_LMICPGAVOL, lr_gain);
-	snd_soc_component_write(component, ADC3101_RMICPGAVOL, lr_gain);
-	snd_soc_component_write(component, ADC3101_ADCSETUP, 0xc2);
-	snd_soc_component_write(component, ADC3101_ADCFGA, 0);
+	snd_soc_write(codec, ADC3101_LMICPGAVOL, lr_gain);
+	snd_soc_write(codec, ADC3101_RMICPGAVOL, lr_gain);
+	snd_soc_write(codec, ADC3101_ADCSETUP, 0xc2);
+	snd_soc_write(codec, ADC3101_ADCFGA, 0);
 
 	pr_info("%s ADCSETUP = %02x\n", __func__,
-			snd_soc_component_read32(component, ADC3101_ADCSETUP));
+			snd_soc_read(codec, ADC3101_ADCSETUP));
 	pr_info("%s DOUTCTL=%02x\n", __func__,
-			snd_soc_component_read32(component, ADC3101_DOUTCTL));
+			snd_soc_read(codec, ADC3101_DOUTCTL));
 	pr_info("%s MICBIAS=%02x\n", __func__,
-			snd_soc_component_read32(component, ADC3101_MICBIAS));
+			snd_soc_read(codec, ADC3101_MICBIAS));
 
 	return 0;
 }
 
 static int adc3101_mute(struct snd_soc_dai *dai, int mute)
 {
-	struct snd_soc_component *component = dai->component;
+	struct snd_soc_codec *codec = dai->codec;
 	u8 dac_reg;
 
-	dac_reg = snd_soc_component_read32(component, ADC3101_DACMUTE) & ~ADC3101_MUTEON;
+	dac_reg = snd_soc_read(codec, ADC3101_DACMUTE) & ~ADC3101_MUTEON;
 	if (mute)
-		snd_soc_component_write(component, ADC3101_DACMUTE, dac_reg | ADC3101_MUTEON);
+		snd_soc_write(codec, ADC3101_DACMUTE, dac_reg | ADC3101_MUTEON);
 	else
-		snd_soc_component_write(component, ADC3101_DACMUTE, dac_reg);
+		snd_soc_write(codec, ADC3101_DACMUTE, dac_reg);
 
 	return 0;
 }
 
-static int adc3101_set_bias_level(struct snd_soc_component *component,
+static int adc3101_set_bias_level(struct snd_soc_codec *codec,
 				  enum snd_soc_bias_level level)
 {
 	pr_debug("%s ..\n", __func__);
 	switch (level) {
 	case SND_SOC_BIAS_ON:
 		/* Switch on PLL */
-		snd_soc_component_update_bits(component, ADC3101_PLLPR,
+		snd_soc_update_bits(codec, ADC3101_PLLPR,
 				    ADC3101_PLLEN, ADC3101_PLLEN);
 
 		/* Switch on NDAC Divider */
-		snd_soc_component_update_bits(component, ADC3101_NDAC,
+		snd_soc_update_bits(codec, ADC3101_NDAC,
 				    ADC3101_NDACEN, ADC3101_NDACEN);
 
 		/* Switch on MDAC Divider */
-		snd_soc_component_update_bits(component, ADC3101_MDAC,
+		snd_soc_update_bits(codec, ADC3101_MDAC,
 				    ADC3101_MDACEN, ADC3101_MDACEN);
 
 		/* Switch on NADC Divider */
-		snd_soc_component_update_bits(component, ADC3101_NADC,
+		snd_soc_update_bits(codec, ADC3101_NADC,
 				    ADC3101_NADCEN, ADC3101_NADCEN);
 
 		/* Switch on MADC Divider */
-		snd_soc_component_update_bits(component, ADC3101_MADC,
+		snd_soc_update_bits(codec, ADC3101_MADC,
 				    ADC3101_MADCEN, ADC3101_MADCEN);
 
 		/* Switch on BCLK_N Divider */
-		snd_soc_component_update_bits(component, ADC3101_BCLKN,
+		snd_soc_update_bits(codec, ADC3101_BCLKN,
 				    ADC3101_BCLKEN, ADC3101_BCLKEN);
 
 		break;
@@ -605,34 +623,34 @@ static int adc3101_set_bias_level(struct snd_soc_component *component,
 		break;
 	case SND_SOC_BIAS_STANDBY:
 		/* Switch off PLL */
-		snd_soc_component_update_bits(component, ADC3101_PLLPR,
+		snd_soc_update_bits(codec, ADC3101_PLLPR,
 				    ADC3101_PLLEN, 0);
 
 		/* Switch off NDAC Divider */
-		snd_soc_component_update_bits(component, ADC3101_NDAC,
+		snd_soc_update_bits(codec, ADC3101_NDAC,
 				    ADC3101_NDACEN, 0);
 
 		/* Switch off MDAC Divider */
-		snd_soc_component_update_bits(component, ADC3101_MDAC,
+		snd_soc_update_bits(codec, ADC3101_MDAC,
 				    ADC3101_MDACEN, 0);
 
 		/* Switch off NADC Divider */
-		snd_soc_component_update_bits(component, ADC3101_NADC,
+		snd_soc_update_bits(codec, ADC3101_NADC,
 				    ADC3101_NADCEN, 0);
 
 		/* Switch off MADC Divider */
-		snd_soc_component_update_bits(component, ADC3101_MADC,
+		snd_soc_update_bits(codec, ADC3101_MADC,
 				    ADC3101_MADCEN, 0);
 
 		/* Switch off BCLK_N Divider */
-		snd_soc_component_update_bits(component, ADC3101_BCLKN,
+		snd_soc_update_bits(codec, ADC3101_BCLKN,
 				    ADC3101_BCLKEN, 0);
 		break;
 	case SND_SOC_BIAS_OFF:
 		break;
 	}
-	component->dapm.bias_level = level;
-	snd_soc_component_init_bias_level(component, level);
+	codec->component.dapm.bias_level = level;
+	snd_soc_codec_init_bias_level(codec, level);
 
 	return 0;
 }
@@ -723,49 +741,51 @@ static struct snd_soc_dai_driver adc3101_dai[] = {
 	},
 };
 
-static int adc3101_suspend(struct snd_soc_component *component)
+static int adc3101_suspend(struct snd_soc_codec *codec)
 {
-	adc3101_set_bias_level(component, SND_SOC_BIAS_OFF);
+	adc3101_set_bias_level(codec, SND_SOC_BIAS_OFF);
 
 	return 0;
 }
 
-static int adc3101_resume(struct snd_soc_component *component)
+static int adc3101_resume(struct snd_soc_codec *codec)
 {
-	adc3101_set_bias_level(component, SND_SOC_BIAS_STANDBY);
+	adc3101_set_bias_level(codec, SND_SOC_BIAS_STANDBY);
 
 	return 0;
 }
 
-static int adc3101_codec_probe(struct snd_soc_component *component)
+static int adc3101_codec_probe(struct snd_soc_codec *codec)
 {
 	u32 tmp_reg;
 
 	pr_info("%s ...\n", __func__);
 
-	snd_soc_component_write(component, ADC3101_RESET, 0x01);
+	snd_soc_write(codec, ADC3101_RESET, 0x01);
 
 	/*
 	 * Workaround: for an unknown reason, the ADC needs to be powered up
 	 * and down for the first capture to work properly. It seems related to
 	 * a HW BUG or some kind of behavior not documented in the datasheet.
 	 */
-	tmp_reg = snd_soc_component_read32(component, ADC3101_ADCSETUP);
-	snd_soc_component_write(component, ADC3101_ADCSETUP, tmp_reg |
+	tmp_reg = snd_soc_read(codec, ADC3101_ADCSETUP);
+	snd_soc_write(codec, ADC3101_ADCSETUP, tmp_reg |
 				ADC3101_LADC_EN | ADC3101_RADC_EN);
-	snd_soc_component_write(component, ADC3101_ADCSETUP, tmp_reg);
+	snd_soc_write(codec, ADC3101_ADCSETUP, tmp_reg);
 
 	pr_info("%s done...\n", __func__);
 
 	return 0;
 }
 
-static void adc3101_remove(struct snd_soc_component *component)
+static int adc3101_remove(struct snd_soc_codec *codec)
 {
-	adc3101_set_bias_level(component, SND_SOC_BIAS_OFF);
+	adc3101_set_bias_level(codec, SND_SOC_BIAS_OFF);
+
+	return 0;
 }
 
-static const struct snd_soc_component_driver __maybe_unused soc_codec_dev_adc3101_2 = {
+static struct snd_soc_codec_driver __maybe_unused soc_codec_dev_adc3101_2 = {
 	.probe = adc3101_codec_probe,
 	.remove = adc3101_remove,
 	.suspend = adc3101_suspend,
@@ -773,19 +793,21 @@ static const struct snd_soc_component_driver __maybe_unused soc_codec_dev_adc310
 	.set_bias_level = adc3101_set_bias_level,
 
 };
-
-static const struct snd_soc_component_driver soc_codec_dev_adc3101 = {
+static struct snd_soc_codec_driver soc_codec_dev_adc3101 = {
 	.probe = adc3101_codec_probe,
 	.remove = adc3101_remove,
 	.suspend = adc3101_suspend,
 	.resume = adc3101_resume,
 	.set_bias_level = adc3101_set_bias_level,
-	.controls = adc3101_snd_controls,
-	.num_controls = ARRAY_SIZE(adc3101_snd_controls),
-	.dapm_widgets = adc3101_dapm_widgets,
-	.num_dapm_widgets = ARRAY_SIZE(adc3101_dapm_widgets),
-	.dapm_routes = adc3101_dapm_routes,
-	.num_dapm_routes = ARRAY_SIZE(adc3101_dapm_routes),
+
+	.component_driver = {
+		.controls = adc3101_snd_controls,
+		.num_controls = ARRAY_SIZE(adc3101_snd_controls),
+		.dapm_widgets = adc3101_dapm_widgets,
+		.num_dapm_widgets = ARRAY_SIZE(adc3101_dapm_widgets),
+		.dapm_routes = adc3101_dapm_routes,
+		.num_dapm_routes = ARRAY_SIZE(adc3101_dapm_routes),
+	}
 };
 
 static int adc3101_i2c_probe(struct i2c_client *i2c,
@@ -798,7 +820,7 @@ static int adc3101_i2c_probe(struct i2c_client *i2c,
 
 	adc3101 = devm_kzalloc(&i2c->dev, sizeof(struct adc3101_priv),
 			GFP_KERNEL);
-	if (!adc3101)
+	if (adc3101 == NULL)
 		return -ENOMEM;
 	adc3101->codec_cnt = 0;
 
@@ -844,7 +866,7 @@ static int adc3101_i2c_probe(struct i2c_client *i2c,
 		ret = 0;
 	}
 	pr_info("%s i2c:%p\n", __func__, i2c);
-	ret = snd_soc_register_component(&i2c->dev,
+	ret = snd_soc_register_codec(&i2c->dev,
 				&soc_codec_dev_adc3101, adc3101_dai, 1);
 
 	pr_info("%s %x done\n", __func__, i2c->addr);
@@ -854,13 +876,13 @@ static int adc3101_i2c_probe(struct i2c_client *i2c,
 
 static int adc3101_i2c_remove(struct i2c_client *client)
 {
-	snd_soc_unregister_component(&client->dev);
+	snd_soc_unregister_codec(&client->dev);
 
 	return 0;
 }
 
 static const struct of_device_id tlv320adc3101_of_match[] = {
-	{.compatible = "ti, tlv320adc3101"},
+	{.compatible = "ti,tlv320adc3101"},
 	{},
 };
 MODULE_DEVICE_TABLE(of, tlv320aic31xx_of_match);

@@ -1,6 +1,18 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/amlogic/media/common/vfm/vframe_receiver.c
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
 /* Standard Linux headers */
@@ -27,11 +39,13 @@ int receiver_list(char *buf)
 	int i = 0;
 
 	len += sprintf(buf + len, "\nreceiver list:\n");
+	mutex_lock(&mutex);
 	for (i = 0; i < MAX_RECEIVER_NUM; i++) {
 		r = receiver_table[i];
 		if (r)
 			len += sprintf(buf + len, "   %s\n", r->name);
 	}
+	mutex_unlock(&mutex);
 
 	return len;
 }
@@ -104,14 +118,14 @@ int vf_notify_receiver(const char *provider_name, int event_type, void *data)
 		}
 	} else {
 		pr_err("Error: %s, fail to get receiver of provider %s\n",
-		       __func__, provider_name);
+			__func__, provider_name);
 	}
 	return ret;
 }
 EXPORT_SYMBOL(vf_notify_receiver);
 
 int vf_notify_receiver_by_name(const char *receiver_name, int event_type,
-			       void *data)
+	void *data)
 {
 	int ret = -1;
 	struct vframe_receiver_s *receiver = NULL;
@@ -128,8 +142,8 @@ int vf_notify_receiver_by_name(const char *receiver_name, int event_type,
 EXPORT_SYMBOL(vf_notify_receiver_by_name);
 
 void vf_receiver_init(struct vframe_receiver_s *recv,
-		      const char *name,
-		      const struct vframe_receiver_op_s *ops, void *op_arg)
+		const char *name,
+		const struct vframe_receiver_op_s *ops, void *op_arg)
 {
 	if (!recv)
 		return;
@@ -143,11 +157,13 @@ EXPORT_SYMBOL(vf_receiver_init);
 
 int vf_reg_receiver(struct vframe_receiver_s *recv)
 {
+
 	struct vframe_receiver_s *r;
 	int i;
 
 	if (!recv)
 		return -1;
+
 	mutex_lock(&mutex);
 	for (i = 0; i < MAX_RECEIVER_NUM; i++) {
 		r = receiver_table[i];
@@ -159,12 +175,13 @@ int vf_reg_receiver(struct vframe_receiver_s *recv)
 		}
 	}
 	for (i = 0; i < MAX_RECEIVER_NUM; i++) {
-		if (!receiver_table[i]) {
+		if (receiver_table[i] == NULL) {
 			receiver_table[i] = recv;
 			break;
 		}
 	}
 	mutex_unlock(&mutex);
+
 	return 0;
 }
 EXPORT_SYMBOL(vf_reg_receiver);
@@ -176,6 +193,7 @@ void vf_unreg_receiver(struct vframe_receiver_s *recv)
 
 	if (!recv)
 		return;
+
 	mutex_lock(&mutex);
 	for (i = 0; i < MAX_RECEIVER_NUM; i++) {
 		r = receiver_table[i];

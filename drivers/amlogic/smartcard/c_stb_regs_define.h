@@ -1,8 +1,3 @@
-/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
-/*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
- */
-
 /*
  * drivers/amlogic/smartcard/c_stb_regs_define.h
  *
@@ -19,9 +14,10 @@
  * more details.
  *
  */
+
 #ifndef __MACH_MESON8_REG_ADDR_H_
 #define __MACH_MESON8_REG_ADDR_H_
-#include <linux/amlogic/media/registers/register_map.h>
+#include <linux/amlogic/iomap.h>
 #define CBUS_REG_ADDR(_r) aml_read_cbus(_r)
 #define SMARTCARD_REG_BASE	smc_get_reg_base()
 #define SMARTCARD_REG0 (SMARTCARD_REG_BASE + 0x0)
@@ -43,4 +39,3 @@
 #define SMARTCARD_REG8 (SMARTCARD_REG_BASE + 0x8)
 #define P_SMARTCARD_REG8                CBUS_REG_ADDR(SMARTCARD_REG8)
 #endif
-

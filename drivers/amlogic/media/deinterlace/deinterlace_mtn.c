@@ -1,4 +1,3 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
  * drivers/amlogic/media/deinterlace/deinterlace_mtn.c
  *
@@ -37,8 +36,7 @@
 #include <linux/proc_fs.h>
 #include <linux/list.h>
 #include <linux/uaccess.h>
-/* media module used media/registers/cpu_version.h since kernel 5.4 */
-#include <linux/amlogic/media/registers/cpu_version.h>
+#include <linux/amlogic/cpu_version.h>
 #include <linux/amlogic/iomap.h>
 #include "register.h"
 #include "deinterlace_mtn.h"
@@ -794,7 +792,7 @@ static void set_combing_regs(int lvl, int bit_mode)
 			 *confirmed with vlsi-baozheng, G12a/G12B/SM1
 			 *is same as TL1, Change the condition to cpu after G12a
 			 */
-		if ((bit_mode != 10 ||
+		if (((bit_mode != 10) ||
 		     cpu_after_eq(MESON_CPU_MAJOR_ID_G12A) ||
 		     is_meson_txlx_cpu()) &&
 		    combing_setting_registers[i] == NR2_MATNR_DEGHOST)

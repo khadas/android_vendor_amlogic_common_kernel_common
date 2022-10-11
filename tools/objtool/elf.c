@@ -1,10 +1,22 @@
-// SPDX-License-Identifier: GPL-2.0-or-later
 /*
  * elf.c - ELF access library
  *
  * Adapted from kpatch (https://github.com/dynup/kpatch):
  * Copyright (C) 2013-2015 Josh Poimboeuf <jpoimboe@redhat.com>
  * Copyright (C) 2014 Seth Jennings <sjenning@redhat.com>
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License
+ * as published by the Free Software Foundation; either version 2
+ * of the License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, see <http://www.gnu.org/licenses/>.
  */
 
 #include <sys/types.h>
@@ -207,7 +219,7 @@ static int read_sections(struct elf *elf)
 static int read_symbols(struct elf *elf)
 {
 	struct section *symtab, *sec;
-	struct symbol *sym, *pfunc, *alias;
+	struct symbol *sym, *pfunc;
 	struct list_head *entry, *tmp;
 	int symbols_nr, i;
 	char *coldstr;
@@ -230,7 +242,6 @@ static int read_symbols(struct elf *elf)
 			return -1;
 		}
 		memset(sym, 0, sizeof(*sym));
-		alias = sym;
 
 		sym->idx = i;
 
@@ -280,17 +291,11 @@ static int read_symbols(struct elf *elf)
 				break;
 			}
 
-			if (sym->offset == s->offset) {
-				if (sym->len && sym->len == s->len && alias == sym)
-					alias = s;
-
-				if (sym->len >= s->len) {
-					entry = tmp;
-					break;
-				}
+			if (sym->offset == s->offset && sym->len >= s->len) {
+				entry = tmp;
+				break;
 			}
 		}
-		sym->alias = alias;
 		list_add(&sym->list, entry);
 		hash_add(sym->sec->symbol_hash, &sym->hash, sym->idx);
 	}
@@ -388,7 +393,6 @@ static int read_relas(struct elf *elf)
 			rela->offset = rela->rela.r_offset;
 			symndx = GELF_R_SYM(rela->rela.r_info);
 			rela->sym = find_symbol_by_index(elf, symndx);
-			rela->sec = sec;
 			if (!rela->sym) {
 				WARN("can't find rela entry symbol %d for %s",
 				     symndx, sec->name);
@@ -404,7 +408,7 @@ static int read_relas(struct elf *elf)
 	return 0;
 }
 
-struct elf *elf_read(const char *name, int flags)
+struct elf *elf_open(const char *name, int flags)
 {
 	struct elf *elf;
 	Elf_Cmd cmd;
@@ -466,7 +470,7 @@ struct section *elf_create_section(struct elf *elf, const char *name,
 {
 	struct section *sec, *shstrtab;
 	size_t size = entsize * nr;
-	Elf_Scn *s;
+	struct Elf_Scn *s;
 	Elf_Data *data;
 
 	sec = malloc(sizeof(*sec));
@@ -529,12 +533,10 @@ struct section *elf_create_section(struct elf *elf, const char *name,
 	sec->sh.sh_flags = SHF_ALLOC;
 
 
-	/* Add section name to .shstrtab (or .strtab for Clang) */
+	/* Add section name to .shstrtab */
 	shstrtab = find_section_by_name(elf, ".shstrtab");
-	if (!shstrtab)
-		shstrtab = find_section_by_name(elf, ".strtab");
 	if (!shstrtab) {
-		WARN("can't find .shstrtab or .strtab section");
+		WARN("can't find .shstrtab section");
 		return NULL;
 	}
 

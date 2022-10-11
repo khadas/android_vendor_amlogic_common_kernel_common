@@ -1,4 +1,3 @@
-/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
  * drivers/amlogic/media/enhancement/amvecm/keystone_correction.h
  *
@@ -44,13 +43,12 @@ enum vks_param_e {
 	VKS_PHS_QMODE,
 	VKS_PARAM_MAX,
 };
-
 /* extern function */
-void keystone_correction_process(void);
-void keystone_correction_config(enum vks_param_e vks_param,
-				unsigned int val);
-void keystone_correction_status(void);
-void keystone_correction_regs(void);
+extern void keystone_correction_process(void);
+extern void keystone_correction_config(enum vks_param_e vks_param,
+	unsigned int val);
+extern void keystone_correction_status(void);
+extern void keystone_correction_regs(void);
 
 /* extern parameters */
 extern unsigned int vks_input_width;

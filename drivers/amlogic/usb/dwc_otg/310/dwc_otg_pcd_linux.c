@@ -61,6 +61,7 @@
 #include "dwc_otg_dbg.h"
 #include <linux/platform_device.h>
 #include <linux/usb/gadget.h>
+#include <linux/amlogic/usb-gxl.h>
 #include <linux/amlogic/usb-v2.h>
 #include <linux/of_device.h>
 
@@ -758,11 +759,13 @@ static int dwc_otg_pcd_udc_start(struct usb_gadget *g,
 		return -EINVAL;
 	}
 
-	if (gadget_wrapper == 0)
+	if (gadget_wrapper == 0) {
 		return -ENODEV;
+	}
 
-	if (gadget_wrapper->driver != 0)
+	if (gadget_wrapper->driver != 0) {
 		return -EBUSY;
+	}
 
 	/* hook up the driver */
 	gadget_wrapper->driver = driver;
@@ -1301,7 +1304,9 @@ int pcd_init(struct platform_device *pdev)
 	}
 
 #ifdef CONFIG_AMLOGIC_USB3PHY
-	if (otg_dev->core_if->phy_interface != 1) {
+	if (otg_dev->core_if->phy_interface == 1) {
+		aml_new_usb_register_notifier(&otg_dev->nb);
+	} else {
 		if (otg_dev->core_if->phy_otg == 1)
 			aml_new_otg_register_notifier(&otg_dev->nb);
 		else
@@ -1321,7 +1326,7 @@ int pcd_init(struct platform_device *pdev)
 	 * Setup interupt handler
 	 */
 
-	//of_dma_configure(&pdev->dev, pdev->dev.of_node);
+	of_dma_configure(&pdev->dev, pdev->dev.of_node);
 
 	irq = platform_get_irq(pdev, 0);
 	if (irq < 0)
@@ -1374,7 +1379,9 @@ void pcd_remove(struct platform_device *pdev)
 	free_wrapper(gadget_wrapper);
 	dwc_otg_pcd_remove(otg_dev->pcd);
 #ifdef CONFIG_AMLOGIC_USB3PHY
-	if (otg_dev->core_if->phy_interface != 1) {
+	if (otg_dev->core_if->phy_interface == 1) {
+		aml_new_usb_unregister_notifier(&otg_dev->nb);
+	} else {
 		if (otg_dev->core_if->phy_otg == 1)
 			aml_new_otg_unregister_notifier(&otg_dev->nb);
 		else

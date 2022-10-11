@@ -1,6 +1,18 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/amlogic/media/common/codec_mm/secmem.c
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
 #include <linux/init.h>
@@ -13,17 +25,18 @@
 #include <linux/dma-buf.h>
 #include <linux/list.h>
 #include <linux/slab.h>
-#include <linux/amlogic/media/codec_mm/secmem.h>
 
-static int secmem_debug;
-module_param(secmem_debug, int, 0644);
+#include "secmem.h"
+
+static int debug;
+module_param(debug, int, 0644);
 
 #define  DEVICE_NAME "secmem"
 #define  CLASS_NAME  "secmem"
 
 #define dprintk(level, fmt, arg...)					      \
 	do {								      \
-		if (secmem_debug >= (level))					      \
+		if (debug >= level)					      \
 			pr_info(DEVICE_NAME ": %s: " fmt,  __func__, ## arg); \
 	} while (0)
 
@@ -40,7 +53,9 @@ struct ksecmem_attachment {
 static int dev_no;
 static struct device *secmem_dev;
 
-static int secmem_dma_attach(struct dma_buf *dbuf, struct dma_buf_attachment *attachment)
+
+static int secmem_dma_attach(struct dma_buf *dbuf, struct device *device,
+			     struct dma_buf_attachment *attachment)
 {
 	struct ksecmem_attachment *attach;
 	struct secmem_block *info = dbuf->priv;
@@ -92,7 +107,8 @@ static void secmem_dma_detach(struct dma_buf *dbuf,
 	attachment->priv = NULL;
 }
 
-static struct sg_table *secmem_dma_map_dma_buf(struct dma_buf_attachment *attachment,
+static struct sg_table *secmem_dma_map_dma_buf(
+		struct dma_buf_attachment *attachment,
 		enum dma_data_direction dma_dir)
 {
 	struct ksecmem_attachment *attach = attachment->priv;
@@ -122,7 +138,8 @@ static struct sg_table *secmem_dma_map_dma_buf(struct dma_buf_attachment *attach
 	return sgt;
 }
 
-static void secmem_dma_unmap_dma_buf(struct dma_buf_attachment *attachment,
+static void secmem_dma_unmap_dma_buf(
+		struct dma_buf_attachment *attachment,
 		struct sg_table *sgt,
 		enum dma_data_direction dma_dir)
 {
@@ -135,8 +152,20 @@ static void secmem_dma_release(struct dma_buf *dbuf)
 
 	pr_enter();
 	info = (struct secmem_block *)dbuf->priv;
-	pr_dbg("secmem dma release handle:%x\n", info->handle);
+	pr_dbg("handle:%x\n", info->handle);
 	kfree(info);
+}
+
+static void *secmem_dma_kmap_atomic(struct dma_buf *dbuf, unsigned long n)
+{
+	pr_enter();
+	return NULL;
+}
+
+static void *secmem_dma_kmap(struct dma_buf *dbuf, unsigned long n)
+{
+	pr_enter();
+	return NULL;
 }
 
 static int secmem_dma_mmap(struct dma_buf *dbuf, struct vm_area_struct *vma)
@@ -151,6 +180,8 @@ static struct dma_buf_ops secmem_dmabuf_ops = {
 	.map_dma_buf = secmem_dma_map_dma_buf,
 	.unmap_dma_buf = secmem_dma_unmap_dma_buf,
 	.release = secmem_dma_release,
+	.kmap_atomic = secmem_dma_kmap_atomic,
+	.kmap = secmem_dma_kmap,
 	.mmap = secmem_dma_mmap
 };
 
@@ -223,7 +254,7 @@ static long secmem_get_handle(unsigned long args)
 	struct secmem_block *info;
 
 	pr_enter();
-	ret = copy_from_user((void *)&fd, (void __user *)args, sizeof(fd));
+	ret = copy_from_user((void *) &fd, (void __user *) args, sizeof(fd));
 	if (ret) {
 		pr_error("copy_from_user failed\n");
 		goto error_copy;
@@ -234,7 +265,7 @@ static long secmem_get_handle(unsigned long args)
 		goto error_get;
 	}
 	info = dbuf->priv;
-	res = (long)(info->handle & (0xffffffff));
+	res = (long) (info->handle & (0xffffffff));
 	dma_buf_put(dbuf);
 error_get:
 error_copy:
@@ -250,7 +281,7 @@ static long secmem_get_phyaddr(unsigned long args)
 	struct secmem_block *info;
 
 	pr_enter();
-	ret = copy_from_user((void *)&fd, (void __user *)args, sizeof(fd));
+	ret = copy_from_user((void *) &fd, (void __user *) args, sizeof(fd));
 	if (ret) {
 		pr_error("copy_from_user failed\n");
 		goto error_copy;
@@ -261,7 +292,7 @@ static long secmem_get_phyaddr(unsigned long args)
 		goto error_get;
 	}
 	info = dbuf->priv;
-	res = (long)(info->paddr & (0xffffffff));
+	res = (long) (info->paddr & (0xffffffff));
 	dma_buf_put(dbuf);
 error_get:
 error_copy:
@@ -279,7 +310,8 @@ static long secmem_import(unsigned long args)
 	dma_addr_t paddr;
 
 	pr_enter();
-	ret = copy_from_user((void *)&fd, (void __user *)args, sizeof(fd));
+	ret = copy_from_user((void *)&fd, (void __user *)args,
+			     sizeof(fd));
 	if (ret) {
 		pr_error("copy_from_user failed\n");
 		goto error_copy;
@@ -302,7 +334,7 @@ static long secmem_import(unsigned long args)
 
 	paddr = sg_dma_address(sgt->sgl);
 
-	res = (long)(paddr & (0xffffffff));
+	res = (long) (paddr & (0xffffffff));
 	dma_buf_unmap_attachment(attach, sgt, DMA_FROM_DEVICE);
 error_map:
 	dma_buf_detach(dbuf, attach);
@@ -312,7 +344,6 @@ error_get:
 error_copy:
 	return res;
 }
-
 static int secmem_open(struct inode *inodep, struct file *filep)
 {
 	pr_enter();
@@ -388,8 +419,13 @@ const struct file_operations fops = {
 #endif
 };
 
+static struct class_attribute secmem_class_attrs[] = {
+	__ATTR_NULL
+};
+
 static struct class secmem_class = {
 	.name = CLASS_NAME,
+	.class_attrs = secmem_class_attrs,
 };
 
 int __init secmem_init(void)
@@ -435,4 +471,6 @@ void __exit secmem_exit(void)
 	pr_dbg("exit done\n");
 }
 
+module_init(secmem_init);
+module_exit(secmem_exit);
 MODULE_LICENSE("GPL");

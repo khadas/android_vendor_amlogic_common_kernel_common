@@ -1,6 +1,5 @@
-/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * drivers/amlogic/media/enhancement/amvecm/set_hdr2_v0.h
+ * drivers/amlogic/media/enhancement/amvecm/hdr/am_hdr10_tm.h
  *
  * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
  *

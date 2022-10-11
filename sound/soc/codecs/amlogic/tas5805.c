@@ -1,9 +1,16 @@
-// SPDX-License-Identifier: GPL-2.0
 /*
- * ALSA SoC Amlogic t9015c interenl codec driver
+ * Driver for the TAS5805M Audio Amplifier
  *
- * Copyright (C) 2019 Amlogic,inc
+ * Author: Andy Liu <andy-liu@ti.com>
  *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License
+ * version 2 as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful, but
+ * WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * General Public License for more details.
  */
 
 #include <linux/module.h>
@@ -13,14 +20,11 @@
 #include <linux/init.h>
 #include <linux/i2c.h>
 #include <linux/regmap.h>
-#include <linux/amlogic/aml_gpio_consumer.h>
 
-#include <sound/initval.h>
-#include <sound/core.h>
-#include <sound/pcm.h>
-#include <sound/pcm_params.h>
 #include <sound/soc.h>
-#include <sound/tlv.h>
+#include <sound/pcm.h>
+#include <sound/initval.h>
+#include <linux/amlogic/aml_gpio_consumer.h>
 
 #include "tas5805.h"
 
@@ -61,7 +65,7 @@
 #define TAS5805M_VOLUME_MAX  (578)
 #define TAS5805M_VOLUME_MIN  (0)
 
-const u32 tas5805m_volume[] = {
+const uint32_t tas5805m_volume[] = {
 	0x0000001B,		//0, -110dB
 	0x0000001E,		//1, -109dB
 	0x00000021,		//2, -108dB
@@ -642,22 +646,20 @@ const u32 tas5805m_volume[] = {
 	0x6FEFA16D,		//577   47dB
 	0x7D982575,		//578   48dB
 };
-
-#define TAS5805_EQ_PARAM_LENGTH 610
-#define TAS5805_EQ_PARAM_COUNT 1220
+#define TAS5805_EQPARAM_LENGTH 610
+#define TAS5805_EQ_LENGTH 245
+#define FILTER_PARAM_BYTE 244
+static  int m_eq_tab[TAS5805_EQPARAM_LENGTH][2];
 #define TAS5805_DRC_PARAM_LENGTH 29
 #define TAS5805_DRC_PARAM_COUNT  58
+static  int m_drc_tab[TAS5805_DRC_PARAM_LENGTH][2];
 
 struct tas5805m_priv {
 	struct regmap *regmap;
 	struct tas5805m_platform_data *pdata;
 	int vol;
-	bool mute;
-	struct snd_soc_component *component;
-	bool eq_enable;
-	char *m_eq_tab;
-	bool drc_enable;
-	char *m_drc_tab;
+	int mute;
+	struct snd_soc_codec *codec;
 };
 
 const struct regmap_config tas5805m_regmap = {
@@ -699,8 +701,8 @@ static int tas5805m_mute_info(struct snd_kcontrol *kcontrol,
 static int tas5805m_vol_locked_get(struct snd_kcontrol *kcontrol,
 				   struct snd_ctl_elem_value *ucontrol)
 {
-	struct snd_soc_component *component = snd_soc_kcontrol_component(kcontrol);
-	struct tas5805m_priv *tas5805m = snd_soc_component_get_drvdata(component);
+	struct snd_soc_codec *codec = snd_soc_kcontrol_codec(kcontrol);
+	struct tas5805m_priv *tas5805m = snd_soc_codec_get_drvdata(codec);
 
 	ucontrol->value.integer.value[0] = tas5805m->vol;
 
@@ -722,14 +724,14 @@ static inline int get_volume_index(int vol)
 	return index;
 }
 
-static void tas5805m_set_volume(struct snd_soc_component *component, int vol)
+static void tas5805m_set_volume(struct snd_soc_codec *codec, int vol)
 {
 	unsigned int index;
-	u32 volume_hex;
-	u8 byte4;
-	u8 byte3;
-	u8 byte2;
-	u8 byte1;
+	uint32_t volume_hex;
+	uint8_t byte4;
+	uint8_t byte3;
+	uint8_t byte2;
+	uint8_t byte1;
 
 	index = get_volume_index(vol);
 	volume_hex = tas5805m_volume[index];
@@ -740,38 +742,38 @@ static void tas5805m_set_volume(struct snd_soc_component *component, int vol)
 	byte1 = ((volume_hex >> 0) & 0xFF);
 
 	//w 58 00 00
-	snd_soc_component_write(component, TAS5805M_REG_00, TAS5805M_PAGE_00);
+	snd_soc_write(codec, TAS5805M_REG_00, TAS5805M_PAGE_00);
 	//w 58 7f 8c
-	snd_soc_component_write(component, TAS5805M_REG_7F, TAS5805M_BOOK_8C);
+	snd_soc_write(codec, TAS5805M_REG_7F, TAS5805M_BOOK_8C);
 	//w 58 00 2a
-	snd_soc_component_write(component, TAS5805M_REG_00, TAS5805M_PAGE_2A);
-	//w 58 24 xx
-	snd_soc_component_write(component, TAS5805M_REG_24, byte4);
-	snd_soc_component_write(component, TAS5805M_REG_25, byte3);
-	snd_soc_component_write(component, TAS5805M_REG_26, byte2);
-	snd_soc_component_write(component, TAS5805M_REG_27, byte1);
-	//w 58 28 xx
-	snd_soc_component_write(component, TAS5805M_REG_28, byte4);
-	snd_soc_component_write(component, TAS5805M_REG_29, byte3);
-	snd_soc_component_write(component, TAS5805M_REG_2A, byte2);
-	snd_soc_component_write(component, TAS5805M_REG_2B, byte1);
+	snd_soc_write(codec, TAS5805M_REG_00, TAS5805M_PAGE_2A);
+	//w 58 24 xx xx xx xx
+	snd_soc_write(codec, TAS5805M_REG_24, byte4);
+	snd_soc_write(codec, TAS5805M_REG_25, byte3);
+	snd_soc_write(codec, TAS5805M_REG_26, byte2);
+	snd_soc_write(codec, TAS5805M_REG_27, byte1);
+	//w 58 28 xx xx xx xx
+	snd_soc_write(codec, TAS5805M_REG_28, byte4);
+	snd_soc_write(codec, TAS5805M_REG_29, byte3);
+	snd_soc_write(codec, TAS5805M_REG_2A, byte2);
+	snd_soc_write(codec, TAS5805M_REG_2B, byte1);
 }
 
 static int tas5805m_vol_locked_put(struct snd_kcontrol *kcontrol,
 				   struct snd_ctl_elem_value *ucontrol)
 {
-	struct snd_soc_component *component = snd_soc_kcontrol_component(kcontrol);
-	struct tas5805m_priv *tas5805m = snd_soc_component_get_drvdata(component);
+	struct snd_soc_codec *codec = snd_soc_kcontrol_codec(kcontrol);
+	struct tas5805m_priv *tas5805m = snd_soc_codec_get_drvdata(codec);
+
 
 	tas5805m->vol = ucontrol->value.integer.value[0];
-	tas5805m_set_volume(component, tas5805m->vol);
+	tas5805m_set_volume(codec, tas5805m->vol);
 
 	return 0;
 }
 
-static int tas5805m_mute(struct snd_soc_component *component, bool mute)
+static int tas5805m_mute(struct snd_soc_codec *codec, int mute)
 {
-	struct tas5805m_priv *tas5805m = snd_soc_component_get_drvdata(component);
 	u8 reg03_value = 0;
 	u8 reg35_value = 0;
 
@@ -785,12 +787,11 @@ static int tas5805m_mute(struct snd_soc_component *component, bool mute)
 		reg35_value = 0x11;
 	}
 
-	snd_soc_component_write(component, TAS5805M_REG_00, TAS5805M_PAGE_00);
-	snd_soc_component_write(component, TAS5805M_REG_7F, TAS5805M_BOOK_00);
-	snd_soc_component_write(component, TAS5805M_REG_00, TAS5805M_PAGE_00);
-	snd_soc_component_write(component, TAS5805M_REG_03, reg03_value);
-	snd_soc_component_write(component, TAS5805M_REG_35, reg35_value);
-	tas5805m->mute = mute;
+	snd_soc_write(codec, TAS5805M_REG_00, TAS5805M_PAGE_00);
+	snd_soc_write(codec, TAS5805M_REG_7F, TAS5805M_BOOK_00);
+	snd_soc_write(codec, TAS5805M_REG_00, TAS5805M_PAGE_00);
+	snd_soc_write(codec, TAS5805M_REG_03, reg03_value);
+	snd_soc_write(codec, TAS5805M_REG_35, reg35_value);
 
 	return 0;
 }
@@ -798,10 +799,11 @@ static int tas5805m_mute(struct snd_soc_component *component, bool mute)
 static int tas5805m_mute_locked_put(struct snd_kcontrol *kcontrol,
 				    struct snd_ctl_elem_value *ucontrol)
 {
-	struct snd_soc_component *component = snd_soc_kcontrol_component(kcontrol);
-	bool mute = !!ucontrol->value.integer.value[0];
+	struct snd_soc_codec *codec = snd_soc_kcontrol_codec(kcontrol);
+	struct tas5805m_priv *tas5805m = snd_soc_codec_get_drvdata(codec);
 
-	tas5805m_mute(component, mute);
+	tas5805m->mute = ucontrol->value.integer.value[0];
+	tas5805m_mute(codec, tas5805m->mute);
 
 	return 0;
 }
@@ -809,143 +811,111 @@ static int tas5805m_mute_locked_put(struct snd_kcontrol *kcontrol,
 static int tas5805m_mute_locked_get(struct snd_kcontrol *kcontrol,
 				    struct snd_ctl_elem_value *ucontrol)
 {
-	struct snd_soc_component *component = snd_soc_kcontrol_component(kcontrol);
-	struct tas5805m_priv *tas5805m = snd_soc_component_get_drvdata(component);
-
+	struct snd_soc_codec *codec = snd_soc_kcontrol_codec(kcontrol);
+	struct tas5805m_priv *tas5805m = snd_soc_codec_get_drvdata(codec);
 	ucontrol->value.integer.value[0] = tas5805m->mute;
-
 	return 0;
 }
 
 static int tas5805_set_EQ_enum(struct snd_kcontrol *kcontrol,
 				   struct snd_ctl_elem_value *ucontrol)
 {
-	struct snd_soc_component *component = snd_soc_kcontrol_component(kcontrol);
-	struct tas5805m_priv *tas5805m = snd_soc_component_get_drvdata(component);
-
-	tas5805m->eq_enable = !!ucontrol->value.integer.value[0];
-
 	return 0;
 }
 
 static int tas5805_get_EQ_enum(struct snd_kcontrol *kcontrol,
 					struct snd_ctl_elem_value *ucontrol)
 {
-	struct snd_soc_component *component = snd_soc_kcontrol_component(kcontrol);
-	struct tas5805m_priv *tas5805m = snd_soc_component_get_drvdata(component);
-
-	ucontrol->value.integer.value[0] = tas5805m->eq_enable;
-
 	return 0;
 }
 
 static int tas5805_set_DRC_enum(struct snd_kcontrol *kcontrol,
 				   struct snd_ctl_elem_value *ucontrol)
 {
-	struct snd_soc_component *component = snd_soc_kcontrol_component(kcontrol);
-	struct tas5805m_priv *tas5805m = snd_soc_component_get_drvdata(component);
-
-	tas5805m->drc_enable = !!ucontrol->value.integer.value[0];
-
 	return 0;
 }
 
 static int tas5805_get_DRC_enum(struct snd_kcontrol *kcontrol,
 					struct snd_ctl_elem_value *ucontrol)
 {
-	struct snd_soc_component *component = snd_soc_kcontrol_component(kcontrol);
-	struct tas5805m_priv *tas5805m = snd_soc_component_get_drvdata(component);
-
-	ucontrol->value.integer.value[0] = tas5805m->drc_enable;
-
 	return 0;
 }
 
 static int tas5805_set_DRC_param(struct snd_kcontrol *kcontrol,
-				  const unsigned int __user *bytes, unsigned int size)
+				   struct snd_ctl_elem_value *ucontrol)
 {
-	struct snd_soc_component *component = snd_soc_kcontrol_component(kcontrol);
-	struct tas5805m_priv *tas5805m = snd_soc_component_get_drvdata(component);
-	struct snd_ctl_tlv *tlv = (struct snd_ctl_tlv *)bytes;
-	char *p = tas5805m->m_drc_tab;
-	unsigned int i = 0, res;
+	struct snd_soc_codec *codec = snd_soc_kcontrol_codec(kcontrol);
+	void *data;
+	char tmp_string[TAS5805_DRC_PARAM_COUNT];
+	char *p_string = &tmp_string[0];
+	u8 *val;
+	unsigned int i = 0;
 
-	if (!p || size > TAS5805_DRC_PARAM_COUNT)
-		return -EINVAL;
+	data = kmemdup(ucontrol->value.bytes.data,
+		TAS5805_DRC_PARAM_COUNT, GFP_KERNEL | GFP_DMA);
+	if (!data)
+		return -ENOMEM;
 
-	res = copy_from_user(p, tlv->tlv, size);
-	if (res)
-		return -EFAULT;
+	val = (u8 *)data;
+	memcpy(p_string, val, TAS5805_DRC_PARAM_COUNT);
 
-	for (i = 0; i < size / 2; i++) {
-		snd_soc_component_write(component, *p, *(p + 1));
-		p += 2;
+	for (i = 0; i < TAS5805_DRC_PARAM_COUNT/2; i++) {
+		m_drc_tab[i][0] = tmp_string[2*i];
+		m_drc_tab[i][1] = tmp_string[2*i+1];
 	}
 
+	for (i = 0; i < TAS5805_DRC_PARAM_LENGTH; i++)
+		snd_soc_write(codec, m_drc_tab[i][0], m_drc_tab[i][1]);
+
+	kfree(data);
 	return 0;
 }
 
 static int tas5805_get_DRC_param(struct snd_kcontrol *kcontrol,
-			    unsigned int __user *bytes, unsigned int size)
+					struct snd_ctl_elem_value *ucontrol)
 {
-	struct snd_soc_component *component = snd_soc_kcontrol_component(kcontrol);
-	struct tas5805m_priv *tas5805m = snd_soc_component_get_drvdata(component);
-	struct snd_ctl_tlv *tlv = (struct snd_ctl_tlv *)bytes;
-	char *p = tas5805m->m_drc_tab;
-	int res = 0;
-
-	if (!p || size > TAS5805_DRC_PARAM_COUNT)
-		return -EINVAL;
-
-	res = copy_to_user(tlv->tlv, p, size);
-	if (res)
-		return -EFAULT;
-
 	return 0;
 }
 
+
 static int tas5805_set_EQ_param(struct snd_kcontrol *kcontrol,
-				  const unsigned int __user *bytes, unsigned int size)
+				   struct snd_ctl_elem_value *ucontrol)
 {
-	struct snd_soc_component *component = snd_soc_kcontrol_component(kcontrol);
-	struct tas5805m_priv *tas5805m = snd_soc_component_get_drvdata(component);
-	struct snd_ctl_tlv *tlv = (struct snd_ctl_tlv *)bytes;
-	char *p = tas5805m->m_eq_tab;
-	unsigned int i = 0, res;
+	struct snd_soc_codec *codec = snd_soc_kcontrol_codec(kcontrol);
+	void *data;
+	char tmp_string[TAS5805_EQ_LENGTH];
+	char *p_string = &tmp_string[0];
+	u8 *val;
+	int band_id;
+	unsigned int i = 0, j = 0;
 
-	if (!p || size > TAS5805_EQ_PARAM_COUNT)
-		return -EINVAL;
+	data = kmemdup(ucontrol->value.bytes.data,
+		TAS5805_EQ_LENGTH, GFP_KERNEL | GFP_DMA);
+	if (!data)
+		return -ENOMEM;
 
-	res = copy_from_user(p, tlv->tlv, size);
-	if (res)
-		return -EFAULT;
-
-	for (i = 0; i < size / 2; i++) {
-		snd_soc_component_write(component, *p, *(p + 1));
-		p += 2;
+	val = (u8 *) data;
+	memcpy(p_string, val, TAS5805_EQ_LENGTH);
+	band_id = tmp_string[0];
+	for (j = 0, i = band_id * FILTER_PARAM_BYTE / 2;
+			j < FILTER_PARAM_BYTE / 2; i++, j++) {
+		m_eq_tab[i][0] = tmp_string[2*j+1];
+		m_eq_tab[i][1] = tmp_string[2*j+2];
 	}
-
+	if (band_id == 4) {
+		for (i = 0; i < TAS5805_EQPARAM_LENGTH; i++)
+			snd_soc_write(codec, m_eq_tab[i][0], m_eq_tab[i][1]);
+	}
+	kfree(data);
 	return 0;
 }
 
 static int tas5805_get_EQ_param(struct snd_kcontrol *kcontrol,
-				unsigned int __user *bytes, unsigned int size)
+					struct snd_ctl_elem_value *ucontrol)
 {
-	struct snd_soc_component *component = snd_soc_kcontrol_component(kcontrol);
-	struct tas5805m_priv *tas5805m = snd_soc_component_get_drvdata(component);
-	struct snd_ctl_tlv *tlv = (struct snd_ctl_tlv *)bytes;
-	char *p = tas5805m->m_eq_tab;
-	int res = 0;
-
-	if (!p || size > TAS5805_EQ_PARAM_COUNT)
-		return -EINVAL;
-
-	res = copy_to_user(tlv->tlv, p, size);
-	if (res)
-		return -EFAULT;
-
 	return 0;
 }
+
 
 static const struct snd_kcontrol_new tas5805m_vol_control[] = {
 	{
@@ -966,13 +936,13 @@ static const struct snd_kcontrol_new tas5805m_vol_control[] = {
 			   tas5805_get_EQ_enum, tas5805_set_EQ_enum),
 	SOC_SINGLE_BOOL_EXT("Set DRC Enable", 0,
 			   tas5805_get_DRC_enum, tas5805_set_DRC_enum),
-	SND_SOC_BYTES_TLV("EQ table", TAS5805_EQ_PARAM_COUNT,
+	SND_SOC_BYTES_EXT("EQ table", TAS5805_EQ_LENGTH,
 			   tas5805_get_EQ_param, tas5805_set_EQ_param),
-	SND_SOC_BYTES_TLV("DRC table", TAS5805_DRC_PARAM_COUNT,
+	SND_SOC_BYTES_EXT("DRC table", TAS5805_DRC_PARAM_COUNT,
 			   tas5805_get_DRC_param, tas5805_set_DRC_param),
 };
 
-static int tas5805m_set_bias_level(struct snd_soc_component *component,
+static int tas5805m_set_bias_level(struct snd_soc_codec *codec,
 				  enum snd_soc_bias_level level)
 {
 	pr_debug("level = %d\n", level);
@@ -992,7 +962,7 @@ static int tas5805m_set_bias_level(struct snd_soc_component *component,
 		/* The chip runs through the power down sequence for us. */
 		break;
 	}
-	component->dapm.bias_level = level;
+	codec->component.dapm.bias_level = level;
 
 	return 0;
 }
@@ -1001,7 +971,7 @@ static int tas5805m_trigger(struct snd_pcm_substream *substream, int cmd,
 			       struct snd_soc_dai *codec_dai)
 {
 	struct tas5805m_priv *tas5805m = snd_soc_dai_get_drvdata(codec_dai);
-	struct snd_soc_component *component = tas5805m->component;
+	struct snd_soc_codec *codec = tas5805m->codec;
 
 	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
 		switch (cmd) {
@@ -1009,25 +979,24 @@ static int tas5805m_trigger(struct snd_pcm_substream *substream, int cmd,
 		case SNDRV_PCM_TRIGGER_RESUME:
 		case SNDRV_PCM_TRIGGER_PAUSE_RELEASE:
 			pr_debug("%s(), start\n", __func__);
-			snd_soc_component_write(component, TAS5805M_REG_00, TAS5805M_PAGE_00);
-			snd_soc_component_write(component, TAS5805M_REG_7F, TAS5805M_BOOK_00);
-			snd_soc_component_write(component, TAS5805M_REG_00, TAS5805M_PAGE_00);
-			snd_soc_component_write(component, TAS5805M_DIG_VAL_CTL, 0x30);
+			snd_soc_write(codec, TAS5805M_REG_00, TAS5805M_PAGE_00);
+			snd_soc_write(codec, TAS5805M_REG_7F, TAS5805M_BOOK_00);
+			snd_soc_write(codec, TAS5805M_REG_00, TAS5805M_PAGE_00);
+			snd_soc_write(codec, TAS5805M_DIG_VAL_CTL, 0x30);
 			break;
 		case SNDRV_PCM_TRIGGER_STOP:
 		case SNDRV_PCM_TRIGGER_SUSPEND:
 		case SNDRV_PCM_TRIGGER_PAUSE_PUSH:
 			pr_debug("%s(), stop\n", __func__);
-			snd_soc_component_write(component, TAS5805M_REG_00, TAS5805M_PAGE_00);
-			snd_soc_component_write(component, TAS5805M_REG_7F, TAS5805M_BOOK_00);
-			snd_soc_component_write(component, TAS5805M_REG_00, TAS5805M_PAGE_00);
-			snd_soc_component_write(component, TAS5805M_DIG_VAL_CTL, 0xff);
+			snd_soc_write(codec, TAS5805M_REG_00, TAS5805M_PAGE_00);
+			snd_soc_write(codec, TAS5805M_REG_7F, TAS5805M_BOOK_00);
+			snd_soc_write(codec, TAS5805M_REG_00, TAS5805M_PAGE_00);
+			snd_soc_write(codec, TAS5805M_DIG_VAL_CTL, 0xff);
 			break;
 		}
 	}
 	return 0;
 }
-
 static int reset_tas5805m_GPIO(struct device *dev)
 {
 	struct tas5805m_priv *tas5805m =  dev_get_drvdata(dev);
@@ -1051,97 +1020,103 @@ static int reset_tas5805m_GPIO(struct device *dev)
 	return 0;
 }
 
-static int tas5805m_snd_suspend(struct snd_soc_component *component)
+static int tas5805m_snd_suspend(struct snd_soc_codec *codec)
 {
-	struct tas5805m_priv *tas5805m = snd_soc_component_get_drvdata(component);
+	struct tas5805m_priv *tas5805m = snd_soc_codec_get_drvdata(codec);
 	struct tas5805m_platform_data *pdata = tas5805m->pdata;
-
-	dev_info(component->dev, "tas5805m_suspend!\n");
-	tas5805m_set_bias_level(component, SND_SOC_BIAS_OFF);
+	dev_info(codec->dev, "tas5805m_suspend!\n");
+	tas5805m_set_bias_level(codec, SND_SOC_BIAS_OFF);
 
 	if (pdata->reset_pin)
 		gpio_direction_output(pdata->reset_pin, GPIOF_OUT_INIT_LOW);
-	usleep_range(9, 15);
+	udelay(10);
 	return 0;
 }
 
-static int tas5805m_reg_init(struct snd_soc_component *component)
+
+static int tas5805m_reg_init(struct snd_soc_codec *codec)
 {
 	int i, j = 0;
 
 	for (j = 0; j < ARRAY_SIZE(tas5805m_reset); j++) {
-		snd_soc_component_write(component, tas5805m_reset[j][0],
+		snd_soc_write(codec, tas5805m_reset[j][0],
 			tas5805m_reset[j][1]);
 	};
 	usleep_range(10 * 1000, 11 * 1000);
 	for (i = 0; i < ARRAY_SIZE(tas5805m_init_sequence); i++) {
-		snd_soc_component_write(component, tas5805m_init_sequence[i][0],
+		snd_soc_write(codec, tas5805m_init_sequence[i][0],
 			tas5805m_init_sequence[i][1]);
 	};
 	return 0;
+
 }
 
-static int tas5805m_snd_resume(struct snd_soc_component *component)
+static int tas5805m_snd_resume(struct snd_soc_codec *codec)
 {
 	int ret;
-	struct tas5805m_priv *tas5805m = snd_soc_component_get_drvdata(component);
+	struct tas5805m_priv *tas5805m = snd_soc_codec_get_drvdata(codec);
 	struct tas5805m_platform_data *pdata = tas5805m->pdata;
+	dev_info(codec->dev, "tas5805m_snd_resume!\n");
 
-	dev_info(component->dev, "%s!\n", __func__);
 	if (pdata->reset_pin)
 		gpio_direction_output(pdata->reset_pin, GPIOF_OUT_INIT_HIGH);
 
 	usleep_range(3 * 1000, 4 * 1000);
 
-	ret = tas5805m_reg_init(component);
+	ret = tas5805m_reg_init(codec);
 //	    regmap_register_patch(tas5805m->regmap, tas5805m_init_sequence,
 //				  ARRAY_SIZE(tas5805m_init_sequence));
 	if (ret != 0) {
-		dev_err(component->dev, "Failed to initialize TAS5805M: %d\n", ret);
+		dev_err(codec->dev, "Failed to initialize TAS5805M: %d\n", ret);
 		goto err;
 	}
 
-	tas5805m_mute(component, tas5805m->mute);
-	tas5805m_set_volume(component, tas5805m->vol);
-	tas5805m_set_bias_level(component, SND_SOC_BIAS_STANDBY);
+	tas5805m_set_volume(codec, tas5805m->vol);
+	tas5805m_set_bias_level(codec, SND_SOC_BIAS_STANDBY);
 
 	return 0;
 err:
 	return ret;
 }
 
-static int tas5805m_probe(struct snd_soc_component *component)
+
+
+
+static int tas5805m_probe(struct snd_soc_codec *codec)
 {
 	int ret;
-	struct tas5805m_priv *tas5805m = snd_soc_component_get_drvdata(component);
+	struct tas5805m_priv *tas5805m = snd_soc_codec_get_drvdata(codec);
 
 	usleep_range(20 * 1000, 21 * 1000);
-	ret = tas5805m_reg_init(component);
+	ret = tas5805m_reg_init(codec);
 	if (ret != 0)
 		goto err;
 
-	tas5805m_set_volume(component, tas5805m->vol);
-	snd_soc_add_component_controls(component, tas5805m_vol_control,
+	tas5805m_set_volume(codec, tas5805m->vol);
+	snd_soc_add_codec_controls(codec, tas5805m_vol_control,
 			ARRAY_SIZE(tas5805m_vol_control));
-	tas5805m->component = component;
+	tas5805m->codec = codec;
 	return 0;
 
 err:
 	return ret;
+
 }
 
-static void tas5805m_remove(struct snd_soc_component *component)
+static int tas5805m_remove(struct snd_soc_codec *codec)
 {
-	struct tas5805m_priv *tas5805m = snd_soc_component_get_drvdata(component);
+	struct tas5805m_priv *tas5805m = snd_soc_codec_get_drvdata(codec);
 	struct tas5805m_platform_data *pdata = tas5805m->pdata;
 
 	if (pdata->reset_pin)
 		gpio_direction_output(pdata->reset_pin, GPIOF_OUT_INIT_LOW);
 
-	usleep_range(9, 15);
+	udelay(10);
+
+	return 0;
 }
 
-static const struct snd_soc_component_driver soc_codec_tas5805m = {
+static struct snd_soc_codec_driver soc_codec_tas5805m = {
 	.probe = tas5805m_probe,
 	.remove = tas5805m_remove,
 	.suspend = tas5805m_snd_suspend,
@@ -1166,7 +1141,8 @@ static struct snd_soc_dai_driver tas5805m_dai = {
 	.ops = &tas5805m_dai_ops,
 };
 
-static int tas5805m_parse_dt(struct tas5805m_priv *tas5805m,
+static int tas5805m_parse_dt(
+	struct tas5805m_priv *tas5805m,
 	struct device_node *np)
 {
 	int ret = 0;
@@ -1214,30 +1190,17 @@ static int tas5805m_i2c_probe(struct i2c_client *i2c,
 
 	tas5805m_parse_dt(tas5805m, i2c->dev.of_node);
 	tas5805m->regmap = regmap;
-	tas5805m->vol = 400;	//10dB
+	tas5805m->vol = 100;	//100, -10dB
 
 	dev_set_drvdata(&i2c->dev, tas5805m);
 
-	ret = devm_snd_soc_register_component(&i2c->dev, &soc_codec_tas5805m,
+	ret =
+		snd_soc_register_codec(&i2c->dev, &soc_codec_tas5805m,
 			&tas5805m_dai, 1);
 	if (ret != 0)
 		return -ENOMEM;
 
 	reset_tas5805m_GPIO(&i2c->dev);
-
-	tas5805m->m_drc_tab =
-		devm_kzalloc(&i2c->dev,
-			     sizeof(char) * TAS5805_DRC_PARAM_COUNT,
-			     GFP_KERNEL);
-	if (!tas5805m->m_drc_tab)
-		return -ENOMEM;
-
-	tas5805m->m_eq_tab =
-		devm_kzalloc(&i2c->dev,
-			     sizeof(char) * TAS5805_EQ_PARAM_COUNT,
-			     GFP_KERNEL);
-	if (!tas5805m->m_eq_tab)
-		return -ENOMEM;
 
 	return ret;
 }
@@ -1258,7 +1221,7 @@ MODULE_DEVICE_TABLE(i2c, tas5805m_i2c_id);
 
 #ifdef CONFIG_OF
 static const struct of_device_id tas5805m_of_match[] = {
-	{.compatible = "ti, tas5805",},
+	{.compatible = "ti,tas5805",},
 	{}
 };
 

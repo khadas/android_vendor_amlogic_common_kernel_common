@@ -1,7 +1,19 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
- */
+ * drivers/amlogic/media/common/codec_mm/codec_mm_keeper.c
+ *
+ * Copyright (C) 2016 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
+*/
 
 #include <linux/kernel.h>
 #include <linux/module.h>
@@ -12,11 +24,10 @@
 #include <linux/amlogic/media/codec_mm/codec_mm.h>
 #include <linux/amlogic/media/codec_mm/codec_mm_scatter.h>
 #include <linux/amlogic/media/codec_mm/codec_mm_keeper.h>
-#include <linux/vmalloc.h>
+
 #include <linux/workqueue.h>
 #include "codec_mm_priv.h"
 #include "codec_mm_scatter_priv.h"
-
 #define KEEP_NAME "keeper"
 #define MAX_KEEP_FRAME 64
 #define START_KEEP_ID 0x9
@@ -32,7 +43,6 @@ struct keep_mem_info {
 
 struct codec_mm_keeper_mgr {
 	int num;
-	/* spin lock */
 	spinlock_t lock;
 	struct delayed_work dealy_work;
 	int work_runs;
@@ -52,8 +62,8 @@ int is_codec_mm_keeped(void *mem_handle)
 }
 EXPORT_SYMBOL(is_codec_mm_keeped);
 /*
- * not call in interrupt;
- */
+*not call in interrupt;
+*/
 int codec_mm_keeper_mask_keep_mem(void *mem_handle, int type)
 {
 	struct codec_mm_keeper_mgr *mgr = get_codec_mm_keeper_mgr();
@@ -65,13 +75,13 @@ int codec_mm_keeper_mask_keep_mem(void *mem_handle, int type)
 	int have_samed = 0;
 
 	if (codec_mm_get_keep_debug_mode() & 1)
-		pr_err("%s %p\n", __func__, mem_handle);
+		pr_err("codec_mm_keeper_mask_keep_mem %p\n", mem_handle);
 	if (!mem_handle) {
 		pr_err("NULL mem_handle for keeper!!\n");
 		return -2;
 	}
 	if (type != MEM_TYPE_CODEC_MM_SCATTER &&
-	    type != MEM_TYPE_CODEC_MM) {
+		type != MEM_TYPE_CODEC_MM) {
 		pr_err("not valid type for keeper!!,%d\n", type);
 		return -3;
 	}
@@ -79,7 +89,7 @@ int codec_mm_keeper_mask_keep_mem(void *mem_handle, int type)
 		ret = codec_mm_scatter_inc_for_keeper(mem_handle);
 		if (ret < 0) {
 			pr_err("keeper scatter failed,%d,handle:%p\n",
-			       ret, mem_handle);
+				ret, mem_handle);
 			if (codec_mm_get_keep_debug_mode() & 1)
 				codec_mm_dump_all_scatters();
 			return -4;
@@ -88,7 +98,7 @@ int codec_mm_keeper_mask_keep_mem(void *mem_handle, int type)
 		ret = codec_mm_request_shared_mem(mem_handle, KEEP_NAME);
 		if (ret < 0) {
 			pr_err("keeper codec mm failed,%d,handle:%p\n",
-			       ret, mem_handle);
+				ret, mem_handle);
 			return -4;
 		}
 	}
@@ -97,9 +107,9 @@ int codec_mm_keeper_mask_keep_mem(void *mem_handle, int type)
 	if (mgr->next_id >= MAX_KEEP_ID)
 		mgr->next_id = START_KEEP_ID;
 	for (i = 0; i < MAX_KEEP_FRAME; i++) {
-		if (!mgr->keep_list[i].handle && slot_i < 0) {
+		if (!mgr->keep_list[i].handle && slot_i < 0)
 			slot_i = i;
-		} else if (mgr->keep_list[i].handle == mem_handle) {
+		else if (mgr->keep_list[i].handle == mem_handle) {
 			have_samed = 1;
 			keep_id = mgr->keep_list[i].keep_id;
 			break;
@@ -117,8 +127,8 @@ int codec_mm_keeper_mask_keep_mem(void *mem_handle, int type)
 	}
 	if (codec_mm_get_keep_debug_mode() & 1) {
 		/*keeped info */
-		pr_err("%s %p id=%d\n", __func__,
-		       mem_handle, keep_id);
+		pr_err("codec_mm_keeper_mask_keep_mem %p id=%d\n",
+			mem_handle, keep_id);
 	}
 	if (keep_id < 0 || have_samed) {
 		if (type == MEM_TYPE_CODEC_MM_SCATTER)
@@ -135,8 +145,8 @@ int codec_mm_keeper_mask_keep_mem(void *mem_handle, int type)
 EXPORT_SYMBOL(codec_mm_keeper_mask_keep_mem);
 
 /*
- * can call in irq
- */
+*can call in irq
+*/
 int codec_mm_keeper_unmask_keeper(int keep_id, int delayms)
 {
 	struct codec_mm_keeper_mgr *mgr = get_codec_mm_keeper_mgr();
@@ -144,7 +154,7 @@ int codec_mm_keeper_unmask_keeper(int keep_id, int delayms)
 	unsigned long flags;
 
 	if (codec_mm_get_keep_debug_mode() & 1)
-		pr_err("%s %d\n", __func__, keep_id);
+		pr_err("codec_mm_keeper_unmask_keeper %d\n", keep_id);
 	if (keep_id < START_KEEP_ID || keep_id >= MAX_KEEP_ID) {
 		pr_err("invalid keepid %d\n", keep_id);
 		return -1;
@@ -180,9 +190,9 @@ static int codec_mm_keeper_free_keep(int index)
 	spin_unlock_irqrestore(&mgr->lock, flags);
 	if (!mem_handle)
 		return -1;
-	if (type == MEM_TYPE_CODEC_MM) {
+	if (type == MEM_TYPE_CODEC_MM)
 		codec_mm_release_with_check(mem_handle, KEEP_NAME);
-	} else if (type == MEM_TYPE_CODEC_MM_SCATTER) {
+	else if (type == MEM_TYPE_CODEC_MM_SCATTER) {
 		struct codec_mm_scatter *sc = mem_handle;
 
 		codec_mm_scatter_dec_keeper_user(sc, 0);
@@ -192,23 +202,21 @@ static int codec_mm_keeper_free_keep(int index)
 }
 
 /*
- * can't call it
- * in irq/timer.tasklet
- */
+*can't call it
+*in irq/timer.tasklet
+*/
 int codec_mm_keeper_free_all_keep(int force)
 {
 	struct codec_mm_keeper_mgr *mgr = get_codec_mm_keeper_mgr();
 	int i;
 	int time_after, want_free;
-
 	for (i = 0; i < MAX_KEEP_FRAME; i++) {
 		struct keep_mem_info *info = &mgr->keep_list[i];
-
 		if (!info->handle || info->keep_id < 0)
 			continue;
 		want_free = 0;
 		time_after = time_after64(get_jiffies_64(),
-					  info->delay_on_jiffies64);
+				info->delay_on_jiffies64);
 		if (force == 1)
 			want_free = 1;
 		else if (force == 2 && info->user <= 0)
@@ -242,21 +250,20 @@ int codec_mm_keeper_dump_info(void *buf, int size)
 		} while (0)\
 
 	BUFPRINT("dump keep list:next_id=%d,work_run:%d,num=%d\n",
-		 mgr->next_id,
-		 mgr->work_runs,
-		 mgr->num);
+			mgr->next_id,
+			mgr->work_runs,
+			mgr->num);
 	for (i = 0; i < MAX_KEEP_FRAME; i++) {
 		BUFPRINT("keeper:[%d]:\t\tid:%d\thandle:%p,type:%d,user:%d\n",
-			 i,
-			 mgr->keep_list[i].keep_id,
-			 mgr->keep_list[i].handle,
-			 mgr->keep_list[i].type,
-			 mgr->keep_list[i].user);
+			i,
+			mgr->keep_list[i].keep_id,
+			mgr->keep_list[i].handle,
+			mgr->keep_list[i].type,
+			mgr->keep_list[i].user);
 	}
 #undef BUFPRINT
 	if (!buf)
 		pr_info("%s", sbuf);
-
 	return tsize;
 }
 

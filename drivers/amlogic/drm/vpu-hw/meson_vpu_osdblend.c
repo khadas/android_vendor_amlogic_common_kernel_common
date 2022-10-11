@@ -1,6 +1,18 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/amlogic/drm/vpu-hw/meson_vpu_osdblend.c
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
 /* Amlogic Headers */
@@ -55,6 +67,16 @@ static void osd_din3_switch_set(struct osdblend_reg_s *reg,
 				 bypass_state, 24, 1);
 }
 
+#if 0
+/*0:din0/1/2/3 input disable,1:enable*/
+static void osd_din_input_enable_set(struct osdblend_reg_s *reg,
+				     bool enable,
+				     enum din_channel_e din_channel)
+{
+	meson_vpu_write_reg_bits(reg->viu_osd_blend_ctrl, enable,
+				 (20 + din_channel), 1);
+}
+#endif
 /*0:din0 input disable,1:din0 input enable*/
 static void osd_din0_input_enable_set(struct osdblend_reg_s *reg,
 				      bool input_enable)
@@ -87,6 +109,16 @@ static void osd_din3_input_enable_set(struct osdblend_reg_s *reg,
 				 input_enable, 23, 1);
 }
 
+#if 0
+/*0:din0/1/2/3 premult disable,1:enable*/
+static void osd_din_premult_enable_set(struct osdblend_reg_s *reg,
+				       bool enable,
+				       enum din_channel_e din_channel)
+{
+	meson_vpu_write_reg_bits(reg->viu_osd_blend_ctrl, enable,
+				 (16 + din_channel), 1);
+}
+#endif
 /*1/2/3:din0/1/2/3 select osd1/osd2/osd3,else select null*/
 static void osd_din_channel_mux_set(struct osdblend_reg_s *reg,
 				    enum osd_channel_e osd_channel,
@@ -160,6 +192,30 @@ static void osd_blend_dummy_data_set(struct osdblend_reg_s *reg,
 			    ((dummy_data.channel0 & 0xff) << 16) |
 		((dummy_data.channel1 & 0xff) << 8) |
 		(dummy_data.channel2 & 0xff));
+}
+
+/*osd blend0 dummy data alpha config*/
+static void osd_blend0_dummy_alpha_set(struct osdblend_reg_s *reg,
+				       unsigned int dummy_alpha)
+{
+	meson_vpu_write_reg_bits(reg->viu_osd_blend_dummy_alpha,
+				 dummy_alpha, 20, 9);
+}
+
+/*osd blend1 dummy data alpha config*/
+static void osd_blend1_dummy_alpha_set(struct osdblend_reg_s *reg,
+				       unsigned int dummy_alpha)
+{
+	meson_vpu_write_reg_bits(reg->viu_osd_blend_dummy_alpha,
+				 dummy_alpha, 11, 9);
+}
+
+/*osd blend2 dummy data alpha config*/
+static void osd_blend2_dummy_alpha_set(struct osdblend_reg_s *reg,
+				       unsigned int dummy_alpha)
+{
+	meson_vpu_write_reg_bits(reg->viu_osd_blend_dummy_alpha,
+				 dummy_alpha, 0, 9);
 }
 
 /*osd blend0 size config*/
@@ -241,11 +297,21 @@ enum osd_channel_e osd2channel(u8 osd_index)
 static void osdblend_hw_update(struct osdblend_reg_s *reg,
 			       struct meson_vpu_osdblend_state *mvobs)
 {
+	struct osd_dummy_data_s dummy_data = {0, 0, 0};
+
 	/*din channel mux config*/
 	osd_din_channel_mux_set(reg, mvobs->din_channel_mux[DIN0], DIN0);
 	osd_din_channel_mux_set(reg, mvobs->din_channel_mux[DIN1], DIN1);
 	osd_din_channel_mux_set(reg, mvobs->din_channel_mux[DIN2], DIN2);
 	osd_din_channel_mux_set(reg, mvobs->din_channel_mux[DIN3], DIN3);
+
+	/*dummy data config*/
+	osd_blend_dummy_data_set(reg, dummy_data);
+
+	/*alpha config*/
+	osd_blend0_dummy_alpha_set(reg, 0);
+	osd_blend1_dummy_alpha_set(reg, 0);
+	osd_blend2_dummy_alpha_set(reg, 0);
 
 	/*internal channel disable default*/
 	osd_din0_input_enable_set(reg, (mvobs->input_mask >> DIN0) & 0x1);
@@ -448,7 +514,7 @@ static int osdblend_check_state(struct meson_vpu_block *vblk,
 	mvobs->input_height[OSD_SUB_BLEND0] = max_height;
 	mvobs->input_height[OSD_SUB_BLEND1] = max_height;
 	DRM_DEBUG("%s check done.\n", vblk->name);
-	return 0;
+	return ret;
 }
 
 static void osdblend_set_state(struct meson_vpu_block *vblk,
@@ -563,17 +629,8 @@ static void osdblend_dump_register(struct meson_vpu_block *vblk,
 static void osdblend_hw_init(struct meson_vpu_block *vblk)
 {
 	struct meson_vpu_osdblend *osdblend = to_osdblend_block(vblk);
-	struct osd_dummy_data_s dummy_data = {0x80, 0x80, 0x80};
 
 	osdblend->reg = &osdblend_reg;
-
-	/*dummy data/alpha config*/
-	osd_blend_dummy_data_set(osdblend->reg, dummy_data);
-	meson_vpu_write_reg(osdblend->reg->viu_osd_blend_dummy_data0, 0);
-
-	/*reset blend ctrl hold line*/
-	meson_vpu_write_reg_bits(osdblend->reg->viu_osd_blend_ctrl, 0, 29, 3);
-
 	DRM_DEBUG("%s hw_init called.\n", osdblend->base.name);
 }
 

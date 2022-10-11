@@ -1,6 +1,18 @@
-/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * sound/soc/amlogic/auge/pdm.h
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
 #ifndef __AML_PDM_H__
@@ -8,6 +20,8 @@
 
 #include <linux/clk.h>
 #include <linux/pinctrl/consumer.h>
+
+
 
 #define DEFAULT_FS_RATIO		256
 
@@ -43,7 +57,6 @@ struct pdm_chipinfo {
 	bool truncate_data;
 	/* train */
 	bool train;
-
 	int train_version;
 };
 
@@ -86,7 +99,7 @@ struct aml_pdm {
 	bool train_en;
 
 	/* low power mode, for dclk_sycpll to 24m */
-	bool islowpower;
+	bool isLowPower;
 	/* force to lower power when suspend */
 	bool force_lowpower;
 	/* Hibernation for vad, suspended or not */
@@ -95,7 +108,6 @@ struct aml_pdm {
 	bool vad_buf_occupation;
 	bool vad_buf_recovery;
 	int pdm_gain_index;
-
 	int train_sample_count;
 };
 

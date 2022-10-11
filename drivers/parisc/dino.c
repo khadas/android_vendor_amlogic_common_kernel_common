@@ -1,4 +1,3 @@
-// SPDX-License-Identifier: GPL-2.0-or-later
 /*
 **	DINO manager
 **
@@ -6,8 +5,12 @@
 **	(c) Copyright 1999 SuSE GmbH
 **	(c) Copyright 1999,2000 Hewlett-Packard Company
 **	(c) Copyright 2000 Grant Grundler
-**	(c) Copyright 2006-2019 Helge Deller
+**	(c) Copyright 2006 Helge Deller
 **
+**	This program is free software; you can redistribute it and/or modify
+**	it under the terms of the GNU General Public License as published by
+**      the Free Software Foundation; either version 2 of the License, or
+**      (at your option) any later version.
 **
 **	This module provides access to Dino PCI bus (config/IOport spaces)
 **	and helps manage Dino IRQ lines.
@@ -56,7 +59,6 @@
 #include <asm/hardware.h>
 
 #include "gsc.h"
-#include "iommu.h"
 
 #undef DINO_DEBUG
 
@@ -151,10 +153,12 @@ struct dino_device
 #endif
 };
 
-static inline struct dino_device *DINO_DEV(struct pci_hba_data *hba)
-{
-	return container_of(hba, struct dino_device, hba);
-}
+/* Looks nice and keeps the compiler happy */
+#define DINO_DEV(d) ({				\
+	void *__pdata = d;			\
+	BUG_ON(!__pdata);			\
+	(struct dino_device *)__pdata; })
+
 
 /* Check if PCI device is behind a Card-mode Dino. */
 static int pci_dev_is_behind_card_dino(struct pci_dev *dev)
@@ -308,7 +312,7 @@ static void dino_mask_irq(struct irq_data *d)
 	struct dino_device *dino_dev = irq_data_get_irq_chip_data(d);
 	int local_irq = gsc_find_local_irq(d->irq, dino_dev->global_irq, DINO_LOCAL_IRQS);
 
-	DBG(KERN_WARNING "%s(0x%px, %d)\n", __func__, dino_dev, d->irq);
+	DBG(KERN_WARNING "%s(0x%p, %d)\n", __func__, dino_dev, d->irq);
 
 	/* Clear the matching bit in the IMR register */
 	dino_dev->imr &= ~(DINO_MASK_IRQ(local_irq));
@@ -321,7 +325,7 @@ static void dino_unmask_irq(struct irq_data *d)
 	int local_irq = gsc_find_local_irq(d->irq, dino_dev->global_irq, DINO_LOCAL_IRQS);
 	u32 tmp;
 
-	DBG(KERN_WARNING "%s(0x%px, %d)\n", __func__, dino_dev, d->irq);
+	DBG(KERN_WARNING "%s(0x%p, %d)\n", __func__, dino_dev, d->irq);
 
 	/*
 	** clear pending IRQ bits
@@ -387,7 +391,7 @@ ilr_again:
 		DBG(KERN_DEBUG "%s(%d, %p) mask 0x%x\n",
 			__func__, irq, intr_dev, mask);
 		generic_handle_irq(irq);
-		mask &= ~DINO_MASK_IRQ(local_irq);
+		mask &= ~(1 << local_irq);
 	} while (mask);
 
 	/* Support for level triggered IRQ lines.
@@ -401,8 +405,9 @@ ilr_again:
 	if (mask) {
 		if (--ilr_loop > 0)
 			goto ilr_again;
-		pr_warn_ratelimited("Dino 0x%px: stuck interrupt %d\n",
+		printk(KERN_ERR "Dino 0x%p: stuck interrupt %d\n", 
 		       dino_dev->hba.base_addr, mask);
+		return IRQ_NONE;
 	}
 	return IRQ_HANDLED;
 }
@@ -572,7 +577,7 @@ dino_fixup_bus(struct pci_bus *bus)
         struct pci_dev *dev;
         struct dino_device *dino_dev = DINO_DEV(parisc_walk_tree(bus->bridge));
 
-	DBG(KERN_WARNING "%s(0x%px) bus %d platform_data 0x%px\n",
+	DBG(KERN_WARNING "%s(0x%p) bus %d platform_data 0x%p\n",
 	    __func__, bus, bus->busn_res.start,
 	    bus->bridge->platform_data);
 
@@ -873,7 +878,7 @@ static int __init dino_common_init(struct parisc_device *dev,
 	res->flags = IORESOURCE_IO; /* do not mark it busy ! */
 	if (request_resource(&ioport_resource, res) < 0) {
 		printk(KERN_ERR "%s: request I/O Port region failed "
-		       "0x%lx/%lx (hpa 0x%px)\n",
+		       "0x%lx/%lx (hpa 0x%p)\n",
 		       name, (unsigned long)res->start, (unsigned long)res->end,
 		       dino_dev->hba.base_addr);
 		return 1;
@@ -887,14 +892,14 @@ static int __init dino_common_init(struct parisc_device *dev,
 #define CUJO_RAVEN_BADPAGE	0x01003000UL
 #define CUJO_FIREHAWK_BADPAGE	0x01607000UL
 
-static const char dino_vers[][4] = {
+static const char *dino_vers[] = {
 	"2.0",
 	"2.1",
 	"3.0",
 	"3.1"
 };
 
-static const char cujo_vers[][4] = {
+static const char *cujo_vers[] = {
 	"1.0",
 	"2.0"
 };
@@ -1041,7 +1046,7 @@ static int __init dino_probe(struct parisc_device *dev)
  * and 725 firmware misreport it as 0x08080 for no adequately explained
  * reason.
  */
-static const struct parisc_device_id dino_tbl[] __initconst = {
+static struct parisc_device_id dino_tbl[] = {
 	{ HPHW_A_DMA, HVERSION_REV_ANY_ID, 0x004, 0x0009D },/* Card-mode Dino */
 	{ HPHW_A_DMA, HVERSION_REV_ANY_ID, HVERSION_ANY_ID, 0x08080 }, /* XXX */
 	{ HPHW_BRIDGE, HVERSION_REV_ANY_ID, 0x680, 0xa }, /* Bridge-mode Dino */
@@ -1050,7 +1055,7 @@ static const struct parisc_device_id dino_tbl[] __initconst = {
 	{ 0, }
 };
 
-static struct parisc_driver dino_driver __refdata = {
+static struct parisc_driver dino_driver = {
 	.name =		"dino",
 	.id_table =	dino_tbl,
 	.probe =	dino_probe,

@@ -1,4 +1,3 @@
-/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
  * drivers/amlogic/media/vout/cvbs/cvbs_mode.h
  *
@@ -27,7 +26,5 @@ enum cvbs_mode_e {
 	MODE_NTSC_M,
 	MODE_MAX,
 };
-
-enum cvbs_mode_e get_local_cvbs_mode(void);
 
 #endif

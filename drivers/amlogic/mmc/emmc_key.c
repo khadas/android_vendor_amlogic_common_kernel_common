@@ -1,6 +1,18 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/amlogic/mmc/emmc_key.c
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
 #include <linux/types.h>
@@ -8,13 +20,13 @@
 #include <linux/mtd/mtd.h>
 #include <linux/mtd/partitions.h>
 #include <linux/slab.h>
+#include <linux/mmc/card.h>
 #include <linux/mmc/emmc_partitions.h>
-#include <linux/amlogic/key_manage.h>
+#include <linux/amlogic/unifykey/key_manage.h>
 #include "emmc_key.h"
-#include "../../mmc/core/core.h"
 
 #define		EMMC_BLOCK_SIZE		(0x100)
-#define		MAX_EMMC_BLOCK_SIZE	(128 * 1024)
+#define		MAX_EMMC_BLOCK_SIZE	(128*1024)
 
 #define     MAX_TRANS_BLK        (256)
 
@@ -88,25 +100,25 @@ int32_t emmc_write_one_key(void *buffer, int valid_flag)
 	unsigned char *src = NULL;
 	struct mmc_card *card = mmc_card_key;
 	int bit = card->csd.read_blkbits;
-	unsigned char *checksum_info;
+	char *checksum_info;
 
 	checksum_info = kmalloc(512, GFP_KERNEL);
-	if (!checksum_info)
-		return -1;
-
 	memset(checksum_info, 0, 512);
-	key_glb_offset = get_reserve_partition_off_from_tbl() + EMMCKEY_RESERVE_OFFSET;
-	blk = (key_glb_offset + (valid_flag % 2) * EMMC_KEYAREA_SIZE) >> bit;
+	key_glb_offset = get_reserve_partition_off_from_tbl()
+		+ EMMCKEY_RESERVE_OFFSET;
+	blk = (key_glb_offset + (valid_flag % 2) * EMMC_KEYAREA_SIZE)
+		>> bit;
 	cnt = EMMC_KEYAREA_SIZE >> bit;
 	src = (unsigned char *)buffer;
-	memcpy(checksum_info, &key_infos[valid_flag - 1], sizeof(struct aml_key_info));
+	memcpy(checksum_info, &key_infos[valid_flag - 1],
+			sizeof(struct aml_key_info));
 	mmc_claim_host(card->host);
 	do {
 		ret = mmc_write_internal(card, blk, EMMC_BLOCK_SIZE, src);
 		if (ret) {
 			pr_err("%s [%d] mmc_write_internal error\n",
 				__func__, __LINE__);
-			goto exit_err;
+			return ret;
 		}
 		blk += EMMC_BLOCK_SIZE;
 		cnt -= EMMC_BLOCK_SIZE;
@@ -114,15 +126,16 @@ int32_t emmc_write_one_key(void *buffer, int valid_flag)
 		pr_info("cnt %llu\n", cnt);
 	} while (cnt != 0);
 
-	blk = ((key_glb_offset + 2 * (EMMC_KEYAREA_SIZE)) >> bit) + (valid_flag % 2);
+	blk = ((key_glb_offset + 2 * (EMMC_KEYAREA_SIZE)) >> bit)
+		+ (valid_flag % 2);
 	ret = mmc_write_internal(card, blk, 1, checksum_info);
 	if (ret)
-		pr_err("%s: block # %#llx, ERROR!\n", __func__, blk);
+		pr_err("%s: block # %#llx, cnt # %#llx ERROR!\n",
+				__func__, blk, cnt);
 
-	pr_info("%s:%d, write %s\n", __func__, __LINE__, (ret) ? "error" : "ok");
+	pr_info("%s:%d, write %s\n",
+			__func__, __LINE__, (ret) ? "error" : "ok");
 	mmc_release_host(card->host);
-
-exit_err:
 	kfree(checksum_info);
 	return ret;
 }
@@ -133,10 +146,12 @@ int update_old_key(struct mmc_card *mmc, void *addr)
 	int valid_flag;
 
 	if (stamp_after(key_infos[1].stamp, key_infos[0].stamp)) {
-		memcpy(&key_infos[1], &key_infos[0], sizeof(struct aml_key_info));
+		memcpy(&key_infos[1], &key_infos[0],
+				sizeof(struct aml_key_info));
 		valid_flag = 2;
 	} else if (stamp_after(key_infos[0].stamp, key_infos[1].stamp)) {
-		memcpy(&key_infos[0], &key_infos[1], sizeof(struct aml_key_info));
+		memcpy(&key_infos[0], &key_infos[1],
+				sizeof(struct aml_key_info));
 		valid_flag = 1;
 	} else {
 		pr_info("do nothing\n");
@@ -352,7 +367,8 @@ int32_t emmc_key_write(u8 *buffer,
 		cnt -= EMMC_BLOCK_SIZE;
 		src = (unsigned char *)buffer + MAX_EMMC_BLOCK_SIZE;
 	} while (cnt != 0);
-	pr_info("%s:%d, write %s\n", __func__, __LINE__, (ret) ? "error" : "ok");
+	pr_info("%s:%d, write %s\n",
+			__func__, __LINE__, (ret) ? "error" : "ok");
 	mmc_release_host(card->host);
 	return ret;
 }
@@ -375,26 +391,28 @@ static int aml_emmc_key_check(void)
 	keypart_cnt = 0;
 	part_size = EMMC_KEYAREA_SIZE;
 	do {
-		emmckey_valid_node = kmalloc(sizeof(*emmckey_valid_node),
-				GFP_KERNEL);
+		emmckey_valid_node = kmalloc(
+			sizeof(*emmckey_valid_node), GFP_KERNEL);
 
-		if (!emmckey_valid_node) {
+		if (emmckey_valid_node == NULL) {
 			pr_info("%s:%d,kmalloc memory fail\n",
 				__func__, __LINE__);
 			return -ENOMEM;
 		}
-		emmckey_valid_node->phy_addr = emmckey_info->keyarea_phy_addr
-						+ part_size * keypart_cnt;
+		emmckey_valid_node->phy_addr =
+			emmckey_info->keyarea_phy_addr
+			+ part_size * keypart_cnt;
 		emmckey_valid_node->phy_size = EMMC_KEYAREA_SIZE;
 		emmckey_valid_node->next = NULL;
 		emmckey_info->key_valid = 0;
-		if (!emmckey_info->key_valid_node) {
+		if (emmckey_info->key_valid_node == NULL) {
+
 			emmckey_info->key_valid_node = emmckey_valid_node;
 
-		} else {
+		} else{
 			temp_valid_node = emmckey_info->key_valid_node;
 
-			while (temp_valid_node->next)
+			while (temp_valid_node->next != NULL)
 				temp_valid_node = temp_valid_node->next;
 
 			temp_valid_node->next = emmckey_valid_node;
@@ -405,8 +423,8 @@ static int aml_emmc_key_check(void)
 	return 0;
 }
 
-int32_t emmc_key_read(u8 *buffer,
-	u32 length, u32 *actual_length)
+int32_t emmc_key_read(uint8_t *buffer,
+	uint32_t length, uint32_t *actual_length)
 {
 	int ret;
 	u64  addr = 0;
@@ -427,16 +445,15 @@ int32_t emmc_key_read(u8 *buffer,
 		ret = mmc_read_internal(card, blk,
 					min(EMMC_BLOCK_SIZE, cnt), dst);
 		if (ret) {
-			pr_err("%s [%d] mmc_write_internal error\n",
+			pr_err("%s [%d] mmc_read_internal error\n",
 			       __func__, __LINE__);
-			break;
+			return ret;
 		}
 		blk += EMMC_BLOCK_SIZE;
 		cnt -= EMMC_BLOCK_SIZE;
 		dst = (unsigned char *)buffer + MAX_EMMC_BLOCK_SIZE;
 	} while (cnt > 0);
-
-	pr_info("%s:%d, read %s\n", __func__, __LINE__, (ret) ? "error" : "ok");
+	pr_info("%s:%d, read %s\n", __func__, __LINE__, (ret) ? "error":"ok");
 
 	mmc_release_host(card->host);
 	return ret;
@@ -450,19 +467,12 @@ int emmc_key_init(struct mmc_card *card)
 	u64  lba_start = 0, lba_end = 0;
 	int err = 0;
 	int bit = card->csd.read_blkbits;
-	struct unifykey_type *uk_type = NULL;
-	struct unifykey_storage_ops ops;
 
 	pr_info("card key: card_blk_probe.\n");
 	emmckey_info = kmalloc(sizeof(*emmckey_info), GFP_KERNEL);
-	if (!emmckey_info) {
+	if (emmckey_info == NULL) {
 		pr_info("%s:%d,kmalloc memory fail\n", __func__, __LINE__);
 		return -ENOMEM;
-	}
-	uk_type = kmalloc(sizeof(*uk_type), GFP_KERNEL);
-	if (!uk_type) {
-		err = -ENOMEM;
-		goto exit_err;
 	}
 	memset(emmckey_info, 0, sizeof(*emmckey_info));
 	emmckey_info->key_init = 0;
@@ -473,7 +483,7 @@ int emmc_key_init(struct mmc_card *card)
 #endif
 	if (get_reserve_partition_off_from_tbl() < 0) {
 		err = -EINVAL;
-		goto exit_err1;
+		goto exit_err;
 	}
 	addr = get_reserve_partition_off_from_tbl() + EMMCKEY_RESERVE_OFFSET;
 	lba_start = addr >> bit;
@@ -481,13 +491,13 @@ int emmc_key_init(struct mmc_card *card)
 	emmckey_info->key_init = 1;
 
 	pr_info("%s:%d emmc key lba_start:0x%llx,lba_end:0x%llx\n",
-		__func__, __LINE__, lba_start, lba_end);
+	 __func__, __LINE__, lba_start, lba_end);
 
 	if (!emmckey_info->key_init) {
 		err = -EINVAL;
 
 		pr_info("%s:%d,emmc key init fail\n", __func__, __LINE__);
-		goto exit_err1;
+		goto exit_err;
 	}
 	emmckey_info->keyarea_phy_addr = addr;
 	emmckey_info->keyarea_phy_size = size;
@@ -500,22 +510,15 @@ int emmc_key_init(struct mmc_card *card)
 	err = aml_emmc_key_check();
 	if (err) {
 		pr_info("%s:%d,emmc key check fail\n", __func__, __LINE__);
-		goto exit_err1;
+	goto exit_err;
 	}
 
-	uk_type->storage_type = UNIFYKEY_STORAGE_TYPE_EMMC;
-	uk_type->ops = &ops;
-	uk_type->ops->read = emmc_key_read;
-	uk_type->ops->write = emmc_key_write;
+	storage_ops_read(emmc_key_read);
+	storage_ops_write(emmc_key_write);
 
-	if (register_unifykey_types(uk_type)) {
-		err = -EINVAL;
-		pr_info("%s:%d,emmc key check fail\n", __func__, __LINE__);
-		goto exit_err1;
-	}
 	pr_info("emmc key: %s:%d ok.\n", __func__, __LINE__);
-exit_err1:
-	kfree(uk_type);
+	return err;
+
 exit_err:
 	kfree(emmckey_info);
 	return err;

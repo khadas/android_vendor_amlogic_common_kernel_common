@@ -1,4 +1,3 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
  * drivers/amlogic/media/enhancement/amvecm/util/enc_dec.c
  *
@@ -23,7 +22,9 @@
 #include "base64.h"
 #include "huffman.h"
 
-unsigned long huff64_encode(unsigned int *in, unsigned int inlen, char *out)
+unsigned long huff64_encode(
+	unsigned int *in, unsigned int inlen,
+	char *out)
 {
 	unsigned int *inptr = in;
 	unsigned char *testin;
@@ -67,8 +68,9 @@ unsigned long huff64_encode(unsigned int *in, unsigned int inlen, char *out)
 		kfree(testout);
 		return 0;
 	}
-	hufflen = huffman_compress(testin, counter,
-				   testout, counter * 2, huffbuf);
+	hufflen = huffman_compress(
+				testin, counter,
+				testout, counter * 2, huffbuf);
 	enbase64array = kmalloc(hufflen * 2, GFP_KERNEL);
 	if (!enbase64array) {
 		kfree(huffbuf);
@@ -86,8 +88,9 @@ unsigned long huff64_encode(unsigned int *in, unsigned int inlen, char *out)
 	return base64len;
 }
 
-unsigned long huff64_decode(char *in, unsigned int inlen,
-			    unsigned int *out, unsigned int outlen)
+unsigned long huff64_decode(
+	char *in, unsigned int inlen,
+	unsigned int *out, unsigned int outlen)
 {
 	char *inptr = in;
 	unsigned char *decbase64array;
@@ -117,8 +120,9 @@ unsigned long huff64_decode(char *in, unsigned int inlen,
 	}
 
 	memset(testver, 0, DECHUFF_MAXLEN);
-	dechufflen = huffman_decompress(decbase64array, hufflen,
-					testver, DECHUFF_MAXLEN, huffbuf);
+	dechufflen = huffman_decompress(
+		decbase64array, hufflen,
+		testver, DECHUFF_MAXLEN, huffbuf);
 
 	if (dechufflen == 0) {
 		kfree(testver);

@@ -83,7 +83,7 @@ void dim_nr_ds_buf_init(unsigned int cma_flag, unsigned long mem_start,
 		#ifdef MARK_HIS
 		nrds_dev.nrds_pages = dma_alloc_from_contiguous(dev,
 								NR_DS_PAGE_NUM,
-								0, 0);
+								0);
 		if (nrds_dev.nrds_pages)
 			nrds_dev.nrds_addr = page_to_phys(nrds_dev.nrds_pages);
 		else

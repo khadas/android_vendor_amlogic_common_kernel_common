@@ -1,13 +1,24 @@
-/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * sound/soc/amlogic/auge/sharebuffer.h
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
-
 #ifndef __AML_AUDIO_SHAREBUFFER_H__
 #define __AML_AUDIO_SHAREBUFFER_H__
 
 #include <sound/pcm.h>
-#include "../common/iec_info.h"
+#include <linux/amlogic/media/sound/iec_info.h>
 
 enum sharebuffer_srcs {
 	SHAREBUFFER_NONE = -1,
@@ -20,17 +31,10 @@ enum sharebuffer_srcs {
 	SHAREBUFFER_SRC_NUM = 6
 };
 
-struct samesource_info {
-	int channels;
-	int rate;
-};
-
 struct clk;
 
 struct samesrc_ops {
 	enum sharebuffer_srcs src;
-	struct frddr *fr;
-	int share_lvl;
 	void *private;
 
 	int (*prepare)(struct snd_pcm_substream *substream,
@@ -65,6 +69,7 @@ int sharebuffer_free(struct snd_pcm_substream *substream,
 		     void *pfrddr,
 		     int samesource_sel,
 		     int share_lvl);
+int release_spdif_same_src(struct snd_pcm_substream *substream);
 int sharebuffer_trigger(int cmd, int samesource_sel, bool reenable);
 
 void sharebuffer_get_mclk_fs_ratio(int samesource_sel,

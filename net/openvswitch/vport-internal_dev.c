@@ -1,8 +1,22 @@
-// SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2007-2012 Nicira, Inc.
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of version 2 of the GNU General Public
+ * License as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful, but
+ * WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+ * General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
+ * 02110-1301, USA
  */
 
+#include <linux/hardirq.h>
 #include <linux/if_vlan.h>
 #include <linux/kernel.h>
 #include <linux/netdevice.h>
@@ -76,14 +90,24 @@ static const struct ethtool_ops internal_dev_ethtool_ops = {
 	.get_link	= ethtool_op_get_link,
 };
 
+static int internal_dev_change_mtu(struct net_device *netdev, int new_mtu)
+{
+	if (new_mtu < 68)
+		return -EINVAL;
+
+	netdev->mtu = new_mtu;
+	return 0;
+}
+
 static void internal_dev_destructor(struct net_device *dev)
 {
 	struct vport *vport = ovs_internal_dev_get_vport(dev);
 
 	ovs_vport_free(vport);
+	free_netdev(dev);
 }
 
-static void
+static struct rtnl_link_stats64 *
 internal_get_stats(struct net_device *dev, struct rtnl_link_stats64 *stats)
 {
 	int i;
@@ -111,6 +135,13 @@ internal_get_stats(struct net_device *dev, struct rtnl_link_stats64 *stats)
 		stats->tx_bytes         += local_stats.tx_bytes;
 		stats->tx_packets       += local_stats.tx_packets;
 	}
+
+	return stats;
+}
+
+static void internal_set_rx_headroom(struct net_device *dev, int new_hr)
+{
+	dev->needed_headroom = new_hr < 0 ? 0 : new_hr;
 }
 
 static const struct net_device_ops internal_dev_netdev_ops = {
@@ -118,7 +149,9 @@ static const struct net_device_ops internal_dev_netdev_ops = {
 	.ndo_stop = internal_dev_stop,
 	.ndo_start_xmit = internal_dev_xmit,
 	.ndo_set_mac_address = eth_mac_addr,
+	.ndo_change_mtu = internal_dev_change_mtu,
 	.ndo_get_stats64 = internal_get_stats,
+	.ndo_set_rx_headroom = internal_set_rx_headroom,
 };
 
 static struct rtnl_link_ops internal_dev_link_ops __read_mostly = {
@@ -129,15 +162,12 @@ static void do_setup(struct net_device *netdev)
 {
 	ether_setup(netdev);
 
-	netdev->max_mtu = ETH_MAX_MTU;
-
 	netdev->netdev_ops = &internal_dev_netdev_ops;
 
 	netdev->priv_flags &= ~IFF_TX_SKB_SHARING;
 	netdev->priv_flags |= IFF_LIVE_ADDR_CHANGE | IFF_OPENVSWITCH |
-			      IFF_NO_QUEUE;
-	netdev->needs_free_netdev = true;
-	netdev->priv_destructor = NULL;
+			      IFF_PHONY_HEADROOM | IFF_NO_QUEUE;
+	netdev->destructor = internal_dev_destructor;
 	netdev->ethtool_ops = &internal_dev_ethtool_ops;
 	netdev->rtnl_link_ops = &internal_dev_link_ops;
 
@@ -157,7 +187,6 @@ static struct vport *internal_dev_create(const struct vport_parms *parms)
 {
 	struct vport *vport;
 	struct internal_dev *internal_dev;
-	struct net_device *dev;
 	int err;
 
 	vport = ovs_vport_alloc(0, &ovs_internal_vport_ops, parms);
@@ -166,9 +195,8 @@ static struct vport *internal_dev_create(const struct vport_parms *parms)
 		goto error;
 	}
 
-	dev = alloc_netdev(sizeof(struct internal_dev),
-			   parms->name, NET_NAME_USER, do_setup);
-	vport->dev = dev;
+	vport->dev = alloc_netdev(sizeof(struct internal_dev),
+				  parms->name, NET_NAME_USER, do_setup);
 	if (!vport->dev) {
 		err = -ENOMEM;
 		goto error_free_vport;
@@ -178,6 +206,7 @@ static struct vport *internal_dev_create(const struct vport_parms *parms)
 		err = -ENOMEM;
 		goto error_free_netdev;
 	}
+	vport->dev->needed_headroom = vport->dp->max_headroom;
 
 	dev_net_set(vport->dev, ovs_dp_get_net(vport->dp));
 	internal_dev = internal_dev_priv(vport->dev);
@@ -191,7 +220,6 @@ static struct vport *internal_dev_create(const struct vport_parms *parms)
 	err = register_netdevice(vport->dev);
 	if (err)
 		goto error_unlock;
-	vport->dev->priv_destructor = internal_dev_destructor;
 
 	dev_set_promiscuity(vport->dev, 1);
 	rtnl_unlock();
@@ -201,9 +229,9 @@ static struct vport *internal_dev_create(const struct vport_parms *parms)
 
 error_unlock:
 	rtnl_unlock();
-	free_percpu(dev->tstats);
+	free_percpu(vport->dev->tstats);
 error_free_netdev:
-	free_netdev(dev);
+	free_netdev(vport->dev);
 error_free_vport:
 	ovs_vport_free(vport);
 error:
@@ -234,7 +262,7 @@ static netdev_tx_t internal_dev_recv(struct sk_buff *skb)
 	}
 
 	skb_dst_drop(skb);
-	nf_reset_ct(skb);
+	nf_reset(skb);
 	secpath_reset(skb);
 
 	skb->pkt_type = PACKET_HOST;

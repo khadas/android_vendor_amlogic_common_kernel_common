@@ -1,6 +1,18 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/amlogic/dvb/demux/aml_key.c
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
 #include <linux/version.h>
@@ -59,7 +71,6 @@
 #define MKL_USER_CRYPTO_T3   (3)
 #define MKL_USER_CRYPTO_T4   (4)
 #define MKL_USER_CRYPTO_T5   (5)
-#define MKL_USER_CRYPTO_ANY  (7)
 #define MKL_USER_LOC_DEC     (8)
 #define MKL_USER_NETWORK     (9)
 #define MKL_USER_LOC_ENC     (10)
@@ -271,9 +282,6 @@ static int kt_config(u32 handle, int key_userid, int key_algo, unsigned int ext_
 	case CRYPTO_T5:
 		key_table[index].key_userid = MKL_USER_CRYPTO_T5;
 		break;
-	case CRYPTO_ANY:
-		key_table[index].key_userid = MKL_USER_CRYPTO_ANY;
-		break;
 	default:
 		dprint("%s, %d invalid user id\n",
 		       __func__, __LINE__);
@@ -304,18 +312,12 @@ static int kt_config(u32 handle, int key_userid, int key_algo, unsigned int ext_
 			break;
 		case KEY_ALGO_S17:
 			key_table[index].key_algo = MKL_USAGE_S17;
-			if (key_userid < CRYPTO_T0) {
-				if (ext_value == 0) {
-					WRITE_CBUS_REG(KT_REE_S17_CONFIG,
-						       S17_CFG_DEFAULT);
-					dprint_i("def frobenius :0x%0x\n",
-						 S17_CFG_DEFAULT);
-				} else {
-					WRITE_CBUS_REG(KT_REE_S17_CONFIG,
-						       ext_value);
-					dprint_i("frobenius :0x%0x\n",
-						 ext_value);
-				}
+			if (ext_value == 0) {
+				WRITE_CBUS_REG(KT_REE_S17_CONFIG, S17_CFG_DEFAULT);
+				dprint_i("def frobenius :0x%0x\n", S17_CFG_DEFAULT);
+			} else {
+				WRITE_CBUS_REG(KT_REE_S17_CONFIG, ext_value);
+				dprint_i("frobenius :0x%0x\n", ext_value);
 			}
 			break;
 		default:
@@ -395,7 +397,7 @@ static int kt_set(u32 handle, unsigned char key[32], unsigned int key_len)
 
 
 	user_id = key_table[index].key_userid;
-	if (user_id <= MKL_USER_CRYPTO_ANY) {
+	if (user_id <= MKL_USER_CRYPTO_T5) {
 		if (key_len == 1) {
 			en_decrypt = 1;
 		} else if (key_len == 2) {
@@ -419,7 +421,7 @@ static int kt_set(u32 handle, unsigned char key[32], unsigned int key_len)
 		}
 		usleep_range(10000, 15000);
 	}
-	if (key_len == 32 && (algo == MKL_USAGE_S17 || algo == MKL_USAGE_AES)) {
+	if (algo == MKL_USAGE_S17) {
 		fun_id = 6;
 		WRITE_CBUS_REG(KT_KEY0, key0);
 		WRITE_CBUS_REG(KT_KEY1, key1);

@@ -1,4 +1,3 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
  * drivers/amlogic/media/enhancement/amvecm/keystone_correction.c
  *
@@ -22,8 +21,7 @@
 #include <linux/delay.h>
 #include <linux/amlogic/media/utils/amstream.h>
 #include <linux/amlogic/media/amvecm/ve.h>
-/* media module used media/registers/cpu_version.h since kernel 5.4 */
-#include <linux/amlogic/media/registers/cpu_version.h>
+#include <linux/amlogic/cpu_version.h>
 #include <linux/amlogic/media/vfm/vframe.h>
 #include <linux/amlogic/media/amvecm/amvecm.h>
 #include <linux/amlogic/media/vout/vinfo.h>
@@ -191,33 +189,26 @@ void keystone_correction_process(void)
 	unsigned int reg_offset[17], reg_step[17], reg_vks_row_scl;
 	unsigned int flag_top_large = 0;
 	unsigned long index1, index2;
-	unsigned int value;
 
 	/*config input h&w*/
 	/*txlx new add,same addr,diferrent usage*/
-	value = vks_input_height & GET_BITS(0, 13);
-	value |= (vks_input_width << 16) & GET_BITS(16, 13);
-	WRITE_VPP_REG(VPP_OUT_H_V_SIZE, value);
-
+	WRITE_VPP_REG_BITS(VPP_OUT_H_V_SIZE, vks_input_width, 16, 13);
+	WRITE_VPP_REG_BITS(VPP_OUT_H_V_SIZE, vks_input_height, 0, 13);
 	/*H-start&H-end*/
-	value = (vks_input_width - 1) & GET_BITS(0, 14);
-	value |= (0 << 16) & GET_BITS(16, 14);
-	WRITE_VPP_REG(VKS_IWIN_HSIZE, value);
-
+	WRITE_VPP_REG_BITS(VKS_IWIN_HSIZE, (vks_input_width - 1), 0, 14);
+	WRITE_VPP_REG_BITS(VKS_IWIN_HSIZE, 0, 16, 14);
 	/*V-start&V-end*/
-	value = (vks_input_height - 1) & GET_BITS(0, 14);
-	value |= (0 << 16) & GET_BITS(16, 14);
-	WRITE_VPP_REG(VKS_IWIN_VSIZE, value);
+	WRITE_VPP_REG_BITS(VKS_IWIN_VSIZE, (vks_input_height - 1), 0, 14);
+	WRITE_VPP_REG_BITS(VKS_IWIN_VSIZE, 0, 16, 14);
 
 	/*config output h&w*/
-	value = vks_output_height & GET_BITS(0, 14);
-	value |= (vks_output_width << 16) & GET_BITS(16, 14);
-	WRITE_VPP_REG(VKS_OUT_WIN_SIZE, value);
+	WRITE_VPP_REG_BITS(VKS_OUT_WIN_SIZE, vks_output_height, 0, 14);
+	WRITE_VPP_REG_BITS(VKS_OUT_WIN_SIZE, vks_output_width, 16, 14);
 
 	/*calc ratio_tb*/
 	index1 = abs(vks_alph0_angle + vks_theta_angle);
 	index2 = abs(vks_alph1_angle - vks_theta_angle);
-	if (index1 >= ANGLE_RAGNE || index2 >= ANGLE_RAGNE) {
+	if ((index1 >= ANGLE_RAGNE) || (index2 >= ANGLE_RAGNE)) {
 		pr_info("out of angle range(%ld,%ld)\n", index1, index2);
 		index1 = 0;
 		index2 = 0;
@@ -240,7 +231,7 @@ void keystone_correction_process(void)
 		step_top = ((step_bot << i) / ratio_tb) << (FRAC_BITS - i);
 	} else {
 		step_bot = ((1 << 20) * vks_output_width +
-			vks_input_width / 2) / vks_input_width;
+			vks_input_width/2) / vks_input_width;
 		for (i = 0; i < (FRAC_BITS - 1); i++) {
 			if (step_bot & (1 << (31 - i)))
 				break;
@@ -267,12 +258,25 @@ void keystone_correction_process(void)
 		step_top, step_bot, offset_top, offset_bot, ratio_tb);
 	if (reg_vks_scl_mode1 == 0) {
 		for (i = 0; i < 17; i++) {
+			#if 0
+			index1 = (1 << 26) / step_top;
+			index2 = (1 << 26) / step_bot;
+			if (index2 < index1)
+				temp_val = index1 -
+				(i - 0) * (index1 - index2) / 16;
+			else
+				temp_val = index1 +
+				(i - 0) * (index2 - index1) / 16;
+			index1 = (1 << 26) / temp_val;
+			index2 = (1 << 30) - 1;
+			#else
 			index1 = (ulong)16 * step_top * step_bot;
 			index2 = (ulong)16 * step_bot +
 				i * (step_top - step_bot);
-			temp_val = index1 / index2;
+			temp_val = index1/index2;
 			index1 = temp_val;
 			index2 = (1 << 24) - 1;
+			#endif
 			reg_step[i] =  min(index1, index2);
 			index1 = offset_top;
 			index2 = offset_bot;
@@ -282,7 +286,7 @@ void keystone_correction_process(void)
 			else
 				temp_val = index1 +
 				(i - 0) * (index2 - index1) / 16;
-			index1 = (ulong)temp_val * reg_step[i] / (1 << 20);
+			index1 = (ulong)temp_val * reg_step[i] / (1<<20);
 			index2 = 1 << 22;
 			reg_offset[i] = min(index1, index2);
 		}
@@ -313,21 +317,19 @@ void keystone_correction_process(void)
 	/*if the input format is RGB,set to 0x00000000*/
 	WRITE_VPP_REG(VKS_FILL_VAL, 0x00002020);
 
-	value = reg_vks_row_scl & GET_BITS(0, 16);
-	value |= (reg_vks_phs_qmode << 16) & GET_BITS(16, 2);
-	value |= (reg_vks_obuf_mrgn1 << 18) & GET_BITS(18, 2);
-	value |= (reg_vks_obuf_mrgn0 << 20) & GET_BITS(20, 2);
-	value |= (reg_vks_obuf_mode1 << 22) & GET_BITS(22, 1);
-	value |= (reg_vks_obuf_mode0 << 23) & GET_BITS(23, 1);
-	value |= (reg_vks_border_ext_mode1 << 24) & GET_BITS(24, 1);
-	value |= (reg_vks_border_ext_mode0 << 25) & GET_BITS(25, 1);
-	value |= (reg_vks_row_inp_mode << 26) & GET_BITS(26, 2);
-	value |= (reg_vks_fill_mode << 28) & GET_BITS(28, 1);
-	value |= (reg_vks_scl_mode1 << 29) & GET_BITS(29, 1);
-	value |= (reg_vks_scl_mode0 << 30) & GET_BITS(30, 1);
-	value |= (reg_vks_en << 31) & GET_BITS(31, 1);
-	WRITE_VPP_REG(VKS_CTRL, value);
-
+	WRITE_VPP_REG_BITS(VKS_CTRL, reg_vks_row_scl, 0, 16);
+	WRITE_VPP_REG_BITS(VKS_CTRL, reg_vks_phs_qmode, 16, 2);
+	WRITE_VPP_REG_BITS(VKS_CTRL, reg_vks_obuf_mrgn1, 18, 2);
+	WRITE_VPP_REG_BITS(VKS_CTRL, reg_vks_obuf_mrgn0, 20, 2);
+	WRITE_VPP_REG_BITS(VKS_CTRL, reg_vks_obuf_mode1, 22, 1);
+	WRITE_VPP_REG_BITS(VKS_CTRL, reg_vks_obuf_mode0, 23, 1);
+	WRITE_VPP_REG_BITS(VKS_CTRL, reg_vks_border_ext_mode1, 24, 1);
+	WRITE_VPP_REG_BITS(VKS_CTRL, reg_vks_border_ext_mode0, 25, 1);
+	WRITE_VPP_REG_BITS(VKS_CTRL, reg_vks_row_inp_mode, 26, 2);
+	WRITE_VPP_REG_BITS(VKS_CTRL, reg_vks_fill_mode, 28, 1);
+	WRITE_VPP_REG_BITS(VKS_CTRL, reg_vks_scl_mode1, 29, 1);
+	WRITE_VPP_REG_BITS(VKS_CTRL, reg_vks_scl_mode0, 30, 1);
+	WRITE_VPP_REG_BITS(VKS_CTRL, reg_vks_en, 31, 1);
 	if (reg_vks_en) {
 		WRITE_VPP_REG_BITS(VPP_MISC, 1, 29, 1);
 		WRITE_VPP_REG_BITS(VPP_GCLK_CTRL1, 3, 10, 2);
@@ -448,12 +450,11 @@ void keystone_correction_status(void)
 void keystone_correction_regs(void)
 {
 	unsigned int reg, i;
-	unsigned int vppbase = codecio_reg_start[CODECIO_VCBUS_BASE];
 
 	pr_info("----keystone regs start----\n");
 	for (reg = VKS_CTRL; reg <= VKS_LBUF_SIZE; reg++)
 		pr_info("[0x%x]reg:0x%x-0x%x\n",
-			(vppbase + (reg << 2)), reg, READ_VPP_REG(reg));
+			(0xFF900000 + (reg<<2)), reg, READ_VPP_REG(reg));
 	pr_info("\t<vks offset regs>\n");
 	for (i = 9; i < 0x1a; i++) {
 		WRITE_VPP_REG(VKS_PARA_ADDR_PORT, i);

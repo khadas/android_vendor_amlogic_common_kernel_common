@@ -1,6 +1,18 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/amlogic/input/keyboard/adc_keypad.c
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
 #include <linux/module.h>
@@ -16,18 +28,26 @@
 #include <linux/string.h>
 #include <linux/of.h>
 #include <linux/iio/consumer.h>
-#include <linux/input-polldev.h>
 #include <linux/amlogic/scpi_protocol.h>
 #include <linux/amlogic/pm.h>
+#include <linux/pm_wakeup.h>
 #include "adc_keypad.h"
 
 #define POLL_INTERVAL_DEFAULT 25
 #define KEY_JITTER_COUNT  1
 #define TMP_BUF_MAX 128
+#define ADC_PWRKEY_NAME "power"
 
 static char adc_key_mode_name[MAX_NAME_LEN] = "abcdef";
 static char kernelkey_en_name[MAX_NAME_LEN] = "abcdef";
 static bool keypad_enable_flag = true;
+static bool has_adc_power_key;
+
+bool meson_adc_is_alive_freeze(void)
+{
+	return has_adc_power_key && is_pm_freeze_mode();
+}
+EXPORT_SYMBOL(meson_adc_is_alive_freeze);
 
 static int meson_adc_kp_search_key(struct meson_adc_kp *kp)
 {
@@ -37,13 +57,13 @@ static int meson_adc_kp_search_key(struct meson_adc_kp *kp)
 	mutex_lock(&kp->kp_lock);
 	for (i = 0; i < kp->chan_num; i++) {
 		if (iio_read_channel_processed(kp->pchan[kp->chan[i]],
-					       &value) >= 0) {
+				&value) >= 0) {
 			if (value < 0)
 				continue;
 			list_for_each_entry(key, &kp->adckey_head, list) {
-				if (key->chan == kp->chan[i] &&
-				    (value >= key->value - key->tolerance) &&
-				    (value <= key->value + key->tolerance)) {
+				if ((key->chan == kp->chan[i])
+				&& (value >= key->value - key->tolerance)
+				&& (value <= key->value + key->tolerance)) {
 					mutex_unlock(&kp->kp_lock);
 					return key->code;
 				}
@@ -54,17 +74,20 @@ static int meson_adc_kp_search_key(struct meson_adc_kp *kp)
 	return KEY_RESERVED;
 }
 
-static void meson_adc_kp_poll(struct input_polled_dev *dev)
+static void meson_adc_kp_poll(struct work_struct *pwork)
 {
-	struct meson_adc_kp *kp = dev->private;
-
+	struct meson_adc_kp *kp =
+		container_of(pwork, struct meson_adc_kp, work.work);
 	int code = meson_adc_kp_search_key(kp);
 
 	if (kp->report_code && kp->report_code != code) {
-		dev_info(&kp->poll_dev->input->dev,
+		dev_info(&kp->input->dev,
 			 "key %d up\n", kp->report_code);
-		input_report_key(kp->poll_dev->input, kp->report_code, 0);
-		input_sync(kp->poll_dev->input);
+		input_report_key(kp->input, kp->report_code, 0);
+		input_sync(kp->input);
+		if (kp->report_code == kp->pwrkey_code)
+			pm_relax(kp->input->dev.parent);
+
 		kp->report_code = 0;
 	}
 
@@ -72,26 +95,31 @@ static void meson_adc_kp_poll(struct input_polled_dev *dev)
 		if (kp->count > 0 && code != kp->prev_code)
 			kp->count = 0;
 
-		if (kp->count < KEY_JITTER_COUNT) {
+		if (kp->count < KEY_JITTER_COUNT)
 			kp->count++;
-		} else {
+		else {
 			if (keypad_enable_flag && kp->report_code != code) {
-				dev_info(&kp->poll_dev->input->dev,
+				dev_info(&kp->input->dev,
 					 "key %d down\n", code);
-				input_report_key(kp->poll_dev->input, code, 1);
-				input_sync(kp->poll_dev->input);
+				input_report_key(kp->input, code, 1);
+				input_sync(kp->input);
+				if (code == kp->pwrkey_code)
+					pm_stay_awake(kp->input->dev.parent);
+
 				kp->report_code = code;
 			}
 			kp->count = 0;
 		}
 		kp->prev_code = code;
 	}
+
+	queue_delayed_work(system_wq, &kp->work,
+			   msecs_to_jiffies(kp->poll_period));
 }
 
 static void send_data_to_bl301(void)
 {
 	u32 val;
-
 	if (!strcmp(adc_key_mode_name, "POWER_WAKEUP_POWER")) {
 		val = 0;  /*only power key resume*/
 		scpi_send_usr_data(SCPI_CL_POWER, &val, sizeof(val));
@@ -102,6 +130,7 @@ static void send_data_to_bl301(void)
 		val = 2; /*no key can resume*/
 		scpi_send_usr_data(SCPI_CL_POWER, &val, sizeof(val));
 	}
+
 }
 
 static void kernel_keypad_enable_mode_enable(void)
@@ -123,6 +152,7 @@ static void meson_adc_kp_get_valid_chan(struct meson_adc_kp *kp)
 {
 	unsigned char incr;
 	struct adc_key *key;
+	bool pwrkey_update_flg = false;
 
 	mutex_lock(&kp->kp_lock);
 	kp->chan_num = 0; /*recalculate*/
@@ -137,12 +167,23 @@ static void meson_adc_kp_get_valid_chan(struct meson_adc_kp *kp)
 					kp->chan[kp->chan_num++] = key->chan;
 			}
 		}
+		if (!strcmp(key->name, ADC_PWRKEY_NAME)) {
+			kp->pwrkey_code = key->code;
+			has_adc_power_key = true;
+			pwrkey_update_flg = true;
+		}
 	}
+
+	if (!pwrkey_update_flg) {
+		kp->pwrkey_code = KEY_RESERVED;
+		has_adc_power_key = false;
+	}
+
 	mutex_unlock(&kp->kp_lock);
 }
 
 static int meson_adc_kp_get_devtree_pdata(struct platform_device *pdev,
-					  struct meson_adc_kp *kp)
+			struct meson_adc_kp *kp)
 {
 	int ret;
 	int count;
@@ -160,7 +201,7 @@ static int meson_adc_kp_get_devtree_pdata(struct platform_device *pdev,
 	}
 
 	count = of_property_count_strings(pdev->dev.of_node,
-					  "io-channel-names");
+		"io-channel-names");
 	if (count < 0) {
 		dev_err(&pdev->dev, "failed to get io-channel-names");
 		return -ENODATA;
@@ -174,27 +215,24 @@ static int meson_adc_kp_get_devtree_pdata(struct platform_device *pdev,
 
 	for (cnt = 0; cnt < count; cnt++) {
 		ret = of_parse_phandle_with_args(pdev->dev.of_node,
-						 "io-channels",
-						 "#io-channel-cells",
-						 cnt, &chanspec);
+			"io-channels", "#io-channel-cells", cnt, &chanspec);
 		if (ret)
 			return ret;
 
 		if (!chanspec.args_count)
 			return -EINVAL;
 
-		if (chanspec.args[0] >= 8) {
+		if (chanspec.args[0] >= SARADC_CH_NUM) {
 			dev_err(&pdev->dev, "invalid channel index[%u]\n",
-				chanspec.args[0]);
+					chanspec.args[0]);
 			return -EINVAL;
 		}
 
 		ret = of_property_read_string_index(pdev->dev.of_node,
-						    "io-channel-names",
-						    cnt, &uname);
+				"io-channel-names", cnt, &uname);
 		if (ret < 0) {
 			dev_err(&pdev->dev, "invalid channel name index[%d]\n",
-				cnt);
+					cnt);
 			return -EINVAL;
 		}
 
@@ -211,12 +249,14 @@ static int meson_adc_kp_get_devtree_pdata(struct platform_device *pdev,
 	}
 
 	for (cnt = 0; cnt < key_num; cnt++) {
-		key = kzalloc(sizeof(*key), GFP_KERNEL);
-		if (!key)
+		key = kzalloc(sizeof(struct adc_key), GFP_KERNEL);
+		if (!key) {
+			dev_err(&pdev->dev, "alloc mem failed!\n");
 			return -ENOMEM;
+		}
 
 		ret = of_property_read_string_index(pdev->dev.of_node,
-						    "key_name", cnt, &uname);
+			 "key_name", cnt, &uname);
 		if (ret < 0) {
 			dev_err(&pdev->dev, "invalid key name index[%d]\n",
 				cnt);
@@ -226,7 +266,7 @@ static int meson_adc_kp_get_devtree_pdata(struct platform_device *pdev,
 		snprintf(key->name, MAX_NAME_LEN, "%s", uname);
 
 		ret = of_property_read_u32_index(pdev->dev.of_node,
-						 "key_code", cnt, &key->code);
+			"key_code", cnt, &key->code);
 		if (ret < 0) {
 			dev_err(&pdev->dev, "invalid key code index[%d]\n",
 				cnt);
@@ -235,7 +275,7 @@ static int meson_adc_kp_get_devtree_pdata(struct platform_device *pdev,
 		}
 
 		ret = of_property_read_u32_index(pdev->dev.of_node,
-						 "key_chan", cnt, &key->chan);
+			"key_chan", cnt, &key->chan);
 		if (ret < 0) {
 			dev_err(&pdev->dev, "invalid key chan index[%d]\n",
 				cnt);
@@ -245,13 +285,13 @@ static int meson_adc_kp_get_devtree_pdata(struct platform_device *pdev,
 
 		if (!kp->pchan[key->chan]) {
 			dev_err(&pdev->dev, "invalid channel[%u], please enable it first by DTS\n",
-				key->chan);
+					key->chan);
 			state = -EINVAL;
 			goto err;
 		}
 
 		ret = of_property_read_u32_index(pdev->dev.of_node,
-						 "key_val", cnt, &key->value);
+			"key_val", cnt, &key->value);
 		if (ret < 0) {
 			dev_err(&pdev->dev, "invalid key value index[%d]\n",
 				cnt);
@@ -260,8 +300,7 @@ static int meson_adc_kp_get_devtree_pdata(struct platform_device *pdev,
 		}
 
 		ret = of_property_read_u32_index(pdev->dev.of_node,
-						 "key_tolerance",
-						 cnt, &key->tolerance);
+			"key_tolerance", cnt, &key->tolerance);
 		if (ret < 0) {
 			dev_err(&pdev->dev, "invalid key tolerance index[%d]\n",
 				cnt);
@@ -275,6 +314,7 @@ static int meson_adc_kp_get_devtree_pdata(struct platform_device *pdev,
 err:
 	kfree(key);
 	return state;
+
 }
 
 static void meson_adc_kp_list_free(struct meson_adc_kp *kp)
@@ -291,7 +331,7 @@ static void meson_adc_kp_list_free(struct meson_adc_kp *kp)
 }
 
 static ssize_t table_show(struct class *cls, struct class_attribute *attr,
-			  char *buf)
+			char *buf)
 {
 	struct meson_adc_kp *kp = container_of(cls,
 					struct meson_adc_kp, kp_class);
@@ -301,7 +341,7 @@ static ssize_t table_show(struct class *cls, struct class_attribute *attr,
 
 	mutex_lock(&kp->kp_lock);
 	list_for_each_entry(key, &kp->adckey_head, list) {
-		len += sprintf(buf + len,
+		len += sprintf(buf+len,
 			"[%d]: name=%-21s code=%-5d channel=%-3d value=%-5d tolerance=%-5d\n",
 			key_num,
 			key->name,
@@ -317,11 +357,11 @@ static ssize_t table_show(struct class *cls, struct class_attribute *attr,
 }
 
 static ssize_t table_store(struct class *cls, struct class_attribute *attr,
-			   const char *buf, size_t count)
+			 const char *buf, size_t count)
 {
 	struct meson_adc_kp *kp = container_of(cls,
 					struct meson_adc_kp, kp_class);
-	struct device *dev = kp->poll_dev->input->dev.parent;
+	struct device *dev = kp->input->dev.parent;
 	struct adc_key *dkey;
 	struct adc_key *key;
 	struct adc_key *key_tmp;
@@ -362,7 +402,7 @@ static ssize_t table_store(struct class *cls, struct class_attribute *attr,
 		return -EINVAL;
 	}
 
-	dkey = kzalloc(sizeof(*dkey), GFP_KERNEL);
+	dkey = kzalloc(sizeof(struct adc_key), GFP_KERNEL);
 	if (!dkey)
 		return -ENOMEM;
 
@@ -377,6 +417,7 @@ static ssize_t table_store(struct class *cls, struct class_attribute *attr,
 			state = -EINVAL;
 			goto err;
 		}
+
 	pval = strsep(&pbuf, ":"); /*channel*/
 	if (pval)
 		if (kstrtoint(pval, 0, &dkey->chan) < 0) {
@@ -385,7 +426,7 @@ static ssize_t table_store(struct class *cls, struct class_attribute *attr,
 		}
 	if (!kp->pchan[dkey->chan]) {
 		dev_err(dev, "invalid channel[%u], please enable it first by DTS\n",
-			dkey->chan);
+				dkey->chan);
 		state = -EINVAL;
 		goto err;
 	}
@@ -403,9 +444,9 @@ static ssize_t table_store(struct class *cls, struct class_attribute *attr,
 		}
 
 	/*check channel data whether valid or not*/
-	if (dkey->chan >= 8) {
+	if (dkey->chan >= SARADC_CH_NUM) {
 		dev_err(dev, "invalid channel[%d-%d]: %d\n", 0,
-			8 - 1, dkey->chan);
+			SARADC_CH_NUM-1, dkey->chan);
 		state = -EINVAL;
 		goto err;
 	}
@@ -428,21 +469,22 @@ static ssize_t table_store(struct class *cls, struct class_attribute *attr,
 
 	mutex_lock(&kp->kp_lock);
 	list_for_each_entry_safe(key, key_tmp, &kp->adckey_head, list) {
-		if (key->code == dkey->code ||
-		    (key->chan == dkey->chan &&
-		     key->value == dkey->value)) {
+		if ((key->code == dkey->code) ||
+			((key->chan == dkey->chan) &&
+			(key->value == dkey->value))) {
 			dev_info(dev, "del older key => %s:%d:%d:%d:%d\n",
-				 key->name, key->code, key->chan,
-				 key->value, key->tolerance);
-			clear_bit(key->code,  kp->poll_dev->input->keybit);
+				key->name, key->code, key->chan,
+				key->value, key->tolerance);
+			clear_bit(key->code,  kp->input->keybit);
 			list_del(&key->list);
 			kfree(key);
 		}
 	}
-	set_bit(dkey->code,  kp->poll_dev->input->keybit);
+	set_bit(dkey->code,  kp->input->keybit);
 	list_add_tail(&dkey->list, &kp->adckey_head);
 	dev_info(dev, "add newer key => %s:%d:%d:%d:%d\n", dkey->name,
-		 dkey->code, dkey->chan, dkey->value, dkey->tolerance);
+		dkey->code, dkey->chan, dkey->value, dkey->tolerance);
+
 	mutex_unlock(&kp->kp_lock);
 
 	meson_adc_kp_get_valid_chan(kp);
@@ -453,14 +495,10 @@ err:
 	return state;
 }
 
-static CLASS_ATTR_RW(table);
-
-static struct attribute *meson_adckey_attrs[] = {
-	&class_attr_table.attr,
-	NULL
+struct class_attribute meson_adckey_attrs[] = {
+	__ATTR_RW(table),
+	__ATTR_NULL
 };
-
-ATTRIBUTE_GROUPS(meson_adckey);
 
 static void meson_adc_kp_init_keybit(struct meson_adc_kp *kp)
 
@@ -469,19 +507,18 @@ static void meson_adc_kp_init_keybit(struct meson_adc_kp *kp)
 
 	list_for_each_entry(key, &kp->adckey_head, list)
 		set_bit(key->code,
-			kp->poll_dev->input->keybit); /*set event code*/
+			kp->input->keybit); /*set event code*/
 }
 
 static int meson_adc_kp_probe(struct platform_device *pdev)
 {
 	struct meson_adc_kp *kp;
-	struct input_dev *input;
 	int ret = 0;
 
 	send_data_to_bl301();
 	kernel_keypad_enable_mode_enable();
 
-	kp = kzalloc(sizeof(*kp), GFP_KERNEL);
+	kp = kzalloc(sizeof(struct meson_adc_kp), GFP_KERNEL);
 	if (!kp)
 		return -ENOMEM;
 
@@ -495,63 +532,66 @@ static int meson_adc_kp_probe(struct platform_device *pdev)
 	if (ret)
 		goto err;
 
-	/*alloc input poll device*/
-	kp->poll_dev = devm_input_allocate_polled_device(&pdev->dev);
-	if (!kp->poll_dev) {
-		dev_err(&pdev->dev, "alloc input poll device failed!\n");
+	/*alloc input device*/
+	kp->input = input_allocate_device();
+	if (!kp->input) {
+		dev_err(&pdev->dev, "alloc input device failed!\n");
 		ret = -ENOMEM;
 		goto err;
 	}
 
-	kp->poll_dev->poll = meson_adc_kp_poll;
-	kp->poll_dev->poll_interval = kp->poll_period;
-	kp->poll_dev->private = kp;
-	input = kp->poll_dev->input;
-
-	set_bit(EV_KEY, input->evbit);
-	set_bit(EV_REP, input->evbit);
+	set_bit(EV_KEY, kp->input->evbit);
 	meson_adc_kp_init_keybit(kp);
 
-	input->name = "adc_keypad";
-	input->phys = "adc_keypad/input0";
-	input->dev.parent = &pdev->dev;
+	kp->input->name = "adc_keypad";
+	kp->input->phys = "adc_keypad/input0";
+	kp->input->dev.parent = &pdev->dev;
 
-	input->id.bustype = BUS_ISA;
-	input->id.vendor = 0x0001;
-	input->id.product = 0x0001;
-	input->id.version = 0x0100;
+	kp->input->id.bustype = BUS_ISA;
+	kp->input->id.vendor = 0x0001;
+	kp->input->id.product = 0x0001;
+	kp->input->id.version = 0x0100;
 
-	input->rep[REP_DELAY] = 0xffffffff;
-	input->rep[REP_PERIOD] = 0xffffffff;
+	kp->input->rep[REP_DELAY] = 0xffffffff;
+	kp->input->rep[REP_PERIOD] = 0xffffffff;
 
-	input->keycodesize = sizeof(unsigned short);
-	input->keycodemax = 0x1ff;
+	kp->input->keycodesize = sizeof(unsigned short);
+	kp->input->keycodemax = 0x1ff;
 
 	/*init class*/
 	kp->kp_class.name = DRIVE_NAME;
 	kp->kp_class.owner = THIS_MODULE;
-	kp->kp_class.class_groups = meson_adckey_groups;
+	kp->kp_class.class_attrs = meson_adckey_attrs;
 	ret = class_register(&kp->kp_class);
 	if (ret) {
 		dev_err(&pdev->dev, "fail to create adc keypad class.\n");
-		goto err;
-	}
-
-	/*register input poll device*/
-	ret = input_register_polled_device(kp->poll_dev);
-	if (ret) {
-		dev_err(&pdev->dev,
-			"unable to register keypad input poll device.\n");
 		goto err1;
 	}
 
+	INIT_DELAYED_WORK(&kp->work, meson_adc_kp_poll);
+
+	/*register input device*/
+	ret = input_register_device(kp->input);
+	if (ret) {
+		dev_err(&pdev->dev,
+			 "unable to register keypad input device.\n");
+		goto err2;
+	}
+
+	device_init_wakeup(&pdev->dev, true);
+
+	mod_delayed_work(system_wq, &kp->work,
+			 msecs_to_jiffies(kp->poll_period));
 	return ret;
 
-err1:
+err2:
 	class_unregister(&kp->kp_class);
+err1:
+	input_free_device(kp->input);
 err:
 	meson_adc_kp_list_free(kp);
 	kfree(kp);
+
 	return ret;
 }
 
@@ -560,39 +600,54 @@ static int meson_adc_kp_remove(struct platform_device *pdev)
 	struct meson_adc_kp *kp = platform_get_drvdata(pdev);
 
 	class_unregister(&kp->kp_class);
-	cancel_delayed_work(&kp->poll_dev->work);
+	cancel_delayed_work_sync(&kp->work);
+	input_unregister_device(kp->input);
+	input_free_device(kp->input);
 	meson_adc_kp_list_free(kp);
 	kfree(kp);
+
 	return 0;
 }
 
 static int meson_adc_kp_suspend(struct platform_device *pdev,
 				pm_message_t state)
 {
+	struct meson_adc_kp *kp = platform_get_drvdata(pdev);
+
+	if (meson_adc_is_alive_freeze())
+		return 0;
+
+	cancel_delayed_work(&kp->work);
+
 	return 0;
 }
 
 static int meson_adc_kp_resume(struct platform_device *pdev)
 {
-	struct adc_key *key;
 	struct meson_adc_kp *kp = platform_get_drvdata(pdev);
 
+	if (meson_adc_is_alive_freeze())
+		return 0;
+
+	mod_delayed_work(system_wq, &kp->work,
+			 msecs_to_jiffies(kp->poll_period));
+
 	if (get_resume_method() == POWER_KEY_WAKEUP) {
-		list_for_each_entry(key, &kp->adckey_head, list) {
-			if (key->code == KEY_POWER) {
-				dev_info(&pdev->dev, "adc keypad wakeup\n");
+		if (kp->pwrkey_code != KEY_RESERVED) {
+			dev_info(&pdev->dev, "adc keypad wakeup\n");
 
-				input_report_key(kp->poll_dev->input,
-						 KEY_POWER,  1);
-				input_sync(kp->poll_dev->input);
-				input_report_key(kp->poll_dev->input,
-						 KEY_POWER,  0);
-				input_sync(kp->poll_dev->input);
+			input_report_key(kp->input,
+					 kp->pwrkey_code,  1);
+			input_sync(kp->input);
+			input_report_key(kp->input,
+					 kp->pwrkey_code,  0);
+			input_sync(kp->input);
 
-				break;
-			}
+			if (scpi_clr_wakeup_reason())
+				pr_debug("clr adc wakeup reason fail.\n");
 		}
 	}
+
 	return 0;
 }
 
@@ -600,7 +655,7 @@ static void meson_adc_kp_shutdown(struct platform_device *pdev)
 {
 	struct meson_adc_kp *kp = platform_get_drvdata(pdev);
 
-	cancel_delayed_work(&kp->poll_dev->work);
+	cancel_delayed_work(&kp->work);
 }
 
 static const struct of_device_id key_dt_match[] = {

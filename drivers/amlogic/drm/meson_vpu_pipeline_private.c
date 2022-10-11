@@ -1,6 +1,18 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/amlogic/drm/meson_vpu_pipeline_private.c
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
 #include <drm/drm_atomic.h>
@@ -69,7 +81,7 @@ static int meson_vpu_osd_state_init(struct meson_drm *private,
 		return -ENOMEM;
 
 	state->base.pblk = &osd->base;
-	drm_atomic_private_obj_init(private->drm, &osd->base.obj,
+	drm_atomic_private_obj_init(&osd->base.obj,
 				    &state->base.obj,
 				    &meson_vpu_osd_obj_funcs);
 
@@ -120,7 +132,7 @@ static int meson_vpu_video_state_init(struct meson_drm *private,
 		return -ENOMEM;
 
 	state->base.pblk = &video->base;
-	drm_atomic_private_obj_init(private->drm, &video->base.obj,
+	drm_atomic_private_obj_init(&video->base.obj,
 				    &state->base.obj,
 				    &meson_vpu_video_obj_funcs);
 
@@ -169,7 +181,7 @@ static int meson_vpu_afbc_state_init(struct meson_drm *private,
 		return -ENOMEM;
 
 	state->base.pblk = &afbc->base;
-	drm_atomic_private_obj_init(private->drm, &afbc->base.obj,
+	drm_atomic_private_obj_init(&afbc->base.obj,
 				    &state->base.obj,
 				    &meson_vpu_afbc_obj_funcs);
 
@@ -224,7 +236,7 @@ static int meson_vpu_scaler_state_init(struct meson_drm *private,
 		return -ENOMEM;
 
 	state->base.pblk = &scaler->base;
-	drm_atomic_private_obj_init(private->drm, &scaler->base.obj,
+	drm_atomic_private_obj_init(&scaler->base.obj,
 				    &state->base.obj,
 				    &meson_vpu_scaler_obj_funcs);
 
@@ -273,7 +285,7 @@ static int meson_vpu_osdblend_state_init(struct meson_drm *private,
 		return -ENOMEM;
 
 	state->base.pblk = &osdblend->base;
-	drm_atomic_private_obj_init(private->drm, &osdblend->base.obj,
+	drm_atomic_private_obj_init(&osdblend->base.obj,
 				    &state->base.obj,
 				    &meson_vpu_osdblend_obj_funcs);
 
@@ -321,7 +333,7 @@ static int meson_vpu_hdr_state_init(struct meson_drm *private,
 		return -ENOMEM;
 
 	state->base.pblk = &hdr->base;
-	drm_atomic_private_obj_init(private->drm, &hdr->base.obj,
+	drm_atomic_private_obj_init(&hdr->base.obj,
 				    &state->base.obj,
 				    &meson_vpu_hdr_obj_funcs);
 
@@ -377,7 +389,7 @@ meson_vpu_postblend_state_init(struct meson_drm *private,
 		return -ENOMEM;
 
 	state->base.pblk = &postblend->base;
-	drm_atomic_private_obj_init(private->drm, &postblend->base.obj,
+	drm_atomic_private_obj_init(&postblend->base.obj,
 				    &state->base.obj,
 				    &meson_vpu_postblend_obj_funcs);
 	return 0;
@@ -393,13 +405,15 @@ meson_vpu_pipeline_atomic_duplicate_state(struct drm_private_obj *obj)
 {
 	struct meson_vpu_pipeline_state *state;
 	struct meson_vpu_pipeline *pipeline = priv_to_pipeline(obj);
-	struct meson_vpu_pipeline_state *cur_state = priv_to_pipeline_state(obj->state);
 
 	state = kzalloc(sizeof(*state), GFP_KERNEL);
-	memcpy(state, cur_state, sizeof(struct meson_vpu_pipeline_state));
-
+	#ifdef MESON_DRM_VERSION_V0
+	memcpy(state, &last_mvps, sizeof(*state));
+	#endif
 	state->pipeline = pipeline;
-	state->global_afbc = 0;
+
+	__drm_atomic_helper_private_obj_duplicate_state(obj, &state->obj);
+
 	return &state->obj;
 }
 
@@ -413,8 +427,8 @@ meson_vpu_pipeline_atomic_destroy_state(struct drm_private_obj *obj,
 }
 
 #ifdef MESON_DRM_VERSION_V0
-void
-meson_vpu_pipeline_atomic_backup_state(struct meson_vpu_pipeline_state *mvps)
+void meson_vpu_pipeline_atomic_backup_state(
+	struct meson_vpu_pipeline_state *mvps)
 {
 	memcpy(&last_mvps, mvps, sizeof(*mvps));
 }
@@ -435,7 +449,7 @@ static int meson_vpu_pipeline_state_init(struct meson_drm *private,
 		return -ENOMEM;
 
 	state->pipeline = pipeline;
-	drm_atomic_private_obj_init(private->drm, &pipeline->obj, &state->obj,
+	drm_atomic_private_obj_init(&pipeline->obj, &state->obj,
 				    &meson_vpu_pipeline_obj_funcs);
 
 	return 0;

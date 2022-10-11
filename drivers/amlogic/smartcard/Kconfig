@@ -3,5 +3,5 @@
 #
 
 config AMLOGIC_SMARTCARD
-	tristate "Amlogic Smartcard driver"
-	default y
+	bool "Amlogic Smartcard driver"
+	default n

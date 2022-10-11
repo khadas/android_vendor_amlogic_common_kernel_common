@@ -1,6 +1,18 @@
-/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * include/linux/amlogic/media/amdolbyvision/dolby_vision.h
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
 #ifndef _DV_H_
@@ -39,7 +51,7 @@
 #define MUTE_TYPE_YUV	1
 #define MUTE_TYPE_RGB	2
 #define MUTE_TYPE_IPT	3
-struct vframe_s;
+
 #define MD_BUF_SIZE 1024
 #define COMP_BUF_SIZE 8196
 
@@ -235,6 +247,7 @@ void tv_dolby_vision_insert_crc(bool print);
 int dolby_vision_check_hdr10(struct vframe_s *vf);
 int dolby_vision_check_hlg(struct vframe_s *vf);
 int dolby_vision_check_hdr10plus(struct vframe_s *vf);
+int dolby_vision_check_cuva(struct vframe_s *vf);
 void tv_dolby_vision_dma_table_modify
 	(u32 tbl_id, uint64_t value);
 void tv_dolby_vision_efuse_info(void);
@@ -265,16 +278,16 @@ void dv_vf_light_unreg_provider(void);
 void dolby_vision_update_backlight(void);
 int dolby_vision_update_src_format(struct vframe_s *vf, u8 toggle_mode);
 void update_graphic_status(void);
-int parse_sei_and_meta_ext
-	(struct vframe_s *vf,
-	 char *aux_buf,
-	 int aux_size,
-	 int *total_comp_size,
-	 int *total_md_size,
-	 void *fmt,
-	 int *ret_flags,
-	 char *md_buf,
-	 char *comp_buf);
+int parse_sei_and_meta_ext(
+	struct vframe_s *vf,
+	char *aux_buf,
+	int aux_size,
+	int *total_comp_size,
+	int *total_md_size,
+	void *fmt,
+	int *ret_flags,
+	char *md_buf,
+	char *comp_buf);
 void dolby_vision_clear_buf(void);
 bool is_dv_control_backlight(void);
 #endif

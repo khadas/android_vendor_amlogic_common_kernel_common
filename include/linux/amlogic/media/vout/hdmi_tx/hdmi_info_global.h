@@ -1,13 +1,25 @@
-/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * include/linux/amlogic/media/vout/hdmi_tx/hdmi_info_global.h
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
 #ifndef _HDMI_INFO_GLOBAL_H
 #define _HDMI_INFO_GLOBAL_H
 
 #include "hdmi_common.h"
-#include "../hdmi_tx_ext.h"
+
 enum hdmi_rx_video_state {
 	STATE_VIDEO__POWERDOWN = 0,
 	STATE_VIDEO__MUTED = 1,
@@ -46,7 +58,7 @@ enum hdmi_scan {
 };
 
 enum hdmi_barinfo {
-	B_INVALID = 0, B_BAR_VERT, /* Vert. Bar Infovalid */
+	B_UNVALID = 0, B_BAR_VERT, /* Vert. Bar Infovalid */
 	B_BAR_HORIZ, /* Horiz. Bar Infovalid */
 	B_BAR_VERT_HORIZ,
 /* Vert.and Horiz. Bar Info valid */
@@ -76,7 +88,6 @@ struct hdmi_videoinfo {
 	enum hdmi_scan ss;
 	enum hdmi_slacing sc;
 };
-
 /* -------------------HDMI VIDEO END---------------------------- */
 
 /* -------------------HDMI AUDIO-------------------------------- */
@@ -106,8 +117,8 @@ enum hdcp_authstate {
 	HDCP_NO_DEVICE_WITH_SLAVE_ADDR,
 	HDCP_BCAP_ERROR,
 	HDCP_BKSV_ERROR,
-	HDCP_R0S_ARE_MISMATCH,
-	HDCP_RIS_ARE_MISMATCH,
+	HDCP_R0S_ARE_MISSMATCH,
+	HDCP_RIS_ARE_MISSMATCH,
 	HDCP_REAUTHENTATION_REQ,
 	HDCP_REQ_AUTHENTICATION,
 	HDCP_NO_ACK_FROM_DEV,
@@ -116,7 +127,7 @@ enum hdcp_authstate {
 	HDCP_REPEATER_AUTH_REQ,
 	HDCP_REQ_SHA_CALC,
 	HDCP_REQ_SHA_HW_CALC,
-	HDCP_FAILED_VIERROR,
+	HDCP_FAILED_ViERROR,
 	HDCP_MAX
 };
 
@@ -247,6 +258,15 @@ struct hdmitx_audinfo {
 	enum hdmi_audio_chnnum channels;
 	enum hdmi_audio_fs fs; /* !< Signal sample rate in Hz */
 	enum hdmi_audio_sampsize ss;
+};
+
+/* -----------------Source Physical Address--------------- */
+struct vsdb_phyaddr {
+	unsigned char a:4;
+	unsigned char b:4;
+	unsigned char c:4;
+	unsigned char d:4;
+	unsigned char valid;
 };
 
 #define Y420CMDB_MAX	32

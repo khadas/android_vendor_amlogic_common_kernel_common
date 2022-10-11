@@ -1,4 +1,3 @@
-/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
  * drivers/amlogic/media/vin/tvin/tvin_frontend.h
  *
@@ -31,6 +30,7 @@
 
 struct tvin_frontend_s;
 
+
 struct tvin_decoder_ops_s {
 	/*
 	 * check whether the port is supported.
@@ -43,7 +43,7 @@ struct tvin_decoder_ops_s {
 	void (*close)(struct tvin_frontend_s *fe);
 	int (*decode_isr)(struct tvin_frontend_s *fe, unsigned int hcnt64);
 	int (*callmaster_det)(enum tvin_port_e port,
-			      struct tvin_frontend_s *fe);
+			struct tvin_frontend_s *fe);
 	int (*ioctl)(struct tvin_frontend_s *fe, void *args);
 	int (*decode_tsk)(struct tvin_frontend_s *fe);
 };
@@ -56,11 +56,11 @@ struct tvin_state_machine_ops_s {
 	bool (*adc_cal)(struct tvin_frontend_s *fe);
 	bool (*pll_lock)(struct tvin_frontend_s *fe);
 	void (*get_sig_property)(struct tvin_frontend_s *fe,
-				 struct tvin_sig_property_s *prop);
+			struct tvin_sig_property_s *prop);
 	void (*vga_set_param)(struct tvafe_vga_parm_s *vga_parm,
-			      struct tvin_frontend_s *fe);
+			struct tvin_frontend_s *fe);
 	void (*vga_get_param)(struct tvafe_vga_parm_s *vga_parm,
-			      struct tvin_frontend_s *fe);
+			struct tvin_frontend_s *fe);
 	bool (*check_frame_skip)(struct tvin_frontend_s *fe);
 	bool (*get_secam_phase)(struct tvin_frontend_s *fe);
 	bool (*hdmi_dv_config)(bool en, struct tvin_frontend_s *fe);
@@ -83,12 +83,14 @@ struct tvin_frontend_s {
 #define VDIN_FRONTEND_IDX	0x10
 
 int tvin_frontend_init(struct tvin_frontend_s *fe,
-		       struct tvin_decoder_ops_s *dec_ops,
-		       struct tvin_state_machine_ops_s *sm_ops, int index);
+		struct tvin_decoder_ops_s *dec_ops,
+		struct tvin_state_machine_ops_s *sm_ops, int index);
 int tvin_reg_frontend(struct tvin_frontend_s *fe);
 void tvin_unreg_frontend(struct tvin_frontend_s *fe);
 struct tvin_frontend_s *tvin_get_frontend(enum tvin_port_e port, int index);
 struct tvin_decoder_ops_s *tvin_get_fe_ops(enum tvin_port_e port, int index);
 struct tvin_state_machine_ops_s *tvin_get_sm_ops(enum tvin_port_e port,
-						 int index);
+		int index);
+
 #endif
+

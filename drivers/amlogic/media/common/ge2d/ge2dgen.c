@@ -1,6 +1,18 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/amlogic/media/common/ge2d/ge2dgen.c
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
 /* Amlogic Headers */
@@ -24,6 +36,7 @@ static inline void _set_src1_format(struct ge2d_src1_data_s *src1_data_cfg,
 	src1_data_cfg->color_map   = (format_src & GE2D_COLOR_MAP_MASK) >>
 				     GE2D_COLOR_MAP_SHIFT;
 
+
 	src1_gen_cfg->pic_struct   = (format_src >> 3) & 3;
 	src1_data_cfg->x_yc_ratio  = (format_src >> 1) & 1;
 	src1_data_cfg->y_yc_ratio  = (format_src >> 0) & 1;
@@ -34,30 +47,30 @@ static inline void _set_src1_format(struct ge2d_src1_data_s *src1_data_cfg,
 		src1_data_cfg->deep_color = 0;
 }
 
-static inline
-void _set_src2_format(struct ge2d_src2_dst_data_s *src2_dst_data_cfg,
-		      struct ge2d_src2_dst_gen_s *src2_dst_gen_cfg,
-		      unsigned int format)
+static inline void _set_src2_format(
+		struct ge2d_src2_dst_data_s *src2_dst_data_cfg,
+		struct ge2d_src2_dst_gen_s *src2_dst_gen_cfg,
+		unsigned int format)
 {
-	src2_dst_data_cfg->src2_format_all = format;
+	src2_dst_data_cfg->src2_format_all  = format;
 
-	src2_dst_data_cfg->src2_format = (format >> 8) & 3;
-	src2_dst_data_cfg->src2_endian = (format & GE2D_ENDIAN_MASK) >>
+	src2_dst_data_cfg->src2_format      = (format >> 8) & 3;
+	src2_dst_data_cfg->src2_endian      = (format & GE2D_ENDIAN_MASK) >>
 					      GE2D_ENDIAN_SHIFT;
-	src2_dst_data_cfg->src2_color_map = (format & GE2D_COLOR_MAP_MASK) >>
+	src2_dst_data_cfg->src2_color_map   = (format & GE2D_COLOR_MAP_MASK) >>
 					      GE2D_COLOR_MAP_SHIFT;
 
 	src2_dst_data_cfg->src2_mode_8b_sel = (format >> 6) & 3;
 
-	src2_dst_gen_cfg->src2_pic_struct = (format >> 3) & 3;
+	src2_dst_gen_cfg->src2_pic_struct   = (format >> 3) & 3;
 }
 
-static inline
-void _set_dst_format(struct ge2d_src2_dst_data_s *src2_dst_data_cfg,
-		     struct ge2d_src2_dst_gen_s *src2_dst_gen_cfg,
-		     struct ge2d_dp_gen_s *dp_gen_cfg,
-		     unsigned int format_src,
-		     unsigned int format_dst)
+static inline void _set_dst_format(
+		struct ge2d_src2_dst_data_s *src2_dst_data_cfg,
+		struct ge2d_src2_dst_gen_s *src2_dst_gen_cfg,
+		struct ge2d_dp_gen_s *dp_gen_cfg,
+		unsigned int format_src,
+		unsigned int format_dst)
 {
 	unsigned int y_yc_ratio;
 
@@ -87,33 +100,13 @@ void _set_dst_format(struct ge2d_src2_dst_data_s *src2_dst_data_cfg,
 		src2_dst_data_cfg->dst2_enable = 1;
 		src2_dst_data_cfg->dst2_color_map =
 			src2_dst_data_cfg->dst_color_map - 5;
-	} else {
+	} else
 		src2_dst_data_cfg->dst2_enable = 0;
-	}
 	/* #endif */
-
-	if (ge2d_meson_dev.dst_repeat)
-		switch (format_dst & GE2D_EXT_MASK) {
-		case GE2D_DST_REPEAT_2:
-			src2_dst_data_cfg->dst_rpt = DST_RPT_2 |
-						     DST_RPT_PATTERN_XX;
-			break;
-		case GE2D_DST_REPEAT_4:
-			src2_dst_data_cfg->dst_rpt = DST_RPT_4 |
-						     DST_RPT_PATTERN_XX;
-			break;
-		case GE2D_DST_REPEAT_8:
-			src2_dst_data_cfg->dst_rpt = DST_RPT_8 |
-						     DST_RPT_PATTERN_XX;
-			break;
-		default:
-			src2_dst_data_cfg->dst_rpt = 0;
-			break;
-		}
 }
 
 static bool is_src1_addr_update(struct ge2d_src1_data_s *src1_data_cfg,
-				unsigned long *phy_addr,
+				unsigned int *phy_addr,
 				unsigned int *stride)
 {
 	int i;
@@ -132,7 +125,7 @@ static bool is_src1_addr_update(struct ge2d_src1_data_s *src1_data_cfg,
 }
 
 static bool is_src2_addr_update(struct ge2d_src2_dst_data_s *src2_dst_data_cfg,
-				unsigned long *phy_addr,
+				unsigned int *phy_addr,
 				unsigned int *stride)
 {
 	int i;
@@ -151,7 +144,7 @@ static bool is_src2_addr_update(struct ge2d_src2_dst_data_s *src2_dst_data_cfg,
 }
 
 static bool is_dst_addr_update(struct ge2d_src2_dst_data_s *src2_dst_data_cfg,
-			       unsigned long *phy_addr,
+			       unsigned int *phy_addr,
 			       unsigned int *stride)
 {
 	int i;
@@ -170,9 +163,9 @@ static bool is_dst_addr_update(struct ge2d_src2_dst_data_s *src2_dst_data_cfg,
 }
 
 void ge2dgen_src(struct ge2d_context_s *wq,
-		 unsigned int canvas_addr,
+		unsigned int canvas_addr,
 		unsigned int format,
-		unsigned long *phy_addr,
+		unsigned int *phy_addr,
 		unsigned int *stride)
 {
 	struct ge2d_src1_data_s *src1_data_cfg = ge2d_wq_get_src_data(wq);
@@ -210,9 +203,8 @@ void ge2dgen_antiflicker(struct ge2d_context_s *wq, unsigned long enable)
 		wq->config.update_flag |= UPDATE_DP_GEN;
 	}
 }
-
 void ge2dgen_post_release_src1buf(struct ge2d_context_s *wq,
-				  unsigned int buffer)
+	unsigned int buffer)
 {
 	struct ge2d_cmd_s *ge2d_cmd_cfg = ge2d_wq_get_cmd(wq);
 
@@ -228,7 +220,7 @@ void ge2dgen_post_release_src1canvas(struct ge2d_context_s *wq)
 }
 
 void ge2dgen_post_release_src2buf(struct ge2d_context_s *wq,
-				  unsigned int buffer)
+	unsigned int buffer)
 {
 	struct ge2d_cmd_s *ge2d_cmd_cfg = ge2d_wq_get_cmd(wq);
 
@@ -254,9 +246,9 @@ void ge2dgen_cb(struct ge2d_context_s *wq,
 }
 
 void ge2dgen_src2(struct ge2d_context_s *wq,
-		  unsigned int canvas_addr,
+		unsigned int canvas_addr,
 		unsigned int format,
-		unsigned long *phy_addr,
+		unsigned int *phy_addr,
 		unsigned int *stride)
 {
 	struct ge2d_src2_dst_data_s *src2_dst_data_cfg =
@@ -282,7 +274,7 @@ void ge2dgen_src2(struct ge2d_context_s *wq,
 void ge2dgen_dst(struct ge2d_context_s *wq,
 		 unsigned int canvas_addr,
 		 unsigned int format,
-		 unsigned long *phy_addr,
+		 unsigned int *phy_addr,
 		 unsigned int *stride)
 {
 	struct ge2d_src1_data_s *src1_data_cfg = ge2d_wq_get_src_data(wq);
@@ -317,9 +309,9 @@ void ge2dgen_src_clip(struct ge2d_context_s *wq,
 	w = x + w - 1;
 	h = y + h - 1;
 	if (src1_gen_cfg->clipx_start != x ||
-	    src1_gen_cfg->clipx_end   != w ||
-	    src1_gen_cfg->clipy_start != y ||
-	    src1_gen_cfg->clipy_end   != h) {
+			src1_gen_cfg->clipx_end   != w ||
+			src1_gen_cfg->clipy_start != y ||
+			src1_gen_cfg->clipy_end   != h) {
 		src1_gen_cfg->clipx_start = x;
 		src1_gen_cfg->clipx_end   = w;
 		src1_gen_cfg->clipy_start = y;
@@ -354,9 +346,9 @@ void ge2dgen_src_key(struct ge2d_context_s *wq,
 	struct ge2d_dp_gen_s *dp_gen_cfg = ge2d_wq_get_dp_gen(wq);
 
 	if (dp_gen_cfg->src1_key_en != en ||
-	    dp_gen_cfg->src1_key != key ||
-	    dp_gen_cfg->src1_key_mask != keymask ||
-	    dp_gen_cfg->src1_key_mode != keymode) {
+			dp_gen_cfg->src1_key != key ||
+			dp_gen_cfg->src1_key_mask != keymask ||
+			dp_gen_cfg->src1_key_mode != keymode) {
 		dp_gen_cfg->src1_key_en = en & 0x1;
 		dp_gen_cfg->src1_key = key;
 		dp_gen_cfg->src1_key_mask = keymask;
@@ -374,8 +366,8 @@ void ge2dgent_src_gbalpha(struct ge2d_context_s *wq,
 {
 	struct ge2d_dp_gen_s *dp_gen_cfg = ge2d_wq_get_dp_gen(wq);
 #ifdef CONFIG_GE2D_SRC2
-	if (dp_gen_cfg->src1_gb_alpha != alpha1 ||
-	    dp_gen_cfg->src2_gb_alpha != alpha2) {
+	if ((dp_gen_cfg->src1_gb_alpha != alpha1)
+		|| (dp_gen_cfg->src2_gb_alpha != alpha2)) {
 		dp_gen_cfg->src1_gb_alpha = alpha1;
 		dp_gen_cfg->src2_gb_alpha = alpha2;
 		wq->config.update_flag |= UPDATE_DP_GEN;
@@ -388,7 +380,8 @@ void ge2dgent_src_gbalpha(struct ge2d_context_s *wq,
 #endif
 }
 
-void ge2dgen_src_color(struct ge2d_context_s *wq, unsigned int color)
+void ge2dgen_src_color(struct ge2d_context_s *wq,
+		       unsigned int color)
 {
 	struct ge2d_src1_data_s *src1_data_cfg = ge2d_wq_get_src_data(wq);
 
@@ -396,6 +389,7 @@ void ge2dgen_src_color(struct ge2d_context_s *wq, unsigned int color)
 		src1_data_cfg->def_color = color;
 		wq->config.update_flag |= UPDATE_SRC_DATA;
 	}
+
 }
 
 void ge2dgen_rendering_dir(struct ge2d_context_s *wq,
@@ -407,9 +401,9 @@ void ge2dgen_rendering_dir(struct ge2d_context_s *wq,
 
 	ge2d_cmd_cfg->src1_x_rev = src_x_dir;
 	ge2d_cmd_cfg->src1_y_rev = src_y_dir;
-	ge2d_cmd_cfg->dst_x_rev = dst_x_dir;
-	ge2d_cmd_cfg->dst_y_rev = dst_y_dir;
-	ge2d_cmd_cfg->dst_xy_swap =  dst_xy_swap;
+	ge2d_cmd_cfg->dst_x_rev  = dst_x_dir;
+	ge2d_cmd_cfg->dst_y_rev  = dst_y_dir;
+	ge2d_cmd_cfg->dst_xy_swap  =  dst_xy_swap;
 }
 
 void ge2dgen_dst_clip(struct ge2d_context_s *wq,

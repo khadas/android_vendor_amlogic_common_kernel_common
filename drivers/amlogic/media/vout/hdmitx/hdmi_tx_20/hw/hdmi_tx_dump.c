@@ -1,6 +1,18 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/amlogic/media/vout/hdmitx/hdmi_tx_20/hw/hdmi_tx_dump.c
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
 #include <linux/module.h>
@@ -33,7 +45,16 @@ static int dump_regs_show(struct seq_file *s, void *p)
 {
 	int i;
 
-	if (reg_maps[HHI_REG_IDX].phy_addr) {
+	if (!map)
+		return 0;
+
+	if (map[PERIPHS_REG_IDX].phy_addr) {
+		seq_puts(s, "\n--------PERIPHS registers--------\n");
+		for (i = 0; i < 0xff; i++)
+			PR_BUS(PERIPHS_REG_ADDR(i));
+	}
+
+	if (map[HHI_REG_IDX].phy_addr) {
 		seq_puts(s, "\n--------HHI registers--------\n");
 		for (i = 0; i < 0x80; i++)
 			PR_BUS(HHI_REG_ADDR(i));
@@ -41,7 +62,7 @@ static int dump_regs_show(struct seq_file *s, void *p)
 			PR_BUS(HHI_REG_ADDR(i));
 	}
 
-	if (reg_maps[VCBUS_REG_IDX].phy_addr) {
+	if (map[VCBUS_REG_IDX].phy_addr) {
 		seq_puts(s, "\n--------ENCP registers--------\n");
 		for (i = 0x1b00; i < 0x1b80; i++)
 			PR_BUS(VCBUS_REG_ADDR(i));
@@ -57,34 +78,10 @@ static int dump_regs_show(struct seq_file *s, void *p)
 			PR_BUS(VCBUS_REG_ADDR(i));
 	}
 
-	if (reg_maps[CBUS_REG_IDX].phy_addr) {
+	if (map[CBUS_REG_IDX].phy_addr) {
 		seq_puts(s, "\n--------CBUS registers--------\n");
 		PR_BUS(P_AIU_HDMI_CLK_DATA_CTRL);
 		PR_BUS(P_ISA_DEBUG_REG0);
-	}
-
-	if (reg_maps[ANACTRL_REG_IDX].phy_addr) {
-		seq_puts(s, "\n--------ANACTRL registers--------\n");
-		for (i = 0; i < 0xff; i++)
-			PR_BUS(ANACTRL_REG_ADDR(i));
-	}
-
-	if (reg_maps[PWRCTRL_REG_IDX].phy_addr) {
-		seq_puts(s, "\n--------PWRCTRL registers--------\n");
-		for (i = 0; i < 0xff; i++)
-			PR_BUS(PWRCTRL_REG_ADDR(i));
-	}
-
-	if (reg_maps[SYSCTRL_REG_IDX].phy_addr) {
-		seq_puts(s, "\n--------SYSCTRL registers--------\n");
-		for (i = 0; i < 0xff; i++)
-			PR_BUS(SYSCTRL_REG_ADDR(i));
-	}
-
-	if (reg_maps[CLKCTRL_REG_IDX].phy_addr) {
-		seq_puts(s, "\n--------CLKCTRL registers--------\n");
-		for (i = 0; i < 0xff; i++)
-			PR_BUS(CLKCTRL_REG_ADDR(i));
 	}
 
 	seq_puts(s, "\n");
@@ -1349,7 +1346,7 @@ static void hdmitx_parsing_vsifpkt(struct seq_file *s)
 			reg_adr = HDMITX_DWC_FC_VSDPAYLOAD2 + count;
 			tmp = hdmitx_rd_reg(reg_adr);
 			seq_printf(s, "dist_values: %d\t", tmp);
-			if (count == 3 || count == 7 || count == 8)
+			if ((count == 3) || (count == 7) || (count == 8))
 				seq_puts(s, "\n");
 		}
 
@@ -1372,7 +1369,7 @@ static void hdmitx_parsing_vsifpkt(struct seq_file *s)
 			reg_adr = HDMITX_DWC_FC_VSDPAYLOAD14 + count;
 			tmp = hdmitx_rd_reg(reg_adr);
 			seq_printf(s, "bc_anchors: %d\t", tmp);
-			if (count == 3 || count == 7 || count == 8)
+			if ((count == 3) || (count == 7) || (count == 8))
 				seq_puts(s, "\n");
 		}
 

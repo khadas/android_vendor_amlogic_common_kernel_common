@@ -1,1 +1,2 @@
-$(MEDIA_MODULE_NAME)-$(CONFIG_AMLOGIC_MEDIA_MSYNC) += avsync/msync.o
+obj-y	+=	amavsync.o
+amavsync-objs += msync.o

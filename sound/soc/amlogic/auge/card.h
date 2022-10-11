@@ -1,16 +1,26 @@
-/* SPDX-License-Identifier: GPL-2.0
+/*
+ * sound/soc/amlogic/auge/card.h
  *
- * ASoC simple sound card support
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
  *
- * Copyright (C) 2012 Renesas Solutions Corp.
- * Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
-#ifndef __SIMPLE_CARD_H
-#define __SIMPLE_CARD_H
+#ifndef __AML_CARD_H_
+#define __AML_CARD_H_
 
 #include <sound/soc.h>
 #include "card_utils.h"
+#include "soft_locker.h"
 
 struct aml_card_info {
 	const char *name;
@@ -23,4 +33,6 @@ struct aml_card_info {
 	struct aml_dai codec_dai;
 };
 
-#endif /* __SIMPLE_CARD_H */
+struct soft_locker *aml_get_card_locker(struct snd_soc_card *card);
+
+#endif /* __AML_CARD_H_ */

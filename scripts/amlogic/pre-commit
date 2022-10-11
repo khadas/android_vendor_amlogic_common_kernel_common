@@ -1,5 +1,4 @@
 #!/bin/sh
-# SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 #
 # pre-commit hook to run check-patch on the output and stop any commits
 # that do not pass. Note, only for git-commit, and not for any of the
@@ -15,7 +14,7 @@ else
 	against=4b825dc642cb6eb9a060e54bf8d69288fbee4904
 fi
 
-git diff --cached --stat -p $against -- | ./scripts/checkpatch.pl --ignore GERRIT_CHANGE_ID,COMMIT_MESSAGE  --strict --no-signoff -
+git diff --cached --stat -p $against -- | ./scripts/checkpatch.pl --no-signoff -
 if [ $? -ne 0 ]
 then
 exit 1;

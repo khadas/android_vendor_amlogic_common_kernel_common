@@ -1,8 +1,5 @@
-/* SPDX-License-Identifier: GPL-2.0 */
 #ifndef __PACKET_INTERNAL_H__
 #define __PACKET_INTERNAL_H__
-
-#include <linux/refcount.h>
 
 struct packet_mclist {
 	struct packet_mclist	*next;
@@ -70,10 +67,7 @@ struct packet_ring_buffer {
 
 	unsigned int __percpu	*pending_refcnt;
 
-	union {
-		unsigned long			*rx_owner_map;
-		struct tpacket_kbdq_core	prb_bdqc;
-	};
+	struct tpacket_kbdq_core	prb_bdqc;
 };
 
 extern struct mutex fanout_mutex;
@@ -92,7 +86,7 @@ struct packet_fanout {
 	struct list_head	list;
 	struct sock		*arr[PACKET_FANOUT_MAX];
 	spinlock_t		lock;
-	refcount_t		sk_ref;
+	atomic_t		sk_ref;
 	struct packet_type	prot_hook ____cacheline_aligned_in_smp;
 };
 
@@ -135,7 +129,6 @@ struct packet_sock {
 	struct net_device __rcu	*cached_dev;
 	int			(*xmit)(struct sk_buff *skb);
 	struct packet_type	prot_hook ____cacheline_aligned_in_smp;
-	atomic_t		tp_drops ____cacheline_aligned_in_smp;
 };
 
 static struct packet_sock *pkt_sk(struct sock *sk)

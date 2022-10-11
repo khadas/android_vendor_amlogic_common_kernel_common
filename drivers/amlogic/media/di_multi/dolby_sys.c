@@ -49,6 +49,7 @@
 #include "register.h"
 #include <linux/amlogic/media/vfm/vframe.h>
 #include <linux/amlogic/media/amdolbyvision/dolby_vision.h>
+
 #define OP_BYPASS_CVM				0x01
 #define OP_BYPASS_CSC				0x02
 #define OP_CLKGATE_WHEN_LOAD_LUT	0x04

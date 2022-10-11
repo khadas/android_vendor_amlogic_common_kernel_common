@@ -1,6 +1,18 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/amlogic/ethernet/phy/phy_debug.c
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
 #include <linux/clk.h>
@@ -23,25 +35,25 @@
 #include <linux/reset.h>
 #include <linux/of_mdio.h>
 
+#ifdef CONFIG_DWMAC_MESON
+#include <linux/amlogic/cpu_version.h>
+#include <linux/amlogic/iomap.h>
 #include "phy_debug.h"
 
 void __iomem *PREG_ETH_REG0;
 void __iomem *PREG_ETH_REG1;
 
-#define ETH_MAC_0_Configuration			(0x0000)
-#define ETH_MMC_rxicmp_err_octets		(0x0284)
-#define ETH_DMA_0_Bus_Mode			(0x1000)
-#define ETH_DMA_21_Curr_Host_Re_Buffer_Addr	(0x1054)
-
 static int g_phyreg;
 static void __iomem *c_ioaddr;
-static ssize_t show_phy_reg(struct device *dev,
-				struct device_attribute *attr, char *buf)
+static ssize_t show_phy_reg(
+	struct device *dev,
+	struct device_attribute *attr, char *buf)
 {
 	return snprintf(buf, PAGE_SIZE, "current phy reg = 0x%x\n", g_phyreg);
 }
 
-static ssize_t set_phy_reg(struct device *dev,
+static ssize_t set_phy_reg(
+	struct device *dev,
 	struct device_attribute *attr,
 	const char *buf, size_t count)
 {
@@ -57,7 +69,8 @@ static ssize_t set_phy_reg(struct device *dev,
 	return count;
 }
 
-static ssize_t show_phy_reg_value(struct device *dev,
+static ssize_t show_phy_reg_value(
+	struct device *dev,
 	struct device_attribute *attr, char *buf)
 {
 	struct phy_device *phy_dev = dev_get_drvdata(dev);
@@ -71,7 +84,8 @@ static ssize_t show_phy_reg_value(struct device *dev,
 	return ret;
 }
 
-static ssize_t set_phy_reg_value(struct device *dev,
+static ssize_t set_phy_reg_value(
+	struct device *dev,
 	struct device_attribute *attr,
 	const char *buf, size_t count)
 {
@@ -130,7 +144,7 @@ static int am_net_read_phyreg(int argc, char **argv)
 		val = phy_read(c_phy_dev, reg);
 		pr_info("read phy [reg_%d] 0x%x\n", reg, val);
 	} else if (reg == 32) {
-//		pr_info("phy features:0x%x\n", c_phy_dev->drv->features);
+		pr_info("phy features:0x%x\n", c_phy_dev->drv->features);
 	} else {
 		pr_info("Invalid parameter\n");
 	}
@@ -166,22 +180,23 @@ static int am_net_write_phyreg(int argc, char **argv)
 
 	if (reg >= 0 && reg <= 31) {
 		phy_write(c_phy_dev, reg, val);
-		pr_info("write phy [reg_%d] 0x%x, 0x%x\n",
+		pr_info(
+			"write phy [reg_%d] 0x%x, 0x%x\n",
 			reg, val, phy_read(c_phy_dev, reg));
 	} else if (reg == 32) {
 		if (val > 255) {
 			pr_info("Invalid parameter\n");
 			return 0;
 		}
-//		c_phy_dev->drv->features &= 0xff;
-//		c_phy_dev->drv->features |= val << 8;
+		c_phy_dev->drv->features &= 0xff;
+		c_phy_dev->drv->features |= val << 8;
 	} else if (reg == 33) {
 		if (val > 255) {
 			pr_info("Invalid parameter\n");
 			return 0;
 		}
-//		c_phy_dev->drv->features &= 0xff00;
-//		c_phy_dev->drv->features |= val;
+		c_phy_dev->drv->features &= 0xff00;
+		c_phy_dev->drv->features |= val;
 	} else {
 		pr_info("Invalid parameter\n");
 	}
@@ -251,7 +266,7 @@ static int read_tst_cntl_reg(int argc, char **argv)
 	int rd_addr;
 	int rd_data = 0;
 
-	if (argc < 2 || !argv || !argv[0] || !argv[1]) {
+	if (argc < 2 || (!argv) || (!argv[0]) || (!argv[1])) {
 		pr_info("Invalid syntax\n");
 		return -1;
 	}
@@ -259,7 +274,8 @@ static int read_tst_cntl_reg(int argc, char **argv)
 		return -1;
 
 	if (rd_addr >= 0 && rd_addr <= 31) {
-		phy_write(c_phy_dev, 20,
+		phy_write(
+			c_phy_dev, 20,
 			((1 << 15) | (1 << 10) | ((rd_addr & 0x1f) << 5)));
 
 		rd_data = phy_read(c_phy_dev, 21);
@@ -278,7 +294,8 @@ static int return_write_val(int rd_addr)
 	int rd_data;
 	int rd_data_hi;
 
-	phy_write(c_phy_dev, 20,
+	phy_write(
+		c_phy_dev, 20,
 		((1 << 15) | (1 << 10) | ((rd_addr & 0x1f) << 5)));
 	rd_data = phy_read(c_phy_dev, 21);
 	rd_data_hi = phy_read(c_phy_dev, 22);
@@ -291,7 +308,7 @@ static int write_tst_cntl_reg(int argc, char **argv)
 {
 	int wr_addr, wr_data;
 
-	if (argc < 3 || !argv || !argv[0] || !argv[1] || !argv[2]) {
+	if (argc < 3 || (!argv) || (!argv[0]) || (!argv[1]) || (!argv[2])) {
 		pr_info("Invalid syntax\n");
 		return -1;
 	}
@@ -305,7 +322,8 @@ static int write_tst_cntl_reg(int argc, char **argv)
 	if (wr_addr >= 0 && wr_addr <= 31) {
 		phy_write(c_phy_dev, 23, (wr_data & 0xffff));
 
-		phy_write(c_phy_dev, 20,
+		phy_write(
+			c_phy_dev, 20,
 			((1 << 14) | (1 << 10) | ((wr_addr << 0) & 0x1f)));
 
 		pr_info("write phy tstcntl [reg_%d] 0x%x, 0x%x\n",
@@ -325,7 +343,8 @@ static void tstcntl_dump_phyreg(void)
 
 	pr_info("========== ETH TST PHY regs ==========\n");
 	for (rd_addr = 0; rd_addr < 32; rd_addr++) {
-		phy_write(c_phy_dev, 20,
+		phy_write(
+			c_phy_dev, 20,
 			((1 << 15) | (1 << 10) | ((rd_addr & 0x1f) << 5)));
 
 		rd_data = phy_read(c_phy_dev, 21);
@@ -389,7 +408,7 @@ static int am_net_read_macreg(int argc, char **argv)
 	int val = 0;
 	int r = 0;
 
-	if (argc < 2 || !argv || !argv[0] || !argv[1]) {
+	if (argc < 2 || (!argv) || (!argv[0]) || (!argv[1])) {
 		pr_err("Invalid syntax\n");
 		return -1;
 	}
@@ -416,7 +435,7 @@ static int am_net_write_macreg(int argc, char **argv)
 	int val;
 	int r;
 
-	if (argc < 3 || !argv || !argv[0] || !argv[1] || !argv[2]) {
+	if ((argc < 3) || (!argv) || (!argv[0]) || (!argv[1]) || (!argv[2])) {
 		pr_err("Invalid syntax\n");
 		return -1;
 	}
@@ -427,7 +446,7 @@ static int am_net_write_macreg(int argc, char **argv)
 		return -1;
 	}
 
-	r = kstrtoint(argv[2], 0, &val);
+	r = kstrtouint(argv[2], 0, &val);
 	if (r) {
 		pr_err("kstrtoint failed\n");
 		return -1;
@@ -451,7 +470,8 @@ static const char *g_phyreg_help = {
 	"    echo w reg val > phyreg;    //write ethernet phy reg\n"
 };
 
-static ssize_t phyreg_show(struct class *class, struct class_attribute *attr, char *buf)
+static ssize_t eth_phyreg_help(
+	struct class *class, struct class_attribute *attr, char *buf)
 {
 	return sprintf(buf, "%s\n", g_phyreg_help);
 }
@@ -534,19 +554,18 @@ static void am_net_eye_pattern_on(void)
 
 	c_phy_dev->autoneg = AUTONEG_DISABLE;
 	/*stop check wol when doing eye pattern, otherwise it will reset phy*/
-//	enable_wol_check = 0;
+	enable_wol_check = 0;
 	phy_write(c_phy_dev, 0, 0x2100);
 	value = phy_read(c_phy_dev, 17);
 	pr_info("0x11 %x\n", value);
 	phy_write(c_phy_dev, 17, (value | 0x0004));
 }
-
 static void am_net_eye_pattern_off(void)
 {
 	unsigned int value;
 
 	c_phy_dev->autoneg = AUTONEG_ENABLE;
-//	enable_wol_check = 1;
+	enable_wol_check = 1;
 	phy_write(c_phy_dev, 0, 0x1000);
 	value = phy_read(c_phy_dev, 17);
 	pr_info("0x11 %x\n", value);
@@ -557,11 +576,11 @@ static void am_net_debug_mode(void)
 {	/*disable autoneg*/
 	c_phy_dev->autoneg = AUTONEG_DISABLE;
 	/*disable wol check*/
-//	enable_wol_check = 0;
+	enable_wol_check = 0;
 }
 
-static ssize_t phyreg_store(struct class *class,
-	struct class_attribute *attr,
+static ssize_t eth_phyreg_func(
+	struct class *class, struct class_attribute *attr,
 	const char *buf, size_t count)
 {
 	int argc;
@@ -656,14 +675,15 @@ static const char *g_macreg_help = {
 	"    echo w reg val > macreg;    //read ethernet mac reg\n"
 };
 
-static ssize_t macreg_show(struct class *class,
+static ssize_t eth_macreg_help(
+	struct class *class,
 	struct class_attribute *attr, char *buf)
 {
 	return sprintf(buf, "%s\n", g_macreg_help);
 }
 
-static ssize_t macreg_store(struct class *class,
-	struct class_attribute *attr,
+static ssize_t eth_macreg_func(
+	struct class *class, struct class_attribute *attr,
 	const char *buf, size_t count)
 {
 	int argc;
@@ -707,8 +727,8 @@ end:
 	return 0;
 }
 
-static ssize_t linkspeed_show(struct class *class,
-	struct class_attribute *attr, char *buf)
+static ssize_t eth_linkspeed_show(
+	struct class *class, struct class_attribute *attr, char *buf)
 {
 	int ret;
 	char buff[100];
@@ -784,8 +804,9 @@ int auto_cali(void)
 		pr_info(" I1 = %d; I2 = %d; I3 = %d; I4 = %d; I5 = %d;\n",
 			I1, I2, I3, I4, I5);
 
-		if (I1 > 0 && I2 > 0 && I3 > 0 &&
-			I4 > 0 && I5 > 0)
+		if (
+			(I1 > 0) && (I2 > 0) && (I3 > 0) &&
+			(I4 > 0) && (I5 > 0))
 			strcpy(problem, "clock delay");
 
 		pr_info(" RXDATA Line %d have %s problem\n",
@@ -817,8 +838,9 @@ static int am_net_cali(int argc, char **argv, int gate)
 		return 0;
 	}
 
-	if (argc < 4 || !argv || !argv[0] ||
-		!argv[1] || !argv[2] || !argv[3]) {
+	if (
+		(argc < 4) || (!argv) || (!argv[0]) ||
+		(!argv[1]) || (!argv[2]) || (!argv[3])) {
 		pr_err("Invalid syntax\n");
 		return -1;
 	}
@@ -853,8 +875,8 @@ static int am_net_cali(int argc, char **argv, int gate)
 	return 0;
 }
 
-static ssize_t cali_store(struct class *class,
-	struct class_attribute *attr,
+static ssize_t eth_cali_store(
+	struct class *class, struct class_attribute *attr,
 	const char *buf, size_t count)
 {
 	int argc;
@@ -864,13 +886,10 @@ static ssize_t cali_store(struct class *class,
 
 	buff = kstrdup(buf, GFP_KERNEL);
 	p = buff;
-/*only support g12a by now, needn't this*/
-/*
- *	if (get_cpu_type() < MESON_CPU_MAJOR_ID_M8B) {
- *		pr_err("Sorry ,this cpu is not support cali!\n");
- *		goto end;
- *	}
- */
+	if (get_cpu_type() < MESON_CPU_MAJOR_ID_M8B) {
+		pr_err("Sorry ,this cpu is not support cali!\n");
+		goto end;
+	}
 	for (argc = 0; argc < 5; argc++) {
 		para = strsep(&p, " ");
 		if (!para)
@@ -906,33 +925,27 @@ end:
 
 #define DRIVER_NAME "ethernet"
 static struct class *phy_sys_class;
+static CLASS_ATTR(phyreg, 0644, eth_phyreg_help, eth_phyreg_func);
+static CLASS_ATTR(macreg, 0644, eth_macreg_help, eth_macreg_func);
+static CLASS_ATTR(linkspeed, 0444, eth_linkspeed_show, NULL);
+static CLASS_ATTR(cali, 0644, NULL, eth_cali_store);
 
-static CLASS_ATTR_RW(phyreg);
-static CLASS_ATTR_RW(macreg);
-static CLASS_ATTR_RO(linkspeed);
-static CLASS_ATTR_WO(cali);
-//extern void __iomem *ioaddr_dbg;
-//EXPORT_SYMBOL(ioaddr_dbg);
 int gmac_create_sysfs(struct phy_device *phydev, void __iomem *ioaddr)
 {
-//	int r;
-//	int t;
+	int r;
+	int t;
 	int ret;
 
 	c_phy_dev  = phydev;
-//	c_ioaddr = ioaddr_dbg;
 	c_ioaddr = ioaddr;
-	if (!c_phy_dev)
-		pr_info("wzh c_phy_dev null\n");
-
-//	dev_set_drvdata(&phydev->mdio.dev, phydev);
-//	for (t = 0; t < ARRAY_SIZE(phy_reg_attrs); t++) {
-//		r = device_create_file(&phydev->mdio.dev, &phy_reg_attrs[t]);
-//		if (r) {
-//			dev_err(&phydev->mdio.dev, "failed to create sysfs file\n");
-//			return r;
-//		}
-//	}
+	dev_set_drvdata(&phydev->mdio.dev, phydev);
+	for (t = 0; t < ARRAY_SIZE(phy_reg_attrs); t++) {
+		r = device_create_file(&phydev->mdio.dev, &phy_reg_attrs[t]);
+		if (r) {
+			dev_err(&phydev->mdio.dev, "failed to create sysfs file\n");
+			return r;
+		}
+	}
 	phy_sys_class = class_create(THIS_MODULE, DRIVER_NAME);
 	ret = class_create_file(phy_sys_class, &class_attr_phyreg);
 	ret = class_create_file(phy_sys_class, &class_attr_macreg);
@@ -940,7 +953,7 @@ int gmac_create_sysfs(struct phy_device *phydev, void __iomem *ioaddr)
 	ret = class_create_file(phy_sys_class, &class_attr_cali);
 	return 0;
 }
-EXPORT_SYMBOL(gmac_create_sysfs);
+
 int gmac_remove_sysfs(struct phy_device *phydev)
 {
 	int t;
@@ -951,4 +964,4 @@ int gmac_remove_sysfs(struct phy_device *phydev)
 	c_phy_dev = NULL;
 	return 0;
 }
-EXPORT_SYMBOL(gmac_remove_sysfs);
+#endif

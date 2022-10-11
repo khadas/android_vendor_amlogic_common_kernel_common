@@ -1,4 +1,3 @@
-/* SPDX-License-Identifier: GPL-2.0 */
 #ifndef _LINUX_ELFNOTE_H
 #define _LINUX_ELFNOTE_H
 /*
@@ -59,7 +58,7 @@
 	ELFNOTE_END
 
 #else	/* !__ASSEMBLER__ */
-#include <uapi/linux/elf.h>
+#include <linux/elf.h>
 /*
  * Use an anonymous structure which matches the shape of
  * Elf{32,64}_Nhdr, but includes the name and desc data.  The size and

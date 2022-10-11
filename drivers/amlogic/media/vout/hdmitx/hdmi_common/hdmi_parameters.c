@@ -1,6 +1,18 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/amlogic/media/vout/hdmitx/hdmi_common/hdmi_parameters.c
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
 #include <linux/kernel.h>
@@ -551,7 +563,6 @@ static struct hdmi_format_para fmt_para_3840x2160p24_16x9 = {
 		.viu_mux           = VIU_MUX_ENCP,
 	},
 };
-
 static struct hdmi_format_para fmt_para_4096x2160p24_256x135 = {
 	.vic = HDMI_4096x2160p24_256x135,
 	.name = "4096x2160p24hz",
@@ -822,9 +833,9 @@ static struct hdmi_format_para fmt_para_1920x1080i60_16x9 = {
 		.h_front = 88,
 		.h_sync = 44,
 		.h_back = 148,
-		.v_active = 1080 / 2,
+		.v_active = 1080/2,
 		.v_total = 1125,
-		.v_blank = 45 / 2,
+		.v_blank = 45/2,
 		.v_front = 2,
 		.v_sync = 5,
 		.v_back = 15,
@@ -871,9 +882,9 @@ static struct hdmi_format_para fmt_para_1920x1080i50_16x9 = {
 		.h_front = 528,
 		.h_sync = 44,
 		.h_back = 148,
-		.v_active = 1080 / 2,
+		.v_active = 1080/2,
 		.v_total = 1125,
-		.v_blank = 45 / 2,
+		.v_blank = 45/2,
 		.v_front = 2,
 		.v_sync = 5,
 		.v_back = 15,
@@ -1544,6 +1555,7 @@ static struct hdmi_format_para fmt_para_3840x2160p60_16x9_y420 = {
 	},
 };
 
+
 static struct hdmi_format_para fmt_para_4096x2160p60_256x135_y420 = {
 	.vic = HDMI_4096x2160p60_256x135_Y420,
 	.name = "4096x2160p60hz420",
@@ -1595,7 +1607,7 @@ static struct hdmi_format_para fmt_para_4096x2160p60_256x135_y420 = {
 };
 
 static struct hdmi_format_para fmt_para_non_hdmi_fmt = {
-	.vic = HDMI_UNKNOWN,
+	.vic = HDMI_Unknown,
 	.name = "invalid",
 	.sname = "invalid",
 	.hdmitx_vinfo = {
@@ -2743,6 +2755,54 @@ static struct hdmi_format_para fmt_para_vesa_1920x1200p60_8x5 = {
 	},
 };
 
+static struct hdmi_format_para fmt_para_vesa_2048x1080p24_256x135 = {
+	.vic = HDMIV_2048x1080p24hz,
+	.name = "2048x1080p24hz",
+	.pixel_repetition_factor = 0,
+	.progress_mode = 1,
+	.scrambler_en = 0,
+	.tmds_clk_div40 = 0,
+	.tmds_clk = 74250,
+	.timing = {
+		.pixel_freq = 74250,
+		.frac_freq = 74176,
+		.h_freq = 27000,
+		.v_freq = 24000,
+		.vsync_polarity = 1,
+		.hsync_polarity = 1,
+		.h_active = 2048,
+		.h_total = 2750,
+		.h_blank = 702,
+		.h_front = 148,
+		.h_sync = 44,
+		.h_back = 510,
+		.v_active = 1080,
+		.v_total = 1125,
+		.v_blank = 45,
+		.v_front = 4,
+		.v_sync = 5,
+		.v_back = 36,
+		.v_sync_ln = 1,
+	},
+	.hdmitx_vinfo = {
+		.name              = "2048x1080p24hz",
+		.mode              = VMODE_HDMI,
+		.width             = 2048,
+		.height            = 1080,
+		.field_height      = 1080,
+		.aspect_ratio_num  = 256,
+		.aspect_ratio_den  = 135,
+		.sync_duration_num = 24,
+		.sync_duration_den = 1,
+		.video_clk         = 74250000,
+		.htotal            = 2750,
+		.vtotal            = 1125,
+		.fr_adj_type       = VOUT_FR_ADJ_HDMI,
+		.viu_color_fmt     = COLOR_FMT_YUV444,
+		.viu_mux           = VIU_MUX_ENCP,
+	},
+};
+
 static struct hdmi_format_para fmt_para_vesa_2160x1200p90_9x5 = {
 	.vic = HDMIV_2160x1200p90hz,
 	.name = "2160x1200p90hz",
@@ -2889,6 +2949,7 @@ static struct hdmi_format_para fmt_para_vesa_3440x1440p60_43x18 = {
 	},
 };
 
+
 static struct hdmi_format_para fmt_para_vesa_2400x1200p90_2x1 = {
 	.vic = HDMIV_2400x1200p90hz,
 	.name = "2400x1200p90hz",
@@ -2994,6 +3055,7 @@ static struct hdmi_format_para *all_fmt_paras[] = {
 	&fmt_para_vesa_1600x1200p60_4x3,
 	&fmt_para_vesa_1680x1050p60_8x5,
 	&fmt_para_vesa_1920x1200p60_8x5,
+	&fmt_para_vesa_2048x1080p24_256x135,
 	&fmt_para_vesa_2160x1200p90_9x5,
 	&fmt_para_vesa_2560x1600p60_8x5,
 	&fmt_para_vesa_3440x1440p60_43x18,
@@ -3006,13 +3068,12 @@ struct hdmi_format_para *hdmi_get_fmt_paras(enum hdmi_vic vic)
 {
 	int i;
 
-	for (i = 0; all_fmt_paras[i]; i++) {
+	for (i = 0; all_fmt_paras[i] != NULL; i++) {
 		if (vic == all_fmt_paras[i]->vic)
 			return all_fmt_paras[i];
 	}
 	return &fmt_para_non_hdmi_fmt;
 }
-EXPORT_SYMBOL(hdmi_get_fmt_paras);
 
 struct hdmi_format_para *hdmi_match_dtd_paras(struct dtd *t)
 {
@@ -3023,14 +3084,14 @@ struct hdmi_format_para *hdmi_match_dtd_paras(struct dtd *t)
 	for (i = 0; all_fmt_paras[i]; i++) {
 		if ((abs(all_fmt_paras[i]->timing.pixel_freq / 10
 		    - t->pixel_clock) <= (t->pixel_clock + 1000) / 1000) &&
-		    t->h_active == all_fmt_paras[i]->timing.h_active &&
-		    t->h_blank == all_fmt_paras[i]->timing.h_blank &&
-		    t->v_active == all_fmt_paras[i]->timing.v_active &&
-		    t->v_blank == all_fmt_paras[i]->timing.v_blank &&
-		    t->h_sync_offset == all_fmt_paras[i]->timing.h_front &&
-		    t->h_sync == all_fmt_paras[i]->timing.h_sync &&
-		    t->v_sync_offset == all_fmt_paras[i]->timing.v_front &&
-		    t->v_sync == all_fmt_paras[i]->timing.v_sync
+		    (t->h_active == all_fmt_paras[i]->timing.h_active) &&
+		    (t->h_blank == all_fmt_paras[i]->timing.h_blank) &&
+		    (t->v_active == all_fmt_paras[i]->timing.v_active) &&
+		    (t->v_blank == all_fmt_paras[i]->timing.v_blank) &&
+		    (t->h_sync_offset == all_fmt_paras[i]->timing.h_front) &&
+		    (t->h_sync == all_fmt_paras[i]->timing.h_sync) &&
+		    (t->v_sync_offset == all_fmt_paras[i]->timing.v_front) &&
+		    (t->v_sync == all_fmt_paras[i]->timing.v_sync)
 		    )
 			return all_fmt_paras[i];
 	}
@@ -3044,9 +3105,9 @@ struct hdmi_format_para *hdmi_get_vesa_paras(struct vesa_standard_timing *t)
 
 	if (!t)
 		return NULL;
-	for (i = 0; all_fmt_paras[i]; i++) {
-		if (t->hactive == all_fmt_paras[i]->timing.h_active &&
-		    t->vactive == all_fmt_paras[i]->timing.v_active) {
+	for (i = 0; all_fmt_paras[i] != NULL; i++) {
+		if ((t->hactive == all_fmt_paras[i]->timing.h_active) &&
+			(t->vactive == all_fmt_paras[i]->timing.v_active)) {
 			if (t->vsync) {
 				unsigned int vsync;
 
@@ -3058,12 +3119,12 @@ struct hdmi_format_para *hdmi_get_vesa_paras(struct vesa_standard_timing *t)
 				if (t->vsync == vsync)
 					return all_fmt_paras[i];
 			}
-			if (t->hblank &&
-			    t->hblank == all_fmt_paras[i]->timing.h_blank &&
-			    t->vblank &&
-			    t->vblank == all_fmt_paras[i]->timing.v_blank &&
-			    t->tmds_clk &&
-			    t->tmds_clk == all_fmt_paras[i]->tmds_clk / 10)
+			if ((t->hblank && (t->hblank ==
+				all_fmt_paras[i]->timing.h_blank))
+				 && (t->vblank && (t->vblank ==
+				all_fmt_paras[i]->timing.v_blank))
+				 && (t->tmds_clk && (t->tmds_clk ==
+				all_fmt_paras[i]->tmds_clk / 10)))
 				return all_fmt_paras[i];
 		}
 	}
@@ -3170,7 +3231,7 @@ struct hdmi_format_para *hdmi_get_fmt_name(char const *name, char const *attr)
 {
 	int i;
 	char *lname;
-	enum hdmi_vic vic = HDMI_UNKNOWN;
+	enum hdmi_vic vic = HDMI_Unknown;
 	struct hdmi_format_para *para = &fmt_para_non_hdmi_fmt;
 	unsigned int copy_len;
 
@@ -3189,7 +3250,7 @@ struct hdmi_format_para *hdmi_get_fmt_name(char const *name, char const *attr)
 			break;
 		}
 	}
-	if (vic != HDMI_UNKNOWN && (i != sizeof(all_fmt_paras) /
+	if ((vic != HDMI_Unknown) && (i != sizeof(all_fmt_paras) /
 		sizeof(struct hdmi_format_para *))) {
 		para = all_fmt_paras[i];
 		memset(&para->ext_name[0], 0, sizeof(para->ext_name));
@@ -3228,7 +3289,7 @@ struct hdmi_format_para *hdmi_get_fmt_name(char const *name, char const *attr)
 
 static struct hdmi_format_para tst_para;
 static inline void copy_para(struct hdmi_format_para *des,
-			     struct hdmi_format_para *src)
+	struct hdmi_format_para *src)
 {
 	if (!des || !src)
 		return;
@@ -3239,7 +3300,7 @@ struct hdmi_format_para *hdmi_tst_fmt_name(char const *name, char const *attr)
 {
 	int i;
 	char *lname;
-	enum hdmi_vic vic = HDMI_UNKNOWN;
+	enum hdmi_vic vic = HDMI_Unknown;
 	unsigned int copy_len;
 
 	copy_para(&tst_para, &fmt_para_non_hdmi_fmt);
@@ -3258,7 +3319,7 @@ struct hdmi_format_para *hdmi_tst_fmt_name(char const *name, char const *attr)
 			break;
 		}
 	}
-	if (vic != HDMI_UNKNOWN && (i != sizeof(all_fmt_paras) /
+	if ((vic != HDMI_Unknown) && (i != sizeof(all_fmt_paras) /
 		sizeof(struct hdmi_format_para *))) {
 		copy_para(&tst_para, all_fmt_paras[i]);
 		memset(&tst_para.ext_name[0], 0, sizeof(tst_para.ext_name));
@@ -3312,8 +3373,8 @@ struct vinfo_s *hdmi_get_valid_vinfo(char *mode)
 			int i = 0;
 
 			for (; mode_[i]; i++) {
-				if (mode_[i] == 'f' &&
-				    mode_[i + 1] == 'p') {
+				if ((mode_[i] == 'f') &&
+					(mode_[i + 1] == 'p')) {
 					do {
 						mode_[i] = mode_[i + 1];
 						i++;
@@ -3331,7 +3392,7 @@ struct vinfo_s *hdmi_get_valid_vinfo(char *mode)
 			if (all_fmt_paras[i]->hdmitx_vinfo.mode == VMODE_MAX)
 				continue;
 			if (strncmp(all_fmt_paras[i]->hdmitx_vinfo.name, mode_,
-				    strlen(mode_)) == 0) {
+				strlen(mode_)) == 0) {
 				info = &all_fmt_paras[i]->hdmitx_vinfo;
 				break;
 			}
@@ -3348,7 +3409,7 @@ void check_detail_fmt(void)
 	struct hdmi_cea_timing *t;
 
 	pr_warn("VIC Hactive Vactive I/P Htotal Hblank Vtotal Vblank Hfreq Vfreq Pfreq\n");
-	for (i = 0; all_fmt_paras[i]; i++) {
+	for (i = 0; all_fmt_paras[i] != NULL; i++) {
 		p = all_fmt_paras[i];
 		t = &p->timing;
 		pr_warn("%s[%d] %d %d %c %d %d %d %d %d %d %d\n",
@@ -3360,7 +3421,7 @@ void check_detail_fmt(void)
 	}
 
 	pr_warn("\nVIC Hfront Hsync Hback Hpol Vfront Vsync Vback Vpol Ln\n");
-	for (i = 0; all_fmt_paras[i]; i++) {
+	for (i = 0; all_fmt_paras[i] != NULL; i++) {
 		p = all_fmt_paras[i];
 		t = &p->timing;
 	pr_warn("%s[%d] %d %d %d %c %d %d %d %c %d\n",
@@ -3373,13 +3434,13 @@ void check_detail_fmt(void)
 	}
 
 	pr_warn("\nCheck Horizon parameter\n");
-	for (i = 0; all_fmt_paras[i]; i++) {
+	for (i = 0; all_fmt_paras[i] != NULL; i++) {
 		p = all_fmt_paras[i];
 		t = &p->timing;
 	if (t->h_total != (t->h_active + t->h_blank))
 		pr_warn("VIC[%d] Ht[%d] != (Ha[%d] + Hb[%d])\n",
-			all_fmt_paras[i]->vic, t->h_total,
-			t->h_active, t->h_blank);
+		all_fmt_paras[i]->vic, t->h_total, t->h_active,
+		t->h_blank);
 	if (t->h_blank != (t->h_front + t->h_sync + t->h_back))
 		pr_warn("VIC[%d] Hb[%d] != (Hf[%d] + Hs[%d] + Hb[%d])\n",
 			all_fmt_paras[i]->vic, t->h_blank,
@@ -3387,20 +3448,20 @@ void check_detail_fmt(void)
 	}
 
 	pr_warn("\nCheck Vertical parameter\n");
-	for (i = 0; all_fmt_paras[i]; i++) {
+	for (i = 0; all_fmt_paras[i] != NULL; i++) {
 		p = all_fmt_paras[i];
 		t = &p->timing;
 		if (t->v_total != (t->v_active + t->v_blank))
 			pr_warn("VIC[%d] Vt[%d] != (Va[%d] + Vb[%d]\n",
 				all_fmt_paras[i]->vic, t->v_total, t->v_active,
 				t->v_blank);
-	if ((t->v_blank != (t->v_front + t->v_sync + t->v_back)) &&
-	    p->progress_mode == 1)
+	if ((t->v_blank != (t->v_front + t->v_sync + t->v_back))
+		& (p->progress_mode == 1))
 		pr_warn("VIC[%d] Vb[%d] != (Vf[%d] + Vs[%d] + Vb[%d])\n",
 			all_fmt_paras[i]->vic, t->v_blank,
 			t->v_front, t->v_sync, t->v_back);
-	if ((t->v_blank / 2 != (t->v_front + t->v_sync + t->v_back)) &&
-	    p->progress_mode == 0)
+	if ((t->v_blank/2 != (t->v_front + t->v_sync + t->v_back))
+		& (p->progress_mode == 0))
 		pr_warn("VIC[%d] Vb[%d] != (Vf[%d] + Vs[%d] + Vb[%d])\n",
 			all_fmt_paras[i]->vic, t->v_blank, t->v_front,
 			t->v_sync, t->v_back);
@@ -3408,7 +3469,7 @@ void check_detail_fmt(void)
 }
 
 /* Recommended N and Expected CTS for 32kHz */
-static const struct hdmi_audio_fs_ncts aud_32k_para = {
+struct hdmi_audio_fs_ncts aud_32k_para = {
 	.array[0] = {
 		.tmds_clk = 25175,
 		.n = 4576,
@@ -3523,7 +3584,7 @@ static const struct hdmi_audio_fs_ncts aud_32k_para = {
 };
 
 /* Recommended N and Expected CTS for 44.1kHz and Multiples */
-static const struct hdmi_audio_fs_ncts aud_44k1_para = {
+struct hdmi_audio_fs_ncts aud_44k1_para = {
 	.array[0] = {
 		.tmds_clk = 25175,
 		.n = 7007,
@@ -3638,7 +3699,7 @@ static const struct hdmi_audio_fs_ncts aud_44k1_para = {
 };
 
 /* Recommended N and Expected CTS for 48kHz and Multiples */
-static const struct hdmi_audio_fs_ncts aud_48k_para = {
+struct hdmi_audio_fs_ncts aud_48k_para = {
 	.array[0] = {
 		.tmds_clk = 25175,
 		.n = 6864,
@@ -3752,7 +3813,7 @@ static const struct hdmi_audio_fs_ncts aud_48k_para = {
 	.def_n = 6144,
 };
 
-static const struct hdmi_audio_fs_ncts *all_aud_paras[] = {
+static struct hdmi_audio_fs_ncts *all_aud_paras[] = {
 	&aud_32k_para,
 	&aud_44k1_para,
 	&aud_48k_para,
@@ -3760,10 +3821,9 @@ static const struct hdmi_audio_fs_ncts *all_aud_paras[] = {
 };
 
 unsigned int hdmi_get_aud_n_paras(enum hdmi_audio_fs fs,
-				  enum hdmi_color_depth cd,
-				  unsigned int tmds_clk)
+	enum hdmi_color_depth cd, unsigned int tmds_clk)
 {
-	const struct hdmi_audio_fs_ncts *p = NULL;
+	struct hdmi_audio_fs_ncts *p = NULL;
 	unsigned int i, n;
 	unsigned int N_multiples = 1;
 
@@ -3808,7 +3868,7 @@ unsigned int hdmi_get_aud_n_paras(enum hdmi_audio_fs fs,
 	}
 
 	if (i < AUDIO_PARA_MAX_NUM)
-		if (cd == COLORDEPTH_24B || cd == COLORDEPTH_30B)
+		if ((cd == COLORDEPTH_24B) || (cd == COLORDEPTH_30B))
 			n = p->array[i].n ? p->array[i].n : p->def_n;
 		else if (cd == COLORDEPTH_36B)
 			n = p->array[i].n_36bit ?
@@ -3822,44 +3882,43 @@ unsigned int hdmi_get_aud_n_paras(enum hdmi_audio_fs fs,
 		n = p->def_n;
 	return n * N_multiples;
 }
-
+/*--------------------------------------------------------------*/
 /* for csc coef */
 
-static const unsigned char coef_yc444_rgb_24bit_601[] = {
+static unsigned char coef_yc444_rgb_24bit_601[] = {
 	0x20, 0x00, 0x69, 0x26, 0x74, 0xfd, 0x01, 0x0e,
 	0x20, 0x00, 0x2c, 0xdd, 0x00, 0x00, 0x7e, 0x9a,
 	0x20, 0x00, 0x00, 0x00, 0x38, 0xb4, 0x7e, 0x3b
 };
 
-static const unsigned char coef_yc444_rgb_24bit_709[] = {
+static unsigned char coef_yc444_rgb_24bit_709[] = {
 	0x20, 0x00, 0x71, 0x06, 0x7a, 0x02, 0x00, 0xa7,
 	0x20, 0x00, 0x32, 0x64, 0x00, 0x00, 0x7e, 0x6d,
 	0x20, 0x00, 0x00, 0x00, 0x3b, 0x61, 0x7e, 0x25
 };
 
-static const struct hdmi_csc_coef_table hdmi_csc_coef[] = {
+
+static struct hdmi_csc_coef_table hdmi_csc_coef[] = {
 	{COLORSPACE_YUV444, COLORSPACE_RGB444, COLORDEPTH_24B, 0,
 		sizeof(coef_yc444_rgb_24bit_601), coef_yc444_rgb_24bit_601},
 	{COLORSPACE_YUV444, COLORSPACE_RGB444, COLORDEPTH_24B, 1,
 		sizeof(coef_yc444_rgb_24bit_709), coef_yc444_rgb_24bit_709},
 };
 
-unsigned int hdmi_get_csc_coef(unsigned int input_format,
-			       unsigned int output_format,
-			       unsigned int color_depth,
-			       unsigned int color_format,
-			       const unsigned char **coef_array,
-			       unsigned int *coef_length)
+unsigned int hdmi_get_csc_coef(
+	unsigned int input_format, unsigned int output_format,
+	unsigned int color_depth, unsigned int color_format,
+	unsigned char **coef_array, unsigned int *coef_length)
 {
 	unsigned int i = 0, max = 0;
 
-	max = sizeof(hdmi_csc_coef) / sizeof(struct hdmi_csc_coef_table);
+	max = sizeof(hdmi_csc_coef)/sizeof(struct hdmi_csc_coef_table);
 
 	for (i = 0; i < max; i++) {
-		if (input_format == hdmi_csc_coef[i].input_format &&
-		    output_format == hdmi_csc_coef[i].output_format &&
-		    color_depth == hdmi_csc_coef[i].color_depth &&
-		    color_format == hdmi_csc_coef[i].color_format) {
+		if ((input_format == hdmi_csc_coef[i].input_format) &&
+			(output_format == hdmi_csc_coef[i].output_format) &&
+			(color_depth == hdmi_csc_coef[i].color_depth) &&
+			(color_format == hdmi_csc_coef[i].color_format)) {
 			*coef_array = hdmi_csc_coef[i].coef;
 			*coef_length = hdmi_csc_coef[i].coef_length;
 			return 0;
@@ -3897,4 +3956,3 @@ bool is_hdmi4k_420(enum hdmi_vic vic)
 		return 1;
 	return 0;
 }
-

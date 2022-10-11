@@ -1,4 +1,3 @@
-// SPDX-License-Identifier: GPL-2.0
 /*
  *
  * sched-messaging.c
@@ -10,7 +9,10 @@
  *
  */
 
+#include "../perf.h"
+#include "../util/util.h"
 #include <subcmd/parse-options.h>
+#include "../builtin.h"
 #include "bench.h"
 
 /* Test groups of 20 processes spraying to 20 receivers */
@@ -258,7 +260,8 @@ static const char * const bench_sched_message_usage[] = {
 	NULL
 };
 
-int bench_sched_messaging(int argc, const char **argv)
+int bench_sched_messaging(int argc, const char **argv,
+		    const char *prefix __maybe_unused)
 {
 	unsigned int i, total_children;
 	struct timeval start, stop, diff;

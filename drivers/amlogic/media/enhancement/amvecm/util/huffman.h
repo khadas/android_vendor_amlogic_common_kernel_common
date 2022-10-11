@@ -1,4 +1,3 @@
-/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
  * drivers/amlogic/media/enhancement/amvecm/util/huffman.h
  *
@@ -44,9 +43,10 @@ sizeof(unsigned long)) * 257))
  * @param huffheap Heap memory to use for compression
  * @return Size of encoded result or 0 on out buffer overrun
  */
-unsigned long huffman_compress(const unsigned char *in, unsigned long inlen,
-			       unsigned char *out,
-			       unsigned long outlen, void *huffheap);
+unsigned long huffman_compress(
+	const unsigned char *in, unsigned long inlen,
+	unsigned char *out,
+	unsigned long outlen, void *huffheap);
 
 /**
  * Huffman decode a block of data
@@ -58,8 +58,9 @@ unsigned long huffman_compress(const unsigned char *in, unsigned long inlen,
  * @param huffheap Heap memory to use for decompression
  * @return Size of decoded result or 0
  */
-unsigned long huffman_decompress(const unsigned char *in, unsigned long inlen,
-				 unsigned char *out,
-				 unsigned long outlen, void *huffheap);
+unsigned long huffman_decompress(
+	const unsigned char *in, unsigned long inlen,
+	unsigned char *out,
+	unsigned long outlen, void *huffheap);
 
 #endif

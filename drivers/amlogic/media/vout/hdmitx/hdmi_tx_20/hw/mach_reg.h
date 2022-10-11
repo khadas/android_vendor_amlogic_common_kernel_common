@@ -1,18 +1,176 @@
-/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/amlogic/media/vout/hdmitx/hdmi_tx_20/hw/mach_reg.h
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
 #ifndef __MACH_REG_H__
 #define __MACH_REG_H__
 
 #include <linux/delay.h>
-#include "reg_ops.h"
 
 struct reg_s {
 	unsigned int reg;
 	unsigned int val;
 };
+
+unsigned int hd_read_reg(unsigned int addr);
+void hd_write_reg(unsigned int addr, unsigned int val);
+void hd_set_reg_bits(unsigned int addr, unsigned int value, unsigned int offset,
+	unsigned int len);
+void init_reg_map(unsigned int type);
+
+#define CBUS_REG_IDX		0
+#define PERIPHS_REG_IDX		1
+#define VCBUS_REG_IDX		2
+#define AOBUS_REG_IDX		3
+#define HHI_REG_IDX		4
+#define RESET_CBUS_REG_IDX	5
+#define HDMITX_REG_IDX		6
+#define HDMITX_SEC_REG_IDX	7
+#define ELP_ESM_REG_IDX		8
+/* new added in SC2 */
+#define ANACTRL_REG_IDX		9
+#define PWRCTRL_REG_IDX		10
+#define RESETCTRL_REG_IDX	11
+#define SYSCTRL_REG_IDX		12
+#define CLKCTRL_REG_IDX		13
+#define REG_IDX_END		14
+
+#define REG_ADDR_END 0xffffffff
+
+#define BASE_REG_OFFSET		24
+
+#define CBUS_REG_ADDR(reg) \
+	((CBUS_REG_IDX << BASE_REG_OFFSET) + ((reg) << 2))
+#define PERIPHS_REG_ADDR(reg) \
+	((PERIPHS_REG_IDX << BASE_REG_OFFSET) + ((reg) << 2))
+#define VCBUS_REG_ADDR(reg) \
+	((VCBUS_REG_IDX << BASE_REG_OFFSET) + ((reg) << 2))
+#define AOBUS_REG_ADDR(reg) \
+	((AOBUS_REG_IDX << BASE_REG_OFFSET) + ((reg) << 2))
+#define HHI_REG_ADDR(reg) \
+	((HHI_REG_IDX << BASE_REG_OFFSET) + ((reg) << 2))
+#define RESET_CBUS_REG_ADDR(reg) \
+	((RESET_CBUS_REG_IDX << BASE_REG_OFFSET) + ((reg) << 2))
+#define HDMITX_SEC_REG_ADDR(reg) \
+	((HDMITX_SEC_REG_IDX << BASE_REG_OFFSET) + (reg))
+#define HDMITX_REG_ADDR(reg) \
+	((HDMITX_REG_IDX << BASE_REG_OFFSET) + (reg))
+#define ELP_ESM_REG_ADDR(reg) \
+	((ELP_ESM_REG_IDX << BASE_REG_OFFSET) + ((reg) << 2))
+#define ANACTRL_REG_ADDR(reg) \
+	((ANACTRL_REG_IDX << BASE_REG_OFFSET) + ((reg) << 2))
+#define PWRCTRL_REG_ADDR(reg) \
+	((PWRCTRL_REG_IDX << BASE_REG_OFFSET) + ((reg) << 2))
+#define RESETCTRL_REG_ADDR(reg) \
+	((RESETCTRL_REG_IDX << BASE_REG_OFFSET) + ((reg) << 2))
+#define SYSCTRL_REG_ADDR(reg) \
+	((SYSCTRL_REG_IDX << BASE_REG_OFFSET) + ((reg) << 2))
+#define CLKCTRL_REG_ADDR(reg) \
+	((CLKCTRL_REG_IDX << BASE_REG_OFFSET) + ((reg) << 2))
+
+#define WAIT_FOR_PLL_LOCKED(reg)				\
+	do {							\
+		unsigned int st = 0, cnt = 10;			\
+		while (cnt--) {                                 \
+			udelay(50);				\
+			st = !!(hd_read_reg(reg) & (1 << 31));	\
+			if (st)					\
+				break;				\
+			else {					\
+				/* reset hpll */		\
+				hd_set_reg_bits(reg, 1, 28, 1);	\
+				hd_set_reg_bits(reg, 0, 28, 1);	\
+			}					\
+		}						\
+		if (cnt < 9)					\
+			pr_info("pll[0x%x] reset %d times\n", reg, 9 - cnt);\
+	} while (0)
+
+#define P_PREG_PAD_GPIO6_EN_N PERIPHS_REG_ADDR(0x08)
+#define P_PREG_PAD_GPIO6_O    PERIPHS_REG_ADDR(0x09)
+#define P_PREG_PAD_GPIO6_I    PERIPHS_REG_ADDR(0x0a)
+#define P_PREG_JTAG_GPIO_ADDR PERIPHS_REG_ADDR(0x0b)
+#define P_PREG_PAD_GPIO0_EN_N PERIPHS_REG_ADDR(0x0c)
+#define P_PREG_PAD_GPIO0_O    PERIPHS_REG_ADDR(0x0d)
+#define P_PREG_PAD_GPIO0_I    PERIPHS_REG_ADDR(0x0e)
+#define P_PREG_PAD_GPIO1_EN_N PERIPHS_REG_ADDR(0x0f)
+#define P_PREG_PAD_GPIO1_O    PERIPHS_REG_ADDR(0x10)
+#define P_PREG_PAD_GPIO1_I    PERIPHS_REG_ADDR(0x11)
+#define P_PREG_PAD_GPIO2_EN_N PERIPHS_REG_ADDR(0x12)
+#define P_PREG_PAD_GPIO2_O    PERIPHS_REG_ADDR(0x13)
+#define P_PREG_PAD_GPIO2_I    PERIPHS_REG_ADDR(0x14)
+#define P_PREG_PAD_GPIO3_EN_N PERIPHS_REG_ADDR(0x15)
+#define P_PREG_PAD_GPIO3_O    PERIPHS_REG_ADDR(0x16)
+#define P_PREG_PAD_GPIO3_I    PERIPHS_REG_ADDR(0x17)
+#define P_PREG_PAD_GPIO4_EN_N PERIPHS_REG_ADDR(0x18)
+#define P_PREG_PAD_GPIO4_O    PERIPHS_REG_ADDR(0x19)
+#define P_PREG_PAD_GPIO4_I    PERIPHS_REG_ADDR(0x1a)
+#define P_PREG_PAD_GPIO5_EN_N PERIPHS_REG_ADDR(0x1b)
+#define P_PREG_PAD_GPIO5_O    PERIPHS_REG_ADDR(0x1c)
+#define P_PREG_PAD_GPIO5_I    PERIPHS_REG_ADDR(0x1d)
+
+#define PERIPHS_PIN_MUX_0 0x2c	/* register.h:419 */
+#define P_PERIPHS_PIN_MUX_0 PERIPHS_REG_ADDR(PERIPHS_PIN_MUX_0)
+#define PERIPHS_PIN_MUX_1 0x2d	/* register.h:420 */
+#define P_PERIPHS_PIN_MUX_1 PERIPHS_REG_ADDR(PERIPHS_PIN_MUX_1)
+#define PERIPHS_PIN_MUX_2 0x2e	/* register.h:421 */
+#define P_PERIPHS_PIN_MUX_2 PERIPHS_REG_ADDR(PERIPHS_PIN_MUX_2)
+#define PERIPHS_PIN_MUX_3 0x2f	/* register.h:422 */
+#define P_PERIPHS_PIN_MUX_3 PERIPHS_REG_ADDR(PERIPHS_PIN_MUX_3)
+#define PERIPHS_PIN_MUX_4 0x30	/* register.h:423 */
+#define P_PERIPHS_PIN_MUX_4 PERIPHS_REG_ADDR(PERIPHS_PIN_MUX_4)
+#define PERIPHS_PIN_MUX_5 0x31	/* register.h:424 */
+#define P_PERIPHS_PIN_MUX_5 PERIPHS_REG_ADDR(PERIPHS_PIN_MUX_5)
+#define PERIPHS_PIN_MUX_6 0x32	/* register.h:425 */
+#define P_PERIPHS_PIN_MUX_6 PERIPHS_REG_ADDR(PERIPHS_PIN_MUX_6)
+#define PERIPHS_PIN_MUX_7 0x33	/* register.h:426 */
+#define P_PERIPHS_PIN_MUX_7 PERIPHS_REG_ADDR(PERIPHS_PIN_MUX_7)
+#define PERIPHS_PIN_MUX_8 0x34	/* register.h:427 */
+#define P_PERIPHS_PIN_MUX_8 PERIPHS_REG_ADDR(PERIPHS_PIN_MUX_8)
+#define PERIPHS_PIN_MUX_9 0x35	/* register.h:428 */
+#define P_PERIPHS_PIN_MUX_9 PERIPHS_REG_ADDR(PERIPHS_PIN_MUX_9)
+#define PERIPHS_PIN_MUX_10 0x36	/* register.h:429 */
+#define P_PERIPHS_PIN_MUX_10 PERIPHS_REG_ADDR(PERIPHS_PIN_MUX_10)
+#define PERIPHS_PIN_MUX_11 0x37	/* register.h:430 */
+#define P_PERIPHS_PIN_MUX_11 PERIPHS_REG_ADDR(PERIPHS_PIN_MUX_11)
+#define PERIPHS_PIN_MUX_12 0x38	/* register.h:431 */
+#define P_PERIPHS_PIN_MUX_12 PERIPHS_REG_ADDR(PERIPHS_PIN_MUX_12)
+#define PERIPHS_PIN_MUX_B 0xbb	/* register.h:431 */
+#define P_PERIPHS_PIN_MUX_B PERIPHS_REG_ADDR(PERIPHS_PIN_MUX_B)
+
+#define PAD_PULL_UP_REG0 0x3a
+#define P_PAD_PULL_UP_REG0 PERIPHS_REG_ADDR(PAD_PULL_UP_REG0)
+#define PAD_PULL_UP_REG1 0x3b
+#define P_PAD_PULL_UP_REG1 PERIPHS_REG_ADDR(PAD_PULL_UP_REG1)
+#define PAD_PULL_UP_REG2 0x3c
+#define P_PAD_PULL_UP_REG2 PERIPHS_REG_ADDR(PAD_PULL_UP_REG2)
+#define PAD_PULL_UP_REG3 0x3d
+#define P_PAD_PULL_UP_REG3 PERIPHS_REG_ADDR(PAD_PULL_UP_REG3)
+#define PAD_PULL_UP_REG4 0x3e
+#define P_PAD_PULL_UP_REG4 PERIPHS_REG_ADDR(PAD_PULL_UP_REG4)
+#define PAD_PULL_UP_EN_REG0 0x48
+#define P_PAD_PULL_UP_EN_REG0 PERIPHS_REG_ADDR(PAD_PULL_UP_EN_REG0)
+#define PAD_PULL_UP_EN_REG1 0x49
+#define P_PAD_PULL_UP_EN_REG1 PERIPHS_REG_ADDR(PAD_PULL_UP_EN_REG1)
+#define PAD_PULL_UP_EN_REG2 0x4a
+#define P_PAD_PULL_UP_EN_REG2 PERIPHS_REG_ADDR(PAD_PULL_UP_EN_REG2)
+#define PAD_PULL_UP_EN_REG3 0x4b
+#define P_PAD_PULL_UP_EN_REG3 PERIPHS_REG_ADDR(PAD_PULL_UP_EN_REG3)
+#define PAD_PULL_UP_EN_REG4 0x4c
+#define P_PAD_PULL_UP_EN_REG4 PERIPHS_REG_ADDR(PAD_PULL_UP_EN_REG4)
 
 #define TM2_HHI_HDMI_PHY_CNTL0 0x05
 #define P_TM2_HHI_HDMI_PHY_CNTL0 HHI_REG_ADDR(TM2_HHI_HDMI_PHY_CNTL0)
@@ -125,18 +283,48 @@ struct reg_s {
 #define HHI_VID_LOCK_CLK_CNTL 0xf2
 #define P_HHI_VID_LOCK_CLK_CNTL HHI_REG_ADDR(HHI_VID_LOCK_CLK_CNTL)
 
-#define RESET0_REGISTER 0x1100
-#define P_RESET0_REGISTER CBUS_REG_ADDR(RESET0_REGISTER)
-#define RESET2_REGISTER 0x1103
-#define P_RESET2_REGISTER CBUS_REG_ADDR(RESET2_REGISTER)
+#define VERSION_CTRL 0x00
+#define P_VERSION_CTRL RESET_CBUS_REG_ADDR(VERSION_CTRL)
+#define RESET0_REGISTER 0x01
+#define P_RESET0_REGISTER RESET_CBUS_REG_ADDR(RESET0_REGISTER)
+#define RESET1_REGISTER 0x02
+#define P_RESET1_REGISTER RESET_CBUS_REG_ADDR(RESET1_REGISTER)
+#define RESET2_REGISTER 0x03
+#define P_RESET2_REGISTER RESET_CBUS_REG_ADDR(RESET2_REGISTER)
+#define RESET3_REGISTER 0x04
+#define P_RESET3_REGISTER RESET_CBUS_REG_ADDR(RESET3_REGISTER)
+#define RESET4_REGISTER 0x05
+#define P_RESET4_REGISTER RESET_CBUS_REG_ADDR(RESET4_REGISTER)
+#define RESET5_REGISTER 0x06
+#define P_RESET5_REGISTER RESET_CBUS_REG_ADDR(RESET5_REGISTER)
+#define RESET6_REGISTER 0x07
+#define P_RESET6_REGISTER RESET_CBUS_REG_ADDR(RESET6_REGISTER)
+#define RESET7_REGISTER 0x08
+#define P_RESET7_REGISTER RESET_CBUS_REG_ADDR(RESET7_REGISTER)
+#define RESET0_MASK 0x10
+#define P_RESET0_MASK RESET_CBUS_REG_ADDR(RESET0_MASK)
+#define RESET1_MASK 0x11
+#define P_RESET1_MASK RESET_CBUS_REG_ADDR(RESET1_MASK)
+#define RESET2_MASK 0x12
+#define P_RESET2_MASK RESET_CBUS_REG_ADDR(RESET2_MASK)
+#define RESET3_MASK 0x13
+#define P_RESET3_MASK RESET_CBUS_REG_ADDR(RESET3_MASK)
+#define RESET4_MASK 0x14
+#define P_RESET4_MASK RESET_CBUS_REG_ADDR(RESET4_MASK)
+#define RESET5_MASK 0x15
+#define P_RESET5_MASK RESET_CBUS_REG_ADDR(RESET5_MASK)
+#define RESET6_MASK 0x16
+#define P_RESET6_MASK RESET_CBUS_REG_ADDR(RESET6_MASK)
 
 #define AIU_HDMI_CLK_DATA_CTRL 0x152a	/* register.h:2466 */
 #define P_AIU_HDMI_CLK_DATA_CTRL CBUS_REG_ADDR(AIU_HDMI_CLK_DATA_CTRL)
 #define ISA_DEBUG_REG0 0x00
 #define P_ISA_DEBUG_REG0 CBUS_REG_ADDR(ISA_DEBUG_REG0)
 
+
 #define VENC_DVI_SETTING 0x1b62	/* register.h:8014 */
 #define P_VENC_DVI_SETTING VCBUS_REG_ADDR(VENC_DVI_SETTING)
+
 #define VENC_VIDEO_TST_EN 0x1b70
 #define P_VENC_VIDEO_TST_EN VCBUS_REG_ADDR(VENC_VIDEO_TST_EN)
 #define VENC_VIDEO_TST_MDSEL 0x1b71
@@ -604,6 +792,7 @@ struct reg_s {
 #define VPP_POSTBLEND_H_SIZE 0x1d21
 #define P_VPP_POSTBLEND_H_SIZE VCBUS_REG_ADDR(VPP_POSTBLEND_H_SIZE)
 
+
 #define VPU_HDMI_SETTING 0x271b	/* register.h:9229 */
 #define P_VPU_HDMI_SETTING VCBUS_REG_ADDR(VPU_HDMI_SETTING)
 
@@ -614,6 +803,26 @@ struct reg_s {
 /* For GXM and later */
 #define VPU_HDMI_DITH_CNTL 0x27fc
 #define P_VPU_HDMI_DITH_CNTL VCBUS_REG_ADDR(VPU_HDMI_DITH_CNTL)
+
+/* c_always_on_pointer.h:71 */
+#define AO_RTI_PULL_UP_REG 0x0B
+#define P_AO_RTI_PULL_UP_REG		AOBUS_REG_ADDR(AO_RTI_PULL_UP_REG)
+#define AO_RTI_PIN_MUX_REG 0x05
+#define P_AO_RTI_PIN_MUX_REG		AOBUS_REG_ADDR(AO_RTI_PIN_MUX_REG)
+#define AO_RTI_PIN_MUX_REG2 0x06
+#define P_AO_RTI_PIN_MUX_REG2		AOBUS_REG_ADDR(AO_RTI_PIN_MUX_REG2)
+#define AO_CRT_CLK_CNTL1 0x1A
+#define P_AO_CRT_CLK_CNTL1		AOBUS_REG_ADDR(AO_CRT_CLK_CNTL1)
+#define AO_DEBUG_REG0 0x28
+#define P_AO_DEBUG_REG0		AOBUS_REG_ADDR(AO_DEBUG_REG0)
+#define AO_DEBUG_REG1 0x29
+#define P_AO_DEBUG_REG1		AOBUS_REG_ADDR(AO_DEBUG_REG1)
+#define AO_DEBUG_REG2 0x2a
+#define P_AO_DEBUG_REG2		AOBUS_REG_ADDR(AO_DEBUG_REG2)
+#define AO_DEBUG_REG3 0x2b
+#define P_AO_DEBUG_REG3		AOBUS_REG_ADDR(AO_DEBUG_REG3)
+#define AO_RTI_GEN_PWR_SLEEP0 0x3a
+#define P_AO_RTI_GEN_PWR_SLEEP0 AOBUS_REG_ADDR(AO_RTI_GEN_PWR_SLEEP0)
 
 #define HDMITX_ADDR_PORT_SEC (0x00 << 2)
 #define P_HDMITX_ADDR_PORT_SEC HDMITX_SEC_REG_ADDR(HDMITX_ADDR_PORT_SEC)

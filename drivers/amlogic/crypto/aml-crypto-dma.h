@@ -1,16 +1,26 @@
-/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/amlogic/crypto/aml-crypto-dma.h
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
 #ifndef _AML_CRYPTO_DMA_H_
 #define _AML_CRYPTO_DMA_H_
 #include <linux/io.h>
-#include <crypto/hash.h>
-#include <crypto/algapi.h>
 
-#define MAX_NUM_TABLES (16)
-#define DMA_IRQ_MODE	(0)
+ /* Reserved 4096 bytes and table is 12 bytes each */
+#define MAX_NUM_TABLES 341
 
 #define DMA_BLOCK_MODE_SIZE (512)
 
@@ -45,13 +55,6 @@ enum TXLX_DMA_REG_OFFSETS {
 	TXLX_DMA_SEC  = 0x11,
 };
 
-enum CRYPTO_ALGO_CAPABILITY {
-	CAP_AES = 0x1,
-	CAP_DES = 0x2,
-	CAP_TDES = 0x4,
-	CAP_S17 = 0x8,
-};
-
 #define aml_write_reg(addr, data) \
 	writel(data, (int *)addr)
 
@@ -81,7 +84,7 @@ enum CRYPTO_ALGO_CAPABILITY {
 #define MODE_AES128  0x8
 #define MODE_AES192  0x9
 #define MODE_AES256  0xa
-#define MODE_S17     0xb
+/* 0xb is skipped */
 #define MODE_DES     0xc
 /* 0xd is skipped */
 #define MODE_TDES_2K 0xe
@@ -89,7 +92,7 @@ enum CRYPTO_ALGO_CAPABILITY {
 
 struct dma_dsc {
 	union {
-		u32 d32;
+		uint32_t d32;
 		struct {
 			unsigned length:17;
 			unsigned irq:1;
@@ -105,8 +108,8 @@ struct dma_dsc {
 			unsigned owner:1;
 		} b;
 	} dsc_cfg;
-	u32 src_addr;
-	u32 tgt_addr;
+	uint32_t src_addr;
+	uint32_t tgt_addr;
 };
 
 #define DMA_FLAG_MAY_OCCUPY    BIT(0)
@@ -117,59 +120,33 @@ struct dma_dsc {
 #define DMA_STATUS_KEY_ERROR   BIT(1)
 
 #define DMA_KEY_IV_BUF_SIZE (48)
-#define DMA_KEY_IV_BUF_SIZE_64B (64)
 struct aml_dma_dev {
-	spinlock_t dma_lock; /* spinlock for dma */
-	u32 thread;
-	u32 status;
+	spinlock_t dma_lock;
+	uint32_t thread;
+	uint32_t status;
 	int	irq;
-	u8 dma_busy;
-	unsigned long irq_flags;
-	struct task_struct *kthread;
-	struct crypto_queue	queue;
-	spinlock_t queue_lock; /* spinlock for queue */
+	uint8_t dma_busy;
 };
 
 u32 swap_ulong32(u32 val);
 void aml_write_crypto_reg(u32 addr, u32 data);
 u32 aml_read_crypto_reg(u32 addr);
 void aml_dma_debug(struct dma_dsc *dsc, u32 nents, const char *msg,
-		   u32 thread, u32 status);
-
-u8 aml_dma_do_hw_crypto(struct aml_dma_dev *dd,
-			  struct dma_dsc *dsc,
-			  u32 dsc_len,
-			  dma_addr_t dsc_addr,
-			  u8 polling, u8 dma_flags);
-
-void aml_dma_finish_hw_crypto(struct aml_dma_dev *dd, u8 dma_flags);
-
-/* queue utilities */
-int aml_dma_crypto_enqueue_req(struct aml_dma_dev *dd,
-			       struct crypto_async_request *req);
+		u32 thread, u32 status);
+void hexdump(unsigned char *buf, unsigned int len);
 
 u32 get_dma_t0_offset(void);
 u32 get_dma_sts0_offset(void);
 
 extern void __iomem *cryptoreg;
 
-extern int debug;
+extern u32 debug;
 #define dbgp(level, fmt, arg...)                 \
 	do {                                            \
-		if (unlikely(level >= debug))                         \
-			pr_warn("%s: " fmt, __func__, ## arg);\
+		if (likely(debug > level))                         \
+			pr_debug("%s: " fmt, __func__, ## arg);\
+		else                                            \
+			pr_info("%s: " fmt, __func__, ## arg); \
 	} while (0)
 
 #endif
-
-int __init aml_sha_driver_init(void);
-void aml_sha_driver_exit(void);
-
-int __init aml_tdes_driver_init(void);
-void aml_tdes_driver_exit(void);
-
-int __init aml_aes_driver_init(void);
-void aml_aes_driver_exit(void);
-
-int __init aml_crypto_device_driver_init(void);
-void aml_crypto_device_driver_exit(void);

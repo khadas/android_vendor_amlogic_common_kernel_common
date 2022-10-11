@@ -1,6 +1,18 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/amlogic/dvb/demux/aml_dsc.c
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
 #include <linux/version.h>
@@ -458,7 +470,8 @@ static int handle_desc_ext(struct aml_dsc *dsc, struct ca_sc2_descr_ex *d)
 				break;
 			}
 			ret = _dsc_chan_alloc(dsc,
-					      d->params.alloc_params.pid & 0x1FFF,
+					      d->params.alloc_params.
+					      pid & 0x1FFF,
 					      d->params.alloc_params.algo + 1,
 					      d->params.alloc_params.dsc_type,
 					      &d->params.alloc_params.ca_index);
@@ -472,7 +485,8 @@ static int handle_desc_ext(struct aml_dsc *dsc, struct ca_sc2_descr_ex *d)
 			pr_dbg("%s CA_FREE:%d\n", __func__,
 			       d->params.free_params.ca_index);
 			ch = _get_chan_from_list(dsc,
-						 d->params.free_params.ca_index);
+						 d->params.free_params.
+						 ca_index);
 			if (ch)
 				_dsc_chan_free(ch);
 			ret = 0;
@@ -491,8 +505,10 @@ static int handle_desc_ext(struct aml_dsc *dsc, struct ca_sc2_descr_ex *d)
 				       d->params.key_params.parity,
 				       d->params.key_params.key_index);
 				ret = _dsc_chan_set_key(ch,
-							d->params.key_params.parity,
-							d->params.key_params.key_index);
+							d->params.key_params.
+							parity,
+							d->params.key_params.
+							key_index);
 			}
 		}
 		break;
@@ -520,8 +536,10 @@ static int handle_desc_ext(struct aml_dsc *dsc, struct ca_sc2_descr_ex *d)
 				       d->params.scb_params.ca_scb,
 				       d->params.scb_params.ca_scb_as_is);
 				ret = _dsc_chan_set_scb(ch,
-							d->params.scb_params.ca_scb,
-							d->params.scb_params.ca_scb_as_is);
+							d->params.scb_params.
+							ca_scb,
+							d->params.scb_params.
+							ca_scb_as_is);
 			}
 		}
 		break;

@@ -1,6 +1,9 @@
-// SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright 2012 Michael Ellerman, IBM Corporation.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License, version 2, as
+ * published by the Free Software Foundation.
  */
 
 #include <linux/kernel.h>
@@ -8,12 +11,11 @@
 #include <linux/kvm.h>
 #include <linux/err.h>
 
-#include <linux/uaccess.h>
+#include <asm/uaccess.h>
 #include <asm/kvm_book3s.h>
 #include <asm/kvm_ppc.h>
 #include <asm/hvcall.h>
 #include <asm/rtas.h>
-#include <asm/xive.h>
 
 #ifdef CONFIG_KVM_XICS
 static void kvm_rtas_set_xive(struct kvm_vcpu *vcpu, struct rtas_args *args)
@@ -30,10 +32,7 @@ static void kvm_rtas_set_xive(struct kvm_vcpu *vcpu, struct rtas_args *args)
 	server = be32_to_cpu(args->args[1]);
 	priority = be32_to_cpu(args->args[2]);
 
-	if (xics_on_xive())
-		rc = kvmppc_xive_set_xive(vcpu->kvm, irq, server, priority);
-	else
-		rc = kvmppc_xics_set_xive(vcpu->kvm, irq, server, priority);
+	rc = kvmppc_xics_set_xive(vcpu->kvm, irq, server, priority);
 	if (rc)
 		rc = -3;
 out:
@@ -53,10 +52,7 @@ static void kvm_rtas_get_xive(struct kvm_vcpu *vcpu, struct rtas_args *args)
 	irq = be32_to_cpu(args->args[0]);
 
 	server = priority = 0;
-	if (xics_on_xive())
-		rc = kvmppc_xive_get_xive(vcpu->kvm, irq, &server, &priority);
-	else
-		rc = kvmppc_xics_get_xive(vcpu->kvm, irq, &server, &priority);
+	rc = kvmppc_xics_get_xive(vcpu->kvm, irq, &server, &priority);
 	if (rc) {
 		rc = -3;
 		goto out;
@@ -80,10 +76,7 @@ static void kvm_rtas_int_off(struct kvm_vcpu *vcpu, struct rtas_args *args)
 
 	irq = be32_to_cpu(args->args[0]);
 
-	if (xics_on_xive())
-		rc = kvmppc_xive_int_off(vcpu->kvm, irq);
-	else
-		rc = kvmppc_xics_int_off(vcpu->kvm, irq);
+	rc = kvmppc_xics_int_off(vcpu->kvm, irq);
 	if (rc)
 		rc = -3;
 out:
@@ -102,10 +95,7 @@ static void kvm_rtas_int_on(struct kvm_vcpu *vcpu, struct rtas_args *args)
 
 	irq = be32_to_cpu(args->args[0]);
 
-	if (xics_on_xive())
-		rc = kvmppc_xive_int_on(vcpu->kvm, irq);
-	else
-		rc = kvmppc_xics_int_on(vcpu->kvm, irq);
+	rc = kvmppc_xics_int_on(vcpu->kvm, irq);
 	if (rc)
 		rc = -3;
 out:

@@ -1,5 +1,5 @@
 #
-# Amlogic VOUT_SERVE driver configuration
+# Amlogic VOUT_SERVE driver configuation
 #
 
 config AMLOGIC_VOUT_SERVE
@@ -7,10 +7,6 @@ config AMLOGIC_VOUT_SERVE
 	default n
 	help
 		Amlogic Video output Server support.
-		Management Vout display drivers with unified api,
-		Provide display mode service for all of the display modules.
-		Amlogic Video output Server support.
-		Management Vout display drivers with unified api,
 		Provide display mode service for all of the display modules.
 
 config AMLOGIC_VOUT2_SERVE
@@ -18,14 +14,5 @@ config AMLOGIC_VOUT2_SERVE
 	default n
 	help
 		Amlogic Video output2 Server support.
-		Management Vout display drivers with unified api,
 		Provide 2nd display mode service for all of the display modules.
-
-config AMLOGIC_VOUT3_SERVE
-	bool "Amlogic Vout3_Serve Module"
-	default n
-	help
-		Amlogic Video output3 Server support.
-		Management Vout display drivers with unified api,
-		Provide 3rd display mode service for all of the display modules.
 

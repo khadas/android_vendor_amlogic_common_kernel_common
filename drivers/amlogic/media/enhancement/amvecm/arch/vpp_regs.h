@@ -1,4 +1,3 @@
-/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
  * drivers/amlogic/media/enhancement/amvecm/arch/vpp_regs.h
  *
@@ -18,12 +17,6 @@
 
 #ifndef VPP_REGS_HEADER_
 #define VPP_REGS_HEADER_
-
-#define VPP_PROBE_CTRL    0x1a7b
-#define VPP_PROBE_POS     0x1a7c
-#define VPP_HI_COLOR      0x1a7d
-#define VPP_PROBE_COLOR   0x1a7e
-#define VPP_PROBE_COLOR1  0x1a7f
 
 #define VPP_DUMMY_DATA 0x1d00
 #define VPP_LINE_IN_LENGTH 0x1d01
@@ -85,6 +78,7 @@
 #define VPP_VADJ2_Y 0x1d44
 #define VPP_VADJ2_MA_MB 0x1d45
 #define VPP_VADJ2_MC_MD 0x1d46
+
 #define VPP_HSHARP_CTRL 0x1d50
 #define VPP_HSHARP_LUMA_THRESH01 0x1d51
 #define VPP_HSHARP_LUMA_THRESH23 0x1d52
@@ -236,6 +230,7 @@
 #define VPP2_INT_LINE_NUM 0x1e20
 #define VPP2_OFIFO_URG_CTRL 0x1e21
 
+
 #define VIU_OSD1_BLK0_CFG_W0 0x1a1b
 #define VIU_OSD1_MATRIX_CTRL 0x1a90
 #define VIU_OSD1_MATRIX_COEF00_01 0x1a91
@@ -306,6 +301,7 @@
 #define VI_HIST_GCLK_CTRL  0x2e2a
 
 #define VPP_IN_H_V_SIZE  0x1da6
+
 
 /* 3D process */
 #define VPU_VPU_3D_SYNC1			0x2738
@@ -822,68 +818,6 @@
 #define SRSHARP1_SR7_CLR_PRT_LUT30            0x5362
 #define SRSHARP1_SR7_CLR_PRT_LUT31            0x5363
 
-/*SHARPNESS0 FMETER REG*/
-#define SRSHARP0_RO_FMETER_HCNT_TYPE0         0x5046
-#define SRSHARP0_RO_FMETER_HCNT_TYPE1         0x5047
-#define SRSHARP0_RO_FMETER_HCNT_TYPE2         0x5048
-#define SRSHARP0_RO_FMETER_HCNT_TYPE3         0x5049
-#define SRSHARP0_RO_FMETER_VCNT_TYPE0         0x504a
-#define SRSHARP0_RO_FMETER_VCNT_TYPE1         0x504b
-#define SRSHARP0_RO_FMETER_VCNT_TYPE2         0x504c
-#define SRSHARP0_RO_FMETER_VCNT_TYPE3         0x504d
-#define SRSHARP0_RO_FMETER_PDCNT_TYPE0        0x504e
-#define SRSHARP0_RO_FMETER_PDCNT_TYPE1        0x504f
-#define SRSHARP0_RO_FMETER_PDCNT_TYPE2        0x5050
-#define SRSHARP0_RO_FMETER_PDCNT_TYPE3        0x5051
-#define SRSHARP0_RO_FMETER_NDCNT_TYPE0        0x5052
-#define SRSHARP0_RO_FMETER_NDCNT_TYPE1        0x5053
-#define SRSHARP0_RO_FMETER_NDCNT_TYPE2        0x5054
-#define SRSHARP0_RO_FMETER_NDCNT_TYPE3        0x5055
-#define SRSHARP0_FMETER_CTRL                  0x5089
-#define SRSHARP0_FMETER_WIN_HOR               0x508a
-#define SRSHARP0_FMETER_WIN_VER               0x508b
-#define SRSHARP0_FMETER_CORING                0x508c
-#define SRSHARP0_FMETER_RATIO_H               0x508d
-#define SRSHARP0_FMETER_RATIO_V               0x508e
-#define SRSHARP0_FMETER_RATIO_D               0x508f
-#define SRSHARP0_FMETER_H_FILTER0_9TAP_0      0x516b
-#define SRSHARP0_FMETER_H_FILTER0_9TAP_1      0x516c
-#define SRSHARP0_FMETER_H_FILTER1_9TAP_0      0x516d
-#define SRSHARP0_FMETER_H_FILTER1_9TAP_1      0x516e
-#define SRSHARP0_FMETER_H_FILTER2_9TAP_0      0x516f
-#define SRSHARP0_FMETER_H_FILTER2_9TAP_1      0x5170
-
-/*SHARPNESS1 FMETER REG*/
-#define SRSHARP1_RO_FMETER_HCNT_TYPE0         0x5246
-#define SRSHARP1_RO_FMETER_HCNT_TYPE1         0x5247
-#define SRSHARP1_RO_FMETER_HCNT_TYPE2         0x5248
-#define SRSHARP1_RO_FMETER_HCNT_TYPE3         0x5249
-#define SRSHARP1_RO_FMETER_VCNT_TYPE0         0x524a
-#define SRSHARP1_RO_FMETER_VCNT_TYPE1         0x524b
-#define SRSHARP1_RO_FMETER_VCNT_TYPE2         0x524c
-#define SRSHARP1_RO_FMETER_VCNT_TYPE3         0x524d
-#define SRSHARP1_RO_FMETER_PDCNT_TYPE0        0x524e
-#define SRSHARP1_RO_FMETER_PDCNT_TYPE1        0x524f
-#define SRSHARP1_RO_FMETER_PDCNT_TYPE2        0x5250
-#define SRSHARP1_RO_FMETER_PDCNT_TYPE3        0x5251
-#define SRSHARP1_RO_FMETER_NDCNT_TYPE0        0x5252
-#define SRSHARP1_RO_FMETER_NDCNT_TYPE1        0x5253
-#define SRSHARP1_RO_FMETER_NDCNT_TYPE2        0x5254
-#define SRSHARP1_RO_FMETER_NDCNT_TYPE3        0x5255
-#define SRSHARP1_FMETER_CTRL                  0x5289
-#define SRSHARP1_FMETER_WIN_HOR               0x528a
-#define SRSHARP1_FMETER_WIN_VER               0x528b
-#define SRSHARP1_FMETER_CORING                0x528c
-#define SRSHARP1_FMETER_RATIO_H               0x528d
-#define SRSHARP1_FMETER_RATIO_V               0x528e
-#define SRSHARP1_FMETER_RATIO_D               0x528f
-#define SRSHARP1_FMETER_H_FILTER0_9TAP_0      0x536b
-#define SRSHARP1_FMETER_H_FILTER0_9TAP_1      0x536c
-#define SRSHARP1_FMETER_H_FILTER1_9TAP_0      0x536d
-#define SRSHARP1_FMETER_H_FILTER1_9TAP_1      0x536e
-#define SRSHARP1_FMETER_H_FILTER2_9TAP_0      0x536f
-#define SRSHARP1_FMETER_H_FILTER2_9TAP_1      0x5370
-
 /*ve dither*/
 #define VPP_VE_DITHER_CTRL		0x3120
 
@@ -924,6 +858,7 @@
 #define HHI_HDMI_PLL_CNTL1			    0xc9
 /*after GXL CNTL5[bit3] is same with CNTL6[bit20] on G9TV/GXTVBB*/
 #define HHI_HDMI_PLL_CNTL5			    0xcd
+
 
 /* #define VI_HIST_CTRL                             0x2e00 */
 /* the total pixels = VDIN_HISTXX*(2^(VDIN_HIST_POW+3)) */
@@ -1200,7 +1135,6 @@
 
 #define VPP_POST_MATRIX_SAT				0x32c1
 
-/* vpp post2 matrix */
 #define VPP_POST2_MATRIX_COEF00_01	    0x39a0
 #define VPP_POST2_MATRIX_COEF02_10	    0x39a1
 #define VPP_POST2_MATRIX_COEF11_12	    0x39a2
@@ -1215,38 +1149,6 @@
 #define VPP_POST2_MATRIX_PRE_OFFSET0_1	0x39ab
 #define VPP_POST2_MATRIX_PRE_OFFSET2	0x39ac
 #define VPP_POST2_MATRIX_EN_CTRL	    0x39ad
-
-/* vpp1 post2 POST2_MATRIX */
-#define VPP1_POST2_MATRIX_COEF00_01                      0x5990
-#define VPP1_POST2_MATRIX_COEF02_10                      0x5991
-#define VPP1_POST2_MATRIX_COEF11_12                      0x5992
-#define VPP1_POST2_MATRIX_COEF20_21                      0x5993
-#define VPP1_POST2_MATRIX_COEF22                         0x5994
-#define VPP1_POST2_MATRIX_COEF13_14                      0x5995
-#define VPP1_POST2_MATRIX_COEF23_24                      0x5996
-#define VPP1_POST2_MATRIX_COEF15_25                      0x5997
-#define VPP1_POST2_MATRIX_CLIP                           0x5998
-#define VPP1_POST2_MATRIX_OFFSET0_1                      0x5999
-#define VPP1_POST2_MATRIX_OFFSET2                        0x599a
-#define VPP1_POST2_MATRIX_PRE_OFFSET0_1                  0x599b
-#define VPP1_POST2_MATRIX_PRE_OFFSET2                    0x599c
-#define VPP1_POST2_MATRIX_EN_CTRL                        0x599d
-
-/* vpp2 post2 POST2_MATRIX */
-#define VPP2_POST2_MATRIX_COEF00_01                      0x59d0
-#define VPP2_POST2_MATRIX_COEF02_10                      0x59d1
-#define VPP2_POST2_MATRIX_COEF11_12                      0x59d2
-#define VPP2_POST2_MATRIX_COEF20_21                      0x59d3
-#define VPP2_POST2_MATRIX_COEF22                         0x59d4
-#define VPP2_POST2_MATRIX_COEF13_14                      0x59d5
-#define VPP2_POST2_MATRIX_COEF23_24                      0x59d6
-#define VPP2_POST2_MATRIX_COEF15_25                      0x59d7
-#define VPP2_POST2_MATRIX_CLIP                           0x59d8
-#define VPP2_POST2_MATRIX_OFFSET0_1                      0x59d9
-#define VPP2_POST2_MATRIX_OFFSET2                        0x59da
-#define VPP2_POST2_MATRIX_PRE_OFFSET0_1                  0x59db
-#define VPP2_POST2_MATRIX_PRE_OFFSET2                    0x59dc
-#define VPP2_POST2_MATRIX_EN_CTRL                        0x59dd
 
 #define VPP_LUT3D_CTRL					0x39d0
 #define VPP_LUT3D_CBUS2RAM_CTRL			0x39d1
@@ -1492,25 +1394,5 @@
 #define LC_STTS_BLACK_INFO     0x403c
 /*LC register end*/
 
-/*new gamma rw interface, implement from T7*/
-#define LCD_GAMMA_CNTL_PORT0    0x14b4
-#define L_GAMMA_VCOM_POL        7
-#define L_GAMMA_RVS_OUT         6
-#define L_GAMMA_TR              2
-#define L_GAMMA_LATCH           1
-#define L_GAMMA_EN              0
-#define LCD_GAMMA_DATA_PORT0    0x14b5
-#define LCD_GAMMA_ADDR_PORT0    0x14b6
-#define L_H_AUTO_INC            8
-/* 10bit */
-#define L_GAMMA_R               20
-#define L_GAMMA_G               10
-#define L_GAMMA_B               0
-
-/*postblender yuv/maxrgb hist statistics*/
-#define VPP_PST_STA_CTRL        0x1d3b
-#define VPP_PST_STA_WIN_X       0x1d3c
-#define VPP_PST_STA_WIN_Y       0x1d3d
-#define VPP_PST_STA_RO_HIST     0x1d3e
 #endif
 

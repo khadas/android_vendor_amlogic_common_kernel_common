@@ -2,12 +2,16 @@
 # Makefile for Tvin.
 #
 
-$(MEDIA_MODULE_NAME)-$(CONFIG_AMLOGIC_MEDIA_TVIN) += vin/tvin/tvin_format_table.o
-$(MEDIA_MODULE_NAME)-$(CONFIG_AMLOGIC_MEDIA_TVIN) += vin/tvin/tvin_frontend.o
-$(MEDIA_MODULE_NAME)-$(CONFIG_AMLOGIC_MEDIA_TVIN) += vin/tvin/tvin_global.o
+obj-$(CONFIG_AMLOGIC_MEDIA_TVIN) += tvin_common.o
+tvin_common-objs += tvin_format_table.o
+tvin_common-objs += tvin_frontend.o
+tvin_common-objs += tvin_global.o
 
-include drivers/amlogic/media/vin/tvin/vdin/Makefile
-include drivers/amlogic/media/vin/tvin/tvafe/Makefile
-include drivers/amlogic/media/vin/tvin/viu/Makefile
-include drivers/amlogic/media/vin/tvin/bt656/Makefile
-include drivers/amlogic/media/vin/tvin/hdmirx/Makefile
+obj-$(CONFIG_AMLOGIC_MEDIA_VDIN)		+= vdin/
+obj-$(CONFIG_AMLOGIC_MEDIA_VIUIN)		+= viu/
+obj-$(CONFIG_AMLOGIC_MEDIA_TVIN_BT656)		+= bt656/
+obj-$(CONFIG_AMLOGIC_MEDIA_TVIN_HDMI_EXT)	+= hdmirx_ext/
+obj-$(CONFIG_AMLOGIC_MEDIA_TVIN_HDMI)	+= hdmirx/
+obj-$(CONFIG_AMLOGIC_MEDIA_TVIN_AFE)	     		+= tvafe/
+obj-$(CONFIG_AMLOGIC_MEDIA_TVIN_CSI) += csi/
+

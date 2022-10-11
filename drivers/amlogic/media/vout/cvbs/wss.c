@@ -1,4 +1,3 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
  * drivers/amlogic/media/vout/cvbs/wss.c
  *
@@ -30,7 +29,7 @@
 #include <linux/amlogic/media/vout/vout_notify.h>
 #include "wss.h"
 #include "cvbs_out_reg.h"
-#include "cvbs_mode.h"
+#include <linux/amlogic/media/vout/cvbs_out.h>
 
 static const char * const wss_480i_cmd[] = {"ar", "cgms", "psp",
 		"prerec", "CC", "mvsn", "off"};
@@ -40,13 +39,13 @@ static const char * const wss_576i_cmd[] = {"ar", "mode", "coding", "helper",
 static unsigned int cgms_ntsc_crc[] = {0x0, 0x5, 0xa, 0xf};
 
 static void wss_set_output(unsigned int cmd, unsigned int mode,
-			   unsigned int line, unsigned int data,
-			   unsigned int start, unsigned int length)
+				unsigned int line, unsigned int data,
+				unsigned int start, unsigned int length)
 {
 	unsigned int value;
 
 	pr_info("[%s], line = %d, data = 0x%x, start_bit = %d, length = %d\n",
-		__func__, line, data, start, length);
+				__func__, line, data, start, length);
 	switch (cmd) {
 	case WSS_576I_CMD_CC:
 	case WSS_480I_CMD_CC:
@@ -54,6 +53,12 @@ static void wss_set_output(unsigned int cmd, unsigned int mode,
 		/*cvbs_out_reg_write(ENCI_VBI_CCDT_ODD, data);*/
 		/*480cvbs default envline 21,oddline 21 */
 		/* 576cvbs default envline 21,oddline 22 */
+#if 0
+		if (mode == 480)
+			cvbs_out_reg_write(ENCI_VBI_CC525_LN, WSS_480I_CC_LINE);
+		else if (mode == 576)
+			cvbs_out_reg_write(ENCI_VBI_CC625_LN, WSS_576I_CC_LINE);
+#endif
 		cvbs_out_reg_setb(ENCI_VBI_SETTING, 0x1, 0, 2);
 		break;
 	case WSS_480I_CMD_CGMS_A:
@@ -78,9 +83,9 @@ static void wss_set_output(unsigned int cmd, unsigned int mode,
 	default:
 		cvbs_out_reg_setb(ENCI_VBI_WSSDT, data, start, length);
 		value = cvbs_out_reg_read(ENCI_VBI_WSSDT);
-		if ((value & 0xf) == 0x0)/* correct the bit3: odd_parity_bit */
+		if ((value&0xf) == 0x0)/* correct the bit3: odd_parity_bit */
 			cvbs_out_reg_setb(ENCI_VBI_WSSDT, 1, 3, 1);
-		cvbs_out_reg_write(ENCI_VBI_WSS_LN, line - 1);
+		cvbs_out_reg_write(ENCI_VBI_WSS_LN, line-1);
 		if (mode == 480)
 			cvbs_out_reg_setb(ENCI_VBI_SETTING, 0x3, 2, 2);
 		/*480i, enable even field for line 20*/
@@ -355,13 +360,13 @@ static unsigned int wss_params_mapping(unsigned int cmd, unsigned int param)
 static void wss_process_cmd(unsigned int cmd, unsigned int param)
 {
 	unsigned int value, mode = 576;
-	unsigned int i, max = sizeof(wss_info) / sizeof(struct wss_info_t);
+	unsigned int i, max = sizeof(wss_info)/sizeof(struct wss_info_t);
 /* pr_info("[%s] cmd = 0x%x, param = 0x%x\n", __FUNCTION__, cmd, param); */
-	if (cmd == WSS_576I_CMD_OFF) {
+	if (cmd == WSS_576I_CMD_OFF)
 		wss_close_output(576);
-	} else if (cmd == WSS_480I_CMD_OFF) {
+	else if (cmd == WSS_480I_CMD_OFF)
 		wss_close_output(480);
-	} else {
+	else {
 		if (cmd <= WSS_576I_CMD_OFF)
 			mode = 576;
 		else if ((cmd >= WSS_480I_CMD_AR) && (cmd <= WSS_480I_CMD_OFF))
@@ -380,7 +385,7 @@ static void wss_process_cmd(unsigned int cmd, unsigned int param)
 
 static void wss_process_description(unsigned int cmd)
 {
-	unsigned int i, max = sizeof(wss_info) / sizeof(struct wss_info_t);
+	unsigned int i, max = sizeof(wss_info)/sizeof(struct wss_info_t);
 
 	for (i = 0; i < max; i++) {
 		if (cmd == wss_info[i].wss_cmd)
@@ -392,8 +397,8 @@ static void wss_show_status(unsigned int mode, char *wss_cmd)
 {
 	unsigned int data = cvbs_out_reg_read(ENCI_VBI_WSSDT);
 
-	if (!wss_cmd) {
-		pr_info("%s wss_cmd is null\n", __func__);
+	if (wss_cmd == NULL) {
+		pr_info("wss_show_status wss_cmd is null\n");
 		return;
 	}
 /* pr_info("[%s] mode = %d, wss_cmd = |%s|\n", __FUNCTION__, mode, wss_cmd); */
@@ -453,37 +458,36 @@ static void wss_dispatch_cmd(char *p)
 		return;
 	}
 	pr_info("[%s]: current_vmode = 0x%x, user input = %s\n",
-		__func__, mode, p);
+			__func__, mode, p);
 	for (argn = 0; argn < 2; argn++) {
 		para = strsep(&p, " ");
-		if (!para)
+		if (para == NULL)
 			break;
 		argv[argn] = para;
 	}
-	if (!strncmp(argv[0], "status", strlen("status"))) {
+	if (!strncmp(argv[0], "status", strlen("status")))
 		cmd = 0xee;
-	} else {
+	else {
 		if (get_local_cvbs_mode() == MODE_480CVBS) {
-			cmd_max = sizeof(wss_480i_cmd) / sizeof(char *);
+			cmd_max = sizeof(wss_480i_cmd)/sizeof(char *);
 			for (i = 0; i < cmd_max; i++) {
 				if (!strncmp(argv[0], wss_480i_cmd[i],
-					     strlen(wss_480i_cmd[i]))) {
+						strlen(wss_480i_cmd[i]))) {
 					cmd = WSS_480I_CMD_AR + i;
 					break;
 				}
 			}
 		} else if (get_local_cvbs_mode() == MODE_576CVBS) {
-			cmd_max = sizeof(wss_576i_cmd) / sizeof(char *);
+			cmd_max = sizeof(wss_576i_cmd)/sizeof(char *);
 			for (i = 0; i < cmd_max; i++) {
 				if (!strncmp(argv[0], wss_576i_cmd[i],
-					     strlen(wss_576i_cmd[i]))) {
+						strlen(wss_576i_cmd[i]))) {
 					cmd = WSS_576I_CMD_AR + i;
 					break;
 				}
 			}
-		} else {
+		} else
 			return;
-		}
 	}
 	pr_info("[%s] wss cmd = 0x%x, argn = %d\n", __func__, cmd, argn);
 	if (cmd == 0xff) {
@@ -493,11 +497,11 @@ static void wss_dispatch_cmd(char *p)
 		wss_show_status(get_local_cvbs_mode(), argv[1]);
 		return;
 	}
-	if (cmd == WSS_576I_CMD_OFF || cmd == WSS_480I_CMD_OFF) {
+	if ((cmd == WSS_576I_CMD_OFF) || (cmd == WSS_480I_CMD_OFF))
 		wss_process_cmd(cmd, 0);
-	} else if (argn == 1) {
+	else if (argn == 1)
 		wss_process_description(cmd);
-	} else {
+	else {
 		ret = kstrtoul(argv[1], 16, &param_l);
 		param = (unsigned int)param_l;
 		wss_process_cmd(cmd, param);
@@ -510,7 +514,7 @@ static void wss_dispatch_cmd(char *p)
  **
  ******************************************************************/
 ssize_t aml_CVBS_attr_wss_show(struct class *class,
-			       struct class_attribute *attr, char *buf)
+			struct class_attribute *attr, char *buf)
 {
 	unsigned int line = 0;
 	unsigned int data = 0;
@@ -535,8 +539,7 @@ ssize_t aml_CVBS_attr_wss_show(struct class *class,
 }
 
 ssize_t aml_CVBS_attr_wss_store(struct class *class,
-				struct class_attribute *attr,
-				const char *buf, size_t count)
+		struct class_attribute *attr, const char *buf, size_t count)
 {
 	char *p = NULL;
 

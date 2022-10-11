@@ -1,4 +1,3 @@
-/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
  * drivers/amlogic/media/video_processor/video_composer/video_composer.h
  *
@@ -78,10 +77,6 @@ enum vc_transform_t {
 	VC_TRANSFORM_FLIP_V_ROT_90 = VC_TRANSFORM_FLIP_V | VC_TRANSFORM_ROT_90,
 };
 
-enum source_type_t {
-	DTV_FIX_TUNNEL = 1,
-};
-
 struct frame_info_t {
 	u32 fd;
 	u32 composer_fen_fd;
@@ -100,8 +95,7 @@ struct frame_info_t {
 	u32 transform;
 	u32 type;
 	u32 sideband_type;
-	u32 reserved[2];
-	u32 source_type;
+	u32 reserved[3];
 };
 
 struct frames_info_t {
@@ -145,7 +139,6 @@ struct dst_buf_t {
 	u32 buf_w;
 	u32 buf_h;
 	u32 buf_size;
-	bool is_tvp;
 };
 
 struct output_axis {
@@ -163,7 +156,6 @@ struct received_frames_t {
 	struct file *file_vf[MXA_LAYER_COUNT];
 	unsigned long phy_addr[MXA_LAYER_COUNT];
 	u64 time_us64;
-	bool is_tvp;
 };
 
 struct composer_dev {
@@ -176,7 +168,6 @@ struct composer_dev {
 	DECLARE_KFIFO(free_q, struct vframe_s *, BUFFER_LEN);
 	DECLARE_KFIFO(display_q, struct vframe_s *, COMPOSER_READY_POOL_SIZE);
 	DECLARE_KFIFO(dma_free_q, struct vframe_s *, BUFFER_LEN);
-	DECLARE_KFIFO(vc_private_q, struct video_composer_private *, COMPOSER_READY_POOL_SIZE);
 	char vf_provider_name[VCOM_PROVIDER_NAME_SIZE];
 	char vfm_map_id[VCOM_MAP_STRUCT_SIZE];
 	char vfm_map_chain[VCOM_MAP_STRUCT_SIZE];
@@ -189,7 +180,6 @@ struct composer_dev {
 	struct task_struct *kthread;
 	struct received_frames_t received_frames[FRAMES_INFO_POOL_SIZE];
 	unsigned long long received_count;
-	unsigned long long received_new_count;
 	unsigned long long fence_creat_count;
 	unsigned long long fence_release_count;
 	unsigned long long fput_count;
@@ -214,7 +204,6 @@ struct composer_dev {
 	bool need_empty_ready;
 	struct vframe_s fake_vf;
 	struct vframe_s fake_back_vf;
-	struct video_composer_private vc_private[COMPOSER_READY_POOL_SIZE];
 	bool select_path_done;
 	bool composer_enabled;
 	bool thread_need_stop;
@@ -229,4 +218,5 @@ struct composer_dev {
 	_IOW(VIDEO_COMPOSER_IOC_MAGIC, 0x02, int)
 
 int video_composer_set_enable(struct composer_dev *dev, u32 val);
+
 #endif /* VIDEO_COMPOSER_H */

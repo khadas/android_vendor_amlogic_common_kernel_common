@@ -1,6 +1,18 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/amlogic/irblaster/sysfs.c
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
 #include <linux/device.h>
@@ -10,6 +22,9 @@
 #include <linux/kdev_t.h>
 #include <linux/amlogic/irblaster.h>
 #include <linux/amlogic/irblaster_consumer.h>
+#ifdef CONFIG_AMLOGIC_IRBLASTER_PROTOCOL
+#include <linux/amlogic/irblaster_encoder.h>
+#endif
 int irblaster_debug;
 
 static ssize_t send_store(struct device *dev,
@@ -63,9 +78,33 @@ static ssize_t send_store(struct device *dev,
 	irblaster_chip_data_clear(chip);
 	mutex_unlock(&chip->sys_lock);
 	kfree(buffer);
+	return ret ? : count;
+}
+
+#ifdef CONFIG_AMLOGIC_IRBLASTER_PROTOCOL
+static ssize_t send_key_store(struct device *dev,
+			      struct device_attribute *attr,
+			      const char *buf, size_t count)
+{
+	struct irblaster_chip *chip = dev_get_drvdata(dev);
+	unsigned int addr, command;
+	int ret;
+
+	ret = sscanf(buf, "%x %x", &addr, &command);
+	if (ret != 2) {
+		pr_err("Can't parse addr and command,usage:[addr command]\n");
+		return -EINVAL;
+	}
+	mutex_lock(&chip->sys_lock);
+	ret = irblaster_send_key(chip, addr, command);
+	if (ret)
+		pr_err("send key fail\n");
+
+	mutex_unlock(&chip->sys_lock);
 
 	return ret ? : count;
 }
+#endif
 
 static ssize_t carrier_freq_show(struct device *dev,
 				 struct device_attribute *attr,
@@ -131,6 +170,38 @@ static ssize_t duty_cycle_store(struct device *dev,
 	return ret ? : count;
 }
 
+#ifdef CONFIG_AMLOGIC_IRBLASTER_PROTOCOL
+static ssize_t protocol_show(struct device *dev,
+			     struct device_attribute *attr,
+			     char *buf)
+{
+	struct irblaster_chip *chip = dev_get_drvdata(dev);
+	unsigned int len;
+
+	len = protocol_show_select(chip, buf);
+
+	return len;
+}
+
+static ssize_t protocol_store(struct device *dev,
+			      struct device_attribute *attr,
+			      const char *buf, size_t count)
+{
+	struct irblaster_chip *chip = dev_get_drvdata(dev);
+	unsigned int ret, protocol;
+
+	protocol = protocol_store_select(buf);
+	if (protocol >= IRBLASTER_PROTOCOL_MAX)
+		pr_err("protocol is not found\n");
+
+	ret = irblaster_set_protocol(chip, protocol);
+	if (ret)
+		pr_err("set protocol fail\n");
+
+	return ret ? : count;
+}
+#endif
+
 static ssize_t debug_store(struct device *dev,
 			   struct device_attribute *attr,
 			   const char *buf, size_t count)
@@ -149,14 +220,26 @@ static ssize_t debug_store(struct device *dev,
 }
 
 static DEVICE_ATTR_WO(send);
+#ifdef CONFIG_AMLOGIC_IRBLASTER_PROTOCOL
+static DEVICE_ATTR_WO(send_key);
+#endif
 static DEVICE_ATTR_RW(carrier_freq);
 static DEVICE_ATTR_RW(duty_cycle);
+#ifdef CONFIG_AMLOGIC_IRBLASTER_PROTOCOL
+static DEVICE_ATTR_RW(protocol);
+#endif
 static DEVICE_ATTR_WO(debug);
 
 static struct attribute *irblaster_chip_attrs[] = {
 	&dev_attr_send.attr,
+#ifdef CONFIG_AMLOGIC_IRBLASTER_PROTOCOL
+	&dev_attr_send_key.attr,
+#endif
 	&dev_attr_carrier_freq.attr,
 	&dev_attr_duty_cycle.attr,
+#ifdef CONFIG_AMLOGIC_IRBLASTER_PROTOCOL
+	&dev_attr_protocol.attr,
+#endif
 	&dev_attr_debug.attr,
 	NULL,
 };
@@ -204,8 +287,8 @@ void irblasterchip_sysfs_unexport(struct irblaster_chip *chip)
 	}
 }
 
-int irblaster_sysfs_init(void)
+static int __init irblaster_sysfs_init(void)
 {
 	return class_register(&irblaster_class);
 }
-
+subsys_initcall(irblaster_sysfs_init);

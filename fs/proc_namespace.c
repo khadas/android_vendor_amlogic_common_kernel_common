@@ -1,4 +1,3 @@
-// SPDX-License-Identifier: GPL-2.0
 /*
  * fs/proc_namespace.c - handling of /proc/<pid>/{mounts,mountinfo,mountstats}
  *
@@ -11,27 +10,25 @@
 #include <linux/nsproxy.h>
 #include <linux/security.h>
 #include <linux/fs_struct.h>
-#include <linux/sched/task.h>
-
 #include "proc/internal.h" /* only for get_proc_task() in ->open() */
 
 #include "pnode.h"
 #include "internal.h"
 
-static __poll_t mounts_poll(struct file *file, poll_table *wait)
+static unsigned mounts_poll(struct file *file, poll_table *wait)
 {
 	struct seq_file *m = file->private_data;
 	struct proc_mounts *p = m->private;
 	struct mnt_namespace *ns = p->ns;
-	__poll_t res = EPOLLIN | EPOLLRDNORM;
+	unsigned res = POLLIN | POLLRDNORM;
 	int event;
 
 	poll_wait(file, &p->ns->poll, wait);
 
-	event = READ_ONCE(ns->event);
+	event = ACCESS_ONCE(ns->event);
 	if (m->poll_event != event) {
 		m->poll_event = event;
-		res |= EPOLLERR | EPOLLPRI;
+		res |= POLLERR | POLLPRI;
 	}
 
 	return res;
@@ -45,10 +42,10 @@ struct proc_fs_info {
 static int show_sb_opts(struct seq_file *m, struct super_block *sb)
 {
 	static const struct proc_fs_info fs_info[] = {
-		{ SB_SYNCHRONOUS, ",sync" },
-		{ SB_DIRSYNC, ",dirsync" },
-		{ SB_MANDLOCK, ",mand" },
-		{ SB_LAZYTIME, ",lazytime" },
+		{ MS_SYNCHRONOUS, ",sync" },
+		{ MS_DIRSYNC, ",dirsync" },
+		{ MS_MANDLOCK, ",mand" },
+		{ MS_LAZYTIME, ",lazytime" },
 		{ 0, NULL }
 	};
 	const struct proc_fs_info *fs_infop;
@@ -88,7 +85,7 @@ static inline void mangle(struct seq_file *m, const char *s)
 static void show_type(struct seq_file *m, struct super_block *sb)
 {
 	mangle(m, sb->s_type->name);
-	if (sb->s_subtype) {
+	if (sb->s_subtype && sb->s_subtype[0]) {
 		seq_putc(m, '.');
 		mangle(m, sb->s_subtype);
 	}
@@ -122,7 +119,7 @@ static int show_vfsmnt(struct seq_file *m, struct vfsmount *mnt)
 		goto out;
 	show_mnt_opts(m, mnt);
 	if (sb->s_op->show_options2)
-		err = sb->s_op->show_options2(mnt, m, mnt_path.dentry);
+			err = sb->s_op->show_options2(mnt, m, mnt_path.dentry);
 	else if (sb->s_op->show_options)
 		err = sb->s_op->show_options(m, mnt_path.dentry);
 	seq_puts(m, " 0 0\n");
@@ -181,7 +178,7 @@ static int show_mountinfo(struct seq_file *m, struct vfsmount *mnt)
 	} else {
 		mangle(m, r->mnt_devname ? r->mnt_devname : "none");
 	}
-	seq_puts(m, sb_rdonly(sb) ? " ro" : " rw");
+	seq_puts(m, sb->s_flags & MS_RDONLY ? " ro" : " rw");
 	err = show_sb_opts(m, sb);
 	if (err)
 		goto out;

@@ -1,4 +1,3 @@
-/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
  * include/linux/amlogic/media/video_sink/ionvideo_ext.h
  *
@@ -19,10 +18,10 @@
 #ifndef IONVIDEO_EXT_H
 #define IONVIDEO_EXT_H
 
-int ionvideo_assign_map(char **receiver_name, int *inst);
+extern int ionvideo_assign_map(char **receiver_name, int *inst);
 
-int ionvideo_alloc_map(int *inst);
+extern int ionvideo_alloc_map(int *inst);
 
-void ionvideo_release_map(int inst);
+extern void ionvideo_release_map(int inst);
 
 #endif /* IONVIDEO_EXT_H */

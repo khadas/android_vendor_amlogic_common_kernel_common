@@ -1,6 +1,18 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * sound/soc/amlogic/auge/pinctrl/pctrl_audio.c
+ *
+ * Copyright (C) 2020 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
 #include <linux/of.h>
@@ -475,21 +487,9 @@ static struct platform_driver audio_pinctrl_driver = {
 	.probe  = audio_pinctrl_probe,
 };
 
-int __init audio_pinctrl_init(void)
-{
-	return platform_driver_register(&audio_pinctrl_driver);
-}
+module_platform_driver(audio_pinctrl_driver);
 
-void __exit audio_pinctrl_exit(void)
-{
-	platform_driver_unregister(&audio_pinctrl_driver);
-}
-
-#ifndef MODULE
-module_init(audio_pinctrl_init);
-module_exit(audio_pinctrl_exit);
 MODULE_AUTHOR("Amlogic, Inc.");
 MODULE_DESCRIPTION("Amlogic audio pinctrl driver");
 MODULE_LICENSE("GPL");
 MODULE_ALIAS("platform:" DRV_NAME);
-#endif

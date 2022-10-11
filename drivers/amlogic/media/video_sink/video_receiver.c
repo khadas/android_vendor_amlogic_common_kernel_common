@@ -1,4 +1,3 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
  * drivers/amlogic/media/video_sink/video_receiver.c
  *
@@ -39,11 +38,10 @@
 #include <linux/amlogic/media/vfm/vframe_receiver.h>
 #include <linux/amlogic/media/video_sink/vpp.h>
 #include <linux/amlogic/media/video_sink/video.h>
-#ifdef CONFIG_AMLOGIC_MEDIA_ENHANCEMENT_DOLBYVISION
 #include <linux/amlogic/media/amdolbyvision/dolby_vision.h>
-#endif
+#ifdef CONFIG_AMLOGIC_MEDIA_DEINTERLACE
 #include <linux/amlogic/media/di/di.h>
-
+#endif
 #include "video_receiver.h"
 
 /* #define ENABLE_DV */
@@ -94,8 +92,9 @@ static inline struct vframe_s *common_vf_get(struct video_recv_s *ins)
 }
 
 #ifdef MORE_FUNCTION
-static int common_vf_get_states(struct video_recv_s *ins,
-				struct vframe_states *states)
+static int common_vf_get_states(
+	struct video_recv_s *ins,
+	struct vframe_states *states)
 {
 	int ret = -1;
 	unsigned long flags;
@@ -110,8 +109,9 @@ static int common_vf_get_states(struct video_recv_s *ins,
 }
 #endif
 
-static inline void common_vf_put(struct video_recv_s *ins,
-				 struct vframe_s *vf)
+static inline void common_vf_put(
+	struct video_recv_s *ins,
+	struct vframe_s *vf)
 {
 	struct vframe_provider_s *vfp = NULL;
 
@@ -122,7 +122,7 @@ static inline void common_vf_put(struct video_recv_s *ins,
 	if (vfp && vf) {
 		vf_put(vf, ins->recv_name);
 #ifdef CONFIG_AMLOGIC_MEDIA_ENHANCEMENT_DOLBYVISION
-		if (glayer_info[0].display_path_id == ins->path_id &&
+		if ((glayer_info[0].display_path_id == ins->path_id) &&
 		    is_dolby_vision_enable())
 			dolby_vision_vf_put(vf);
 #endif
@@ -136,31 +136,16 @@ static void common_vf_unreg_provider(struct video_recv_s *ins)
 	ulong flags;
 	bool layer1_used = false;
 	bool layer2_used = false;
-	bool layer3_used = false;
 	int i;
-	bool vpp1_used = false, vpp2_used = false;
 	bool wait = false;
 
 	if (!ins)
 		return;
-	if (!strcmp(ins->recv_name, "video_render.5"))
-		vpp1_used = true;
-	if (!strcmp(ins->recv_name, "video_render.6"))
-		vpp1_used = true;
+
 	/* FIXME: remove the global variable */
 	atomic_inc(&video_unreg_flag);
-	if (vpp1_used)
-		atomic_inc(&video_unreg_flag_vpp[0]);
-	if (vpp2_used)
-		atomic_inc(&video_unreg_flag_vpp[1]);
 	while (atomic_read(&video_inirq_flag) > 0)
 		schedule();
-	if (vpp1_used)
-		while (atomic_read(&video_inirq_flag_vpp[0]) > 0)
-			schedule();
-	if (vpp2_used)
-		while (atomic_read(&video_inirq_flag_vpp[1]) > 0)
-			schedule();
 
 	spin_lock_irqsave(&ins->lock, flags);
 	ins->buf_to_put_num = 0;
@@ -172,15 +157,15 @@ static void common_vf_unreg_provider(struct video_recv_s *ins)
 	ins->last_switch_state = false;
 
 	if (ins->cur_buf) {
-		if (ins->cur_buf->vf_ext &&
-		    IS_DI_POSTWRTIE(ins->cur_buf->type)) {
+		if ((ins->cur_buf->vf_ext) &&
+		    (ins->cur_buf->type & VIDTYPE_DI_PW)) {
 			struct vframe_s *tmp =
 				(struct vframe_s *)ins->cur_buf->vf_ext;
 
 			memcpy(&tmp->pic_mode, &ins->cur_buf->pic_mode,
 				sizeof(struct vframe_pic_mode_s));
 			ins->local_buf_ext = *tmp;
-			ins->local_buf = *ins->cur_buf;
+		ins->local_buf = *ins->cur_buf;
 			ins->local_buf.vf_ext = (void *)&ins->local_buf_ext;
 		} else {
 			ins->local_buf = *ins->cur_buf;
@@ -193,33 +178,13 @@ static void common_vf_unreg_provider(struct video_recv_s *ins)
 		== &ins->cur_buf) {
 		layer1_used = true;
 	}
-	if (vd_layer_vpp[0].vpp_index != VPP0 && vd_layer_vpp[0].layer_id == 1) {
-		if (vd_layer_vpp[0].dispbuf_mapping
-			== &ins->cur_buf) {
-			layer2_used = true;
-		}
-	} else {
-		if (vd_layer[1].dispbuf_mapping
-			== &ins->cur_buf) {
-			layer2_used = true;
-		}
-	}
-
-	if (vd_layer_vpp[1].vpp_index != VPP0 && vd_layer_vpp[1].layer_id == 2) {
-		if (vd_layer_vpp[0].dispbuf_mapping
-			== &ins->cur_buf) {
-			layer3_used = true;
-		}
-	} else {
-		if (vd_layer[2].dispbuf_mapping
-			== &ins->cur_buf) {
-			layer3_used = true;
-		}
+	if (vd_layer[1].dispbuf_mapping
+		== &ins->cur_buf) {
+		layer2_used = true;
 	}
 
 	if (layer1_used || !vd_layer[0].dispbuf_mapping)
 		atomic_set(&primary_src_fmt, VFRAME_SIGNAL_FMT_INVALID);
-
 	if (!layer1_used && !layer2_used) {
 		ins->cur_buf = NULL;
 	} else {
@@ -230,59 +195,40 @@ static void common_vf_unreg_provider(struct video_recv_s *ins)
 	}
 
 	if (layer1_used)
-		safe_switch_videolayer(0, false, true);
+		safe_switch_videolayer(
+			0, false, true);
 	if (layer2_used)
-		safe_switch_videolayer(1, false, true);
-	if (layer3_used)
-		safe_switch_videolayer(2, false, true);
+		safe_switch_videolayer(
+			1, false, true);
 
-	pr_info("%s %s: vd1 used: %s, vd2 used: %s, vd3 used: %s, black_out:%d, cur_buf:%p\n",
-		__func__,
+	pr_info("common_vf_unreg_provider %s: vd1 used: %s, vd2 used: %s, black_out:%d, cur_buf:%p\n",
 		ins->recv_name,
 		layer1_used ? "true" : "false",
 		layer2_used ? "true" : "false",
-		layer3_used ? "true" : "false",
 		ins->blackout | force_blackout,
 		ins->cur_buf);
 
 	ins->active = false;
 	atomic_dec(&video_unreg_flag);
-	if (vpp1_used)
-		atomic_dec(&video_unreg_flag_vpp[0]);
-	if (vpp2_used)
-		atomic_dec(&video_unreg_flag_vpp[1]);
 
 	while (wait && (!ins->exited || ins->request_exit))
 		schedule();
 }
 
-static void common_vf_light_unreg_provider(struct video_recv_s *ins)
+static void common_vf_light_unreg_provider(
+	struct video_recv_s *ins)
 {
 	ulong flags;
 	int i;
-	bool vpp1_used = false, vpp2_used = false;
 
 	if (!ins)
 		return;
 
-	if (!strcmp(ins->recv_name, "video_render.5"))
-		vpp1_used = true;
-	if (!strcmp(ins->recv_name, "video_render.6"))
-		vpp1_used = true;
 	/* FIXME: remove the global variable */
 	atomic_inc(&video_unreg_flag);
-	if (vpp1_used)
-		atomic_inc(&video_unreg_flag_vpp[0]);
-	if (vpp2_used)
-		atomic_inc(&video_unreg_flag_vpp[1]);
 	while (atomic_read(&video_inirq_flag) > 0)
 		schedule();
-	if (vpp1_used)
-		while (atomic_read(&video_inirq_flag_vpp[0]) > 0)
-			schedule();
-	if (vpp2_used)
-		while (atomic_read(&video_inirq_flag_vpp[1]) > 0)
-			schedule();
+
 	spin_lock_irqsave(&ins->lock, flags);
 	ins->buf_to_put_num = 0;
 	for (i = 0; i < DISPBUF_TO_PUT_MAX; i++)
@@ -296,15 +242,10 @@ static void common_vf_light_unreg_provider(struct video_recv_s *ins)
 	spin_unlock_irqrestore(&ins->lock, flags);
 
 	atomic_dec(&video_unreg_flag);
-	if (vpp1_used)
-		atomic_dec(&video_unreg_flag_vpp[0]);
-	if (vpp2_used)
-		atomic_dec(&video_unreg_flag_vpp[1]);
 }
 
-static int common_receiver_event_fun(int type,
-				     void *data,
-				     void *private_data)
+static int common_receiver_event_fun(
+	int type, void *data, void *private_data)
 {
 	struct video_recv_s *ins = (struct video_recv_s *)private_data;
 
@@ -368,20 +309,19 @@ static int dolby_vision_need_wait_common(struct video_recv_s *ins)
 }
 #endif
 
-static void common_toggle_frame(struct video_recv_s *ins,
-				struct vframe_s *vf)
+static void common_toggle_frame(
+	struct video_recv_s *ins, struct vframe_s *vf)
 {
 	if (!ins || !vf)
 		return;
 
-	if (vf->width == 0 || vf->height == 0) {
-		pr_err("%s %s: invalid frame dimension\n",
-		       __func__,
+	if ((vf->width == 0) || (vf->height == 0)) {
+		pr_err("common_toggle_frame %s: invalid frame dimension\n",
 		       ins->recv_name);
 		return;
 	}
 	if (ins->cur_buf &&
-	    ins->cur_buf != &ins->local_buf &&
+	    (ins->cur_buf != &ins->local_buf) &&
 	    (ins->original_vf != vf)) {
 #ifdef CONFIG_AMLOGIC_MEDIA_VSYNC_RDMA
 		int i = 0;
@@ -393,15 +333,18 @@ static void common_toggle_frame(struct video_recv_s *ins,
 					    ins->original_vf;
 					ins->buf_to_put_num++;
 				} else {
-					common_vf_put(ins, ins->original_vf);
+					common_vf_put(
+						ins, ins->original_vf);
 				}
 			} else {
-				common_vf_put(ins, ins->original_vf);
+				common_vf_put(
+					ins, ins->original_vf);
 			}
 		} else {
 			for (i = 0; i < ins->buf_to_put_num; i++) {
 				if (ins->buf_to_put[i]) {
-					common_vf_put(ins, ins->buf_to_put[i]);
+					common_vf_put(
+						ins, ins->buf_to_put[i]);
 					ins->buf_to_put[i] = NULL;
 				}
 			}
@@ -422,12 +365,13 @@ static void common_toggle_frame(struct video_recv_s *ins,
 /*********************************************************
  * recv func APIs
  *********************************************************/
-static s32 recv_common_early_process(struct video_recv_s *ins, u32 op)
+static s32 recv_common_early_process(
+	struct video_recv_s *ins, u32 op)
 {
 	int i;
 
 	if (!ins) {
-		pr_err("%s error, empty ins\n", __func__);
+		pr_err("recv_common_early_process error, empty ins\n");
 		return -1;
 	}
 
@@ -436,7 +380,8 @@ static s32 recv_common_early_process(struct video_recv_s *ins, u32 op)
 		for (i = 0; i < ins->buf_to_put_num; i++) {
 			if (ins->buf_to_put[i]) {
 				ins->buf_to_put[i]->rendered = true;
-				common_vf_put(ins, ins->buf_to_put[i]);
+				common_vf_put(
+					ins, ins->buf_to_put[i]);
 				ins->buf_to_put[i] = NULL;
 			}
 		}
@@ -449,7 +394,8 @@ static s32 recv_common_early_process(struct video_recv_s *ins, u32 op)
 	return 0;
 }
 
-static struct vframe_s *recv_common_dequeue_frame(struct video_recv_s *ins)
+static struct vframe_s *recv_common_dequeue_frame(
+	struct video_recv_s *ins)
 {
 	struct vframe_s *vf = NULL;
 	struct vframe_s *toggle_vf = NULL;
@@ -459,7 +405,7 @@ static struct vframe_s *recv_common_dequeue_frame(struct video_recv_s *ins)
 #endif
 
 	if (!ins) {
-		pr_err("%s error, empty ins\n", __func__);
+		pr_err("recv_common_dequeue_frame error, empty ins\n");
 		return NULL;
 	}
 
@@ -468,9 +414,10 @@ static struct vframe_s *recv_common_dequeue_frame(struct video_recv_s *ins)
 		ins->exited = false;
 		ins->request_exit = false;
 	}
+
 	vf = common_vf_peek(ins);
 #ifdef CONFIG_AMLOGIC_MEDIA_ENHANCEMENT_DOLBYVISION
-	if (glayer_info[0].display_path_id == ins->path_id &&
+	if ((glayer_info[0].display_path_id == ins->path_id) &&
 	    is_dolby_vision_enable()) {
 		struct provider_aux_req_s req;
 		u32 i, bl_cnt = 0xffffffff;
@@ -480,19 +427,20 @@ static struct vframe_s *recv_common_dequeue_frame(struct video_recv_s *ins)
 			dolby_vision_check_hdr10(vf);
 			dolby_vision_check_hdr10plus(vf);
 			dolby_vision_check_hlg(vf);
+			dolby_vision_check_cuva(vf);
 		}
 
 		fmt = get_vframe_src_fmt(vf);
-		if ((fmt == VFRAME_SIGNAL_FMT_DOVI ||
-		     fmt == VFRAME_SIGNAL_FMT_INVALID) &&
+		if (((fmt == VFRAME_SIGNAL_FMT_DOVI) ||
+		     (fmt == VFRAME_SIGNAL_FMT_INVALID)) &&
 		    vf_peek("dvel")) {
 			req.vf = NULL;
 			req.bot_flag = 0;
 			req.aux_buf = NULL;
 			req.aux_size = 0xffffffff;
 			req.dv_enhance_exist = 0;
-			vf_notify_provider_by_name
-				("dvbldec",
+			vf_notify_provider_by_name(
+				"dvbldec",
 				VFRAME_EVENT_RECEIVER_GET_AUX_DATA,
 				(void *)&req);
 			bl_cnt = req.aux_size;
@@ -502,13 +450,13 @@ static struct vframe_s *recv_common_dequeue_frame(struct video_recv_s *ins)
 			req.aux_buf = NULL;
 			req.aux_size = 0xffffffff;
 			req.dv_enhance_exist = 0;
-			vf_notify_provider_by_name
-				("dveldec",
+			vf_notify_provider_by_name(
+				"dveldec",
 				VFRAME_EVENT_RECEIVER_GET_AUX_DATA,
 				(void *)&req);
-			if (req.aux_size != 0xffffffff &&
-			    bl_cnt != 0xffffffff &&
-			    bl_cnt > req.aux_size) {
+			if ((req.aux_size != 0xffffffff) &&
+			    (bl_cnt != 0xffffffff) &&
+			    (bl_cnt > req.aux_size)) {
 				i = bl_cnt - req.aux_size;
 				while (i > 0) {
 					if (!recycle_dvel_vf_put())
@@ -522,7 +470,7 @@ static struct vframe_s *recv_common_dequeue_frame(struct video_recv_s *ins)
 	while (vf) {
 		if (!vf->frame_dirty) {
 #ifdef CONFIG_AMLOGIC_MEDIA_ENHANCEMENT_DOLBYVISION
-			if (glayer_info[0].display_path_id == ins->path_id &&
+			if ((glayer_info[0].display_path_id == ins->path_id) &&
 			    dolby_vision_need_wait_common(ins))
 				break;
 #endif
@@ -544,17 +492,18 @@ static struct vframe_s *recv_common_dequeue_frame(struct video_recv_s *ins)
 		drop_count++;
 		vf = common_vf_peek(ins);
 	}
+
 #ifdef CONFIG_AMLOGIC_MEDIA_DEINTERLACE
-	if (toggle_vf && IS_DI_POST(toggle_vf->type) &&
+	if (toggle_vf &&
 	    (toggle_vf->flag & VFRAME_FLAG_DOUBLE_FRAM) &&
-	    glayer_info[0].display_path_id == ins->path_id) {
+	    (glayer_info[0].display_path_id == ins->path_id)) {
 		if (toggle_vf->di_instance_id == di_api_get_instance_id()) {
 			if (ins->switch_vf) {
 				ins->switch_vf = false;
 				pr_info("set switch_vf false\n");
 			}
 		} else {
-			if (!ins->switch_vf) {
+			if (ins->switch_vf == false) {
 				ins->switch_vf = true;
 				pr_info("set switch_vf true\n");
 			}
@@ -570,8 +519,8 @@ static struct vframe_s *recv_common_dequeue_frame(struct video_recv_s *ins)
 		}
 	} else if (ins->cur_buf) {
 		/* repeat frame */
-		if (ins->switch_vf && ins->cur_buf->vf_ext &&
-		    (ins->cur_buf->flag & VFRAME_FLAG_DOUBLE_FRAM)) {
+		if (ins->switch_vf && ins->cur_buf->vf_ext
+		    && (ins->cur_buf->flag & VFRAME_FLAG_DOUBLE_FRAM)) {
 			ins->cur_buf = ins->cur_buf->vf_ext;
 			toggle_vf = ins->cur_buf;
 		} else if (!ins->switch_vf &&
@@ -581,8 +530,8 @@ static struct vframe_s *recv_common_dequeue_frame(struct video_recv_s *ins)
 		}
 	}
 #ifdef CONFIG_AMLOGIC_MEDIA_DEINTERLACE
-	if (ins->switch_vf &&
-	    ins->switch_vf != ins->last_switch_state) {
+	if (ins->switch_vf
+	    && (ins->switch_vf != ins->last_switch_state)) {
 		di_api_post_disable();
 	}
 #endif
@@ -591,16 +540,17 @@ static struct vframe_s *recv_common_dequeue_frame(struct video_recv_s *ins)
 	return toggle_vf;
 }
 
-static s32 recv_common_return_frame(struct video_recv_s *ins,
-				    struct vframe_s *vf)
+static s32 recv_common_return_frame(
+	struct video_recv_s *ins, struct vframe_s *vf)
 {
 	if (!ins || !vf) {
-		pr_err("%s error, empty ins\n", __func__);
+		pr_err("recv_common_return_frame error, ins: %p, vf: %p\n",
+		       ins, vf);
 		return -1;
 	}
 
-	if (vf == ins->cur_buf &&
-	    ins->cur_buf == &ins->local_buf) {
+	if ((vf == ins->cur_buf) &&
+	    (ins->cur_buf == &ins->local_buf)) {
 		pr_info("recv_common_return_frame skip the local vf =%p\n",
 			ins->original_vf);
 		return 0;
@@ -618,10 +568,11 @@ static s32 recv_common_return_frame(struct video_recv_s *ins,
 	return 0;
 }
 
-static s32 recv_common_late_proc(struct video_recv_s *ins)
+static s32 recv_common_late_proc(
+	struct video_recv_s *ins)
 {
 	if (!ins) {
-		pr_err("%s error, empty ins\n", __func__);
+		pr_err("recv_common_late_proc error, empty ins\n");
 		return -1;
 	}
 #ifdef CONFIG_AMLOGIC_MEDIA_VSYNC_RDMA
@@ -642,7 +593,7 @@ struct video_recv_s *create_video_receiver(const char *recv_name, u8 path_id)
 	struct video_recv_s *ins = NULL;
 
 	if (!recv_name) {
-		pr_err("%s: recv_name is NULL.\n", __func__);
+		pr_err("create_video_receiver: recv_name is NULL.\n");
 		goto CREATE_FAIL;
 	}
 	ins = kmalloc(sizeof(*ins), GFP_KERNEL);
@@ -655,16 +606,19 @@ struct video_recv_s *create_video_receiver(const char *recv_name, u8 path_id)
 	ins->func = (struct recv_func_s *)&recv_common_ops;
 	ins->path_id = path_id;
 	spin_lock_init(&ins->lock);
-	vf_receiver_init(&ins->handle,
-			 ins->recv_name,
-			 ins->vf_ops, ins);
+	vf_receiver_init(
+		&ins->handle,
+		ins->recv_name,
+		ins->vf_ops, ins);
 	if (vf_reg_receiver(&ins->handle)) {
-		pr_err("%s %s: reg recv fail\n",
-		       __func__, recv_name);
+		pr_err(
+			"create_video_receiver %s: reg recv fail\n",
+			recv_name);
 		goto CREATE_FAIL;
 	}
-	pr_info("%s %s  %p, path_id:%d success\n",
-		__func__, recv_name, ins, ins->path_id);
+	pr_info(
+		"create_video_receiver %s  %p, path_id:%d success\n",
+		recv_name, ins, ins->path_id);
 	return ins;
 CREATE_FAIL:
 	kfree(ins);
@@ -674,20 +628,21 @@ CREATE_FAIL:
 void destroy_video_receiver(struct video_recv_s *ins)
 {
 	if (!ins) {
-		pr_err("%s: ins is NULL.\n", __func__);
+		pr_err("destroy_video_receiver: ins is NULL.\n");
 		return;
 	}
 	vf_unreg_receiver(&ins->handle);
 	kfree(ins);
-	pr_info("%s\n", __func__);
+	pr_info("destroy_video_receiver\n");
 }
 
 void switch_vf(struct video_recv_s *ins, bool switch_flag)
 {
 	if (!ins) {
-		pr_err("%s: ins is NULL.\n", __func__);
+		pr_err("switch_vf: ins is NULL.\n");
 		return;
 	}
 	ins->switch_vf = switch_flag;
 	pr_info("set switch_flag %d\n", switch_flag);
 }
+

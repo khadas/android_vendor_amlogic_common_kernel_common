@@ -1,10 +1,21 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/amlogic/media/vout/hdmitx/hdmi_tx_20/hw/hw_g12a.c
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
 #include <linux/printk.h>
-#include <linux/pinctrl/devinfo.h>
 #include <linux/amlogic/media/vout/hdmi_tx/hdmi_tx_module.h>
 #include "common.h"
 #include "mach_reg.h"
@@ -44,14 +55,12 @@
 #undef WAIT_FOR_PLL_LOCKED
 #endif
 
-#define WAIT_FOR_PLL_LOCKED(_reg) \
+#define WAIT_FOR_PLL_LOCKED(reg) \
 	do { \
 		unsigned int st = 0; \
-		unsigned int reg = 0; \
 		int cnt = 10; \
-		reg = _reg; \
 		while (cnt--) { \
-			usleep_range(40, 50); \
+			udelay(50); \
 			st = (((hd_read_reg(reg) >> 30) & 0x3) == 3); \
 			if (st) \
 				break; \
@@ -90,11 +99,11 @@ static bool set_hpll_hclk_v1(unsigned int m, unsigned int frac_val)
 	hd_write_reg(P_HHI_HDMI_PLL_CNTL2, 0x00000000);
 
 	if (frac_val == 0x8148) {
-		if ((hdev->para->vic == HDMI_3840x2160p50_16x9 ||
-		     hdev->para->vic == HDMI_3840x2160p60_16x9 ||
-		     hdev->para->vic == HDMI_3840x2160p50_64x27 ||
-		     hdev->para->vic == HDMI_3840x2160p60_64x27) &&
-		     hdev->para->cs != COLORSPACE_YUV420) {
+		if (((hdev->para->vic == HDMI_3840x2160p50_16x9) ||
+			(hdev->para->vic == HDMI_3840x2160p60_16x9) ||
+			(hdev->para->vic == HDMI_3840x2160p50_64x27) ||
+			(hdev->para->vic == HDMI_3840x2160p60_64x27)) &&
+			(hdev->para->cs != COLORSPACE_YUV420)) {
 			hd_write_reg(P_HHI_HDMI_PLL_CNTL3, 0x6a685c00);
 			hd_write_reg(P_HHI_HDMI_PLL_CNTL4, 0x11551293);
 		} else {
@@ -102,15 +111,15 @@ static bool set_hpll_hclk_v1(unsigned int m, unsigned int frac_val)
 			hd_write_reg(P_HHI_HDMI_PLL_CNTL4, 0x44331290);
 		}
 	} else {
-		if (hdev->data->chip_type == MESON_CPU_ID_SM1 &&
+		if ((hdev->chip_type == MESON_CPU_ID_SM1) &&
 		    hdmitx_find_vendor_6g(hdev) &&
-		    (hdev->para->vic == HDMI_3840x2160p50_16x9 ||
-		    hdev->para->vic == HDMI_3840x2160p60_16x9 ||
-		    hdev->para->vic == HDMI_3840x2160p50_64x27 ||
-		    hdev->para->vic == HDMI_3840x2160p60_64x27 ||
-		    hdev->para->vic == HDMI_4096x2160p50_256x135 ||
-		    hdev->para->vic == HDMI_4096x2160p60_256x135) &&
-		    hdev->para->cs != COLORSPACE_YUV420) {
+		    ((hdev->para->vic == HDMI_3840x2160p50_16x9) ||
+		    (hdev->para->vic == HDMI_3840x2160p60_16x9) ||
+		    (hdev->para->vic == HDMI_3840x2160p50_64x27) ||
+		    (hdev->para->vic == HDMI_3840x2160p60_64x27) ||
+		    (hdev->para->vic == HDMI_4096x2160p50_256x135) ||
+		    (hdev->para->vic == HDMI_4096x2160p60_256x135)) &&
+		    (hdev->para->cs != COLORSPACE_YUV420)) {
 			hd_write_reg(P_HHI_HDMI_PLL_CNTL3, 0x6a685c00);
 			hd_write_reg(P_HHI_HDMI_PLL_CNTL4, 0x11551293);
 		} else {
@@ -168,18 +177,16 @@ static bool set_hpll_hclk_v3(unsigned int m, unsigned int frac_val)
 	return ret; /* return hpll locked status */
 }
 
-static inline int is_dongle_mode(struct hdmitx_dev *hdev)
-{
-	return hdev->dongle_mode &&
-		(hdev->para->cs == COLORSPACE_YUV422 ||
-		hdev->para->cd == COLORDEPTH_24B) &&
-		(hdev->cur_VIC == HDMI_1280x720p50_16x9 ||
-		 hdev->cur_VIC == HDMI_1280x720p60_16x9 ||
-		 hdev->cur_VIC == HDMI_1920x1080i60_16x9 ||
-		 hdev->cur_VIC == HDMI_1920x1080i50_16x9 ||
-		 hdev->cur_VIC == HDMI_1920x1080p60_16x9 ||
-		 hdev->cur_VIC == HDMI_1920x1080p50_16x9);
-}
+#define IS_DONGLE_MODE(hdev) \
+	((hdev->dongle_mode) \
+	&& (hdev->para->cs == COLORSPACE_YUV422 \
+		|| hdev->para->cd == COLORDEPTH_24B) \
+	&& (hdev->cur_VIC == HDMI_1280x720p50_16x9 \
+		|| hdev->cur_VIC == HDMI_1280x720p60_16x9 \
+		|| hdev->cur_VIC == HDMI_1920x1080i60_16x9 \
+		|| hdev->cur_VIC == HDMI_1920x1080i50_16x9 \
+		|| hdev->cur_VIC == HDMI_1920x1080p60_16x9 \
+		|| hdev->cur_VIC == HDMI_1920x1080p50_16x9))
 
 static void set_hpll_hclk_dongle_5940m(void)
 {
@@ -204,7 +211,7 @@ void set_g12a_hpll_clk_out(unsigned int frac_rate, unsigned int clk)
 
 	switch (clk) {
 	case 5940000:
-		if (is_dongle_mode(hdev)) {
+		if (IS_DONGLE_MODE(hdev)) {
 			set_hpll_hclk_dongle_5940m();
 			break;
 		}
@@ -450,37 +457,23 @@ void set_hpll_od3_g12a(unsigned int div)
 int hdmitx_hpd_hw_op_g12a(enum hpd_op cmd)
 {
 	int ret = 0;
-	struct hdmitx_dev *hdev = get_hdmitx_device();
-
-	if (!(hdev->pdev)) {
-		pr_info("exit for null device of hdmitx!\n");
-		return -ENODEV;
-	}
-
-	if (!(hdev->pdev->pins)) {
-		pr_info("exit for null pins of hdmitx device!\n");
-		return -ENODEV;
-	}
-
-	if (!(hdev->pdev->pins->p)) {
-		pr_info("exit for null pinctrl of hdmitx device pins!\n");
-		return -ENODEV;
-	}
 
 	switch (cmd) {
+	case HPD_INIT_DISABLE_PULLUP:
+		hd_set_reg_bits(P_PAD_PULL_UP_REG1, 0, 25, 1);
+		break;
 	case HPD_INIT_SET_FILTER:
 		hdmitx_wr_reg(HDMITX_TOP_HPD_FILTER,
-			      ((0xa << 12) | (0xa0 << 0)));
+			((0xa << 12) | (0xa0 << 0)));
 		break;
 	case HPD_IS_HPD_MUXED:
-		ret = 1;
+		ret = !!(hd_read_reg(P_PERIPHS_PIN_MUX_6) & (1 << 31));
 		break;
 	case HPD_MUX_HPD:
-		pinctrl_select_state(hdev->pdev->pins->p,
-				     hdev->pinctrl_default);
+		hd_set_reg_bits(P_PERIPHS_PIN_MUX_B, 1, 8, 4);
 		break;
 	case HPD_UNMUX_HPD:
-		pinctrl_select_state(hdev->pdev->pins->p, hdev->pinctrl_i2c);
+		hd_set_reg_bits(P_PERIPHS_PIN_MUX_B, 0, 8, 4);
 		break;
 	case HPD_READ_HPD_GPIO:
 		ret = hdmitx_rd_reg(HDMITX_DWC_PHY_STAT0) & (1 << 1);
@@ -531,45 +524,20 @@ void hdmitx_phy_bandgap_en_g12(void)
 		hd_write_reg(P_HHI_HDMI_PHY_CNTL0, 0x0b4242);
 }
 
-int hdmitx_ddc_hw_op_g12a(enum ddc_op cmd)
-{
-	int ret = 0;
-	struct hdmitx_dev *hdev = get_hdmitx_device();
-
-	if (!(hdev->pdev)) {
-		pr_info("exit for null device of hdmitx!\n");
-		return -ENODEV;
-	}
-
-	if (!(hdev->pdev->pins)) {
-		pr_info("exit for null pins of hdmitx device!\n");
-		return -ENODEV;
-	}
-
-	if (!(hdev->pdev->pins->p)) {
-		pr_info("exit for null pinctrl of hdmitx device pins!\n");
-		return -ENODEV;
-	}
-
-	switch (cmd) {
-	case DDC_MUX_DDC:
-		pinctrl_select_state(hdev->pdev->pins->p,
-				     hdev->pinctrl_default);
-		break;
-	case DDC_UNMUX_DDC:
-		pinctrl_select_state(hdev->pdev->pins->p, hdev->pinctrl_i2c);
-		break;
-	default:
-		pr_err("error ddc cmd %d\n", cmd);
-	}
-	return ret;
-}
+static unsigned int g12_phy_array[] = {
+	0x37eb76d4,
+	0x37eb76e4,
+	0xf7eb84fa,
+};
 
 void set_phy_by_mode_g12(unsigned int mode)
 {
+	struct hdmitx_dev *hdev = get_hdmitx_device();
+
 	switch (mode) {
 	case HDMI_PHYPARA_6G: /* 5.94Gbps */
-		hd_write_reg(P_HHI_HDMI_PHY_CNTL0, 0x37eb76d4);
+		hd_write_reg(P_HHI_HDMI_PHY_CNTL0,
+			     g12_phy_array[hdev->phy_idx]);
 		hd_write_reg(P_HHI_HDMI_PHY_CNTL3, 0x2ab0ff3b);
 		hd_write_reg(P_HHI_HDMI_PHY_CNTL5, 0x0000080b);
 		break;

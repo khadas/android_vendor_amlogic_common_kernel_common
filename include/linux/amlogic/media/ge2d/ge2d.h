@@ -1,6 +1,18 @@
-/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * include/linux/amlogic/media/ge2d/ge2d.h
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
 #ifndef _GE2D_H_
@@ -10,7 +22,6 @@
 #include <linux/wait.h>
 #include <linux/sched.h>
 #include <linux/semaphore.h>
-#include <linux/completion.h>
 
 #ifdef CONFIG_COMPAT
 #include <linux/compat.h>
@@ -117,8 +128,6 @@ enum ge2d_memtype_s {
 #define FILTER_TYPE_GAU0_BOT    5
 #define FILTER_TYPE_GAU1    6
 
-#define DST_SIGN_MODE   BIT(8)
-#define DST_REPEAT      BIT(7)
 #define CANVAS_STATUS   (BIT(5) | BIT(6))
 #define HAS_SELF_POWER  BIT(4)
 #define DEEP_COLOR      BIT(3)
@@ -126,28 +135,15 @@ enum ge2d_memtype_s {
 #define SRC2_REPEAT     BIT(1)
 #define SRC2_ALPHA      BIT(0)
 
-#define DST_RPT_PATTERN_X0 1
-#define DST_RPT_PATTERN_0X 2
-#define DST_RPT_PATTERN_XX 3
-
-#define DST_RPT_2          (0 << 2)
-#define DST_RPT_4          BIT(2)
-#define DST_RPT_8          (2 << 2)
-
 #define MATRIX_YCC_TO_RGB               BIT(0)
 #define MATRIX_RGB_TO_YCC               BIT(1)
 #define MATRIX_FULL_RANGE_YCC_TO_RGB    BIT(2)
 #define MATRIX_RGB_TO_FULL_RANGE_YCC    BIT(3)
+#define MATRIX_BT_STANDARD              BIT(4)
 #define MATRIX_BT_601                   (0 << 4)
 #define MATRIX_BT_709                   BIT(4)
 #define MATRIX_CUSTOM                   BIT(5)
-#define MATRIX_SIGNED                   BIT(6)
-
-#define GE2D_EXT_MASK                   (BIT(25) | BIT(26) | BIT(27) | BIT(31))
-#define GE2D_DST_REPEAT_2               BIT(31)
-#define GE2D_DST_REPEAT_4               BIT(27)
-#define GE2D_DST_REPEAT_8               (BIT(31) | BIT(27))
-#define GE2D_DST_SIGN_MDOE              BIT(26)
+#define STRIDE_CUSTOM                   BIT(6)
 
 #define GE2D_FORMAT_BT_STANDARD         BIT(28)
 #define GE2D_FORMAT_BT601               (0 << 28)
@@ -158,7 +154,7 @@ enum ge2d_memtype_s {
 #define GE2D_ENDIAN_SHIFT	24
 #define GE2D_ENDIAN_MASK            (0x1 << GE2D_ENDIAN_SHIFT)
 #define GE2D_BIG_ENDIAN             (0 << GE2D_ENDIAN_SHIFT)
-#define GE2D_LITTLE_ENDIAN          BIT(GE2D_ENDIAN_SHIFT)
+#define GE2D_LITTLE_ENDIAN          (1 << GE2D_ENDIAN_SHIFT)
 
 #define GE2D_COLOR_MAP_SHIFT        20
 #define GE2D_COLOR_MAP_MASK         (0xf << GE2D_COLOR_MAP_SHIFT)
@@ -170,14 +166,14 @@ enum ge2d_memtype_s {
 #define GE2D_COLOR_MAP_10BIT_YUV444		(0 << GE2D_COLOR_MAP_SHIFT)
 #define GE2D_COLOR_MAP_10BIT_VUY444		(5 << GE2D_COLOR_MAP_SHIFT)
 #define GE2D_COLOR_MAP_10BIT_YUV422		(0 << GE2D_COLOR_MAP_SHIFT)
-#define GE2D_COLOR_MAP_10BIT_YVU422		BIT(GE2D_COLOR_MAP_SHIFT)
+#define GE2D_COLOR_MAP_10BIT_YVU422		(1 << GE2D_COLOR_MAP_SHIFT)
 #define GE2D_COLOR_MAP_12BIT_YUV422		(8 << GE2D_COLOR_MAP_SHIFT)
 #define GE2D_COLOR_MAP_12BIT_YVU422		(9 << GE2D_COLOR_MAP_SHIFT)
 
 /* 16 bit */
 #define GE2D_COLOR_MAP_YUV422		(0 << GE2D_COLOR_MAP_SHIFT)
-#define GE2D_COLOR_MAP_RGB655		BIT(GE2D_COLOR_MAP_SHIFT)
-#define GE2D_COLOR_MAP_YUV655		BIT(GE2D_COLOR_MAP_SHIFT)
+#define GE2D_COLOR_MAP_RGB655		(1 << GE2D_COLOR_MAP_SHIFT)
+#define GE2D_COLOR_MAP_YUV655		(1 << GE2D_COLOR_MAP_SHIFT)
 #define GE2D_COLOR_MAP_RGB844		(2 << GE2D_COLOR_MAP_SHIFT)
 #define GE2D_COLOR_MAP_YUV844		(2 << GE2D_COLOR_MAP_SHIFT)
 #define GE2D_COLOR_MAP_RGBA6442     (3 << GE2D_COLOR_MAP_SHIFT)
@@ -195,8 +191,8 @@ enum ge2d_memtype_s {
 /* 24 bit */
 #define GE2D_COLOR_MAP_RGB888       (0 << GE2D_COLOR_MAP_SHIFT)
 #define GE2D_COLOR_MAP_YUV444       (0 << GE2D_COLOR_MAP_SHIFT)
-#define GE2D_COLOR_MAP_RGBA5658     BIT(GE2D_COLOR_MAP_SHIFT)
-#define GE2D_COLOR_MAP_YUVA5658     BIT(GE2D_COLOR_MAP_SHIFT)
+#define GE2D_COLOR_MAP_RGBA5658     (1 << GE2D_COLOR_MAP_SHIFT)
+#define GE2D_COLOR_MAP_YUVA5658     (1 << GE2D_COLOR_MAP_SHIFT)
 #define GE2D_COLOR_MAP_ARGB8565     (2 << GE2D_COLOR_MAP_SHIFT)
 #define GE2D_COLOR_MAP_AYUV8565     (2 << GE2D_COLOR_MAP_SHIFT)
 #define GE2D_COLOR_MAP_RGBA6666     (3 << GE2D_COLOR_MAP_SHIFT)
@@ -208,8 +204,8 @@ enum ge2d_memtype_s {
 /* 32 bit */
 #define GE2D_COLOR_MAP_RGBA8888		(0 << GE2D_COLOR_MAP_SHIFT)
 #define GE2D_COLOR_MAP_YUVA8888		(0 << GE2D_COLOR_MAP_SHIFT)
-#define GE2D_COLOR_MAP_ARGB8888     BIT(GE2D_COLOR_MAP_SHIFT)
-#define GE2D_COLOR_MAP_AYUV8888     BIT(GE2D_COLOR_MAP_SHIFT)
+#define GE2D_COLOR_MAP_ARGB8888     (1 << GE2D_COLOR_MAP_SHIFT)
+#define GE2D_COLOR_MAP_AYUV8888     (1 << GE2D_COLOR_MAP_SHIFT)
 #define GE2D_COLOR_MAP_ABGR8888     (2 << GE2D_COLOR_MAP_SHIFT)
 #define GE2D_COLOR_MAP_AVUY8888     (2 << GE2D_COLOR_MAP_SHIFT)
 #define GE2D_COLOR_MAP_BGRA8888     (3 << GE2D_COLOR_MAP_SHIFT)
@@ -248,11 +244,11 @@ enum ge2d_memtype_s {
 #define GE2D_FMT_S8_A		0x000c0 /* 00_11_0_00_0_00 */
 #define GE2D_FMT_S8_LUT		0x00020 /* 00_00_1_00_0_00 */
 #define GE2D_FMT_S16_YUV422	0x20102 /* 01_00_0_00_0_00 */
-#define GE2D_FMT_S16_RGB (GE2D_LITTLE_ENDIAN | 0x00100) /* 01_00_0_00_0_00 */
+#define GE2D_FMT_S16_RGB (GE2D_LITTLE_ENDIAN|0x00100) /* 01_00_0_00_0_00 */
 #define GE2D_FMT_S24_YUV444	0x20200 /* 10_00_0_00_0_00 */
-#define GE2D_FMT_S24_RGB (GE2D_LITTLE_ENDIAN | 0x00200) /* 10_00_0_00_0_00 */
+#define GE2D_FMT_S24_RGB (GE2D_LITTLE_ENDIAN|0x00200) /* 10_00_0_00_0_00 */
 #define GE2D_FMT_S32_YUVA444	0x20300 /* 11_00_0_00_0_00 */
-#define GE2D_FMT_S32_RGBA (GE2D_LITTLE_ENDIAN | 0x00300) /* 11_00_0_00_0_00 */
+#define GE2D_FMT_S32_RGBA (GE2D_LITTLE_ENDIAN|0x00300) /* 11_00_0_00_0_00 */
 #define GE2D_FMT_M24_YUV420	0x20007 /* 00_00_0_00_1_11 */
 #define GE2D_FMT_M24_YUV422	0x20006 /* 00_00_0_00_1_10 */
 #define GE2D_FMT_M24_YUV444	0x20004 /* 00_00_0_00_1_00 */
@@ -285,10 +281,11 @@ enum ge2d_memtype_s {
 #define GE2D_FMT_S16_12BIT_YUV422T		0x60112
 #define GE2D_FMT_S16_12BIT_YUV422B		0x6011a
 
+
 /* back compatible defines */
-#define GE2D_FORMAT_S8_Y            (GE2D_FORMAT_YUV | GE2D_FMT_S8_Y)
-#define GE2D_FORMAT_S8_CB           (GE2D_FORMAT_YUV | GE2D_FMT_S8_CB)
-#define GE2D_FORMAT_S8_CR           (GE2D_FORMAT_YUV | GE2D_FMT_S8_CR)
+#define GE2D_FORMAT_S8_Y            (GE2D_FORMAT_YUV|GE2D_FMT_S8_Y)
+#define GE2D_FORMAT_S8_CB          (GE2D_FORMAT_YUV|GE2D_FMT_S8_CB)
+#define GE2D_FORMAT_S8_CR          (GE2D_FORMAT_YUV|GE2D_FMT_S8_CR)
 #define GE2D_FORMAT_S8_R            GE2D_FMT_S8_R
 #define GE2D_FORMAT_S8_G            GE2D_FMT_S8_G
 #define GE2D_FORMAT_S8_B            GE2D_FMT_S8_B
@@ -301,6 +298,7 @@ enum ge2d_memtype_s {
 #define GE2D_FORMAT_M24_NV21  (GE2D_FMT_M24_YUV420SP | GE2D_COLOR_MAP_NV21)
 #define GE2D_FORMAT_M24_NV21T (GE2D_FMT_M24_YUV420SPT | GE2D_COLOR_MAP_NV21)
 #define GE2D_FORMAT_M24_NV21B (GE2D_FMT_M24_YUV420SPB | GE2D_COLOR_MAP_NV21)
+
 
 #define GE2D_FORMAT_S12_RGB_655 (GE2D_FMT_S16_RGB | GE2D_COLOR_MAP_RGB655)
 #define GE2D_FORMAT_S16_YUV422 (GE2D_FMT_S16_YUV422 | GE2D_COLOR_MAP_YUV422)
@@ -354,7 +352,7 @@ enum ge2d_memtype_s {
 	(GE2D_FMT_S16_10BIT_YUV422T | GE2D_COLOR_MAP_10BIT_YUV422)
 
 #define GE2D_FORMAT_S16_10BIT_YUV422B \
-	(GE2D_FMT_S16_10BIT_YUV422B | GE2D_COLOR_MAP_10BIT_YUV422)
+		(GE2D_FMT_S16_10BIT_YUV422B | GE2D_COLOR_MAP_10BIT_YUV422)
 
 #define GE2D_FORMAT_S16_10BIT_YVU422 \
 	(GE2D_FMT_S16_10BIT_YUV422 | GE2D_COLOR_MAP_10BIT_YVU422)
@@ -370,6 +368,7 @@ enum ge2d_memtype_s {
 
 #define GE2D_FORMAT_S16_12BIT_YVU422 \
 	(GE2D_FMT_S16_12BIT_YUV422 | GE2D_COLOR_MAP_12BIT_YVU422)
+
 
 #define	UPDATE_SRC_DATA     0x01
 #define	UPDATE_SRC_GEN      0x02
@@ -404,13 +403,13 @@ struct ge2d_para_s {
 
 struct ge2d_gen_s {
 	unsigned char     interrupt_ctrl;
+
 	unsigned char     dp_onoff_mode;
 	unsigned char     vfmt_onoff_en;
 	unsigned int      dp_on_cnt;
 	unsigned int      dp_off_cnt;
 	unsigned int      fifo_size;
 	unsigned int      burst_ctrl;
-	unsigned int      bytes_per_burst;
 };
 
 struct ge2d_src1_data_s {
@@ -437,9 +436,8 @@ struct ge2d_src1_data_s {
 	unsigned char     color_conv_mode1;
 	unsigned int      def_color;
 	unsigned int      format_all;
-	unsigned long      phy_addr[MAX_PLANE];
+	unsigned int      phy_addr[MAX_PLANE];
 	unsigned int      stride[MAX_PLANE];
-	unsigned int      stride_mode[MAX_PLANE];
 };
 
 struct ge2d_src1_gen_s {
@@ -488,13 +486,10 @@ struct ge2d_src2_dst_data_s {
 	unsigned char	dst2_discard_mode;
 	unsigned char	dst2_enable;
 
-	unsigned long src2_phyaddr[MAX_PLANE];
+	unsigned int src2_phyaddr[MAX_PLANE];
 	unsigned int src2_stride[MAX_PLANE];
-	unsigned int src2_stride_mode[MAX_PLANE];
-	unsigned long dst_phyaddr[MAX_PLANE];
+	unsigned int dst_phyaddr[MAX_PLANE];
 	unsigned int dst_stride[MAX_PLANE];
-	unsigned int dst_stride_mode[MAX_PLANE];
-	unsigned char dst_rpt;
 };
 
 struct ge2d_src2_dst_gen_s {
@@ -551,7 +546,6 @@ struct ge2d_dp_gen_s {
 	unsigned char     conv_matrix_en_src2;        /* src2 matrix enable */
 	unsigned char     conv_matrix_en_dst;         /* dst  matrix enable */
 	unsigned char     matrix_sat_in_en;
-	unsigned char     dst_signed_mode;
 	unsigned char     matrix_minus_16_ctrl; /* 3bit */
 	unsigned char     matrix_sign_ctrl;     /* 3bit */
 	int               matrix_offset[3];
@@ -577,6 +571,7 @@ struct ge2d_dp_gen_s {
 	unsigned char     bitmask_en;
 	unsigned char     bytemask_only;
 	unsigned int      bitmask;
+
 };
 
 struct ge2d_cmd_s {
@@ -646,7 +641,7 @@ struct ge2d_cmd_s {
 	unsigned char    alpha_dst_blend_factor;
 	unsigned char    alpha_logic_op;
 
-	int (*cmd_cb)(unsigned int param);
+	int (*cmd_cb)(unsigned int);
 	unsigned int     cmd_cb_param;
 	unsigned int     src1_buffer;
 	unsigned int     src2_buffer;
@@ -711,9 +706,9 @@ struct ge2d_config_s {
 	struct ge2d_dma_cfg_s src_dma_cfg[MAX_PLANE];
 	struct ge2d_dma_cfg_s src2_dma_cfg[MAX_PLANE];
 	struct ge2d_dma_cfg_s dst_dma_cfg[MAX_PLANE];
-	struct ge2d_matrix_s matrix_custom;
 	/* operate on secure memory */
 	int mem_sec;
+	struct ge2d_matrix_s matrix_custom;
 };
 
 struct ge2d_dma_buf_s {
@@ -798,7 +793,7 @@ struct src_dst_para_s {
 	int  canvas_index;
 	int  bpp;
 	int  ge2d_color_index;
-	ulong  phy_addr[MAX_PLANE];
+	int  phy_addr[MAX_PLANE];
 	int  stride[MAX_PLANE];
 };
 
@@ -1097,6 +1092,7 @@ struct config_ge2d_para_ex_s {
 	};
 };
 
+
 #ifdef CONFIG_COMPAT
 struct compat_config_para_ex_memtype_s {
 	int ge2d_magic;
@@ -1146,8 +1142,7 @@ enum {
 	GEN_PWR_SLEEP0,
 	GEN_PWR_ISO0,
 	MEM_PD_REG0,
-	PWR_SMC,
-	PWR_RUNTIME
+	PWR_SMC
 };
 
 struct ge2d_ctrl_s {
@@ -1176,12 +1171,8 @@ struct ge2d_device_data_s {
 	struct ge2d_power_table_s *poweroff_table;
 	int chip_type;
 	unsigned int adv_matrix;
-	unsigned int src2_repeat;    /* src2 x/y repeat */
-	unsigned int dst_repeat;     /* dst x repeat */
-	unsigned int dst_sign_mode;  /* dst signed matrix */
-	unsigned int blk_stride_mode;     /* block or linear mode*/
+	unsigned int src2_repeat;
 };
-
 extern struct ge2d_device_data_s ge2d_meson_dev;
 
 #define GE2D_IOC_MAGIC  'G'
@@ -1206,6 +1197,7 @@ extern struct ge2d_device_data_s ge2d_meson_dev;
 	_IOW(GE2D_IOC_MAGIC, 0x02, struct compat_config_para_s)
 #endif
 
+
 #define GE2D_CONFIG_EX_ION	 \
 	_IOW(GE2D_IOC_MAGIC, 0x03,  struct config_para_ex_ion_s)
 
@@ -1229,7 +1221,8 @@ extern struct ge2d_device_data_s ge2d_meson_dev;
 #define GE2D_SYNC_DEVICE _IOW(GE2D_IOC_MAGIC, 0x08, int)
 #define GE2D_SYNC_CPU _IOW(GE2D_IOC_MAGIC, 0x09, int)
 
-#define GE2D_ATTACH_DMA_FD _IOW(GE2D_IOC_MAGIC, 0x0a, struct ge2d_dmabuf_attach_s)
+#define GE2D_ATTACH_DMA_FD \
+	_IOW(GE2D_IOC_MAGIC, 0x0a, struct ge2d_dmabuf_attach_s)
 #define GE2D_DETACH_DMA_FD _IOW(GE2D_IOC_MAGIC, 0x0b, enum ge2d_data_type_e)
 
 void ge2d_set_src1_data(struct ge2d_src1_data_s *cfg);
@@ -1253,9 +1246,9 @@ int ge2d_context_config_ex(struct ge2d_context_s *context,
 			   struct config_para_ex_s *ge2d_config);
 int ge2d_context_config_ex_ion(struct ge2d_context_s *context,
 			       struct config_para_ex_ion_s *ge2d_config);
-int
-ge2d_context_config_ex_mem(struct ge2d_context_s *context,
-			   struct config_para_ex_memtype_s *ge2d_config_mem);
+int ge2d_context_config_ex_mem(struct ge2d_context_s *context,
+			       struct config_para_ex_memtype_s *ge2d_config_mem
+			       );
 struct ge2d_context_s *create_ge2d_work_queue(void);
 int destroy_ge2d_work_queue(struct ge2d_context_s *wq);
 int ge2d_wq_remove_config(struct ge2d_context_s *wq);
@@ -1266,14 +1259,12 @@ int ge2d_antiflicker_enable(struct ge2d_context_s *context,
 			    unsigned long enable);
 struct ge2d_src1_data_s *ge2d_wq_get_src_data(struct ge2d_context_s *wq);
 struct ge2d_src1_gen_s *ge2d_wq_get_src_gen(struct ge2d_context_s *wq);
-struct ge2d_src2_dst_data_s
-*ge2d_wq_get_dst_data(struct ge2d_context_s *wq);
-extern struct ge2d_src2_dst_gen_s
-*ge2d_wq_get_dst_gen(struct ge2d_context_s *wq);
+struct ge2d_src2_dst_data_s *ge2d_wq_get_dst_data(struct ge2d_context_s *wq);
+struct ge2d_src2_dst_gen_s *ge2d_wq_get_dst_gen(struct ge2d_context_s *wq);
 struct ge2d_dp_gen_s *ge2d_wq_get_dp_gen(struct ge2d_context_s *wq);
 struct ge2d_cmd_s *ge2d_wq_get_cmd(struct ge2d_context_s *wq);
 int ge2d_wq_add_work(struct ge2d_context_s *wq);
-void ge2d_canv_config(u32 index, ulong *addr, u32 *stride, u32 *stride_mode);
+void ge2d_canv_config(u32 index, u32 *addr, u32 *stride);
 #include "ge2d_func.h"
 
 #endif

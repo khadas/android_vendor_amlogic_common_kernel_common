@@ -1,6 +1,18 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * include/linux/amlogic/usb-v2.h
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
 #ifndef __USB_V2_HEADER_
@@ -8,16 +20,13 @@
 
 #include <linux/usb/phy.h>
 #include <linux/platform_device.h>
-#include <linux/of_gpio.h>
+#include <linux/amlogic/aml_gpio_consumer.h>
 #include <linux/workqueue.h>
 #include <linux/notifier.h>
 #include <linux/clk.h>
 
 #define PHY_REGISTER_SIZE	0x20
 #define USB_PHY_MAX_NUMBER  0x8
-#define ID_GPIO_IRQ_FLAGS \
-	(IRQF_SHARED | IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING)
-
 /* Register definitions */
 
 int aml_new_usb_v2_register_notifier(struct notifier_block *nb);
@@ -26,7 +35,7 @@ int aml_new_otg_register_notifier(struct notifier_block *nb);
 int aml_new_otg_unregister_notifier(struct notifier_block *nb);
 
 struct u2p_aml_regs_v2 {
-	void __iomem	*u2p_r_v2[4];
+	void __iomem	*u2p_r_v2[2];
 };
 
 union u2p_r0_v2 {
@@ -54,42 +63,6 @@ union u2p_r1_v2 {
 		unsigned OTGSESSVLD0:1;
 		unsigned VBUSVALID0:1;
 		unsigned reserved:28;
-	} b;
-};
-
-union u2p_r2_v2 {
-	/** raw register data */
-	u32 d32;
-	/** register bits */
-	struct {
-		unsigned iddig_sync:1;
-		unsigned iddig_reg:1;
-		unsigned iddig_cfg:2;
-		unsigned iddig_en0:1;
-		unsigned iddig_en1:1;
-		unsigned iddig_curr:1;
-		unsigned usb_iddig_irq:1;
-		unsigned iddig_th:8;
-		unsigned iddig_cnt:8;
-		unsigned reserved:8;
-	} b;
-};
-
-union u2p_r3_v2 {
-	/** raw register data */
-	u32 d32;
-	/** register bits */
-	struct {
-		unsigned vbusdig_sync:1;
-		unsigned vbusdig_reg:1;
-		unsigned vbusdig_cfg:2;
-		unsigned vbusdig_en0:1;
-		unsigned vbusdig_en1:1;
-		unsigned vbusdig_curr:1;
-		unsigned usb_vbusdig_irq:1;
-		unsigned vbusdig_th:8;
-		unsigned vbusdig_cnt:8;
-		unsigned reserved:8;
 	} b;
 };
 
@@ -164,10 +137,11 @@ union usb_r4_v2 {
 		unsigned p21_SLEEPM0:1;
 		unsigned mem_pd:2;
 		unsigned p21_only:1;
-		unsigned u3h_hub_port_overcurrent:5;
-		unsigned u3h_hub_port_perm_attach:5;
-		unsigned u3h_host_u2_port_disable:3;
-		unsigned u3h_host_u3_port_disable:2;
+		unsigned reserved:12;
+		unsigned p31_lane0_tx2rx_loopback:1;
+		unsigned p31_lane0_ext_pclk_req:1;
+		unsigned p31_pcs_rx_los_mask_val:10;
+		unsigned reserve:3;
 	} b;
 };
 
@@ -191,7 +165,7 @@ union usb_r5_v2 {
 
 union usb_r7_v2 {
 	/** raw register data */
-	u32 d32;
+	uint32_t d32;
 	/** register bits */
 	struct {
 		unsigned p31_ssc_en:1;
@@ -222,40 +196,43 @@ struct amlogic_usb_v2 {
 	void __iomem	*phy31_cfg_r4;
 	void __iomem	*phy31_cfg_r5;
 	void __iomem	*usb2_phy_cfg;
+	void __iomem	*power_base;
+	void __iomem	*hhi_mem_pd_base;
 	u32 pll_setting[8];
-	u32 pll_dis_thred_enhance;
 	int phy_cfg_state[4];
-	int phy_trim_initvalue[8];
-	int phy_0xc_initvalue[8];
-	int phy_trim_state[4];
 	/* Set VBus Power though GPIO */
 	int vbus_power_pin;
 	int vbus_power_pin_work_mask;
-	int otg;
 	struct delayed_work	work;
-	struct delayed_work	id_gpio_work;
 	struct gpio_desc *usb_gpio_desc;
-	struct gpio_desc *idgpiodesc;
 
 	int portnum;
 	int suspend_flag;
 	int phy_version;
+	int pwr_ctl;
+	u32 u2_ctrl_sleep_shift;
+	u32 u2_hhi_mem_pd_mask;
+	u32 u2_ctrl_iso_shift;
+	u32 u2_hhi_mem_pd_shift;
+	u32 u30_ctrl_sleep_shift;
+	u32 u30_hhi_mem_pd_mask;
+	u32 u30_ctrl_iso_shift;
+	u32 u30_hhi_mem_pd_shift;
 	u32 phy_reset_level_bit[USB_PHY_MAX_NUMBER];
 	u32 usb_reset_bit;
-	u32 otg_phy_index;
+	u32 usb30_ctrl_rst_bit;
+	u32 u31_ctrl_sleep_shift;
+	u32 u31_hhi_mem_pd_mask;
+	u32 u31_ctrl_iso_shift;
+	u32 u31_hhi_mem_pd_shift;
+	u32 usb31_ctrl_rst_bit;
 	u32 reset_level;
 	struct clk		*clk;
-	struct clk		*usb_clk;
 	struct clk		*gate0_clk;
 	struct clk		*gate1_clk;
+	struct clk		*pcie_hcsl_en_clk;
 	u32 portconfig_31;
 	u32 portconfig_30;
-	void __iomem	*usb_phy_trim_reg;
-	u32 phy_id;
-	struct clk		*general_clk;
-	u32 usb3_apb_reset_bit;
-	u32 usb3_phy_reset_bit;
-	u32 usb3_reset_shift;
 };
 
 union phy3_r1 {
@@ -315,11 +292,5 @@ union phy3_r5 {
 	} b;
 };
 
-int aml_new_otg_get_mode(void);
-int aml_new_usb_get_mode(void);
-int amlogic_crg_device_usb2_init(u32 phy_id);
-#ifdef CONFIG_AMLOGIC_USB3PHY
-void aml_new_otg_init(void);
-#endif
 
 #endif

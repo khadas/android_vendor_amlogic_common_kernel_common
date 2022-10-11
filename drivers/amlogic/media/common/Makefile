@@ -1,27 +1,14 @@
 #Ascending by module name's ASCII
-include drivers/amlogic/media/common/arch/Makefile
-
-include drivers/amlogic/media/common/canvas/Makefile
-
-include drivers/amlogic/media/common/ge2d/Makefile
-
-include drivers/amlogic/media/common/ion_dev/Makefile
-
-include drivers/amlogic/media/common/vpu/Makefile
-
-include drivers/amlogic/media/common/rdma/Makefile
-
-include drivers/amlogic/media/common/codec_mm/Makefile
-
-include drivers/amlogic/media/common/uvm/Makefile
-
-include drivers/amlogic/media/common/vfm/Makefile
-
-include drivers/amlogic/media/common/v4l_util/Makefile
-
-include drivers/amlogic/media/common/lut_dma/Makefile
-
-include drivers/amlogic/media/common/vpu_security/Makefile
-
-include drivers/amlogic/media/common/resource_mgr/Makefile
-
+obj-y	+=	arch/
+obj-$(CONFIG_AMLOGIC_MEDIA_CANVAS)	+=	canvas/
+obj-$(CONFIG_AMLOGIC_MEDIA_CODEC_MM)	+=	codec_mm/
+obj-$(CONFIG_AMLOGIC_ION)			+= ion_dev/
+obj-$(CONFIG_AMLOGIC_MEDIA_GE2D)	+=	ge2d/
+obj-$(CONFIG_AMLOGIC_MEDIA_RDMA)	+=	rdma/
+obj-$(CONFIG_AMLOGIC_UVM_CORE)		+=	uvm/
+obj-$(CONFIG_AMLOGIC_MEDIA_VFM)	+=	vfm/
+obj-$(CONFIG_AMLOGIC_VPU)	+=	vpu/
+obj-$(CONFIG_AMLOGIC_VIDEOBUF_RESOURCE)	+= v4l_util/
+obj-$(CONFIG_AMLOGIC_MEDIA_LUT_DMA)	+= lut_dma/
+obj-$(CONFIG_AMLOGIC_MEDIA_RESMANAGE)	+=	resource_mgr/
+obj-$(CONFIG_AMLOGIC_MEDIA_SECURITY) += vpu_security/

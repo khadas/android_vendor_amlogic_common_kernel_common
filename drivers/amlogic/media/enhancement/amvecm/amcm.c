@@ -1,4 +1,3 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
  * drivers/amlogic/media/enhancement/amvecm/amcm.c
  *
@@ -30,9 +29,7 @@
 #include "arch/ve_regs.h"
 #include "amcm.h"
 #include "amcm_regmap.h"
-#ifdef CONFIG_AMLOGIC_MEDIA_ENHANCEMENT_DOLBYVISION
 #include <linux/amlogic/media/amdolbyvision/dolby_vision.h>
-#endif
 #include "amcsc.h"
 #include "local_contrast.h"
 #include "amve.h"
@@ -70,6 +67,11 @@ int pq_reg_wr_rdma = 1;/* 0:disabel;1:enable */
 module_param(pq_reg_wr_rdma, int, 0664);
 MODULE_PARM_DESC(pq_reg_wr_rdma, "\n pq_reg_wr_rdma\n");
 
+#if 0
+struct cm_region_s cm_region;
+struct cm_top_s    cm_top;
+struct cm_demo_s   cm_demo;
+#endif
 static int cm_level_last = 0xff;/* 0:optimize;1:enhancement */
 unsigned int cm2_patch_flag;
 unsigned int cm_size;
@@ -90,38 +92,34 @@ void am_set_regmap(struct am_regs_s *p)
 {
 	unsigned short i;
 	unsigned int temp = 0;
-	unsigned int mask = 0;
-	unsigned int val = 0;
-	unsigned int addr = 0;
 	unsigned int skip = 0;
 	struct am_reg_s *dejaggy_reg;
 
 	dejaggy_reg = sr0_dej_setting[DEJAGGY_LEVEL - 1].am_reg;
+
 	for (i = 0; i < p->length; i++) {
-		mask = p->am_reg[i].mask;
-		val = p->am_reg[i].val;
-		addr = p->am_reg[i].addr;
 		skip = skip_pq_ctrl_load(&p->am_reg[i]);
 		if (skip != 0)
-			mask &= ~skip;
+			p->am_reg[i].mask &= ~skip;
+
 		switch (p->am_reg[i].type) {
 		case REG_TYPE_PHY:
 			break;
 		case REG_TYPE_CBUS:
-			if (mask == 0xffffffff) {
+			if (p->am_reg[i].mask == 0xffffffff)
 				/* WRITE_CBUS_REG(p->am_reg[i].addr,*/
 				/*  p->am_reg[i].val); */
-				aml_write_cbus(addr, val);
-			} else {
+				aml_write_cbus(p->am_reg[i].addr,
+					       p->am_reg[i].val);
+			else
 				/* WRITE_CBUS_REG(p->am_reg[i].addr, */
 				/* (READ_CBUS_REG(p->am_reg[i].addr) & */
 				/* (~(p->am_reg[i].mask))) | */
 				/* (p->am_reg[i].val & p->am_reg[i].mask)); */
-				temp = aml_read_cbus(addr);
-				aml_write_cbus(addr,
-					       (temp & (~mask)) |
-					       (val & mask));
-			}
+				aml_write_cbus(p->am_reg[i].addr,
+					       (aml_read_cbus(p->am_reg[i].addr) &
+					(~(p->am_reg[i].mask))) |
+					(p->am_reg[i].val & p->am_reg[i].mask));
 			break;
 		case REG_TYPE_APB:
 			/* if (p->am_reg[i].mask == 0xffffffff) */
@@ -155,140 +153,167 @@ void am_set_regmap(struct am_regs_s *p)
 			break;
 		case REG_TYPE_INDEX_VPPCHROMA:
 			/*  add for vm2 demo frame size setting */
-			if (addr == 0x20f) {
-				if ((val & 0xff) != 0) {
-					cm2_patch_flag = val;
-					val = val & 0xffffff00;
-				} else {
+			if (p->am_reg[i].addr == 0x20f) {
+				if ((p->am_reg[i].val & 0xff) != 0) {
+					cm2_patch_flag = p->am_reg[i].val;
+					p->am_reg[i].val =
+						p->am_reg[i].val & 0xffffff00;
+				} else
 					cm2_patch_flag = 0;
-				}
 			}
 			/* add for cm patch size config */
-			if (addr == 0x205 ||
-			    addr == 0x209 ||
-			    addr == 0x20a) {
-				pr_amcm_dbg("[amcm]:%s %s addr:0x%x",
-					    "REG_TYPE_INDEX_VPPCHROMA",
-					    __func__, addr);
+			if ((p->am_reg[i].addr == 0x205) ||
+			    (p->am_reg[i].addr == 0x209) ||
+				(p->am_reg[i].addr == 0x20a)) {
+				pr_amcm_dbg("[amcm]:%s REG_TYPE_INDEX_VPPCHROMA addr:0x%x",
+					    __func__, p->am_reg[i].addr);
 				break;
 			}
 
 			if (!cm_en) {
-				if (addr == 0x208) {
+				if (p->am_reg[i].addr == 0x208) {
 					if (get_cpu_type() >=
 						MESON_CPU_MAJOR_ID_G12A)
-						val = val & 0xfffffffc;
+						p->am_reg[i].val =
+						p->am_reg[i].val & 0xfffffffc;
 					else
-						val = val & 0xfffffff9;
+						p->am_reg[i].val =
+						p->am_reg[i].val & 0xfffffff9;
 				}
-				pr_amcm_dbg("[amcm]:%s %s addr:0x%x",
-					    "REG_TYPE_INDEX_VPPCHROMA",
-					    __func__, addr);
-			} else if (addr == 0x208) {
+				pr_amcm_dbg("[amcm]:%s REG_TYPE_INDEX_VPPCHROMA addr:0x%x",
+					    __func__, p->am_reg[i].addr);
+			} else if (p->am_reg[i].addr == 0x208) {
 				if (get_cpu_type() >=
-				    MESON_CPU_MAJOR_ID_G12A)
-					val = val & 0xfffffffd;
+					MESON_CPU_MAJOR_ID_G12A)
+					p->am_reg[i].val =
+						p->am_reg[i].val & 0xfffffffd;
 				else
-					val = val & 0xfffffffb;
+					p->am_reg[i].val =
+						p->am_reg[i].val & 0xfffffffb;
 
-				if (val & 0x2)
+				if (p->am_reg[i].val & 0x2)
 					cm_dis_flag = false;
 				else
 					cm_dis_flag = true;
 			}
 
-			VSYNC_WR_MPEG_REG(VPP_CHROMA_ADDR_PORT, addr);
-			if (mask == 0xffffffff) {
+			VSYNC_WR_MPEG_REG(VPP_CHROMA_ADDR_PORT,
+					  p->am_reg[i].addr);
+			if (p->am_reg[i].mask == 0xffffffff)
 				VSYNC_WR_MPEG_REG(VPP_CHROMA_DATA_PORT,
-						  val);
-			} else {
-				temp = READ_VPP_REG(VPP_CHROMA_DATA_PORT);
+						  p->am_reg[i].val);
+			else {
+				temp = VSYNC_RD_MPEG_REG(VPP_CHROMA_DATA_PORT);
 				VSYNC_WR_MPEG_REG(VPP_CHROMA_ADDR_PORT,
-						  addr);
+						  p->am_reg[i].addr);
 				VSYNC_WR_MPEG_REG(VPP_CHROMA_DATA_PORT,
-						  (temp & (~mask)) |
-						  (val & mask));
+						  (temp & (~(p->am_reg[i].mask))) |
+						  (p->am_reg[i].val & p->am_reg[i].mask));
 			}
 
-			default_sat_param(addr, val);
+			default_sat_param(p->am_reg[i].addr, p->am_reg[i].val);
 			break;
 		case REG_TYPE_INDEX_GAMMA:
 			break;
 		case VALUE_TYPE_CONTRAST_BRIGHTNESS:
 			break;
 		case REG_TYPE_INDEX_VPP_COEF:
-			if (((addr & 0xf) == 0) ||
-			    ((addr & 0xf) == 0x8)) {
-				aml_write_vcbus_s(VPP_CHROMA_ADDR_PORT, addr);
-				aml_write_vcbus_s(VPP_CHROMA_DATA_PORT, val);
-			} else {
-				aml_write_vcbus_s(VPP_CHROMA_DATA_PORT, val);
-			}
+			if (((p->am_reg[i].addr & 0xf) == 0) ||
+			    ((p->am_reg[i].addr & 0xf) == 0x8)) {
+				aml_write_vcbus_s(VPP_CHROMA_ADDR_PORT,
+						  p->am_reg[i].addr);
+				aml_write_vcbus_s(VPP_CHROMA_DATA_PORT,
+						  p->am_reg[i].val);
+			} else
+				aml_write_vcbus_s(VPP_CHROMA_DATA_PORT,
+						  p->am_reg[i].val);
 			break;
 		case REG_TYPE_VCBUS:
-			if (addr == offset_addr(SRSHARP0_DEJ_ALPHA)) {
-				dejaggy_reg[1].val = val & 0xff;
+			if (p->am_reg[i].addr ==
+			    offset_addr(SRSHARP0_DEJ_ALPHA)) {
+				dejaggy_reg[1].val =
+					p->am_reg[i].val & 0xff;
 				if (pd_detect_en)
-					mask &= ~(0xff);
+					p->am_reg[i].mask &= ~(0xff);
 			}
 
-			if (addr == offset_addr(SRSHARP0_DEJ_CTRL)) {
-				dejaggy_reg[0].val = val & 0x1;
+			if (p->am_reg[i].addr ==
+			    offset_addr(SRSHARP0_DEJ_CTRL)) {
+				dejaggy_reg[0].val =
+					p->am_reg[i].val & 0x1;
 				if (pd_detect_en)
-					mask &= ~(0x1);
+					p->am_reg[i].mask &= ~(0x1);
 			}
 
-			if (mask == 0xffffffff) {
+			if (p->am_reg[i].mask == 0xffffffff) {
 				if (pq_reg_wr_rdma)
-					VSYNC_WR_MPEG_REG(addr, val);
+					VSYNC_WR_MPEG_REG(p->am_reg[i].addr,
+							  p->am_reg[i].val);
 				else
 					aml_write_vcbus_s(p->am_reg[i].addr,
 							  p->am_reg[i].val);
 			} else {
-				if (addr == VPP_MISC)
+				if (p->am_reg[i].addr == VPP_MISC)
 					break;
 				if (sr_demo_flag) {
-					if (addr == offset_addr(SRSHARP0_DEMO_CRTL) ||
-					    addr == offset_addr(SRSHARP1_DEMO_CRTL))
+					if ((p->am_reg[i].addr ==
+						offset_addr(SRSHARP0_DEMO_CRTL)) ||
+						(p->am_reg[i].addr ==
+						offset_addr(SRSHARP1_DEMO_CRTL)))
 						break;
 				}
 
-				if (addr == offset_addr(SRSHARP1_LC_TOP_CTRL)) {
+				if (p->am_reg[i].addr ==
+				    offset_addr(SRSHARP1_LC_TOP_CTRL)) {
 					if (!lc_en)
-						val = val & 0xffffffef;
+						p->am_reg[i].val =
+						p->am_reg[i].val & 0xffffffef;
 				}
-				if (pq_reg_wr_rdma) {
-					temp = READ_VPP_REG(addr);
-					VSYNC_WR_MPEG_REG(addr,
-							  (temp & (~mask)) |
-					       (val & mask));
-				} else {
-					temp = aml_read_vcbus_s(addr);
-					aml_write_vcbus_s(addr,
-							  (temp & (~mask)) |
-					       (val & mask));
+
+				if (lc_curve_ctrl_reg_set_flag(p->am_reg[i].addr)) {
+					p->am_reg[i].mask |= 0x1;
+					p->am_reg[i].val |= 0x1;
 				}
-				aipq_base_peaking_param(addr, mask, val);
+
+				if (pq_reg_wr_rdma)
+					VSYNC_WR_MPEG_REG(
+						p->am_reg[i].addr,
+						(VSYNC_RD_MPEG_REG(p->am_reg[i].addr) &
+						(~(p->am_reg[i].mask))) |
+						(p->am_reg[i].val & p->am_reg[i].mask));
+				else
+					aml_write_vcbus_s(
+						p->am_reg[i].addr,
+						(aml_read_vcbus_s(p->am_reg[i].addr) &
+						(~(p->am_reg[i].mask))) |
+						(p->am_reg[i].val & p->am_reg[i].mask));
+				aipq_base_peaking_param(
+					p->am_reg[i].addr,
+					p->am_reg[i].mask,
+					p->am_reg[i].val);
 			}
 			break;
 		case REG_TYPE_OFFSET_VCBUS:
-			if (mask == 0xffffffff) {
+			if (p->am_reg[i].mask == 0xffffffff) {
 				if (pq_reg_wr_rdma)
-					VSYNC_WRITE_VPP_REG(addr, val);
+					VSYNC_WRITE_VPP_REG(p->am_reg[i].addr,
+							    p->am_reg[i].val);
 				else
-					WRITE_VPP_REG(addr, val);
+					WRITE_VPP_REG(p->am_reg[i].addr,
+						      p->am_reg[i].val);
 			} else {
-				if (pq_reg_wr_rdma) {
-					temp = READ_VPP_REG(addr);
-					VSYNC_WRITE_VPP_REG(addr,
-							    (temp & (~mask)) |
-					       (val & mask));
-				} else {
-					temp = READ_VPP_REG(addr);
-					WRITE_VPP_REG(addr,
-						      (temp & (~mask)) |
-					       (val & mask));
-				}
+				if (pq_reg_wr_rdma)
+					VSYNC_WRITE_VPP_REG(
+						p->am_reg[i].addr,
+						(VSYNC_READ_VPP_REG(p->am_reg[i].addr) &
+						(~(p->am_reg[i].mask))) |
+						(p->am_reg[i].val & p->am_reg[i].mask));
+				else
+					WRITE_VPP_REG(
+						p->am_reg[i].addr,
+						(READ_VPP_REG(p->am_reg[i].addr) &
+					(~(p->am_reg[i].mask))) |
+					(p->am_reg[i].val & p->am_reg[i].mask));
 			}
 			break;
 /* #endif */
@@ -296,6 +321,7 @@ void am_set_regmap(struct am_regs_s *p)
 			break;
 		}
 	}
+	return;
 }
 
 void amcm_disable(void)
@@ -385,11 +411,7 @@ void pd_combing_fix_patch(enum pd_comb_fix_lvl_e level)
 	/* so skip the function */
 	if (!(is_meson_tl1_cpu() || is_meson_txlx_cpu() ||
 	      is_meson_tm2_cpu() || is_meson_txl_cpu() ||
-	      is_meson_txhd_cpu() ||
-	      get_cpu_type() == MESON_CPU_MAJOR_ID_T5 ||
-	      get_cpu_type() == MESON_CPU_MAJOR_ID_T5D ||
-	      get_cpu_type() == MESON_CPU_MAJOR_ID_T7 ||
-	      get_cpu_type() == MESON_CPU_MAJOR_ID_T3))
+	      is_meson_txhd_cpu()))
 		return;
 
 	pr_amcm_dbg("\n[amcm..] pd fix lvl = %d\n", level);
@@ -397,10 +419,11 @@ void pd_combing_fix_patch(enum pd_comb_fix_lvl_e level)
 	dejaggy_reg_count = sr0_dej_setting[level].length;
 	dejaggy_reg = sr0_dej_setting[level].am_reg;
 	for (i = 0; i < dejaggy_reg_count; i++) {
-		WRITE_VPP_REG(dejaggy_reg[i].addr,
-			      (READ_VPP_REG(dejaggy_reg[i].addr) &
-			       (~(dejaggy_reg[i].mask))) |
-			      (dejaggy_reg[i].val & dejaggy_reg[i].mask));
+		VSYNC_WRITE_VPP_REG(
+		dejaggy_reg[i].addr,
+		(READ_VPP_REG(dejaggy_reg[i].addr) &
+		(~(dejaggy_reg[i].mask))) |
+		(dejaggy_reg[i].val & dejaggy_reg[i].mask));
 	}
 }
 
@@ -448,7 +471,7 @@ void cm2_frame_size_patch(unsigned int width, unsigned int height)
 		return;
 	else if (width < cm_width_limit)
 		amcm_disable();
-	else if ((!cm_en_flag) && (!cm_dis_flag))
+	else if ((cm_en_flag != true) && (cm_dis_flag == false))
 		amcm_enable();
 	vpp_size = width | (height << 16);
 	if (cm_size != vpp_size) {
@@ -464,11 +487,12 @@ void cm2_frame_size_patch(unsigned int width, unsigned int height)
 		VSYNC_WRITE_VPP_REG(VPP_CHROMA_ADDR_PORT, STA_WIN_XYXY1_REG);
 		VSYNC_WRITE_VPP_REG(VPP_CHROMA_DATA_PORT, 0 | (height << 16));
 		cm_size =  vpp_size;
-		pr_amcm_dbg("\n[amcm..]set cm size from scaler: %x, ",
-			    vpp_size);
+		pr_amcm_dbg("\n[amcm..]cm size from scaler: set cm2 framesize %x, ",
+				vpp_size);
 		pr_amcm_dbg("set demo mode  %x\n", cm2_patch_flag);
 	}
 }
+
 
 /* set the frame size for cm2 demo*/
 void cm2_frame_switch_patch(void)
@@ -486,33 +510,34 @@ void cm_latch_process(void)
 	/*(vecm_latch_flag & FLAG_REG_MAP4) ||*/
 	/* (vecm_latch_flag & FLAG_REG_MAP5)){*/
 	do {
-		if (vecm_latch_flag & FLAG_REG_MAP0)
+		if (vecm_latch_flag & FLAG_REG_MAP0) {
 			cm_regmap_latch(&amregs0, FLAG_REG_MAP0);
-		if (vecm_latch_flag & FLAG_REG_MAP1)
+		}
+		if (vecm_latch_flag & FLAG_REG_MAP1) {
 			cm_regmap_latch(&amregs1, FLAG_REG_MAP1);
-		if (vecm_latch_flag & FLAG_REG_MAP2)
+		}
+		if (vecm_latch_flag & FLAG_REG_MAP2) {
 			cm_regmap_latch(&amregs2, FLAG_REG_MAP2);
-		if (vecm_latch_flag & FLAG_REG_MAP3)
+		}
+		if (vecm_latch_flag & FLAG_REG_MAP3) {
 			cm_regmap_latch(&amregs3, FLAG_REG_MAP3);
-		if (vecm_latch_flag & FLAG_REG_MAP4)
+		}
+		if (vecm_latch_flag & FLAG_REG_MAP4) {
 			cm_regmap_latch(&amregs4, FLAG_REG_MAP4);
-		if (vecm_latch_flag & FLAG_REG_MAP5)
+		}
+		if (vecm_latch_flag & FLAG_REG_MAP5) {
 			cm_regmap_latch(&amregs5, FLAG_REG_MAP5);
+		}
 		if ((cm2_patch_flag & 0xff) > 0)
 			cm2_frame_switch_patch();
 	} while (0);
-	if (cm_en && cm_level_last != cm_level) {
+	if (cm_en && (cm_level_last != cm_level)) {
 		cm_level_last = cm_level;
 		if ((!is_meson_gxtvbb_cpu()) &&
-		    (!is_meson_txl_cpu()) &&
+			(!is_meson_txl_cpu()) &&
 			(!is_meson_txlx_cpu()) &&
 			(!is_meson_tl1_cpu()) &&
-			(!is_meson_tm2_cpu()) &&
-			(get_cpu_type() != MESON_CPU_MAJOR_ID_SC2) &&
-			(get_cpu_type() != MESON_CPU_MAJOR_ID_T5) &&
-			(get_cpu_type() != MESON_CPU_MAJOR_ID_T5D) &&
-			(get_cpu_type() != MESON_CPU_MAJOR_ID_T7) &&
-			(get_cpu_type() != MESON_CPU_MAJOR_ID_T3))
+			(!is_meson_tm2_cpu()))
 			amcm_level_sel(cm_level);
 		amcm_enable();
 		pr_amcm_dbg("\n[amcm..] set cm2 load OK!!!\n");
@@ -534,84 +559,84 @@ static int amvecm_regmap_info(struct am_regs_s *p)
 			break;
 		case REG_TYPE_CBUS:
 			pr_info("%s:%-3d cbus: 0x%-4x=0x%-8x (%-5u)=(%-10u)",
-				__func__, i, p->am_reg[i].addr,
-				(p->am_reg[i].val & p->am_reg[i].mask),
-				p->am_reg[i].addr,
-				(p->am_reg[i].val & p->am_reg[i].mask));
+					__func__, i, p->am_reg[i].addr,
+					(p->am_reg[i].val & p->am_reg[i].mask),
+					p->am_reg[i].addr,
+					(p->am_reg[i].val & p->am_reg[i].mask));
 			pr_info(" mask=%-8x(%u)\n",
-				p->am_reg[i].mask,
-				p->am_reg[i].mask);
+					p->am_reg[i].mask,
+					p->am_reg[i].mask);
 			break;
 		case REG_TYPE_APB:
 			pr_info("%s:%-3d apb: 0x%-4x=0x%-8x (%-5u)=(%-10u)",
-				__func__, i, p->am_reg[i].addr,
-				(p->am_reg[i].val & p->am_reg[i].mask),
-				p->am_reg[i].addr,
-				(p->am_reg[i].val & p->am_reg[i].mask));
+					__func__, i, p->am_reg[i].addr,
+					(p->am_reg[i].val & p->am_reg[i].mask),
+					p->am_reg[i].addr,
+					(p->am_reg[i].val & p->am_reg[i].mask));
 			pr_info(" mask=%-8x(%u)\n",
-				p->am_reg[i].mask,
-				p->am_reg[i].mask);
+					p->am_reg[i].mask,
+					p->am_reg[i].mask);
 			break;
 		case REG_TYPE_MPEG:
 			pr_info("%s:%-3d mpeg: 0x%-4x=0x%-8x (%-5u)=(%-10u)",
-				__func__, i, p->am_reg[i].addr,
-				(p->am_reg[i].val & p->am_reg[i].mask),
-				p->am_reg[i].addr,
-				(p->am_reg[i].val & p->am_reg[i].mask));
+					__func__, i, p->am_reg[i].addr,
+					(p->am_reg[i].val & p->am_reg[i].mask),
+					p->am_reg[i].addr,
+					(p->am_reg[i].val & p->am_reg[i].mask));
 			pr_info(" mask=%-8x(%u)\n",
-				p->am_reg[i].mask,
-				p->am_reg[i].mask);
+					p->am_reg[i].mask,
+					p->am_reg[i].mask);
 			break;
 		case REG_TYPE_AXI:
 			pr_info("%s:%-3d axi: 0x%-4x=0x%-8x (%-5u)=(%-10u)",
-				__func__, i, p->am_reg[i].addr,
-				(p->am_reg[i].val & p->am_reg[i].mask),
-				p->am_reg[i].addr,
-				(p->am_reg[i].val & p->am_reg[i].mask));
+					__func__, i, p->am_reg[i].addr,
+					(p->am_reg[i].val & p->am_reg[i].mask),
+					p->am_reg[i].addr,
+					(p->am_reg[i].val & p->am_reg[i].mask));
 			pr_info(" mask=%-8x(%u)\n",
-				p->am_reg[i].mask,
-				p->am_reg[i].mask);
+					p->am_reg[i].mask,
+					p->am_reg[i].mask);
 			break;
 		case REG_TYPE_INDEX_VPPCHROMA:
 			pr_info("%s:%-3d chroma: 0x%-4x=0x%-8x (%-5u)=(%-10u)",
-				__func__, i, p->am_reg[i].addr,
-				(p->am_reg[i].val & p->am_reg[i].mask),
-				p->am_reg[i].addr,
-				(p->am_reg[i].val & p->am_reg[i].mask));
+					__func__, i, p->am_reg[i].addr,
+					(p->am_reg[i].val & p->am_reg[i].mask),
+					p->am_reg[i].addr,
+					(p->am_reg[i].val & p->am_reg[i].mask));
 			pr_info(" mask=%-8x(%u)\n",
-				p->am_reg[i].mask,
-				p->am_reg[i].mask);
+					p->am_reg[i].mask,
+					p->am_reg[i].mask);
 			break;
 		case REG_TYPE_INDEX_GAMMA:
 			pr_info("%s:%-3d bus type: REG_TYPE_INDEX_GAMMA...\n",
-				__func__, i);
+					__func__, i);
 			break;
 		case VALUE_TYPE_CONTRAST_BRIGHTNESS:
-			pr_info("%s:%-3d bus type: VALUE_TYPE_CON_BRIT\n",
-				__func__, i);
+			pr_info("%s:%-3d bus type: VALUE_TYPE_CONTRAST_BRIGHTNESS...\n",
+					__func__, i);
 			break;
 		case REG_TYPE_INDEX_VPP_COEF:
 			pr_info("%s:%-3d vpp coef: 0x%-4x=0x%-8x (%-5u)=(%-10u)",
-				__func__, i, p->am_reg[i].addr,
-				(p->am_reg[i].val & p->am_reg[i].mask),
-				p->am_reg[i].addr,
-				(p->am_reg[i].val & p->am_reg[i].mask));
+					__func__, i, p->am_reg[i].addr,
+					(p->am_reg[i].val & p->am_reg[i].mask),
+					p->am_reg[i].addr,
+					(p->am_reg[i].val & p->am_reg[i].mask));
 			pr_info(" mask=%-8x(%u)\n",
-				p->am_reg[i].mask,
-				p->am_reg[i].mask);
+					p->am_reg[i].mask,
+					p->am_reg[i].mask);
 			break;
 		case REG_TYPE_VCBUS:
 			pr_info("%s:%-3d vcbus: 0x%-4x=0x%-8x (%-5u)=(%-10u)",
-				__func__, i, p->am_reg[i].addr,
-				(p->am_reg[i].val & p->am_reg[i].mask),
-				p->am_reg[i].addr,
-				(p->am_reg[i].val & p->am_reg[i].mask));
+					__func__, i, p->am_reg[i].addr,
+					(p->am_reg[i].val & p->am_reg[i].mask),
+					p->am_reg[i].addr,
+					(p->am_reg[i].val & p->am_reg[i].mask));
 			pr_info(" mask=%-8x(%u)\n",	p->am_reg[i].mask,
-				p->am_reg[i].mask);
+					p->am_reg[i].mask);
 			break;
 		default:
 			pr_info("%s:%3d bus type error!!!bustype = 0x%x...\n",
-				__func__, i, p->am_reg[i].type);
+					__func__, i, p->am_reg[i].type);
 			break;
 		}
 	}
@@ -619,24 +644,24 @@ static int amvecm_regmap_info(struct am_regs_s *p)
 }
 
 static long amvecm_regmap_set(struct am_regs_s *regs,
-			      struct am_regs_s *arg, unsigned int reg_map)
+		struct am_regs_s *arg, unsigned int reg_map)
 {
 	int ret = 0;
 
 	if (!(memcpy(regs, arg, sizeof(struct am_regs_s)))) {
-		pr_amcm_dbg("[amcm..]%s 0x%x: can't get buffer length\n",
-			    __func__,
-			    reg_map);
+		pr_amcm_dbg(
+		"[amcm..]0x%x load reg errors: can't get buffer length\n",
+		reg_map);
 		return -EFAULT;
 	}
-	if (!regs->length || regs->length > am_reg_size) {
-		pr_amcm_dbg("[amcm..]%s 0x%x: buf length error! len = 0x%x\n",
-			    __func__,
-			    reg_map, regs->length);
+	if (!regs->length || (regs->length > am_reg_size)) {
+		pr_amcm_dbg(
+		"[amcm..]0x%x load regs error: buf length error!!!, length=0x%x\n",
+				reg_map, regs->length);
 		return -EINVAL;
 	}
-	pr_amcm_dbg("\n[amcm..]%s 0x%x reg length=0x%x\n",
-		    __func__, reg_map, regs->length);
+	pr_amcm_dbg("\n[amcm..]0x%x reg length=0x%x ......\n",
+			reg_map, regs->length);
 
 	if (debug_regload)
 		amvecm_regmap_info(regs);

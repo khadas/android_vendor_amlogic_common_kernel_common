@@ -1,6 +1,18 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/amlogic/secmon/secmon.c
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
 #include <linux/errno.h>
@@ -13,6 +25,7 @@
 #include <linux/io.h>
 #include <linux/platform_device.h>
 #include <linux/dma-contiguous.h>
+#include <asm/compiler.h>
 #include <linux/cma.h>
 #include <linux/arm-smccc.h>
 #undef pr_fmt
@@ -23,7 +36,7 @@ static void __iomem *sharemem_out_base;
 static long phy_in_base;
 static long phy_out_base;
 static unsigned long secmon_start_virt;
-static unsigned int secmon_size;
+static unsigned int mem_size;
 
 #ifdef CONFIG_ARM64
 #define IN_SIZE	0x6000
@@ -32,13 +45,9 @@ static unsigned int secmon_size;
 #endif
  #define OUT_SIZE 0x1000
 static DEFINE_MUTEX(sharemem_mutex);
-#define DEV_REGISTERED 1
+#define DEV_REGISTED 1
 #define DEV_UNREGISTED 0
-
-unsigned int sharemem_in_size = IN_SIZE;
-unsigned int sharemem_out_size = OUT_SIZE;
-
-static int secmon_dev_registered = DEV_UNREGISTED;
+static int secmon_dev_registed = DEV_UNREGISTED;
 static long get_sharemem_info(unsigned int function_id)
 {
 	struct arm_smccc_res res;
@@ -48,19 +57,6 @@ static long get_sharemem_info(unsigned int function_id)
 	return res.a0;
 }
 
-static void get_sharemem_size(unsigned int function_id)
-{
-	struct arm_smccc_res res;
-
-	arm_smccc_smc(function_id, 1, 0, 0, 0, 0, 0, 0, &res);
-	if (res.a0 != -1)
-		sharemem_in_size =  res.a0;
-
-	arm_smccc_smc(function_id, 2, 0, 0, 0, 0, 0, 0, &res);
-	if (res.a0 != -1)
-		sharemem_out_size =  res.a0;
-}
-
 #define RESERVE_MEM_SIZE	0x300000
 
 int within_secmon_region(unsigned long addr)
@@ -68,8 +64,8 @@ int within_secmon_region(unsigned long addr)
 	if (!secmon_start_virt)
 		return 0;
 
-	if (addr >= secmon_start_virt &&
-	    addr <= (secmon_start_virt + secmon_size))
+	if ((addr >= secmon_start_virt) &&
+	    (addr <= (secmon_start_virt + mem_size)))
 		return 1;
 
 	return 0;
@@ -88,15 +84,11 @@ static int secmon_probe(struct platform_device *pdev)
 	if (!of_property_read_u32(np, "out_base_func", &id))
 		phy_out_base = get_sharemem_info(id);
 
-	if (!of_property_read_u32(np, "inout_size_func", &id))
-		get_sharemem_size(id);
-
-	if (of_property_read_u32(np, "reserve_mem_size", &secmon_size)) {
+	if (of_property_read_u32(np, "reserve_mem_size", &mem_size)) {
 		pr_err("can't get reserve_mem_size, use default value\n");
-		secmon_size = RESERVE_MEM_SIZE;
-	} else {
-		pr_info("reserve_mem_size:0x%x\n", secmon_size);
-	}
+		mem_size = RESERVE_MEM_SIZE;
+	} else
+		pr_info("reserve_mem_size:0x%x\n", mem_size);
 
 	ret = of_reserved_mem_device_init(&pdev->dev);
 	if (ret) {
@@ -104,7 +96,7 @@ static int secmon_probe(struct platform_device *pdev)
 		return ret;
 	}
 
-	page = dma_alloc_from_contiguous(&pdev->dev, secmon_size >> PAGE_SHIFT, 0, 0);
+	page = dma_alloc_from_contiguous(&pdev->dev, mem_size >> PAGE_SHIFT, 0);
 	if (!page) {
 		pr_err("alloc page failed, ret:%p\n", page);
 		return -ENOMEM;
@@ -115,7 +107,7 @@ static int secmon_probe(struct platform_device *pdev)
 	if (pfn_valid(__phys_to_pfn(phy_in_base)))
 		sharemem_in_base = (void __iomem *)__phys_to_virt(phy_in_base);
 	else
-		sharemem_in_base = ioremap_cache(phy_in_base, sharemem_in_size);
+		sharemem_in_base = ioremap_cache(phy_in_base, IN_SIZE);
 
 	if (!sharemem_in_base) {
 		pr_info("secmon share mem in buffer remap fail!\n");
@@ -126,14 +118,13 @@ static int secmon_probe(struct platform_device *pdev)
 		sharemem_out_base = (void __iomem *)
 				__phys_to_virt(phy_out_base);
 	else
-		sharemem_out_base = ioremap_cache(phy_out_base,
-				sharemem_out_size);
+		sharemem_out_base = ioremap_cache(phy_out_base, OUT_SIZE);
 
 	if (!sharemem_out_base) {
 		pr_info("secmon share mem out buffer remap fail!\n");
 		return -ENOMEM;
 	}
-	secmon_dev_registered = DEV_REGISTERED;
+	secmon_dev_registed = DEV_REGISTED;
 	pr_info("share in base: 0x%lx, share out base: 0x%lx\n",
 		(long)sharemem_in_base, (long)sharemem_out_base);
 	pr_info("phy_in_base: 0x%lx, phy_out_base: 0x%lx\n",
@@ -183,34 +174,34 @@ int __init meson_secmon_init(void)
 	int ret;
 
 	ret = platform_driver_register(&secmon_platform_driver);
-	WARN((secmon_dev_registered != DEV_REGISTERED),
+	WARN((secmon_dev_registed != DEV_REGISTED),
 			"ERROR: secmon device must be enable!!!\n");
 	return ret;
 }
 subsys_initcall(meson_secmon_init);
 
-void meson_sm_mutex_lock(void)
+void sharemem_mutex_lock(void)
 {
 	mutex_lock(&sharemem_mutex);
 }
-EXPORT_SYMBOL(meson_sm_mutex_lock);
+EXPORT_SYMBOL(sharemem_mutex_lock);
 
-void meson_sm_mutex_unlock(void)
+void sharemem_mutex_unlock(void)
 {
 	mutex_unlock(&sharemem_mutex);
 }
-EXPORT_SYMBOL(meson_sm_mutex_unlock);
+EXPORT_SYMBOL(sharemem_mutex_unlock);
 
-void __iomem *get_meson_sm_input_base(void)
+void __iomem *get_secmon_sharemem_input_base(void)
 {
 	return sharemem_in_base;
 }
-EXPORT_SYMBOL(get_meson_sm_input_base);
-void __iomem *get_meson_sm_output_base(void)
+EXPORT_SYMBOL(get_secmon_sharemem_input_base);
+
+void __iomem *get_secmon_sharemem_output_base(void)
 {
 	return sharemem_out_base;
 }
-EXPORT_SYMBOL(get_meson_sm_output_base);
 
 long get_secmon_phy_input_base(void)
 {
@@ -222,15 +213,3 @@ long get_secmon_phy_output_base(void)
 {
 	return phy_out_base;
 }
-
-unsigned int get_secmon_sharemem_in_size(void)
-{
-	return sharemem_in_size;
-}
-EXPORT_SYMBOL(get_secmon_sharemem_in_size);
-unsigned int get_secmon_sharemem_out_size(void)
-{
-	return sharemem_out_size;
-}
-EXPORT_SYMBOL(get_secmon_sharemem_out_size);
-

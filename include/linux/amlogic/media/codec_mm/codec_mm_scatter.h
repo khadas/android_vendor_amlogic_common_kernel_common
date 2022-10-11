@@ -1,7 +1,19 @@
-/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
- */
+ * include/linux/amlogic/media/codec_mm/codec_mm_scatter.h
+ *
+ * Copyright (C) 2016 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
+*/
 
 #ifndef CODEC_MM_SCATTER_HEADER
 #define CODEC_MM_SCATTER_HEADER
@@ -19,7 +31,7 @@
 #endif
 #define page_sid_type u16
 
-#define PAGE_INDEX(page) ((page) >> PAGE_SHIFT)
+#define PAGE_INDEX(page) (page >> PAGE_SHIFT)
 
 struct codec_mm_scatter {
 	void *manager;
@@ -28,11 +40,9 @@ struct codec_mm_scatter {
 	int page_cnt;		/*page num */
 	int page_tail;		/*last page in list */
 	int page_used;
-	/* spin lock */
 	spinlock_t lock;
 	atomic_t user_cnt;
 	unsigned long tofree_jiffies;
-	/* mutex lock */
 	struct mutex mutex;
 	struct list_head list;	/*hold list. */
 };
@@ -83,22 +93,23 @@ enum e_mmu_alloc_status {
 		MMU_ALLOC_START_LOCK_DONE,
 };
 
+
 int codec_mm_scatter_free_all_pages(struct codec_mm_scatter *mms);
 
 int codec_mm_scatter_free_tail_pages(struct codec_mm_scatter *mms,
-				     int start_free_id);
+	int start_free_id);
 int codec_mm_scatter_free_tail_pages_fast(struct codec_mm_scatter *mms,
-					  int start_free_id);
+	int start_free_id);
 int codec_mm_scatter_free_tail_pages_fast(struct codec_mm_scatter *mms,
-					  int start_free_id);
+	int start_free_id);
 
-struct codec_mm_scatter *codec_mm_scatter_alloc(int max_page, int page_num,
-						int istvp);
+struct codec_mm_scatter *codec_mm_scatter_alloc(int max_page,
+	int page_num, int istvp);
 int codec_mm_scatter_alloc_want_pages(struct codec_mm_scatter *mms,
-				      int want_pages);
+			int want_pages);
 int codec_mm_scatter_size(int is_tvp);
-int codec_mm_scatter_mgt_delay_free_switch(int on, int delay_ms,
-					   int wait_size_M, int istvp);
+int codec_mm_scatter_mgt_delay_free_swith(int on, int delay_ms,
+	int wait_size_M, int istvp);
 int codec_mm_dump_scatter(struct codec_mm_scatter *mms, void *buf, int size);
 int codec_mm_scatter_dec_owner_user(void *sc_mm, int delay_ms);
 

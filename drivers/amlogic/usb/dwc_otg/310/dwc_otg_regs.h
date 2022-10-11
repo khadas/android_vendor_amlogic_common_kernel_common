@@ -1853,7 +1853,6 @@ typedef struct dwc_otg_dev_if {
 
 	/** Session Requested */
 	uint32_t vbus_on;
-	u32 suspend_no;
 
 } dwc_otg_dev_if_t;
 

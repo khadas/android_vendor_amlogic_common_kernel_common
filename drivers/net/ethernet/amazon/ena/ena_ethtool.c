@@ -60,8 +60,8 @@ struct ena_stats {
 
 static const struct ena_stats ena_stats_global_strings[] = {
 	ENA_STAT_GLOBAL_ENTRY(tx_timeout),
-	ENA_STAT_GLOBAL_ENTRY(suspend),
-	ENA_STAT_GLOBAL_ENTRY(resume),
+	ENA_STAT_GLOBAL_ENTRY(io_suspend),
+	ENA_STAT_GLOBAL_ENTRY(io_resume),
 	ENA_STAT_GLOBAL_ENTRY(wd_expired),
 	ENA_STAT_GLOBAL_ENTRY(interface_up),
 	ENA_STAT_GLOBAL_ENTRY(interface_down),
@@ -80,25 +80,20 @@ static const struct ena_stats ena_stats_tx_strings[] = {
 	ENA_STAT_TX_ENTRY(tx_poll),
 	ENA_STAT_TX_ENTRY(doorbells),
 	ENA_STAT_TX_ENTRY(prepare_ctx_err),
+	ENA_STAT_TX_ENTRY(missing_tx_comp),
 	ENA_STAT_TX_ENTRY(bad_req_id),
-	ENA_STAT_TX_ENTRY(llq_buffer_copy),
-	ENA_STAT_TX_ENTRY(missed_tx),
 };
 
 static const struct ena_stats ena_stats_rx_strings[] = {
 	ENA_STAT_RX_ENTRY(cnt),
 	ENA_STAT_RX_ENTRY(bytes),
-	ENA_STAT_RX_ENTRY(rx_copybreak_pkt),
-	ENA_STAT_RX_ENTRY(csum_good),
 	ENA_STAT_RX_ENTRY(refil_partial),
 	ENA_STAT_RX_ENTRY(bad_csum),
 	ENA_STAT_RX_ENTRY(page_alloc_fail),
 	ENA_STAT_RX_ENTRY(skb_alloc_fail),
 	ENA_STAT_RX_ENTRY(dma_mapping_err),
 	ENA_STAT_RX_ENTRY(bad_desc_num),
-	ENA_STAT_RX_ENTRY(bad_req_id),
-	ENA_STAT_RX_ENTRY(empty_rx_ring),
-	ENA_STAT_RX_ENTRY(csum_unchecked),
+	ENA_STAT_RX_ENTRY(rx_copybreak_pkt),
 };
 
 static const struct ena_stats ena_stats_ena_com_strings[] = {
@@ -305,20 +300,32 @@ static int ena_get_coalesce(struct net_device *net_dev,
 {
 	struct ena_adapter *adapter = netdev_priv(net_dev);
 	struct ena_com_dev *ena_dev = adapter->ena_dev;
+	struct ena_intr_moder_entry intr_moder_entry;
 
 	if (!ena_com_interrupt_moderation_supported(ena_dev)) {
 		/* the devie doesn't support interrupt moderation */
 		return -EOPNOTSUPP;
 	}
-
 	coalesce->tx_coalesce_usecs =
-		ena_com_get_nonadaptive_moderation_interval_tx(ena_dev) *
+		ena_com_get_nonadaptive_moderation_interval_tx(ena_dev) /
 			ena_dev->intr_delay_resolution;
+	if (!ena_com_get_adaptive_moderation_enabled(ena_dev)) {
+		coalesce->rx_coalesce_usecs =
+			ena_com_get_nonadaptive_moderation_interval_rx(ena_dev)
+			/ ena_dev->intr_delay_resolution;
+	} else {
+		ena_com_get_intr_moderation_entry(adapter->ena_dev, ENA_INTR_MODER_LOWEST, &intr_moder_entry);
+		coalesce->rx_coalesce_usecs_low = intr_moder_entry.intr_moder_interval;
+		coalesce->rx_max_coalesced_frames_low = intr_moder_entry.pkts_per_interval;
 
-	coalesce->rx_coalesce_usecs =
-		ena_com_get_nonadaptive_moderation_interval_rx(ena_dev)
-		* ena_dev->intr_delay_resolution;
+		ena_com_get_intr_moderation_entry(adapter->ena_dev, ENA_INTR_MODER_MID, &intr_moder_entry);
+		coalesce->rx_coalesce_usecs = intr_moder_entry.intr_moder_interval;
+		coalesce->rx_max_coalesced_frames = intr_moder_entry.pkts_per_interval;
 
+		ena_com_get_intr_moderation_entry(adapter->ena_dev, ENA_INTR_MODER_HIGHEST, &intr_moder_entry);
+		coalesce->rx_coalesce_usecs_high = intr_moder_entry.intr_moder_interval;
+		coalesce->rx_max_coalesced_frames_high = intr_moder_entry.pkts_per_interval;
+	}
 	coalesce->use_adaptive_rx_coalesce =
 		ena_com_get_adaptive_moderation_enabled(ena_dev);
 
@@ -336,28 +343,34 @@ static void ena_update_tx_rings_intr_moderation(struct ena_adapter *adapter)
 		adapter->tx_ring[i].smoothed_interval = val;
 }
 
-static void ena_update_rx_rings_intr_moderation(struct ena_adapter *adapter)
-{
-	unsigned int val;
-	int i;
-
-	val = ena_com_get_nonadaptive_moderation_interval_rx(adapter->ena_dev);
-
-	for (i = 0; i < adapter->num_queues; i++)
-		adapter->rx_ring[i].smoothed_interval = val;
-}
-
 static int ena_set_coalesce(struct net_device *net_dev,
 			    struct ethtool_coalesce *coalesce)
 {
 	struct ena_adapter *adapter = netdev_priv(net_dev);
 	struct ena_com_dev *ena_dev = adapter->ena_dev;
+	struct ena_intr_moder_entry intr_moder_entry;
 	int rc;
 
 	if (!ena_com_interrupt_moderation_supported(ena_dev)) {
 		/* the devie doesn't support interrupt moderation */
 		return -EOPNOTSUPP;
 	}
+
+	if (coalesce->rx_coalesce_usecs_irq ||
+	    coalesce->rx_max_coalesced_frames_irq ||
+	    coalesce->tx_coalesce_usecs_irq ||
+	    coalesce->tx_max_coalesced_frames ||
+	    coalesce->tx_max_coalesced_frames_irq ||
+	    coalesce->stats_block_coalesce_usecs ||
+	    coalesce->use_adaptive_tx_coalesce ||
+	    coalesce->pkt_rate_low ||
+	    coalesce->tx_coalesce_usecs_low ||
+	    coalesce->tx_max_coalesced_frames_low ||
+	    coalesce->pkt_rate_high ||
+	    coalesce->tx_coalesce_usecs_high ||
+	    coalesce->tx_max_coalesced_frames_high ||
+	    coalesce->rate_sample_interval)
+		return -EINVAL;
 
 	rc = ena_com_update_nonadaptive_moderation_interval_tx(ena_dev,
 							       coalesce->tx_coalesce_usecs);
@@ -366,20 +379,37 @@ static int ena_set_coalesce(struct net_device *net_dev,
 
 	ena_update_tx_rings_intr_moderation(adapter);
 
-	rc = ena_com_update_nonadaptive_moderation_interval_rx(ena_dev,
-							       coalesce->rx_coalesce_usecs);
-	if (rc)
-		return rc;
+	if (ena_com_get_adaptive_moderation_enabled(ena_dev)) {
+		if (!coalesce->use_adaptive_rx_coalesce) {
+			ena_com_disable_adaptive_moderation(ena_dev);
+			rc = ena_com_update_nonadaptive_moderation_interval_rx(ena_dev,
+									       coalesce->rx_coalesce_usecs);
+			return rc;
+		}
+	} else { /* was in non-adaptive mode */
+		if (coalesce->use_adaptive_rx_coalesce) {
+			ena_com_enable_adaptive_moderation(ena_dev);
+		} else {
+			rc = ena_com_update_nonadaptive_moderation_interval_rx(ena_dev,
+									       coalesce->rx_coalesce_usecs);
+			return rc;
+		}
+	}
 
-	ena_update_rx_rings_intr_moderation(adapter);
+	intr_moder_entry.intr_moder_interval = coalesce->rx_coalesce_usecs_low;
+	intr_moder_entry.pkts_per_interval = coalesce->rx_max_coalesced_frames_low;
+	intr_moder_entry.bytes_per_interval = ENA_INTR_BYTE_COUNT_NOT_SUPPORTED;
+	ena_com_init_intr_moderation_entry(adapter->ena_dev, ENA_INTR_MODER_LOWEST, &intr_moder_entry);
 
-	if (coalesce->use_adaptive_rx_coalesce &&
-	    !ena_com_get_adaptive_moderation_enabled(ena_dev))
-		ena_com_enable_adaptive_moderation(ena_dev);
+	intr_moder_entry.intr_moder_interval = coalesce->rx_coalesce_usecs;
+	intr_moder_entry.pkts_per_interval = coalesce->rx_max_coalesced_frames;
+	intr_moder_entry.bytes_per_interval = ENA_INTR_BYTE_COUNT_NOT_SUPPORTED;
+	ena_com_init_intr_moderation_entry(adapter->ena_dev, ENA_INTR_MODER_MID, &intr_moder_entry);
 
-	if (!coalesce->use_adaptive_rx_coalesce &&
-	    ena_com_get_adaptive_moderation_enabled(ena_dev))
-		ena_com_disable_adaptive_moderation(ena_dev);
+	intr_moder_entry.intr_moder_interval = coalesce->rx_coalesce_usecs_high;
+	intr_moder_entry.pkts_per_interval = coalesce->rx_max_coalesced_frames_high;
+	intr_moder_entry.bytes_per_interval = ENA_INTR_BYTE_COUNT_NOT_SUPPORTED;
+	ena_com_init_intr_moderation_entry(adapter->ena_dev, ENA_INTR_MODER_HIGHEST, &intr_moder_entry);
 
 	return 0;
 }
@@ -413,32 +443,13 @@ static void ena_get_ringparam(struct net_device *netdev,
 			      struct ethtool_ringparam *ring)
 {
 	struct ena_adapter *adapter = netdev_priv(netdev);
+	struct ena_ring *tx_ring = &adapter->tx_ring[0];
+	struct ena_ring *rx_ring = &adapter->rx_ring[0];
 
-	ring->tx_max_pending = adapter->max_tx_ring_size;
-	ring->rx_max_pending = adapter->max_rx_ring_size;
-	ring->tx_pending = adapter->tx_ring[0].ring_size;
-	ring->rx_pending = adapter->rx_ring[0].ring_size;
-}
-
-static int ena_set_ringparam(struct net_device *netdev,
-			     struct ethtool_ringparam *ring)
-{
-	struct ena_adapter *adapter = netdev_priv(netdev);
-	u32 new_tx_size, new_rx_size;
-
-	new_tx_size = ring->tx_pending < ENA_MIN_RING_SIZE ?
-			ENA_MIN_RING_SIZE : ring->tx_pending;
-	new_tx_size = rounddown_pow_of_two(new_tx_size);
-
-	new_rx_size = ring->rx_pending < ENA_MIN_RING_SIZE ?
-			ENA_MIN_RING_SIZE : ring->rx_pending;
-	new_rx_size = rounddown_pow_of_two(new_rx_size);
-
-	if (new_tx_size == adapter->requested_tx_ring_size &&
-	    new_rx_size == adapter->requested_rx_ring_size)
-		return 0;
-
-	return ena_update_queue_sizes(adapter, new_tx_size, new_rx_size);
+	ring->rx_max_pending = rx_ring->ring_size;
+	ring->tx_max_pending = tx_ring->ring_size;
+	ring->rx_pending = rx_ring->ring_size;
+	ring->tx_pending = tx_ring->ring_size;
 }
 
 static u32 ena_flow_hash_to_flow_type(u16 hash_fields)
@@ -528,8 +539,12 @@ static int ena_get_rss_hash(struct ena_com_dev *ena_dev,
 	}
 
 	rc = ena_com_get_hash_ctrl(ena_dev, proto, &hash_fields);
-	if (rc)
+	if (rc) {
+		/* If device don't have permission, return unsupported */
+		if (rc == -EPERM)
+			rc = -EOPNOTSUPP;
 		return rc;
+	}
 
 	cmd->data = ena_flow_hash_to_flow_type(hash_fields);
 
@@ -597,7 +612,7 @@ static int ena_set_rxnfc(struct net_device *netdev, struct ethtool_rxnfc *info)
 		rc = -EOPNOTSUPP;
 	}
 
-	return rc;
+	return (rc == -EPERM) ? -EOPNOTSUPP : rc;
 }
 
 static int ena_get_rxnfc(struct net_device *netdev, struct ethtool_rxnfc *info,
@@ -623,7 +638,7 @@ static int ena_get_rxnfc(struct net_device *netdev, struct ethtool_rxnfc *info,
 		rc = -EOPNOTSUPP;
 	}
 
-	return rc;
+	return (rc == -EPERM) ? -EOPNOTSUPP : rc;
 }
 
 static u32 ena_get_rxfh_indir_size(struct net_device *netdev)
@@ -693,7 +708,7 @@ static int ena_get_rxfh(struct net_device *netdev, u32 *indir, u8 *key,
 		func = ETH_RSS_HASH_TOP;
 		break;
 	case ENA_ADMIN_CRC32:
-		func = ETH_RSS_HASH_CRC32;
+		func = ETH_RSS_HASH_XOR;
 		break;
 	default:
 		netif_err(adapter, drv, netdev,
@@ -742,7 +757,7 @@ static int ena_set_rxfh(struct net_device *netdev, const u32 *indir,
 	case ETH_RSS_HASH_TOP:
 		func = ENA_ADMIN_TOEPLITZ;
 		break;
-	case ETH_RSS_HASH_CRC32:
+	case ETH_RSS_HASH_XOR:
 		func = ENA_ADMIN_CRC32;
 		break;
 	default:
@@ -769,8 +784,8 @@ static void ena_get_channels(struct net_device *netdev,
 {
 	struct ena_adapter *adapter = netdev_priv(netdev);
 
-	channels->max_rx = adapter->num_queues;
-	channels->max_tx = adapter->num_queues;
+	channels->max_rx = ENA_MAX_NUM_IO_QUEUES;
+	channels->max_tx = ENA_MAX_NUM_IO_QUEUES;
 	channels->max_other = 0;
 	channels->max_combined = 0;
 	channels->rx_count = adapter->num_queues;
@@ -831,7 +846,6 @@ static const struct ethtool_ops ena_ethtool_ops = {
 	.get_coalesce		= ena_get_coalesce,
 	.set_coalesce		= ena_set_coalesce,
 	.get_ringparam		= ena_get_ringparam,
-	.set_ringparam		= ena_set_ringparam,
 	.get_sset_count         = ena_get_sset_count,
 	.get_strings		= ena_get_strings,
 	.get_ethtool_stats      = ena_get_ethtool_stats,
@@ -866,8 +880,8 @@ static void ena_dump_stats_ex(struct ena_adapter *adapter, u8 *buf)
 		return;
 	}
 
-	strings_buf = devm_kcalloc(&adapter->pdev->dev,
-				   ETH_GSTRING_LEN, strings_num,
+	strings_buf = devm_kzalloc(&adapter->pdev->dev,
+				   strings_num * ETH_GSTRING_LEN,
 				   GFP_ATOMIC);
 	if (!strings_buf) {
 		netif_err(adapter, drv, netdev,
@@ -875,8 +889,8 @@ static void ena_dump_stats_ex(struct ena_adapter *adapter, u8 *buf)
 		return;
 	}
 
-	data_buf = devm_kcalloc(&adapter->pdev->dev,
-				strings_num, sizeof(u64),
+	data_buf = devm_kzalloc(&adapter->pdev->dev,
+				strings_num * sizeof(u64),
 				GFP_ATOMIC);
 	if (!data_buf) {
 		netif_err(adapter, drv, netdev,

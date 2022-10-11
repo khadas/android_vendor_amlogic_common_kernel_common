@@ -1,6 +1,18 @@
-/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/amlogic/media/dtv_demod/include/dtv_demod_regs.h
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
 #ifndef __REG_DTV_DEMOD_H__
@@ -24,8 +36,4 @@
 #define J83B_FEC_TS_CLK		(0x84)
 #define PARALLEL_CLK_DIV_BIT	16
 #define PARALLEL_CLK_DIV_WID	6
-
-/* S4D reg */
-#define AFIFO_ADC_S4D (0x6c)
-#define DEMOD_CLK_CTL_S4D (0x80)
 #endif

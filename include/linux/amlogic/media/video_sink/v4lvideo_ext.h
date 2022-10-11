@@ -1,4 +1,3 @@
-/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
  * include/linux/amlogic/media/video_sink/v4lvideo_ext.h
  *
@@ -62,12 +61,11 @@ struct v4l_data_t {
 	char *dst_addr;
 	u32 phy_addr[3];
 	int byte_stride;
-	u32 width;
-	u32 height;
+	uint32_t width;
+	uint32_t height;
 };
 
-void v4lvideo_data_copy(struct v4l_data_t *v4l_data,
-				struct dma_buf *dmabuf, u32 align);
+void v4lvideo_data_copy(struct v4l_data_t *v4l_data, struct dma_buf *dmabuf);
 struct file_private_data *v4lvideo_get_vf(int fd);
 void dim_post_keep_cmd_release2(struct vframe_s *vframe);
 int is_v4lvideo_buf_file(struct file *file);

@@ -1,6 +1,18 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/amlogic/soc_info/nocsdata.c
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
 #include <linux/cdev.h>
@@ -34,13 +46,13 @@ static long meson64_efuse_fn_smc(struct efuse_hal_api_arg *arg)
 	switch (arg->cmd) {
 	case EFUSE_HAL_NOCS_API_READ:
 		cmd = read_nocsdata_cmd;
-		socinfo_sharemem_base = get_meson_sm_output_base();
+		socinfo_sharemem_base = get_secmon_sharemem_output_base();
 		if (!socinfo_sharemem_base)
 			return -1;
 		break;
 	case EFUSE_HAL_NOCS_API_WRITE:
 		cmd = write_nocsdata_cmd;
-		socinfo_sharemem_base = get_meson_sm_input_base();
+		socinfo_sharemem_base = get_secmon_sharemem_input_base();
 		if (!socinfo_sharemem_base)
 			return -1;
 		break;
@@ -49,7 +61,7 @@ static long meson64_efuse_fn_smc(struct efuse_hal_api_arg *arg)
 		}
 	offset = arg->offset;
 	size = arg->size;
-	meson_sm_mutex_lock();
+	sharemem_mutex_lock();
 	if (arg->cmd == EFUSE_HAL_NOCS_API_WRITE)
 		memcpy((void *)socinfo_sharemem_base,
 			(const void *)arg->buffer, size);
@@ -59,10 +71,10 @@ static long meson64_efuse_fn_smc(struct efuse_hal_api_arg *arg)
 	arm_smccc_smc(cmd, offset, size, 0, 0, 0, 0, 0, &res);
 	ret = res.a0;
 	*retcnt = res.a0;
-	if (arg->cmd == EFUSE_HAL_NOCS_API_READ && ret != 0)
+	if ((arg->cmd == EFUSE_HAL_NOCS_API_READ) && (ret != 0))
 		memcpy((void *)arg->buffer,
 			(const void *)socinfo_sharemem_base, ret);
-	meson_sm_mutex_unlock();
+	sharemem_mutex_unlock();
 
 	if (!ret)
 		return -1;
@@ -73,15 +85,15 @@ static long meson64_efuse_fn_smc(struct efuse_hal_api_arg *arg)
 static int meson64_trustzone_efuse(struct efuse_hal_api_arg *arg)
 {
 	int ret;
-//	struct cpumask org_cpumask;
+	struct cpumask org_cpumask;
 
 	if (!arg)
 		return -1;
 
-//	cpumask_copy(&org_cpumask, &current->cpus_allowed);
-//	set_cpus_allowed_ptr(current, cpumask_of(0));
+	cpumask_copy(&org_cpumask, &current->cpus_allowed);
+	set_cpus_allowed_ptr(current, cpumask_of(0));
 	ret = meson64_efuse_fn_smc(arg);
-//	set_cpus_allowed_ptr(current, &org_cpumask);
+	set_cpus_allowed_ptr(current, &org_cpumask);
 	return ret;
 }
 
@@ -101,7 +113,7 @@ ssize_t nocsdata_read(char *buf, size_t count, loff_t *ppos)
 	ret = meson64_trustzone_efuse(&arg);
 	if (ret == 0) {
 		*ppos += retcnt;
-		return 0;
+		return retcnt;
 	}
 	pr_debug("%s:%s:%d: read error!!!\n",
 			   __FILE__, __func__, __LINE__);
@@ -125,7 +137,7 @@ ssize_t nocsdata_write(const char *buf, size_t count, loff_t *ppos)
 	ret = meson64_trustzone_efuse(&arg);
 	if (ret == 0) {
 		*ppos = retcnt;
-		return 0;
+		return retcnt;
 	}
 	pr_debug("%s:%s:%d: write error!!!\n",
 			   __FILE__, __func__, __LINE__);

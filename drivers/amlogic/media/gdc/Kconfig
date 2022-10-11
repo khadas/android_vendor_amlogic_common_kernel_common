@@ -2,7 +2,7 @@
 # gdc driver configuration
 #
 config AMLOGIC_MEDIA_GDC
-	tristate "Amlogic gdc driver"
+	bool "Amlogic gdc driver"
 	default n
 	help
 		Select to enable gdc driver.

@@ -1,15 +1,24 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/amlogic/drm/vpu-hw/meson_osd_afbc.c
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
-#include <linux/bitfield.h>
 #include "meson_vpu_pipeline.h"
 #include "meson_vpu_reg.h"
 #include "meson_vpu_util.h"
 #include "meson_osd_afbc.h"
-#define BYTE_8_ALIGNED(x)	(((x) + 7) & ~7)
-#define BYTE_32_ALIGNED(x)	(((x) + 31) & ~31)
 
 /* osd_mafbc_irq_clear& irq_mask */
 #define OSD_MAFBC_SURFACES_COMPLETED		BIT(0)
@@ -49,10 +58,6 @@
 
 #define MALI_AFBC_REG_BACKUP_COUNT 41
 
-static u32 afbc_set_cnt;
-static u32 global_afbc_mask;
-static u32 afbc_err_cnt;
-static u32 afbc_err_irq_clear;
 static u32 afbc_order_conf;
 module_param(afbc_order_conf, uint, 0664);
 MODULE_PARM_DESC(afbc_order_conf, "afbc order conf");
@@ -206,8 +211,8 @@ static u32 afbc_color_order(u32 fmt_mode)
 		return 0x1234;
 	}
 }
-
-static u32 line_stride_calc_afbc(u32 fmt_mode,
+static u32 line_stride_calc_afbc(
+		u32 fmt_mode,
 		u32 hsize,
 		u32 stride_align_32bytes)
 {
@@ -233,21 +238,23 @@ static u32 line_stride_calc_afbc(u32 fmt_mode,
 	/* need wr ddr is 32bytes aligned */
 	if (stride_align_32bytes)
 		line_stride = ((line_stride + 1) >> 1) << 1;
-
+	else
+		line_stride = line_stride;
 	return line_stride;
 }
 
 static void osd_afbc_enable(u32 osd_index, bool flag)
 {
 	if (flag) {
-		meson_vpu_write_reg_bits(VPU_MAFBC_SURFACE_CFG,
+		meson_vpu_write_reg_bits(
+				VPU_MAFBC_SURFACE_CFG,
 				1, osd_index, 1);
-		global_afbc_mask |= 1 << osd_index;
-	} else {
-		meson_vpu_write_reg_bits(VPU_MAFBC_SURFACE_CFG,
+		meson_vpu_write_reg(
+				VPU_MAFBC_IRQ_MASK, 0xf);
+	} else
+		meson_vpu_write_reg_bits(
+				VPU_MAFBC_SURFACE_CFG,
 				0, osd_index, 1);
-		global_afbc_mask &= ~(1 << osd_index);
-	}
 }
 
 static int osd_afbc_check_state(struct meson_vpu_block *vblk,
@@ -272,7 +279,6 @@ static void osd_afbc_set_state(struct meson_vpu_block *vblk,
 			       struct meson_vpu_block_state *state)
 {
 	u32 pixel_format, line_stride, output_stride;
-	u32 frame_width, frame_height;
 	u32 osd_index;
 	u64 header_addr, out_addr;
 	u32 aligned_32, afbc_color_reorder;
@@ -287,7 +293,6 @@ static void osd_afbc_set_state(struct meson_vpu_block *vblk,
 	struct meson_vpu_pipeline_state *pipeline_state;
 	struct osd_mif_reg_s *osd_reg;
 	struct afbc_osd_reg_s *afbc_reg;
-	const struct drm_format_info *info;
 
 	afbc = to_afbc_block(vblk);
 	afbc_state = to_afbc_state(state);
@@ -303,30 +308,24 @@ static void osd_afbc_set_state(struct meson_vpu_block *vblk,
 		return;
 	}
 
-	if (0)
-		afbc_backup_reset();
+	afbc_backup_reset();
 	osd_afbc_enable(osd_index, 1);
-
 	aligned_32 = 1;
 	afbc_color_reorder = afbc_color_order(plane_info->pixel_format);
 
 	pixel_format = afbc_pix_format(plane_info->pixel_format);
-	info = drm_format_info(plane_info->pixel_format);
-	depth = info->depth;
-	bpp = info->cpp[0] * 8;
+	drm_fb_get_bpp_depth(plane_info->pixel_format, &depth, &bpp);
 	header_addr = plane_info->phy_addr;
 
-	frame_width = plane_info->byte_stride / 4;
-	frame_height = BYTE_8_ALIGNED(plane_info->fb_h);
 	line_stride = line_stride_calc_afbc(pixel_format,
-					    frame_width, aligned_32);
+					    plane_info->src_w, aligned_32);
 
-	output_stride = frame_width * bpp / 8;
+	output_stride = plane_info->src_w * bpp / 8;
 
 	header_addr = plane_info->phy_addr;
 	out_addr = ((u64)(vblk->index + 1)) << 24;
-	reverse_x = (plane_info->rotation & DRM_MODE_REFLECT_X) ? 1 : 0;
-	reverse_y = (plane_info->rotation & DRM_MODE_REFLECT_Y) ? 1 : 0;
+	reverse_x = (plane_info->rotation & DRM_REFLECT_X) ? 1 : 0;
+	reverse_y = (plane_info->rotation & DRM_REFLECT_Y) ? 1 : 0;
 
 	/* set osd path misc ctrl */
 	meson_vpu_write_reg_bits(OSD_PATH_MISC_CTRL, 0x1, (osd_index + 4), 1);
@@ -365,9 +364,9 @@ static void osd_afbc_set_state(struct meson_vpu_block *vblk,
 
 	/* set pic size */
 	meson_vpu_write_reg(afbc_reg->vpu_mafbc_buffer_width_s,
-			    frame_width);
+			    plane_info->src_w);
 	meson_vpu_write_reg(afbc_reg->vpu_mafbc_buffer_height_s,
-			    frame_height);
+			    plane_info->src_h);
 
 	/* set buf stride */
 	meson_vpu_write_reg(afbc_reg->vpu_mafbc_output_buf_stride_s,
@@ -392,6 +391,7 @@ static void osd_afbc_set_state(struct meson_vpu_block *vblk,
 				 reverse_x, 0, 1);
 	meson_vpu_write_reg_bits(afbc_reg->vpu_mafbc_prefetch_cfg_s,
 				 reverse_y, 1, 1);
+	meson_vpu_write_reg(VPU_MAFBC_COMMAND, 1);
 
 	DRM_DEBUG("%s set_state called.\n", afbc->base.name);
 }
@@ -410,11 +410,6 @@ static void osd_afbc_dump_register(struct meson_vpu_block *vblk,
 	reg = afbc->afbc_regs;
 
 	snprintf(buff, 8, "OSD%d", osd_index + 1);
-	seq_printf(seq, "afbc error [%d]\n", afbc_err_cnt);
-
-	value = meson_drm_read_reg(VPU_MAFBC_SURFACE_CFG);
-	seq_printf(seq, "%s_%-35s\t0x%08X\n", buff, "VPU_MAFBC_SURFACE_CFG:",
-		   value);
 
 	value = meson_drm_read_reg(reg->vpu_mafbc_header_buf_addr_low_s);
 	seq_printf(seq, "%s_%-35s\t0x%08X\n", buff, "AFBC_HEADER_BUF_ADDR_LOW:",
@@ -472,6 +467,9 @@ static void osd_afbc_dump_register(struct meson_vpu_block *vblk,
 static void osd_afbc_hw_enable(struct meson_vpu_block *vblk)
 {
 	struct meson_vpu_afbc *afbc = to_afbc_block(vblk);
+	u32 osd_index = vblk->index;
+
+	osd_afbc_enable(osd_index, 1);
 
 	DRM_DEBUG("%s enable called.\n", afbc->base.name);
 }
@@ -482,6 +480,7 @@ static void osd_afbc_hw_disable(struct meson_vpu_block *vblk)
 	u32 osd_index = vblk->index;
 
 	osd_afbc_enable(osd_index, 0);
+
 	DRM_DEBUG("%s disable called.\n", afbc->base.name);
 }
 
@@ -492,53 +491,13 @@ static void osd_afbc_hw_init(struct meson_vpu_block *vblk)
 	afbc->afbc_regs = &afbc_osd_regs[vblk->index];
 	afbc->status_regs = &afbc_status_regs;
 
-	meson_vpu_write_reg_bits(MALI_AFBCD_TOP_CTRL, 0, 23, 1);
-
-	if (0)
-		afbc_backup_init();
-
-    /* disable osd1 afbc */
+	switch_vpu_mem_pd_vmod(VPU_MAIL_AFBCD,
+			       VPU_MEM_POWER_ON);
+	afbc_backup_init();
+	/* disable osd1 afbc */
 	osd_afbc_enable(vblk->index, 0);
 
 	DRM_DEBUG("%s hw_init called.\n", afbc->base.name);
-}
-
-void arm_fbc_start(struct meson_vpu_pipeline_state *pipeline_state)
-{
-	if (!pipeline_state->global_afbc && global_afbc_mask) {
-		meson_vpu_write_reg(VPU_MAFBC_IRQ_MASK, 0xf);
-		meson_vpu_write_reg(VPU_MAFBC_IRQ_CLEAR, 0x3f);
-		meson_vpu_write_reg(VPU_MAFBC_COMMAND, 1);
-		pipeline_state->global_afbc = 1;
-		afbc_err_irq_clear = 1;
-	}
-
-	afbc_set_cnt = pipeline_state->global_afbc;
-}
-
-void arm_fbc_check_error(void)
-{
-	u32 val;
-
-	if (afbc_err_irq_clear) {
-		/*check afbc error*/
-		val = meson_drm_read_reg(VPU_MAFBC_IRQ_RAW_STATUS);
-		if (val & 0x3c) {
-			DRM_ERROR("afbc error happened, %x-%x\n", val, global_afbc_mask);
-			afbc_err_cnt++;
-			afbc_err_irq_clear = 0;
-		}
-	}
-
-	if (0) {
-		/*check surface config*/
-		val = meson_drm_read_reg(VPU_MAFBC_SURFACE_CFG);
-		if ((val & 0xf) != global_afbc_mask)
-			DRM_ERROR("afbc surface cfg error, %x-%x\n", val, global_afbc_mask);
-
-		if (global_afbc_mask && !afbc_set_cnt)
-			DRM_ERROR("afbc not start, %x-%x\n", global_afbc_mask, afbc_set_cnt);
-	}
 }
 
 struct meson_vpu_block_ops afbc_ops = {

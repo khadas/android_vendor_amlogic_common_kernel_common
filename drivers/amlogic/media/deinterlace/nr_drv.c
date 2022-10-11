@@ -1,4 +1,3 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
  * drivers/amlogic/media/deinterlace/nr_drv.c
  *
@@ -23,8 +22,7 @@
 #include <linux/vmalloc.h>
 #include <linux/slab.h>
 #include <linux/amlogic/iomap.h>
-/* media module used media/registers/cpu_version.h since kernel 5.4 */
-#include <linux/amlogic/media/registers/cpu_version.h>
+#include <linux/amlogic/cpu_version.h>
 #include "register.h"
 #include "register_nr4.h"
 #include "nr_drv.h"
@@ -276,9 +274,8 @@ int ver_blk_ofst_calc_sw(int *pVbOfVldCnt,
 	return 0;
 }
 #endif
-
-static u32 check_dnr_dm_ctrl(u32 org_val, unsigned short width,
-			     unsigned short height)
+static u32 check_dnr_dm_ctrl(
+	u32 org_val, unsigned short width, unsigned short height)
 {
 	if (!dynamic_dm_chk)
 		return org_val;
@@ -286,8 +283,7 @@ static u32 check_dnr_dm_ctrl(u32 org_val, unsigned short width,
 	if (is_meson_tl1_cpu() || is_meson_tm2_cpu() ||
 	    IS_IC(dil_get_cpuver_flag(), T5)	||
 	    IS_IC(dil_get_cpuver_flag(), T5D)	||
-	    IS_IC(dil_get_cpuver_flag(), T5DB)  ||
-	    (cpu_after_eq(MESON_CPU_MAJOR_ID_SC2))) {
+	    IS_IC(dil_get_cpuver_flag(), T5DB)) {
 		/* disable dm chroma when > 720p */
 		if (width > 1280)
 			org_val &= ~(1 << 8);
@@ -301,7 +297,8 @@ static u32 check_dnr_dm_ctrl(u32 org_val, unsigned short width,
 		/* disable dm when > 1080p */
 		if (width > 1920 || !dnr_dm_en)
 			org_val &= ~(1 << 9);
-	} else if (cpu_after_eq(MESON_CPU_MAJOR_ID_TXLX) || is_meson_gxl_cpu()) {
+	} else if (cpu_after_eq(MESON_CPU_MAJOR_ID_TXLX) ||
+		   is_meson_gxl_cpu()) {
 		/* disable dm when >720p */
 		if (width > 1280 || !dnr_dm_en) {
 			org_val &= ~(1 << 8);
@@ -341,8 +338,7 @@ static void dnr_config(struct DNR_PARM_s *dnr_parm_p,
 	if (is_meson_tl1_cpu() || is_meson_tm2_cpu() ||
 	    IS_IC(dil_get_cpuver_flag(), T5)	||
 	    IS_IC(dil_get_cpuver_flag(), T5D)	||
-	    IS_IC(dil_get_cpuver_flag(), T5DB)  ||
-	    (cpu_after_eq(MESON_CPU_MAJOR_ID_SC2))) {
+	    IS_IC(dil_get_cpuver_flag(), T5DB)) {
 		if (width > 1280)
 			DI_Wr_reg_bits(DNR_DM_CTRL, 0, 8, 1);
 		else
@@ -356,7 +352,8 @@ static void dnr_config(struct DNR_PARM_s *dnr_parm_p,
 		/* disable chroma dm according to baozheng */
 		DI_Wr_reg_bits(DNR_DM_CTRL, 0, 8, 1);
 		DI_Wr(DNR_CTRL, 0x1dd00);
-	} else if (cpu_after_eq(MESON_CPU_MAJOR_ID_TXLX) || is_meson_gxl_cpu()) {
+	} else if (cpu_after_eq(MESON_CPU_MAJOR_ID_TXLX) ||
+		   is_meson_gxl_cpu()) {
 		/*disable */
 		if (width > 1280) {
 			DI_Wr_reg_bits(DNR_DM_CTRL, 0, 8, 1);
@@ -456,8 +453,10 @@ static void cue_config(struct CUE_PARM_s *pcue_parm, unsigned short field_type)
 	pcue_parm->frame_count = 8;
 	pcue_parm->field_count1 = 8;
 
-	if (cpu_after_eq(MESON_CPU_MAJOR_ID_SC2) && (!IS_IC(dil_get_cpuver_flag(), T5D)) &&
-	    (!IS_IC(dil_get_cpuver_flag(), T5))) {
+	if (cpu_after_eq(MESON_CPU_MAJOR_ID_SC2) &&
+	    (!IS_IC(dil_get_cpuver_flag(), T5D)) &&
+	    (!IS_IC(dil_get_cpuver_flag(), T5)) &&
+	    (!IS_IC(dil_get_cpuver_flag(), T5DB))) {
 		if (field_type != VIDTYPE_PROGRESSIVE) {
 			DI_Wr_reg_bits(NR2_CUE_PRG_DIF, 0, 20, 1);
 			DI_Wr_reg_bits(NR4_TOP_CTRL, 0, 1, 1);
@@ -564,7 +563,7 @@ static void secam_cfr_fun(int top)
 		DI_Wr_reg_bits(NR2_SW_EN, 1, 7, 1);/*set cfr_en:1*/
 	DI_Wr_reg_bits(NR2_CFR_PARA_CFG0, 1, 2, 2);
 	DI_Wr_reg_bits(NR2_CFR_PARA_CFG1, 0x208020, 0, 24);
-	if ((gb_flg == 0 && top) || (gb_flg == 1 && !top)) {
+	if (((gb_flg == 0) && top) || ((gb_flg == 1) && (!top))) {
 		cfr_phase1 = ~cfr_phase1;
 		DI_Wr_reg_bits(NR2_CFR_PARA_CFG0, cfr_phase1, 6, 1);
 	}
@@ -899,7 +898,8 @@ static void cue_process_irq(void)
 		if (nr_param.frame_count > 1 && cue_glb_mot_check_en) {
 			if (cpu_after_eq(MESON_CPU_MAJOR_ID_SC2) &&
 			    (!IS_IC(dil_get_cpuver_flag(), T5D)) &&
-			    (!IS_IC(dil_get_cpuver_flag(), T5)))
+			    (!IS_IC(dil_get_cpuver_flag(), T5)) &&
+			    (!IS_IC(dil_get_cpuver_flag(), T5DB)))
 				DI_Wr_reg_bits(NR4_TOP_CTRL,
 					       cue_en ? 1 : 0, 1, 1);
 			else
@@ -908,7 +908,8 @@ static void cue_process_irq(void)
 			/*confirm with vlsi,fix jira SWPL-31571*/
 			if (cpu_after_eq(MESON_CPU_MAJOR_ID_SC2) &&
 			    (!IS_IC(dil_get_cpuver_flag(), T5D)) &&
-			    (!IS_IC(dil_get_cpuver_flag(), T5)))
+			    (!IS_IC(dil_get_cpuver_flag(), T5)) &&
+			    (!IS_IC(dil_get_cpuver_flag(), T5DB)))
 				DI_Wr_reg_bits(MCDI_CTRL_MODE,
 					       (!cue_en) ? 1 : 0, 16, 1);
 		}
@@ -932,8 +933,10 @@ void cue_int(struct vframe_s *vf)
 	}
 	/*close cue when cue disable*/
 	if (!cue_en) {
-		if (cpu_after_eq(MESON_CPU_MAJOR_ID_SC2) && (!IS_IC(dil_get_cpuver_flag(), T5D)) &&
-		    (!IS_IC(dil_get_cpuver_flag(), T5)))
+		if (cpu_after_eq(MESON_CPU_MAJOR_ID_SC2) &&
+		    (!IS_IC(dil_get_cpuver_flag(), T5D)) &&
+		    (!IS_IC(dil_get_cpuver_flag(), T5)) &&
+		    (!IS_IC(dil_get_cpuver_flag(), T5DB)))
 			DI_Wr_reg_bits(NR4_TOP_CTRL, 0, 1, 1);
 		else if (cpu_after_eq(MESON_CPU_MAJOR_ID_GXLX))
 			DI_Wr_reg_bits(DI_NR_CTRL0, 0, 26, 1);
@@ -957,8 +960,10 @@ void adaptive_cue_adjust(unsigned int frame_diff, unsigned int field_diff)
 		return;
 
 	//if (is_meson_tl1_cpu() || is_meson_tm2_cpu()) {
-	if (cpu_after_eq(MESON_CPU_MAJOR_ID_SC2) && (!IS_IC(dil_get_cpuver_flag(), T5D)) &&
-	    (!IS_IC(dil_get_cpuver_flag(), T5))) {
+	if (cpu_after_eq(MESON_CPU_MAJOR_ID_SC2) &&
+	    (!IS_IC(dil_get_cpuver_flag(), T5D)) &&
+	    (!IS_IC(dil_get_cpuver_flag(), T5)) &&
+	    (!IS_IC(dil_get_cpuver_flag(), T5DB))) {
 		/*value from VLSI(yanling.liu)*/
 		/*after SC2 need new setting 2020-08-04: */
 		mask1 = 0x50362;

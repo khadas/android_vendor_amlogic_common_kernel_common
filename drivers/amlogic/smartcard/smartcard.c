@@ -1,6 +1,18 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/amlogic/smartcard/smartcard.c
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
 #include <linux/version.h>
@@ -21,9 +33,6 @@
 #include <linux/platform_device.h>
 #include <linux/pinctrl/pinmux.h>
 #include <linux/gpio/consumer.h>
-#include <linux/amlogic/cpu_version.h>
-#include <linux/sched/clock.h>
-#include <linux/of.h>
 #ifndef MESON_CPU_TYPE
 #define MESON_CPU_TYPE 0x50
 #endif
@@ -39,8 +48,7 @@
 /*#include < mach/gpio.h > */
 #include <linux/platform_device.h>
 #include <linux/slab.h>
-//#include <linux/amlogic/aml_gpio_consumer.h>
-//#include <linux/amlogic/aml_gpio_consumer.h>
+#include <linux/amlogic/aml_gpio_consumer.h>
 #define OWNER_NAME "smc"
 #if MESON_CPU_TYPE >= MESON_CPU_TYPE_MESON6
 #include <mach/mod_gate.h>
@@ -48,12 +56,11 @@
 #endif
 
 #include <linux/version.h>
-//#include <linux/amlogic/aml_gpio_consumer.h>
+#include <linux/amlogic/aml_gpio_consumer.h>
 #include <linux/amlogic/amsmc.h>
 #include <linux/clk.h>
 #include <linux/reset.h>
 #include <linux/amlogic/media/utils/vdec_reg.h>
-#include <linux/mod_devicetable.h>
 
 #include "smartcard.h"
 #include "c_stb_regs_define.h"
@@ -73,9 +80,16 @@
 
 /*#define FILE_DEBUG*/
 #define MEM_DEBUG
+#define SMC_GPIO_NUM_PROP(node, prop_name, str, gpio_pin) { \
+	if (!of_property_read_string(node, prop_name, &str)) { \
+		gpio_pin = \
+		desc_to_gpio(of_get_named_gpiod_flags(node, \
+					prop_name, 0, NULL)); \
+	} \
+}
 
 #ifdef FILE_DEBUG
-#define DBUF_SIZE (512 * 2)
+#define DBUF_SIZE (512*2)
 #define pr_dbg(fmt, args...) \
 	do { if (smc_debug > 0) { \
 			dcnt = sprintf(dbuf, fmt, ## args); \
@@ -93,14 +107,14 @@
 #define Ipr		 Fpr
 
 #elif defined(MEM_DEBUG)
-#define DBUF_SIZE (1024 * 1024 * 1)
+#define DBUF_SIZE (1024*1024*1)
 #define pr_dbg(fmt, args...) \
 	do {\
 		if (smc_debug > 0) { \
 			if (dwrite > (DBUF_SIZE - 512)) \
-				sprintf(dbuf + dwrite, "lost\n"); \
+				sprintf(dbuf+dwrite, "lost\n"); \
 			else { \
-				dcnt = sprintf(dbuf + dwrite, fmt, ## args); \
+				dcnt = sprintf(dbuf+dwrite, fmt, ## args); \
 				dwrite += dcnt; \
 			} \
 		} \
@@ -109,12 +123,11 @@
 	do { \
 		if (smc_debug > 1) { \
 			if (dwrite > (DBUF_SIZE - 512)) \
-				sprintf(dbuf + dwrite, "lost\n"); \
+				sprintf(dbuf+dwrite, "lost\n"); \
 			else { \
-				dcnt = print_time(local_clock(),\
-						dbuf + dwrite); \
+				dcnt = print_time(local_clock(), dbuf+dwrite); \
 				dwrite += dcnt; \
-				dcnt = sprintf(dbuf + dwrite, _a); \
+				dcnt = sprintf(dbuf+dwrite, _a); \
 				dwrite += dcnt; \
 			} \
 		} \
@@ -122,23 +135,19 @@
 #define Ipr		 Fpr
 
 #else
-//#if 1
+#if 1
 #define pr_dbg(fmt, args...) \
 do {\
 	if (smc_debug > 0) \
 		pr_err("Smartcard: " fmt, ## args); \
 } \
 while (0)
-#define Fpr(fmt, args...)	do {\
-	if (smc_debug > 1) \
-		pr_inf("Smartcard: " fmt, ## args);\
-} \
-while (0)
+#define Fpr(a...)	do { if (smc_debug > 1) printk(a); } while (0)
 #define Ipr		 Fpr
-//#else
-//#define pr_dbg(fmt, args...)
-//#define Fpr(a...)
-//#endif
+#else
+#define pr_dbg(fmt, args...)
+#define Fpr(a...)
+#endif
 #endif
 
 #define pr_error(fmt, args...) pr_err("Smartcard: " fmt, ## args)
@@ -198,7 +207,6 @@ static void open_debug(void)
 		pr_dbg("smc: debug file[%s] open.\n", DEBUG_FILE_NAME);
 	}
 }
-
 static void close_debug(void)
 {
 	if (debug_filp) {
@@ -218,16 +226,32 @@ static size_t print_time(u64 ts, char *buf)
 		return snprintf(NULL, 0, "[%5lu.000000] ", (unsigned long)ts);
 
 	return sprintf(buf, "[%5lu.%06lu] ",
-		       (unsigned long)ts, rem_nsec / 1000);
+			(unsigned long)ts, rem_nsec / 1000);
 }
 #endif
 
+#ifdef CONFIG_OF
 static const struct of_device_id smc_dt_match[] = {
-	{
-	 .compatible = "amlogic,smartcard",
+	{	.compatible = "amlogic,smartcard",
 	},
 	{},
 };
+#else
+#define smc_dt_match NULL
+#endif
+
+
+MODULE_PARM_DESC(smc0_irq, "\n\t\t Irq number of smartcard0");
+static int smc0_irq = -1;
+module_param(smc0_irq, int, 0644);
+
+MODULE_PARM_DESC(smc0_reset, "\n\t\t Reset GPIO pin of smartcard0");
+static int smc0_reset = -1;
+module_param(smc0_reset, int, 0644);
+
+MODULE_PARM_DESC(atr_delay, "\n\t\t atr delay");
+static int atr_delay;
+module_param(atr_delay, int, 0644);
 
 MODULE_PARM_DESC(atr_holdoff, "\n\t\t atr_holdoff");
 static int atr_holdoff = 1;
@@ -278,8 +302,8 @@ module_param(clock_source, int, 0644);
 #define RECV_BUF_SIZE	 1024
 #define SEND_BUF_SIZE	 1024
 
-#define RESET_ENABLE	  (smc->reset_level)	/*reset */
-#define RESET_DISABLE	 (!smc->reset_level)	/*dis-reset */
+#define RESET_ENABLE	  (smc->reset_level) /*reset*/
+#define RESET_DISABLE	 (!smc->reset_level) /*dis-reset*/
 
 enum sc_type {
 	SC_DIRECT,
@@ -287,56 +311,56 @@ enum sc_type {
 };
 
 struct smc_dev {
-	int id;
-	struct device *dev;
+	int		id;
+	struct device	 *dev;
 	struct platform_device *pdev;
-	int init;
-	int used;
-	int cardin;
-	int active;
-	struct mutex lock; /*define mutext*/
-	spinlock_t slock;  /*define spin lock*/
+	int		init;
+	int		used;
+	int		cardin;
+	int		active;
+	struct mutex	  lock;
+	spinlock_t		 slock;
 	wait_queue_head_t rd_wq;
 	wait_queue_head_t wr_wq;
-	int recv_start;
-	int recv_count;
-	int send_start;
-	int send_count;
-	char recv_buf[RECV_BUF_SIZE];
-	char send_buf[SEND_BUF_SIZE];
+	int		recv_start;
+	int		recv_count;
+	int		send_start;
+	int		send_count;
+	char	  recv_buf[RECV_BUF_SIZE];
+	char	  send_buf[SEND_BUF_SIZE];
 	struct am_smc_param param;
-	struct am_smc_atr atr;
+	struct am_smc_atr  atr;
 
 	struct gpio_desc *enable_pin;
 #define SMC_ENABLE_PIN_NAME "smc:ENABLE"
-	int enable_level;
+	int	  enable_level;
 
 	struct gpio_desc *enable_5v3v_pin;
 #define SMC_ENABLE_5V3V_PIN_NAME "smc:5V3V"
-	int enable_5v3v_level;
-	int (*reset)(void *smc, int value);
-	int irq_num;
-	int reset_level;
+	int	  enable_5v3v_level;
+	int (*reset)(void*, int);
+	int		irq_num;
+	int		reset_level;
 
-	u32 pin_clk_pinmux_reg;
-	u32 pin_clk_pinmux_bit;
-//      struct gpio_desc *pin_clk_pin;
+	u32	 pin_clk_pinmux_reg;
+	u32	 pin_clk_pinmux_bit;
+	struct gpio_desc *pin_clk_pin;
 #define SMC_CLK_PIN_NAME "smc:PINCLK"
-	u32 pin_clk_oen_reg;
-	u32 pin_clk_out_reg;
-	u32 pin_clk_oebit;
-	u32 pin_clk_oubit;
-	u32 use_enable_pin;
+	u32	 pin_clk_oen_reg;
+	u32	 pin_clk_out_reg;
+	u32	 pin_clk_oebit;
+	u32	 pin_clk_oubit;
+	u32	 use_enable_pin;
 
 #ifdef SW_INVERT
-	int atr_mode;
-	enum sc_type sc_type;
+	int		atr_mode;
+	enum sc_type		 sc_type;
 #endif
 
-	int recv_end;
-	int send_end;
+	int	  recv_end;
+	int	  send_end;
 #ifdef SMC_FIQ
-	bridge_item_t smc_fiq_bridge;
+	bridge_item_t	 smc_fiq_bridge;
 #endif
 
 #ifdef DET_FROM_PIO
@@ -348,20 +372,26 @@ struct smc_dev {
 #define SMC_RESET_PIN_NAME "smc:RESET"
 #endif
 
-	int detect_invert;
+	int		detect_invert;
 
-	struct pinctrl *pinctrl;
+	struct pinctrl	  *pinctrl;
 
-	struct tasklet_struct tasklet;
+	struct tasklet_struct	 tasklet;
 };
 
 #define SMC_DEV_NAME	 "smc"
 #define SMC_CLASS_NAME  "smc-class"
 #define SMC_DEV_COUNT	1
 
+#define WRITE_CBUS_REG(_r, _v)   aml_write_cbus(_r, _v)
+#define READ_CBUS_REG(_r)        aml_read_cbus(_r)
+
+#define SMC_READ_REG(a)          READ_MPEG_REG(SMARTCARD_##a)
+#define SMC_WRITE_REG(a, b)      WRITE_MPEG_REG(SMARTCARD_##a, b)
+
 static struct mutex smc_lock;
-static int smc_major;
-static struct smc_dev smc_dev[SMC_DEV_COUNT];
+static int		 smc_major;
+static struct smc_dev	smc_dev[SMC_DEV_COUNT];
 static int ENA_GPIO_PULL = 1;
 static int DIV_SMC = 3;
 
@@ -400,13 +430,13 @@ static const unsigned char inv_table[256] = {
 	0xF0, 0x70, 0xB0, 0x30, 0xD0, 0x50, 0x90, 0x10,
 	0xE0, 0x60, 0xA0, 0x20, 0xC0, 0x40, 0x80, 0x00
 };
-#endif /*SW_INVERT */
+#endif /*SW_INVERT*/
 
 #define dump(b, l) do { \
 	int i; \
 	pr_dbg("dump: "); \
 	for (i = 0; i < (l); i++) \
-		pr_dbg("%02x ", *(((unsigned char *)(b)) + i)); \
+		pr_dbg("%02x ", *(((unsigned char *)(b))+i)); \
 		pr_dbg("\n"); \
 } while (0)
 
@@ -418,8 +448,9 @@ static int smc_hw_active(struct smc_dev *smc);
 static int smc_hw_deactive(struct smc_dev *smc);
 static int smc_hw_get_status(struct smc_dev *smc, int *sret);
 
-static ssize_t smc_gpio_pull_show(struct device *dev,
-				  struct device_attribute *attr, char *buf)
+static ssize_t show_gpio_pull(struct class *class,
+	struct class_attribute *attr,
+	char *buf)
 {
 	if (ENA_GPIO_PULL > 0)
 		return sprintf(buf, "%s\n", "enable GPIO pull low");
@@ -427,54 +458,10 @@ static ssize_t smc_gpio_pull_show(struct device *dev,
 		return sprintf(buf, "%s\n", "disable GPIO pull low");
 }
 
-static void *p_smc_hw_base;
-
-static void write_smc(unsigned int reg, unsigned int val)
-{
-	void *ptr = (void *)(p_smc_hw_base + reg);
-
-	writel(val, ptr);
-	pr_dbg("write addr:%lx, org v:0x%0x, ret v:0x%0x\n",
-	       (unsigned long)ptr, val, readl(ptr));
-}
-
-static int read_smc(unsigned int reg)
-{
-	void *addr = p_smc_hw_base + reg;
-	int ret = 0;
-
-	ret = readl(addr);
-	pr_dbg("read addr:%lx, value:0x%0x\n", (unsigned long)addr, ret);
-	return ret;
-}
-
-static int smc_addr(struct platform_device *pdev)
-{
-	struct resource *res;
-
-	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-	if (!res) {
-		pr_error("%s fail\n", __func__);
-		return -1;
-	}
-
-	p_smc_hw_base = devm_ioremap_nocache(&pdev->dev, res->start,
-					     resource_size(res));
-	if (!p_smc_hw_base) {
-		pr_error("%s base addr error\n", __func__);
-		return -1;
-	}
-	return 0;
-}
-
-#define WRITE_CBUS_REG(_r, _v)   write_smc((_r), _v)
-#define READ_CBUS_REG(_r)        read_smc((_r))
-
-#define SMC_READ_REG(a)          READ_CBUS_REG(SMARTCARD_##a)
-#define SMC_WRITE_REG(a, b)      WRITE_CBUS_REG(SMARTCARD_##a, b)
-static ssize_t smc_gpio_pull_store(struct device *dev,
-				   struct device_attribute *attr,
-				   const char *buf, size_t count)
+static ssize_t set_gpio_pull(struct class *class,
+	struct class_attribute *attr,
+	const char *buf,
+	size_t count)
 {
 	int dbg;
 
@@ -485,8 +472,9 @@ static ssize_t smc_gpio_pull_store(struct device *dev,
 	return count;
 }
 
-static ssize_t ctrl_5v3v_show(struct device *dev,
-			      struct device_attribute *attr, char *buf)
+static ssize_t show_5v3v(struct class *class,
+	struct class_attribute *attr,
+	char *buf)
 {
 	struct smc_dev *smc = NULL;
 	int enable_5v3v = 0;
@@ -499,9 +487,10 @@ static ssize_t ctrl_5v3v_show(struct device *dev,
 	return sprintf(buf, "5v3v_pin level = %d\n", enable_5v3v);
 }
 
-static ssize_t ctrl_5v3v_store(struct device *dev,
-			       struct device_attribute *attr,
-			       const char *buf, size_t count)
+static ssize_t store_5v3v(struct class *class,
+	struct class_attribute *attr,
+	const char *buf,
+	size_t count)
 {
 	unsigned int enable_5v3v = 0;
 	struct smc_dev *smc = NULL;
@@ -513,23 +502,29 @@ static ssize_t ctrl_5v3v_store(struct device *dev,
 	smc = &smc_dev[0];
 	smc->enable_5v3v_level = enable_5v3v;
 
-	_gpio_out(smc->enable_5v3v_pin,
-		  smc->enable_5v3v_level, SMC_ENABLE_5V3V_PIN_NAME);
-	pr_error("enable_pin: -->(%d)\n", (smc->enable_5v3v_level) ? 1 : 0);
+	if (smc->enable_5v3v_pin != NULL) {
+		_gpio_out(smc->enable_5v3v_pin,
+			smc->enable_5v3v_level,
+			SMC_ENABLE_5V3V_PIN_NAME);
+		pr_error("enable_pin: -->(%d)\n",
+			(smc->enable_5v3v_level) ? 1 : 0);
+	}
 	mutex_unlock(&smc_lock);
 
 	return count;
 }
 
-static ssize_t freq_show(struct device *dev,
-			 struct device_attribute *attr, char *buf)
+static ssize_t show_freq(struct class *class,
+	struct class_attribute *attr,
+	char *buf)
 {
 	return sprintf(buf, "%dKHz\n", smc_dev[0].param.freq);
 }
 
-static ssize_t freq_store(struct device *dev,
-			  struct device_attribute *attr,
-			  const char *buf, size_t count)
+static ssize_t store_freq(struct class *class,
+	struct class_attribute *attr,
+	const char *buf,
+	size_t count)
 {
 	int freq = 0;
 
@@ -543,15 +538,17 @@ static ssize_t freq_store(struct device *dev,
 	return count;
 }
 
-static ssize_t div_smc_show(struct device *dev,
-			    struct device_attribute *attr, char *buf)
+static ssize_t show_div_smc(struct class *class,
+	struct class_attribute *attr,
+	char *buf)
 {
 	return sprintf(buf, "div -> %d\n", DIV_SMC);
 }
 
-static ssize_t div_smc_store(struct device *dev,
-			     struct device_attribute *attr,
-			     const char *buf, size_t count)
+static ssize_t store_div_smc(struct class *class,
+	struct class_attribute *attr,
+	const char *buf,
+	size_t count)
 {
 	int div = 0;
 
@@ -566,40 +563,39 @@ static ssize_t div_smc_store(struct device *dev,
 }
 
 #ifdef MEM_DEBUG
-static ssize_t debug_show(struct device *dev,
-			  struct device_attribute *attr, char *buf)
+static ssize_t show_debug(struct class *class,
+	struct class_attribute *attr,
+	char *buf)
 {
 	pr_inf("Usage:\n");
 	pr_inf("\techo [ 1 | 2 | 0 | dump | reset ] >");
 	pr_inf("debug : enable(1/2)|disable|dump|reset\n");
-	pr_inf("\t dump file: " DEBUG_FILE_NAME "\n");
+	pr_inf("\t dump file: "DEBUG_FILE_NAME"\n");
 	return 0;
 }
 
-static ssize_t debug_store(struct device *dev,
-			   struct device_attribute *attr,
-			   const char *buf, size_t count)
+static ssize_t store_debug(struct class *class,
+	struct class_attribute *attr,
+	const char *buf,
+	size_t count)
 {
 	int smc_debug_level = 0;
 
 	switch (buf[0]) {
 	case '2':
-	case '1':{
-			void *p =
-			    krealloc((const void *)dbuf, DBUF_SIZE, GFP_KERNEL);
-			if (buf[0] == '2')
-				smc_debug_level++;
+		smc_debug_level++;
+	case '1': {
+		void *p = krealloc((const void *)dbuf, DBUF_SIZE, GFP_KERNEL);
 
-			smc_debug_level++;
-			if (p) {
-				dbuf = (char *)p;
-				smc_debug = smc_debug_level;
-			} else {
-				pr_error("krealloc(dbuf:%d) failed\n",
-					 DBUF_SIZE);
-			}
-			break;
+		smc_debug_level++;
+		if (p) {
+			dbuf = (char *)p;
+			smc_debug = smc_debug_level;
+		} else {
+			pr_error("krealloc(dbuf:%d) failed\n", DBUF_SIZE);
 		}
+		break;
+	}
 	case '0':
 		smc_debug = 0;
 		kfree(dbuf);
@@ -618,7 +614,7 @@ static ssize_t debug_store(struct device *dev,
 	case 'D':
 		if (smc_debug) {
 			open_debug();
-			debug_write(dbuf, dwrite + 5);
+			debug_write(dbuf, dwrite+5);
 			close_debug();
 			pr_inf("dbuf dump ok\n");
 		}
@@ -630,33 +626,20 @@ static ssize_t debug_store(struct device *dev,
 }
 #endif
 
-DEVICE_ATTR_RW(smc_gpio_pull);
-DEVICE_ATTR_RW(ctrl_5v3v);
-DEVICE_ATTR_RW(freq);
-DEVICE_ATTR_RW(div_smc);
+static struct class_attribute smc_class_attrs[] = {
+	__ATTR(smc_gpio_pull, 0644, show_gpio_pull, set_gpio_pull),
+	__ATTR(ctrl_5v3v, 0644, show_5v3v, store_5v3v),
+	__ATTR(freq, 0644, show_freq, store_freq),
+	__ATTR(div_smc, 0644, show_div_smc, store_div_smc),
 #ifdef MEM_DEBUG
-DEVICE_ATTR_RW(debug);
+	__ATTR(debug, 0644, show_debug, store_debug),
 #endif
-
-#define SMC_ATTR(name) (&dev_attr_##name.attr)
-
-static struct attribute *smc_attrs[] = {
-	SMC_ATTR(smc_gpio_pull),
-	SMC_ATTR(ctrl_5v3v),
-	SMC_ATTR(freq),
-	SMC_ATTR(div_smc),
-
-#ifdef MEM_DEBUG
-	SMC_ATTR(debug),
-#endif
-};
-
-static struct attribute_group smc_attribute_group = {
-	.attrs = smc_attrs,
+	__ATTR_NULL
 };
 
 static struct class smc_class = {
 	.name = SMC_CLASS_NAME,
+	.class_attrs = smc_class_attrs,
 };
 
 long smc_get_reg_base(void)
@@ -664,7 +647,7 @@ long smc_get_reg_base(void)
 	int newbase = 0;
 
 	if (get_cpu_type() > MESON_CPU_MAJOR_ID_TXL &&
-	    get_cpu_type() != MESON_CPU_MAJOR_ID_GXLX) {
+		get_cpu_type() != MESON_CPU_MAJOR_ID_GXLX) {
 		newbase = 1;
 	}
 	return (newbase) ? 0x9400 : 0x2110;
@@ -704,6 +687,7 @@ static int _gpio_in(struct gpio_desc *gpio, const char *owner)
 #endif
 static int _gpio_free(struct gpio_desc *gpio, const char *owner)
 {
+
 	gpiod_put(gpio);
 	return 0;
 }
@@ -719,6 +703,7 @@ static inline int smc_write_end(struct smc_dev *smc)
 
 	return ret;
 }
+
 
 static inline int smc_can_read(struct smc_dev *smc)
 {
@@ -746,21 +731,20 @@ static inline int smc_can_write(struct smc_dev *smc)
 static int smc_hw_set_param(struct smc_dev *smc)
 {
 	unsigned long v = 0;
-	struct SMCCARD_HW_REG0 *reg0;
-	struct SMCCARD_HW_REG6 *reg6;
-	struct SMCCARD_HW_REG2 *reg2;
-	struct SMCCARD_HW_REG5 *reg5;
+	struct SMCCARD_HW_Reg0 *reg0;
+	struct SMCCARD_HW_Reg6 *reg6;
+	struct SMCCARD_HW_Reg2 *reg2;
+	struct SMCCARD_HW_Reg5 *reg5;
 	/*
 	 * SMC_ANSWER_TO_RST *reg1;
-	 * SMC_INTERRUPT_REG *reg_int;
+	 * SMC_INTERRUPT_Reg *reg_int;
 	 */
-	unsigned long freq_cpu =
-	    clk_get_rate(aml_smartcard_clk) / 1000 * DIV_SMC;
+	unsigned long freq_cpu = clk_get_rate(aml_smartcard_clk)/1000*DIV_SMC;
 
 	pr_error("hw set param\n");
 
 	v = SMC_READ_REG(REG0);
-	reg0 = (struct SMCCARD_HW_REG0 *)&v;
+	reg0 = (struct SMCCARD_HW_Reg0 *)&v;
 	reg0->etu_divider = ETU_DIVIDER_CLOCK_HZ * smc->param.f /
 	    (smc->param.d * smc->param.freq) - 1;
 	SMC_WRITE_REG(REG0, v);
@@ -773,7 +757,7 @@ static int smc_hw_set_param(struct smc_dev *smc)
 	pr_error("REG1: 0x%08lx\n", v);
 
 	v = SMC_READ_REG(REG2);
-	reg2 = (struct SMCCARD_HW_REG2 *)&v;
+	reg2 = (struct SMCCARD_HW_Reg2 *)&v;
 	reg2->recv_invert = smc->param.recv_invert;
 	reg2->recv_parity = smc->param.recv_parity;
 	reg2->recv_lsb_msb = smc->param.recv_lsb_msb;
@@ -783,11 +767,11 @@ static int smc_hw_set_param(struct smc_dev *smc)
 	reg2->xmit_retries = smc->param.xmit_retries;
 	reg2->xmit_repeat_dis = smc->param.xmit_repeat_dis;
 	reg2->recv_no_parity = smc->param.recv_no_parity;
-	reg2->clk_tcnt = freq_cpu / smc->param.freq - 1;
+	reg2->clk_tcnt = freq_cpu/smc->param.freq - 1;
 	reg2->det_filter_sel = DET_FILTER_SEL_DEFAULT;
 	reg2->io_filter_sel = IO_FILTER_SEL_DEFAULT;
 	reg2->clk_sel = clock_source;
-	/*reg2->pulse_irq = 0; */
+	/*reg2->pulse_irq = 0;*/
 	SMC_WRITE_REG(REG2, v);
 	pr_error("REG2: 0x%08lx\n", v);
 	pr_error("recv_inv:%d\n", smc->param.recv_invert);
@@ -802,17 +786,17 @@ static int smc_hw_set_param(struct smc_dev *smc)
 	pr_error("clk_tcnt:%d freq_cpu:%ld\n", reg2->clk_tcnt, freq_cpu);
 
 	v = SMC_READ_REG(REG5);
-	reg5 = (struct SMCCARD_HW_REG5 *)&v;
+	reg5 = (struct SMCCARD_HW_Reg5 *)&v;
 	reg5->cwt_detect_en = cwt_det_en;
 	reg5->bwt_base_time_gnt = BWT_BASE_DEFAULT;
 	SMC_WRITE_REG(REG5, v);
 	pr_error("REG5: 0x%08lx\n", v);
 
 	v = SMC_READ_REG(REG6);
-	reg6 = (struct SMCCARD_HW_REG6 *)&v;
+	reg6 = (struct SMCCARD_HW_Reg6 *)&v;
 	reg6->cwi_value = smc->param.cwi;
 	reg6->bwi = smc->param.bwi;
-	reg6->bgt = smc->param.bgt - 2;
+	reg6->bgt = smc->param.bgt-2;
 	reg6->N_parameter = smc->param.n;
 	SMC_WRITE_REG(REG6, v);
 	pr_error("REG6: 0x%08lx\n", v);
@@ -850,15 +834,14 @@ static int smc_default_init(struct smc_dev *smc)
 static int smc_hw_setup(struct smc_dev *smc)
 {
 	unsigned long v = 0;
-	struct SMCCARD_HW_REG0 *reg0;
+	struct SMCCARD_HW_Reg0 *reg0;
 	struct SMC_ANSWER_TO_RST *reg1;
-	struct SMCCARD_HW_REG2 *reg2;
-	struct SMC_INTERRUPT_REG *reg_int;
-	struct SMCCARD_HW_REG5 *reg5;
-	struct SMCCARD_HW_REG6 *reg6;
+	struct SMCCARD_HW_Reg2 *reg2;
+	struct SMC_INTERRUPT_Reg *reg_int;
+	struct SMCCARD_HW_Reg5 *reg5;
+	struct SMCCARD_HW_Reg6 *reg6;
 
-	unsigned long freq_cpu =
-	    clk_get_rate(aml_smartcard_clk) / 1000 * DIV_SMC;
+	unsigned long freq_cpu = clk_get_rate(aml_smartcard_clk)/1000*DIV_SMC;
 
 	pr_error("SMC CLK SOURCE - %luKHz\n", freq_cpu);
 
@@ -867,7 +850,7 @@ static int smc_hw_setup(struct smc_dev *smc)
 #endif
 
 	v = SMC_READ_REG(REG0);
-	reg0 = (struct SMCCARD_HW_REG0 *)&v;
+	reg0 = (struct SMCCARD_HW_Reg0 *)&v;
 	reg0->enable = 1;
 	reg0->clk_en = 0;
 	reg0->clk_oen = 0;
@@ -878,7 +861,7 @@ static int smc_hw_setup(struct smc_dev *smc)
 	reg0->io_level = 0;
 	reg0->recv_fifo_threshold = FIFO_THRESHOLD_DEFAULT;
 	reg0->etu_divider = ETU_DIVIDER_CLOCK_HZ * smc->param.f
-	    / (smc->param.d * smc->param.freq) - 1;
+	    / (smc->param.d*smc->param.freq) - 1;
 	reg0->first_etu_offset = 5;
 	SMC_WRITE_REG(REG0, v);
 	pr_error("REG0: 0x%08lx\n", v);
@@ -891,13 +874,13 @@ static int smc_hw_setup(struct smc_dev *smc)
 	reg1->atr_final_tcnt = ATR_FINAL_TCNT_DEFAULT;
 	reg1->atr_holdoff_tcnt = ATR_HOLDOFF_TCNT_DEFAULT;
 	reg1->atr_clk_mux = ATR_CLK_MUX_DEFAULT;
-	reg1->atr_holdoff_en = atr_holdoff;	/*ATR_HOLDOFF_EN; */
+	reg1->atr_holdoff_en = atr_holdoff;/*ATR_HOLDOFF_EN;*/
 	reg1->etu_clk_sel = ETU_CLK_SEL;
 	SMC_WRITE_REG(REG1, v);
 	pr_error("REG1: 0x%08lx\n", v);
 
 	v = SMC_READ_REG(REG2);
-	reg2 = (struct SMCCARD_HW_REG2 *)&v;
+	reg2 = (struct SMCCARD_HW_Reg2 *)&v;
 	reg2->recv_invert = smc->param.recv_invert;
 	reg2->recv_parity = smc->param.recv_parity;
 	reg2->recv_lsb_msb = smc->param.recv_lsb_msb;
@@ -907,11 +890,11 @@ static int smc_hw_setup(struct smc_dev *smc)
 	reg2->xmit_retries = smc->param.xmit_retries;
 	reg2->xmit_repeat_dis = smc->param.xmit_repeat_dis;
 	reg2->recv_no_parity = smc->param.recv_no_parity;
-	reg2->clk_tcnt = freq_cpu / smc->param.freq - 1;
+	reg2->clk_tcnt = freq_cpu/smc->param.freq - 1;
 	reg2->det_filter_sel = DET_FILTER_SEL_DEFAULT;
 	reg2->io_filter_sel = IO_FILTER_SEL_DEFAULT;
 	reg2->clk_sel = clock_source;
-	/*reg2->pulse_irq = 0; */
+	/*reg2->pulse_irq = 0;*/
 	SMC_WRITE_REG(REG2, v);
 	pr_error("REG2: 0x%08lx\n", v);
 	pr_error("recv_inv:%d\n", smc->param.recv_invert);
@@ -926,7 +909,7 @@ static int smc_hw_setup(struct smc_dev *smc)
 	pr_error("clk_tcnt:%d freq_cpu:%ld\n", reg2->clk_tcnt, freq_cpu);
 
 	v = SMC_READ_REG(INTR);
-	reg_int = (struct SMC_INTERRUPT_REG *)&v;
+	reg_int = (struct SMC_INTERRUPT_Reg *)&v;
 	reg_int->recv_fifo_bytes_threshold_int_mask = 0;
 	reg_int->send_fifo_last_byte_int_mask = 1;
 	reg_int->cwt_expeired_int_mask = 1;
@@ -941,7 +924,7 @@ static int smc_hw_setup(struct smc_dev *smc)
 	pr_error("INTR: 0x%08lx\n", v);
 
 	v = SMC_READ_REG(REG5);
-	reg5 = (struct SMCCARD_HW_REG5 *)&v;
+	reg5 = (struct SMCCARD_HW_Reg5 *)&v;
 	reg5->cwt_detect_en = cwt_det_en;
 	reg5->btw_detect_en = btw_det_en;
 	reg5->etu_msr_en = etu_msr_en;
@@ -949,11 +932,12 @@ static int smc_hw_setup(struct smc_dev *smc)
 	SMC_WRITE_REG(REG5, v);
 	pr_error("REG5: 0x%08lx\n", v);
 
+
 	v = SMC_READ_REG(REG6);
-	reg6 = (struct SMCCARD_HW_REG6 *)&v;
+	reg6 = (struct SMCCARD_HW_Reg6 *)&v;
 	reg6->N_parameter = smc->param.n;
 	reg6->cwi_value = smc->param.cwi;
-	reg6->bgt = smc->param.bgt - 2;
+	reg6->bgt = smc->param.bgt-2;
 	reg6->bwi = smc->param.bwi;
 	SMC_WRITE_REG(REG6, v);
 	pr_error("REG6: 0x%08lx\n", v);
@@ -968,7 +952,8 @@ static void enable_smc_clk(struct smc_dev *smc)
 {
 	unsigned int _value;
 
-	if ((smc->pin_clk_pinmux_reg == -1) || (smc->pin_clk_pinmux_bit == -1))
+	if ((smc->pin_clk_pinmux_reg == -1)
+			|| (smc->pin_clk_pinmux_bit == -1))
 		return;
 	_value = READ_CBUS_REG(smc->pin_clk_pinmux_reg);
 	_value |= smc->pin_clk_pinmux_bit;
@@ -979,19 +964,23 @@ static void disable_smc_clk(struct smc_dev *smc)
 {
 	unsigned int _value;
 
-	if ((smc->pin_clk_pinmux_reg == -1) || (smc->pin_clk_pinmux_bit == -1))
+	if ((smc->pin_clk_pinmux_reg == -1)
+			|| (smc->pin_clk_pinmux_bit == -1))
 		return;
 
 	_value = READ_CBUS_REG(smc->pin_clk_pinmux_reg);
 	_value &= ~smc->pin_clk_pinmux_bit;
 	WRITE_CBUS_REG(smc->pin_clk_pinmux_reg, _value);
 	_value = READ_CBUS_REG(smc->pin_clk_pinmux_reg);
-	/*pr_dbg("disable smc_clk: mux[%x]\n", _value); */
 
-	if ((smc->pin_clk_oen_reg != -1) &&
-	    (smc->pin_clk_out_reg != -1) &&
-	    (smc->pin_clk_oebit != -1) && (smc->pin_clk_oubit != -1)) {
-		/*force the clk pin to low. */
+	/*pr_dbg("disable smc_clk: mux[%x]\n", _value);*/
+
+	if ((smc->pin_clk_oen_reg != -1)
+			&& (smc->pin_clk_out_reg != -1)
+			&& (smc->pin_clk_oebit != -1)
+			&& (smc->pin_clk_oubit != -1)) {
+
+		/*force the clk pin to low.*/
 		_value = READ_CBUS_REG(smc->pin_clk_oen_reg);
 		_value &= ~smc->pin_clk_oebit;
 		WRITE_CBUS_REG(smc->pin_clk_oen_reg, _value);
@@ -999,7 +988,18 @@ static void disable_smc_clk(struct smc_dev *smc)
 		_value &= ~smc->pin_clk_oubit;
 		WRITE_CBUS_REG(smc->pin_clk_out_reg, _value);
 		pr_dbg("disable smc_clk: pin[%x](reg)\n", _value);
+	} else if (smc->pin_clk_pin != NULL) {
+
+		udelay(20);
+		/*	_gpio_out(smc->pin_clk_pin,
+		 *	0,
+		 *	SMC_CLK_PIN_NAME);
+		 */
+		udelay(1000);
+
+		/*pr_dbg("disable smc_clk: pin[%x](pin)\n", smc->pin_clk_pin);*/
 	} else {
+
 		pr_error("no reg/bit or pin");
 		pr_error("defined for clk-pin contrl.\n");
 	}
@@ -1009,21 +1009,22 @@ static int smc_hw_active(struct smc_dev *smc)
 {
 	if (ENA_GPIO_PULL > 0) {
 		enable_smc_clk(smc);
-		usleep_range(200, 250);
+		udelay(200);
 	}
 	if (!smc->active) {
+
 		if (smc->reset) {
 			smc->reset(NULL, 0);
 			pr_dbg("call reset(0) in bsp.\n");
 		} else {
 			if (smc->use_enable_pin) {
 				_gpio_out(smc->enable_pin,
-					  smc->enable_level,
-					  SMC_ENABLE_PIN_NAME);
+					smc->enable_level,
+					SMC_ENABLE_PIN_NAME);
 			}
 		}
 
-		usleep_range(200, 250);
+		udelay(200);
 		smc_hw_setup(smc);
 
 		smc->active = 1;
@@ -1036,7 +1037,7 @@ static int smc_hw_deactive(struct smc_dev *smc)
 {
 	if (smc->active) {
 		unsigned long sc_reg0 = SMC_READ_REG(REG0);
-		struct SMCCARD_HW_REG0 *sc_reg0_reg = (void *)&sc_reg0;
+		struct SMCCARD_HW_Reg0 *sc_reg0_reg = (void *)&sc_reg0;
 
 		sc_reg0_reg->rst_level = RESET_ENABLE;
 		sc_reg0_reg->enable = 1;
@@ -1048,7 +1049,7 @@ static int smc_hw_deactive(struct smc_dev *smc)
 		/*_gpio_out(smc->reset_pin, RESET_ENABLE, SMC_RESET_PIN_NAME);*/
 		_gpio_out(smc->reset_pin, RESET_DISABLE, SMC_RESET_PIN_NAME);
 #endif
-		usleep_range(200, 250);
+		udelay(200);
 
 		if (smc->reset) {
 			smc->reset(NULL, 1);
@@ -1056,12 +1057,12 @@ static int smc_hw_deactive(struct smc_dev *smc)
 		} else {
 			if (smc->use_enable_pin)
 				_gpio_out(smc->enable_pin,
-					  smc->enable_level,
-					  SMC_ENABLE_PIN_NAME);
+					smc->enable_level,
+					SMC_ENABLE_PIN_NAME);
 		}
 		if (ENA_GPIO_PULL > 0) {
 			disable_smc_clk(smc);
-			/*smc_pull_down_data(); */
+			/*smc_pull_down_data();*/
 		}
 
 		smc->active = 0;
@@ -1070,18 +1071,20 @@ static int smc_hw_deactive(struct smc_dev *smc)
 	return 0;
 }
 
+#define INV(a) ((smc->sc_type == SC_INVERSE) ? inv_table[(int)(a)] : (a))
+
 #ifndef ATR_FROM_INT
 static int smc_hw_get(struct smc_dev *smc, int cnt, int timeout)
 {
 	unsigned long sc_status;
-	int times = timeout * 100;
-	struct SMC_STATUS_REG *sc_status_reg =
-	    (struct SMC_STATUS_REG *)&sc_status;
+	int times = timeout*100;
+	struct SMC_STATUS_Reg *sc_status_reg =
+	    (struct SMC_STATUS_Reg *)&sc_status;
 
 	while ((times > 0) && (cnt > 0)) {
 		sc_status = SMC_READ_REG(STATUS);
 
-		/*pr_dbg("read atr status %08x\n", sc_status); */
+		/*pr_dbg("read atr status %08x\n", sc_status);*/
 
 		if (sc_status_reg->rst_expired_status)
 			pr_error("atr timeout\n");
@@ -1092,11 +1095,11 @@ static int smc_hw_get(struct smc_dev *smc, int cnt, int timeout)
 		}
 
 		if (sc_status_reg->recv_fifo_empty_status) {
-			usleep_range(10, 20);
+			udelay(10);
 			times--;
 		} else {
 			while (sc_status_reg->recv_fifo_bytes_number > 0) {
-				u8 byte = (SMC_READ_REG(FIFO)) & 0xff;
+				u8 byte = (SMC_READ_REG(FIFO))&0xff;
 
 #ifdef SW_INVERT
 				if (smc->sc_type == SC_INVERSE)
@@ -1123,15 +1126,16 @@ static int smc_hw_get(struct smc_dev *smc, int cnt, int timeout)
 static int smc_fiq_get(struct smc_dev *smc, int size, int timeout)
 {
 	int ret = 0;
-	int times = timeout / 10;
+	int times = timeout/10;
 	int start, end;
 
 	if (!times)
 		times = 1;
 
 	while ((times > 0) && (size > 0)) {
+
 		start = smc->recv_start;
-		end = smc->recv_end;	/*momentary value */
+		end = smc->recv_end;/*momentary value*/
 
 		if (!smc->cardin) {
 			ret = -ENODEV;
@@ -1139,20 +1143,16 @@ static int smc_fiq_get(struct smc_dev *smc, int size, int timeout)
 			ret = -EAGAIN;
 		} else {
 			int i;
-			int tmp;
-			/*ATR only, no loop */
+			/*ATR only, no loop*/
 			ret = end - start;
 			if (ret > size)
 				ret = size;
 			memcpy(&smc->atr.atr[smc->atr.atr_len],
-			       &smc->recv_buf[start], ret);
+				&smc->recv_buf[start], ret);
 			for (i = smc->atr.atr_len;
-			     i < smc->atr.atr_len + ret; i++) {
-				if (c->sc_type == SC_INVERSE) {
-					tmp = smc->atr.atr[i];
-					smc->atr.atr[i] = inv_table[tmp];
-				}
-			}
+				i < smc->atr.atr_len+ret;
+				i++)
+				smc->atr.atr[i] = INV((int)smc->atr.atr[i]);
 			smc->atr.atr_len += ret;
 
 			smc->recv_start += ret;
@@ -1170,7 +1170,7 @@ static int smc_fiq_get(struct smc_dev *smc, int size, int timeout)
 
 	return ret;
 }
-#endif /*ifndef ATR_FROM_INT */
+#endif /*ifndef ATR_FROM_INT*/
 
 static int smc_hw_read_atr(struct smc_dev *smc)
 {
@@ -1206,35 +1206,35 @@ static int smc_hw_read_atr(struct smc_dev *smc)
 		if (smc->atr.atr_len > 1)
 			ptr[1] = inv_table[(int)ptr[1]];
 	}
-#endif /*SW_INVERT */
+#endif /*SW_INVERT*/
 
 	ptr++;
-	his_len = ptr[0] & 0x0F;
+	his_len = ptr[0]&0x0F;
 
 	do {
 		tnext = 0;
 		loop_cnt++;
-		if (ptr[0] & 0x10) {
+		if (ptr[0]&0x10) {
 			if (smc_hw_get(smc, 1, 1000) < 0)
 				goto end;
 		}
-		if (ptr[0] & 0x20) {
+		if (ptr[0]&0x20) {
 			if (smc_hw_get(smc, 1, 1000) < 0)
 				goto end;
 		}
-		if (ptr[0] & 0x40) {
+		if (ptr[0]&0x40) {
 			if (smc_hw_get(smc, 1, 1000) < 0)
 				goto end;
 		}
-		if (ptr[0] & 0x80) {
+		if (ptr[0]&0x80) {
 			if (smc_hw_get(smc, 1, 1000) < 0)
 				goto end;
 
-			ptr = &smc->atr.atr[smc->atr.atr_len - 1];
-			t = ptr[0] & 0x0F;
+			ptr = &smc->atr.atr[smc->atr.atr_len-1];
+			t = ptr[0]&0x0F;
 			if (t)
 				only_t0 = 0;
-			if (ptr[0] & 0xF0)
+			if (ptr[0]&0xF0)
 				tnext = 1;
 		}
 	} while (tnext && loop_cnt < 4);
@@ -1256,7 +1256,7 @@ static int smc_hw_read_atr(struct smc_dev *smc)
 			int i;
 
 			for (i = 0; i < smc->atr.atr_len; i++)
-				smc->recv_buf[smc->recv_start + i] =
+				smc->recv_buf[smc->recv_start+i] =
 				    smc->atr.atr[i];
 		}
 	}
@@ -1271,15 +1271,16 @@ end:
 #endif
 }
 
+
 void smc_reset_prepare(struct smc_dev *smc)
 {
-	/*reset recv&send buf */
+	/*reset recv&send buf*/
 	smc->send_start = 0;
 	smc->send_count = 0;
 	smc->recv_start = 0;
 	smc->recv_count = 0;
 
-	/*Read ATR */
+	/*Read ATR*/
 	smc->atr.atr_len = 0;
 	smc->recv_count = 0;
 	smc->send_count = 0;
@@ -1298,9 +1299,9 @@ static int smc_hw_reset(struct smc_dev *smc)
 	unsigned long flags;
 	int ret;
 	unsigned long sc_reg0 = SMC_READ_REG(REG0);
-	struct SMCCARD_HW_REG0 *sc_reg0_reg = (void *)&sc_reg0;
+	struct SMCCARD_HW_Reg0 *sc_reg0_reg = (void *)&sc_reg0;
 	unsigned long sc_int;
-	struct SMC_INTERRUPT_REG *sc_int_reg = (void *)&sc_int;
+	struct SMC_INTERRUPT_Reg *sc_int_reg = (void *)&sc_int;
 
 	pr_dbg("smc read reg0 0x%lx\n", sc_reg0);
 
@@ -1312,41 +1313,44 @@ static int smc_hw_reset(struct smc_dev *smc)
 	spin_unlock_irqrestore(&smc->slock, flags);
 
 	if (ret >= 0) {
-		/*Reset */
+		/*Reset*/
 #ifdef NO_HOT_RESET
 		smc->active = 0;
 #endif
 		if (smc->active) {
+
 			smc_reset_prepare(smc);
+
 			sc_reg0_reg->rst_level = RESET_ENABLE;
 			sc_reg0_reg->clk_en = 1;
 			sc_reg0_reg->etu_divider = ETU_DIVIDER_CLOCK_HZ *
-			    smc->param.f / (smc->param.d * smc->param.freq) - 1;
+			    smc->param.f / (smc->param.d*smc->param.freq) - 1;
 			SMC_WRITE_REG(REG0, sc_reg0);
 #ifdef RST_FROM_PIO
 			_gpio_out(smc->reset_pin,
-				  RESET_ENABLE, SMC_RESET_PIN_NAME);
+				RESET_ENABLE,
+				SMC_RESET_PIN_NAME);
 #endif
 
-			usleep_range(800 / smc->param.freq,
-				     1000 / smc->param.freq);
+			udelay(800/smc->param.freq); /*>= 400/f ;*/
 
-			/*disable receive interrupt */
+			/*disable receive interrupt*/
 			sc_int = SMC_READ_REG(INTR);
 			sc_int_reg->recv_fifo_bytes_threshold_int_mask = 0;
-			SMC_WRITE_REG(INTR, sc_int | 0x3FF);
+			SMC_WRITE_REG(INTR, sc_int|0x3FF);
 
 			sc_reg0_reg->rst_level = RESET_DISABLE;
 			sc_reg0_reg->start_atr = 1;
 			SMC_WRITE_REG(REG0, sc_reg0);
 #ifdef RST_FROM_PIO
 			_gpio_out(smc->reset_pin,
-				  RESET_DISABLE, SMC_RESET_PIN_NAME);
+				RESET_DISABLE,
+				SMC_RESET_PIN_NAME);
 #endif
 		} else {
 			smc_hw_deactive(smc);
 
-			usleep_range(200, 250);
+			udelay(200);
 
 			smc_hw_active(smc);
 
@@ -1359,42 +1363,43 @@ static int smc_hw_reset(struct smc_dev *smc)
 #ifdef RST_FROM_PIO
 			if (smc->use_enable_pin) {
 				_gpio_out(smc->enable_pin,
-					  smc->enable_level,
-					  SMC_RESET_PIN_NAME);
-				usleep_range(100, 150);
+					smc->enable_level,
+					SMC_RESET_PIN_NAME);
+				udelay(100);
 			}
 			_gpio_out(smc->reset_pin,
-				  RESET_ENABLE, SMC_RESET_PIN_NAME);
+				RESET_ENABLE,
+				SMC_RESET_PIN_NAME);
 #endif
-			usleep_range(2000, 2050);	/*>= 400/f ; */
+			udelay(2000); /*>= 400/f ;*/
 
-			/*disable receive interrupt */
+			/*disable receive interrupt*/
 			sc_int = SMC_READ_REG(INTR);
 			sc_int_reg->recv_fifo_bytes_threshold_int_mask = 0;
-			SMC_WRITE_REG(INTR, sc_int | 0x3FF);
+			SMC_WRITE_REG(INTR, sc_int|0x3FF);
 
 			sc_reg0_reg->rst_level = RESET_DISABLE;
 			sc_reg0_reg->start_atr_en = 1;
 			sc_reg0_reg->start_atr = 1;
 			sc_reg0_reg->enable = 1;
 			sc_reg0_reg->etu_divider = ETU_DIVIDER_CLOCK_HZ *
-			    smc->param.f / (smc->param.d * smc->param.freq) - 1;
+			    smc->param.f / (smc->param.d*smc->param.freq) - 1;
 			SMC_WRITE_REG(REG0, sc_reg0);
 #ifdef RST_FROM_PIO
 
 			_gpio_out(smc->reset_pin,
-				  RESET_DISABLE, SMC_RESET_PIN_NAME);
+				RESET_DISABLE, SMC_RESET_PIN_NAME);
 #endif
 		}
 
 #if defined(ATR_FROM_INT)
-		/*enable receive interrupt */
+		/*enable receive interrupt*/
 		sc_int = SMC_READ_REG(INTR);
 		sc_int_reg->recv_fifo_bytes_threshold_int_mask = 1;
-		SMC_WRITE_REG(INTR, sc_int | 0x3FF);
+		SMC_WRITE_REG(INTR, sc_int|0x3FF);
 #endif
 
-		/*msleep(atr_delay); */
+		/*msleep(atr_delay);*/
 		ret = smc_hw_read_atr(smc);
 
 #ifdef SW_INVERT
@@ -1402,13 +1407,13 @@ static int smc_hw_reset(struct smc_dev *smc)
 #endif
 
 #if defined(ATR_FROM_INT)
-		/*disable receive interrupt */
+		/*disable receive interrupt*/
 		sc_int = SMC_READ_REG(INTR);
 		sc_int_reg->recv_fifo_bytes_threshold_int_mask = 0;
-		SMC_WRITE_REG(INTR, sc_int | 0x3FF);
+		SMC_WRITE_REG(INTR, sc_int|0x3FF);
 #endif
 
-		/*Disable ATR */
+		/*Disable ATR*/
 		sc_reg0 = SMC_READ_REG(REG0);
 		sc_reg0_reg->start_atr_en = 0;
 		sc_reg0_reg->start_atr = 0;
@@ -1417,7 +1422,8 @@ static int smc_hw_reset(struct smc_dev *smc)
 #ifndef DISABLE_RECV_INT
 		sc_int_reg->recv_fifo_bytes_threshold_int_mask = 1;
 #endif
-		SMC_WRITE_REG(INTR, sc_int | 0x3FF);
+		SMC_WRITE_REG(INTR, sc_int|0x3FF);
+
 	}
 
 	return ret;
@@ -1428,7 +1434,7 @@ static int smc_hw_get_status(struct smc_dev *smc, int *sret)
 	unsigned long flags;
 #ifndef DET_FROM_PIO
 	unsigned int reg_val;
-	struct SMCCARD_HW_REG0 *reg = (struct SMCCARD_HW_REG0 *)&reg_val;
+	struct SMCCARD_HW_Reg0 *reg = (struct SMCCARD_HW_Reg0 *)&reg_val;
 #endif
 	spin_lock_irqsave(&smc->slock, flags);
 
@@ -1454,6 +1460,7 @@ static int smc_hw_get_status(struct smc_dev *smc, int *sret)
 
 	return 0;
 }
+
 
 static inline void _atomic_wrap_inc(int *p, int wrap)
 {
@@ -1489,14 +1496,14 @@ static inline int smc_can_recv_max(struct smc_dev *smc)
 static int smc_hw_start_send(struct smc_dev *smc)
 {
 	unsigned int sc_status;
-	struct SMC_STATUS_REG *sc_status_reg =
-		(struct SMC_STATUS_REG *)&sc_status;
+	struct SMC_STATUS_Reg *sc_status_reg =
+		(struct SMC_STATUS_Reg *)&sc_status;
 	u8 byte;
 
-	/*trigger only */
+	/*trigger only*/
 	sc_status = SMC_READ_REG(STATUS);
 	if (smc->send_end != smc->send_start &&
-	    !sc_status_reg->send_fifo_full_status) {
+		!sc_status_reg->send_fifo_full_status) {
 		pr_dbg("s i f [%d:%d]\n", smc->send_start, smc->send_end);
 		byte = smc->send_buf[smc->send_end];
 		_atomic_wrap_inc(&smc->send_end, SEND_BUF_SIZE);
@@ -1536,14 +1543,18 @@ static void smc_irq_handler(void)
 	unsigned int sc_status;
 	unsigned int sc_reg0;
 	unsigned int sc_int;
-	struct SMC_INTERRUPT_REG *sc_int_reg =
-	    (struct SMC_INTERRUPT_REG *)&sc_int;
-	struct SMCCARD_HW_REG0 *sc_reg0_reg = (void *)&sc_reg0;
+	struct SMC_STATUS_Reg *sc_status_reg =
+		(struct SMC_STATUS_Reg *)&sc_status;
+	struct SMC_INTERRUPT_Reg *sc_int_reg =
+		(struct SMC_INTERRUPT_Reg *)&sc_int;
+	struct SMCCARD_HW_Reg0 *sc_reg0_reg =
+		(void *)&sc_reg0;
 
 	sc_int = SMC_READ_REG(INTR);
-	/*Fpr("smc intr:0x%x\n", sc_int); */
+	/*Fpr("smc intr:0x%x\n", sc_int);*/
 
 	if (sc_int_reg->recv_fifo_bytes_threshold_int) {
+
 		int num = 0;
 
 		sc_status = SMC_READ_REG(STATUS);
@@ -1558,7 +1569,7 @@ static void smc_irq_handler(void)
 				byte = SMC_READ_REG(FIFO);
 #ifdef SW_INVERT
 				if (!smc->atr_mode &&
-				    smc->sc_type == SC_INVERSE)
+					smc->sc_type == SC_INVERSE)
 					byte = inv_table[byte];
 #endif
 				smc->recv_buf[smc->recv_end] = byte;
@@ -1571,7 +1582,9 @@ static void smc_irq_handler(void)
 
 			fiq_bridge_pulse_trigger(&smc->smc_fiq_bridge);
 		}
+
 		sc_int_reg->recv_fifo_bytes_threshold_int = 0;
+
 	}
 
 	if (sc_int_reg->send_fifo_last_byte_int) {
@@ -1582,7 +1595,7 @@ static void smc_irq_handler(void)
 		while (1) {
 			sc_status = SMC_READ_REG(STATUS);
 			if (smc->send_end == start ||
-			    sc_status_reg->send_fifo_full_status)
+				sc_status_reg->send_fifo_full_status)
 				break;
 
 			byte = smc->send_buf[smc->send_end];
@@ -1603,9 +1616,12 @@ static void smc_irq_handler(void)
 			sc_int_reg->recv_fifo_bytes_threshold_int_mask = 1;
 			fiq_bridge_pulse_trigger(&smc->smc_fiq_bridge);
 		}
+
 		sc_int_reg->send_fifo_last_byte_int = 0;
+
 	}
-	SMC_WRITE_REG(INTR, sc_int | 0x3FF);
+
+	SMC_WRITE_REG(INTR, sc_int|0x3FF);
 
 #ifndef DET_FROM_PIO
 	sc_reg0 = SMC_READ_REG(REG0);
@@ -1620,7 +1636,7 @@ static void smc_irq_handler(void)
 static int transmit_chars(struct smc_dev *smc)
 {
 	unsigned int status;
-	struct SMC_STATUS_REG *status_r = (struct SMC_STATUS_REG *)&status;
+	struct SMC_STATUS_Reg *status_r = (struct SMC_STATUS_Reg *)&status;
 	int cnt = 0;
 	u8 byte;
 	int start = smc->send_start;
@@ -1649,7 +1665,7 @@ static int receive_chars(struct smc_dev *smc)
 {
 	unsigned int status;
 	unsigned int intr;
-	struct SMC_STATUS_REG *status_r = (struct SMC_STATUS_REG *)&status;
+	struct SMC_STATUS_Reg *status_r = (struct SMC_STATUS_Reg *)&status;
 	int cnt = 0;
 	u8 byte;
 
@@ -1659,7 +1675,7 @@ static int receive_chars(struct smc_dev *smc)
 		return -1;
 	}
 
-	/*clear recv_fifo_bytes_threshold_int_mask or INT lost */
+	/*clear recv_fifo_bytes_threshold_int_mask or INT lost*/
 	intr = SMC_READ_REG(INTR);
 	SMC_WRITE_REG(INTR, (intr & ~0x103ff));
 
@@ -1686,10 +1702,10 @@ static void smc_irq_bh_handler(unsigned long arg)
 	struct smc_dev *smc = (struct smc_dev *)arg;
 #ifndef DET_FROM_PIO
 	unsigned int sc_reg0;
-	struct SMCCARD_HW_REG0 *sc_reg0_reg = (void *)&sc_reg0;
+	struct SMCCARD_HW_Reg0 *sc_reg0_reg = (void *)&sc_reg0;
 #endif
 
-	/*Read card status */
+	/*Read card status*/
 #ifndef DET_FROM_PIO
 	sc_reg0 = SMC_READ_REG(REG0);
 	smc->cardin = sc_reg0_reg->card_detect;
@@ -1705,22 +1721,23 @@ static void smc_irq_bh_handler(unsigned long arg)
 		wake_up_interruptible(&smc->wr_wq);
 }
 
+
 static irqreturn_t smc_irq_handler(int irq, void *data)
 {
 	struct smc_dev *smc = (struct smc_dev *)data;
 	unsigned int sc_status;
 	unsigned int sc_int;
-	struct SMC_STATUS_REG *sc_status_reg =
-		(struct SMC_STATUS_REG *)&sc_status;
-	struct SMC_INTERRUPT_REG *sc_int_reg =
-	    (struct SMC_INTERRUPT_REG *)&sc_int;
+	struct SMC_STATUS_Reg *sc_status_reg =
+		(struct SMC_STATUS_Reg *)&sc_status;
+	struct SMC_INTERRUPT_Reg *sc_int_reg =
+		(struct SMC_INTERRUPT_Reg *)&sc_int;
 
 	sc_int = SMC_READ_REG(INTR);
 	Ipr("Int:0x%x\n", sc_int);
 	sc_status = SMC_READ_REG(STATUS);
 	Ipr("Sta:0x%x\n", sc_status);
 
-	/*Receive */
+	/*Receive*/
 	sc_status = SMC_READ_REG(STATUS);
 	if (!sc_status_reg->recv_fifo_empty_status)
 		receive_chars(smc);
@@ -1735,13 +1752,13 @@ static irqreturn_t smc_irq_handler(int irq, void *data)
 		}
 	}
 
-	SMC_WRITE_REG(INTR, sc_int | 0x3FF);
+	SMC_WRITE_REG(INTR, sc_int|0x3FF);
 
 	tasklet_schedule(&smc->tasklet);
 
 	return IRQ_HANDLED;
 }
-#endif /*ifdef SMC_FIQ */
+#endif /*ifdef SMC_FIQ*/
 
 static void smc_dev_deinit(struct smc_dev *smc)
 {
@@ -1753,18 +1770,22 @@ static void smc_dev_deinit(struct smc_dev *smc)
 	if (smc->use_enable_pin)
 		_gpio_free(smc->enable_pin, SMC_ENABLE_PIN_NAME);
 	clk_disable_unprepare(aml_smartcard_clk);
-
+#if 0
+	if (smc->pin_clk_pin != -1)
+		_gpio_free(smc->pin_clk_pin, SMC_CLK_PIN_NAME);
+#endif
 #ifdef DET_FROM_PIO
-//      if (smc->detect_pin != NULL)
-	_gpio_free(smc->detect_pin, SMC_DETECT_PIN_NAME);
+	if (smc->detect_pin != NULL)
+		_gpio_free(smc->detect_pin, SMC_DETECT_PIN_NAME);
 #endif
 #ifdef RST_FROM_PIO
-	//if (smc->reset_pin != NULL)
-	_gpio_free(smc->reset_pin, SMC_RESET_PIN_NAME);
+	if (smc->reset_pin != NULL)
+		_gpio_free(smc->reset_pin, SMC_RESET_PIN_NAME);
 #endif
+#ifdef CONFIG_OF
 	if (smc->pinctrl)
 		devm_pinctrl_put(smc->pinctrl);
-
+#endif
 	if (smc->dev)
 		device_destroy(&smc_class, MKDEV(smc_major, smc->id));
 
@@ -1775,53 +1796,57 @@ static void smc_dev_deinit(struct smc_dev *smc)
 #if defined(MESON_CPU_TYPE_MESON8) && (MESON_CPU_TYPE >= MESON_CPU_TYPE_MESON8)
 	CLK_GATE_OFF(SMART_CARD_MPEG_DOMAIN);
 #endif
+
 }
 
-static int _set_gpio(struct smc_dev *smc,
-		     struct gpio_desc **gpiod, char *str,
-		     int input_output, int output_level)
+static int _set_gpio(struct smc_dev *smc, struct gpio_desc **gpiod,
+	char *str, int input_output, int output_level)
 {
 	int ret = 0;
-	/*pr_dbg("smc _set_gpio %s %p\n", str, *gpiod); */
+	/*pr_dbg("smc _set_gpio %s %p\n", str, *gpiod);*/
 	if (IS_ERR(*gpiod)) {
 		pr_dbg("smc %s request failed\n", str);
 		return -1;
 	}
 	if (input_output == OUTPUT) {
 		*gpiod = gpiod_get(&smc->pdev->dev, str,
-				   output_level ? GPIOD_OUT_HIGH :
-				   GPIOD_OUT_LOW);
+				output_level ? GPIOD_OUT_HIGH : GPIOD_OUT_LOW);
 		ret = gpiod_direction_output(*gpiod, output_level);
-	} else if (input_output == INPUT) {
+	} else if (input_output == INPUT)	{
 		*gpiod = gpiod_get(&smc->pdev->dev, str, GPIOD_IN);
 		ret = gpiod_direction_input(*gpiod);
 		ret |= gpiod_set_pull(*gpiod, GPIOD_PULL_UP);
-	} else {
+	} else
 		pr_dbg("SMC Request gpio direction invalid\n");
-	}
+
 	return ret;
 }
-
 static int smc_dev_init(struct smc_dev *smc, int id)
 {
+#ifndef CONFIG_OF
+	struct resource *res;
+#else
 	int ret;
 	u32 value;
 	char buf[32];
 	const char *dts_str;
 	struct resource *res;
+#endif
 
 #if defined(MESON_CPU_TYPE_MESON8) && (MESON_CPU_TYPE >= MESON_CPU_TYPE_MESON8)
 	CLK_GATE_ON(SMART_CARD_MPEG_DOMAIN);
 #error
 #endif
-	/*of_match_node(smc_dt_match, smc->pdev->dev.of_node); */
+	/*of_match_node(smc_dt_match, smc->pdev->dev.of_node);*/
 	smc->id = id;
+
+#ifdef CONFIG_OF
 	smc->pinctrl = devm_pinctrl_get_select_default(&smc->pdev->dev);
 	if (IS_ERR(smc->pinctrl))
 		return -1;
 
 	ret = of_property_read_string(smc->pdev->dev.of_node,
-				      "smc_need_enable_pin", &dts_str);
+		"smc_need_enable_pin", &dts_str);
 	if (ret < 0) {
 		pr_error("failed to get smartcard node.\n");
 		return -EINVAL;
@@ -1830,167 +1855,337 @@ static int smc_dev_init(struct smc_dev *smc, int id)
 		smc->use_enable_pin = 1;
 	else
 		smc->use_enable_pin = 0;
-
 	if (smc->use_enable_pin == 1) {
-		snprintf(buf, sizeof(buf), "smc%d_enable_pin", id);
-		_set_gpio(smc, &smc->enable_pin, "enable_pin",
-			  OUTPUT, OUTLEVEL_HIGH);
+		smc->enable_pin = NULL;
+		if (smc->enable_pin == NULL) {
+			snprintf(buf, sizeof(buf), "smc%d_enable_pin", id);
+			_set_gpio(smc, &smc->enable_pin, "enable_pin",
+				OUTPUT, OUTLEVEL_HIGH);
+#else /*CONFIG_OF*/
+			res = platform_get_resource_byname(smc->pdev,
+				IORESOURCE_MEM, buf);
+			if (!res)
+				pr_error("cannot get resource \"%s\"\n", buf);
+			else {
+				smc->enable_pin = res->start;
+				_gpio_request(smc->enable_pin,
+					SMC_ENABLE_PIN_NAME);
+			}
+#endif /*CONFIG_OF*/
+		}
 
 		if (smc->use_enable_pin) {
 			snprintf(buf, sizeof(buf), "smc%d_enable_level", id);
-
+#ifdef CONFIG_OF
 			ret = of_property_read_u32(smc->pdev->dev.of_node,
-						   buf, &value);
+				buf, &value);
 			if (!ret) {
 				smc->enable_level = value;
 				pr_error("%s: %d\n", buf, smc->enable_level);
-				_gpio_out(smc->enable_pin,
-					  smc->enable_level,
-					  SMC_ENABLE_PIN_NAME);
-				pr_error("enable_pin: -->(%d)\n",
-					 (!smc->enable_level) ? 1 : 0);
+				if (smc->enable_pin != NULL) {
+					_gpio_out(smc->enable_pin,
+						smc->enable_level,
+						SMC_ENABLE_PIN_NAME);
+					pr_error("enable_pin: -->(%d)\n",
+						(!smc->enable_level)?1:0);
+				}
 			} else {
 				pr_error("cannot find resource \"%s\"\n", buf);
 			}
+#else /*CONFIG_OF*/
+			res = platform_get_resource_byname(smc->pdev,
+				IORESOURCE_MEM, buf);
+			if (!res)
+				pr_error("cannot get resource \"%s\"\n", buf);
+			else
+				smc->enable_level = res->start;
+#endif /*CONFIG_OF*/
 		}
-	} else {
+	} else
 		pr_dbg("Smartcard is working with no enable pin\n");
-	}
+
+#ifdef CONFIG_OF
 	smc->reset_pin = NULL;
 	ret = _set_gpio(smc, &smc->reset_pin, "reset_pin",
-			OUTPUT, OUTLEVEL_HIGH);
+		OUTPUT, OUTLEVEL_HIGH);
 	if (ret) {
 		pr_dbg("smc reset pin request failed, we can not work now\n");
 		return -1;
 	}
 	ret = of_property_read_u32(smc->pdev->dev.of_node,
-				   "reset_level", &value);
+		"reset_level", &value);
 	smc->reset_level = value;
 	pr_dbg("smc reset_level %d\n", value);
 
-	smc->irq_num = -1;
+#else /*CONFIG_OF*/
+	res = platform_get_resource_byname(smc->pdev, IORESOURCE_MEM, buf);
+	if (!res)
+		pr_error("cannot get resource \"%s\"\n", buf);
+	else
+		smc->reset_level = res->start;
+#endif /*CONFIG_OF*/
+	smc->irq_num = smc0_irq;
 	if (smc->irq_num == -1) {
 		snprintf(buf, sizeof(buf), "smc%d_irq", id);
-
+#if 0
+		ret = of_property_read_u32(smc->pdev->dev.of_node, buf, &value);
+		if (!ret) {
+			smc->irq_num = value;
+			pr_error("%s: %d\n", buf, smc->irq_num);
+		} else {
+			pr_error("cannot find resource \"%s\"\n", buf);
+			return -1;
+		}
+#else /*CONFIG_OF*/
 		res = platform_get_resource_byname(smc->pdev,
-						   IORESOURCE_IRQ, buf);
+			IORESOURCE_IRQ, buf);
 		if (!res) {
 			pr_error("cannot get resource \"%s\"\n", buf);
 			return -1;
 		}
 		smc->irq_num = res->start;
+#endif /*CONFIG_OF*/
+	}
+	smc->pin_clk_pinmux_reg = -1;
+	if (smc->pin_clk_pinmux_reg == -1) {
+		snprintf(buf, sizeof(buf), "smc%d_clk_pinmux_reg", id);
+#ifdef CONFIG_OF
+		ret = of_property_read_u32(smc->pdev->dev.of_node, buf, &value);
+		if (!ret) {
+			smc->pin_clk_pinmux_reg = value;
+			pr_error("%s: 0x%x\n", buf, smc->pin_clk_pinmux_reg);
+		} else
+			pr_error("cannot find resource \"%s\"\n", buf);
+#else /*CONFIG_OF*/
+		res = platform_get_resource_byname(smc->pdev,
+			IORESOURCE_MEM, buf);
+		if (!res)
+			pr_error("cannot get resource \"%s\"\n", buf);
+		else
+			smc->pin_clk_pinmux_reg = res->start;
+#endif /*CONFIG_OF*/
+	}
+#if 1
+	smc->pin_clk_pinmux_bit = -1;
+	if (smc->pin_clk_pinmux_bit == -1) {
+		snprintf(buf, sizeof(buf), "smc%d_clk_pinmux_bit", id);
+#ifdef CONFIG_OF
+		ret = of_property_read_u32(smc->pdev->dev.of_node, buf, &value);
+		if (!ret) {
+			smc->pin_clk_pinmux_bit = value;
+			pr_error("%s: 0x%x\n", buf, smc->pin_clk_pinmux_bit);
+		} else
+			pr_error("cannot find resource \"%s\"\n", buf);
+		/*TODO:*/
+#else /*CONFIG_OF*/
+		res = platform_get_resource_byname(smc->pdev,
+			IORESOURCE_MEM, buf);
+		if (!res)
+			pr_error("cannot get resource \"%s\"\n", buf);
+		else
+			smc->pin_clk_pinmux_bit = res->start;
+#endif /*CONFIG_OF*/
+	}
+#endif
+	smc->pin_clk_oen_reg = -1;
+	if (smc->pin_clk_oen_reg == -1) {
+		snprintf(buf, sizeof(buf), "smc%d_clk_oen_reg", id);
+#ifdef CONFIG_OF
+		ret = of_property_read_u32(smc->pdev->dev.of_node, buf, &value);
+		if (!ret) {
+			smc->pin_clk_oen_reg = value;
+			pr_error("%s: 0x%x\n", buf, smc->pin_clk_oen_reg);
+		} else
+			pr_error("cannot find resource \"%s\"\n", buf);
+#else /*CONFIG_OF*/
+		res = platform_get_resource_byname(smc->pdev,
+			IORESOURCE_MEM, buf);
+		if (!res)
+			pr_error("cannot get resource \"%s\"\n", buf);
+		else {
+			smc->pin_clk_oen_reg = res->start;
+#endif /*CONFIG_OF*/
 	}
 
-	snprintf(buf, sizeof(buf), "smc%d_clk_pinmux_reg", id);
-	ret = of_property_read_u32(smc->pdev->dev.of_node, buf, &value);
-	if (!ret) {
-		smc->pin_clk_pinmux_reg = value;
-		pr_error("%s: 0x%x\n", buf, smc->pin_clk_pinmux_reg);
-	} else {
-		pr_error("cannot find resource \"%s\"\n", buf);
-	}
-	snprintf(buf, sizeof(buf), "smc%d_clk_pinmux_bit", id);
-
-	ret = of_property_read_u32(smc->pdev->dev.of_node, buf, &value);
-	if (!ret) {
-		smc->pin_clk_pinmux_bit = value;
-		pr_error("%s: 0x%x\n", buf, smc->pin_clk_pinmux_bit);
-	} else {
-		pr_error("cannot find resource \"%s\"\n", buf);
-	}
-	snprintf(buf, sizeof(buf), "smc%d_clk_oen_reg", id);
-	ret = of_property_read_u32(smc->pdev->dev.of_node, buf, &value);
-	if (!ret) {
-		smc->pin_clk_oen_reg = value;
-		pr_error("%s: 0x%x\n", buf, smc->pin_clk_oen_reg);
-	} else {
-		pr_error("cannot find resource \"%s\"\n", buf);
+	smc->pin_clk_out_reg = -1;
+	if (smc->pin_clk_out_reg == -1) {
+		snprintf(buf, sizeof(buf), "smc%d_clk_out_reg", id);
+#ifdef CONFIG_OF
+		ret = of_property_read_u32(smc->pdev->dev.of_node, buf, &value);
+		if (!ret) {
+			smc->pin_clk_out_reg = value;
+			pr_error("%s: 0x%x\n", buf, smc->pin_clk_out_reg);
+		} else {
+			pr_error("cannot find resource \"%s\"\n", buf);
+		}
+#else /*CONFIG_OF*/
+		res = platform_get_resource_byname(smc->pdev,
+			IORESOURCE_MEM, buf);
+		if (!res)
+			pr_error("cannot get resource \"%s\"\n", buf);
+		else
+			smc->pin_clk_out_reg = res->start;
+#endif /*CONFIG_OF*/
 	}
 
-	snprintf(buf, sizeof(buf), "smc%d_clk_out_reg", id);
-	ret = of_property_read_u32(smc->pdev->dev.of_node, buf, &value);
-	if (!ret) {
-		smc->pin_clk_out_reg = value;
-		pr_error("%s: 0x%x\n", buf, smc->pin_clk_out_reg);
-	} else {
-		pr_error("cannot find resource \"%s\"\n", buf);
+	smc->pin_clk_oebit = -1;
+	if (smc->pin_clk_oebit == -1) {
+		snprintf(buf, sizeof(buf), "smc%d_clk_oebit", id);
+#ifdef CONFIG_OF
+		ret = of_property_read_u32(smc->pdev->dev.of_node, buf, &value);
+		if (!ret) {
+			smc->pin_clk_oebit = value;
+			pr_error("%s: 0x%x\n", buf, smc->pin_clk_oebit);
+		} else {
+			pr_error("cannot find resource \"%s\"\n", buf);
+		}
+#else /*CONFIG_OF*/
+		res = platform_get_resource_byname(smc->pdev,
+			IORESOURCE_MEM, buf);
+		if (!res)
+			pr_error("cannot get resource \"%s\"\n", buf);
+		else
+			smc->pin_clk_oebit = res->start;
+#endif /*CONFIG_OF*/
 	}
-
-	snprintf(buf, sizeof(buf), "smc%d_clk_oebit", id);
-	ret = of_property_read_u32(smc->pdev->dev.of_node, buf, &value);
-	if (!ret) {
-		smc->pin_clk_oebit = value;
-		pr_error("%s: 0x%x\n", buf, smc->pin_clk_oebit);
-	} else {
-		pr_error("cannot find resource \"%s\"\n", buf);
-	}
-
-	snprintf(buf, sizeof(buf), "smc%d_clk_oubit", id);
-	ret = of_property_read_u32(smc->pdev->dev.of_node, buf, &value);
-	if (!ret) {
-		smc->pin_clk_oubit = value;
-		pr_error("%s: 0x%x\n", buf, smc->pin_clk_oubit);
-	} else {
-		pr_error("cannot find resource \"%s\"\n", buf);
+	smc->pin_clk_oubit = -1;
+	if (smc->pin_clk_oubit == -1) {
+		snprintf(buf, sizeof(buf), "smc%d_clk_oubit", id);
+#ifdef CONFIG_OF
+		ret = of_property_read_u32(smc->pdev->dev.of_node, buf, &value);
+		if (!ret) {
+			smc->pin_clk_oubit = value;
+			pr_error("%s: 0x%x\n", buf, smc->pin_clk_oubit);
+		} else {
+			pr_error("cannot find resource \"%s\"\n", buf);
+		}
+#else /*CONFIG_OF*/
+		res = platform_get_resource_byname(smc->pdev,
+			IORESOURCE_MEM, buf);
+		if (!res)
+			pr_error("cannot get resource \"%s\"\n", buf);
+		else
+			smc->pin_clk_oubit = res->start;
+#endif /*CONFIG_OF*/
 	}
 
 #ifdef DET_FROM_PIO
-	ret = _set_gpio(smc, &smc->detect_pin, "detect_pin", INPUT, 0);
-	if (ret) {
-		pr_dbg("smc detect_pin request failed, we can not work\n");
-		return -1;
+	smc->detect_pin = NULL;
+	if (smc->detect_pin == NULL) {
+#ifdef CONFIG_OF
+		ret = _set_gpio(smc, &smc->detect_pin, "detect_pin", INPUT, 0);
+		if (ret) {
+			pr_dbg("smc detect_pin request failed, we can not work\n");
+			return -1;
+		}
+#endif
+#else /*CONFIG_OF*/
+		ret = platform_get_resource_byname(smc->pdev,
+			IORESOURCE_MEM, buf);
+		if (!ret) {
+			pr_error("cannot get resource \"%s\"\n", buf);
+		} else {
+			smc->detect_pin = res->start;
+			_gpio_request(smc->detect_pin, SMC_DETECT_PIN_NAME);
+		}
+#endif /*CONFIG_OF*/
 	}
-#else
-	ret = platform_get_resource_byname(smc->pdev, IORESOURCE_MEM, buf);
-	if (!ret) {
-		pr_error("cannot get resource \"%s\"\n", buf);
-	} else {
-		smc->detect_pin = res->start;
-		_gpio_request(smc->detect_pin, SMC_DETECT_PIN_NAME);
+	if (1) {
+		snprintf(buf, sizeof(buf), "smc%d_clock_source", id);
+#ifdef CONFIG_OF
+		ret = of_property_read_u32(smc->pdev->dev.of_node, buf, &value);
+		if (!ret) {
+			clock_source = value;
+			pr_error("%s: %d\n", buf, clock_source);
+		} else {
+			pr_error("cannot find resource \"%s\"\n", buf);
+			pr_error("using clock source default: %d\n",
+				clock_source);
+		}
+#else /*CONFIG_OF*/
+		res = platform_get_resource_byname(smc->pdev,
+			IORESOURCE_MEM, buf);
+		if (!res) {
+			pr_error("cannot get resource \"%s\"\n", buf);
+			pr_error("using clock source default: %d\n",
+				clock_source);
+		} else {
+			clock_source = res->start;
+		}
+#endif /*CONFIG_OF*/
+	}
+	smc->detect_invert = 0;
+	if (1) {
+		snprintf(buf, sizeof(buf), "smc%d_det_invert", id);
+#ifdef CONFIG_OF
+		ret = of_property_read_u32(smc->pdev->dev.of_node, buf, &value);
+		if (!ret) {
+			smc->detect_invert = value;
+			pr_error("%s: %d\n", buf, smc->detect_invert);
+		} else {
+			pr_error("cannot find resource \"%s\"\n", buf);
+		}
+#else /*CONFIG_OF*/
+		res = platform_get_resource_byname(smc->pdev,
+			IORESOURCE_MEM, buf);
+		if (!res)
+			pr_error("cannot get resource \"%s\"\n", buf);
+		else
+			smc->detect_invert = res->start;
+#endif /*CONFIG_OF*/
+	}
+#if 1
+	smc->enable_5v3v_pin = NULL;
+	if (smc->enable_5v3v_pin == NULL) {
+		snprintf(buf, sizeof(buf), "smc%d_5v3v_pin", id);
+#ifdef CONFIG_OF
+		ret = _set_gpio(smc, &smc->enable_5v3v_pin,
+			"enable_5v3v_pin", OUTPUT, OUTLEVEL_HIGH);
+		if (ret == -1)
+			pr_dbg("smc 5v3v_pin is not working, we might face some problems\n");
+#else /*CONFIG_OF*/
+		res = platform_get_resource_byname(smc->pdev,
+			IORESOURCE_MEM, buf);
+		if (!res) {
+			pr_error("cannot get resource \"%s\"\n", buf);
+		} else {
+			smc->enable_5v3v_pin = res->start;
+			_gpio_request(smc->enable_5v3v_pin,
+				SMC_ENABLE_5V3V_PIN_NAME);
+		}
+#endif /*CONFIG_OF*/
 	}
 #endif
 
-	snprintf(buf, sizeof(buf), "smc%d_clock_source", id);
-
-	ret = of_property_read_u32(smc->pdev->dev.of_node, buf, &value);
-	if (!ret) {
-		clock_source = value;
-		pr_error("%s: %d\n", buf, clock_source);
-	} else {
-		pr_error("cannot find resource \"%s\"\n", buf);
-		pr_error("using clock source default: %d\n", clock_source);
-	}
-
-	smc->detect_invert = 0;
-	snprintf(buf, sizeof(buf), "smc%d_det_invert", id);
-	ret = of_property_read_u32(smc->pdev->dev.of_node, buf, &value);
-	if (!ret) {
-		smc->detect_invert = value;
-		pr_error("%s: %d\n", buf, smc->detect_invert);
-	} else {
-		pr_error("cannot find resource \"%s\"\n", buf);
-	}
-
-	snprintf(buf, sizeof(buf), "smc%d_5v3v_pin", id);
-
-	ret = _set_gpio(smc, &smc->enable_5v3v_pin,
-			"enable_5v3v_pin", OUTPUT, OUTLEVEL_HIGH);
-	if (ret == -1)
-		pr_dbg("smc 5v3v_pin is not working,some problems\n");
-
+#if 1
 	smc->enable_5v3v_level = 0;
-	snprintf(buf, sizeof(buf), "smc%d_5v3v_level", id);
-	ret = of_property_read_u32(smc->pdev->dev.of_node, buf, &value);
-	if (!ret) {
-		smc->enable_5v3v_level = value;
-		pr_error("%s: %d\n", buf, smc->enable_5v3v_level);
-		_gpio_out(smc->enable_5v3v_pin,
-			  smc->enable_5v3v_level, SMC_ENABLE_5V3V_PIN_NAME);
-		pr_error("5v3v_pin: -->(%d)\n",
-			 (smc->enable_5v3v_level) ? 1 : 0);
-	} else {
-		pr_error("cannot find resource \"%s\"\n", buf);
+	if (1) {
+		snprintf(buf, sizeof(buf), "smc%d_5v3v_level", id);
+#ifdef CONFIG_OF
+		ret = of_property_read_u32(smc->pdev->dev.of_node, buf, &value);
+		if (!ret) {
+			smc->enable_5v3v_level = value;
+			pr_error("%s: %d\n", buf, smc->enable_5v3v_level);
+			if (smc->enable_5v3v_pin != NULL) {
+				_gpio_out(smc->enable_5v3v_pin,
+					smc->enable_5v3v_level,
+					SMC_ENABLE_5V3V_PIN_NAME);
+				pr_error("5v3v_pin: -->(%d)\n",
+					(smc->enable_5v3v_level) ? 1 : 0);
+			}
+		} else {
+			pr_error("cannot find resource \"%s\"\n", buf);
+		}
+#else /*CONFIG_OF*/
+		res = platform_get_resource_byname(smc->pdev,
+			IORESOURCE_MEM, buf);
+		if (!res)
+			pr_error("cannot get resource \"%s\"\n", buf);
+		else
+			smc->enable_5v3v_level = res->start;
+#endif /*CONFIG_OF*/
 	}
+#endif
 
 	init_waitqueue_head(&smc->rd_wq);
 	init_waitqueue_head(&smc->wr_wq);
@@ -2011,23 +2206,22 @@ static int smc_dev_init(struct smc_dev *smc, int id)
 			return -1;
 		}
 	}
-
 	request_fiq(smc->irq_num, &smc_irq_handler);
 #else
 	smc->irq_num = request_irq(smc->irq_num,
-				   smc_irq_handler,
-				   IRQF_SHARED | IRQF_TRIGGER_RISING, "smc",
-				   smc);
+			(irq_handler_t)smc_irq_handler,
+			IRQF_SHARED|IRQF_TRIGGER_RISING, "smc", smc);
 	if (smc->irq_num < 0) {
 		pr_error("request irq error!\n");
 		smc_dev_deinit(smc);
 		return -1;
 	}
+
 	tasklet_init(&smc->tasklet, smc_irq_bh_handler, (unsigned long)smc);
 #endif
 	snprintf(buf, sizeof(buf), "smc%d", smc->id);
-	smc->dev = device_create(&smc_class, NULL,
-				 MKDEV(smc_major, smc->id), smc, buf);
+	smc->dev = device_create(&smc_class,
+		NULL, MKDEV(smc_major, smc->id), smc, buf);
 	if (!smc->dev) {
 		pr_error("create device error!\n");
 		smc_dev_deinit(smc);
@@ -2104,7 +2298,7 @@ static int smc_close(struct inode *inode, struct file *filp)
 }
 
 static ssize_t smc_read(struct file *filp,
-			char __user *buff, size_t size, loff_t *ppos)
+	char __user *buff, size_t size, loff_t *ppos)
 {
 	struct smc_dev *smc = (struct smc_dev *)filp->private_data;
 	unsigned long flags;
@@ -2117,6 +2311,7 @@ static ssize_t smc_read(struct file *filp,
 
 	spin_lock_irqsave(&smc->slock, flags);
 	if (ret == 0) {
+
 		start = smc->recv_start;
 		end = smc->recv_end;
 
@@ -2125,25 +2320,25 @@ static ssize_t smc_read(struct file *filp,
 		} else if (start == end) {
 			ret = -EAGAIN;
 		} else {
-			ret = (end > start) ? (end - start) :
-			    (RECV_BUF_SIZE - start + end);
+			ret = (end > start) ? (end-start) :
+			    (RECV_BUF_SIZE-start+end);
 			if (ret > size)
 				ret = size;
 		}
 	}
 
 	if (ret > 0) {
-		int cnt = RECV_BUF_SIZE - start;
+		int cnt = RECV_BUF_SIZE-start;
 		long cr;
 
 		pr_dbg("read %d bytes\n", ret);
 		if (cnt >= ret) {
-			cr = copy_to_user(buff, smc->recv_buf + start, ret);
+			cr = copy_to_user(buff, smc->recv_buf+start, ret);
 		} else {
-			int cnt1 = ret - cnt;
+			int cnt1 = ret-cnt;
 
-			cr = copy_to_user(buff, smc->recv_buf + start, cnt);
-			cr = copy_to_user(buff + cnt, smc->recv_buf, cnt1);
+			cr = copy_to_user(buff, smc->recv_buf+start, cnt);
+			cr = copy_to_user(buff+cnt, smc->recv_buf, cnt1);
 		}
 		_atomic_wrap_add(&smc->recv_start, ret, RECV_BUF_SIZE);
 	}
@@ -2155,13 +2350,13 @@ static ssize_t smc_read(struct file *filp,
 }
 
 static ssize_t smc_write(struct file *filp,
-			 const char __user *buff, size_t size, loff_t *offp)
+	const char __user *buff, size_t size, loff_t *offp)
 {
 	struct smc_dev *smc = (struct smc_dev *)filp->private_data;
 	unsigned long flags;
 	int ret;
 	unsigned long sc_int;
-	struct SMC_INTERRUPT_REG *sc_int_reg = (void *)&sc_int;
+	struct SMC_INTERRUPT_Reg *sc_int_reg = (void *)&sc_int;
 	int start = 0, end;
 
 	ret = mutex_lock_interruptible(&smc->lock);
@@ -2171,6 +2366,7 @@ static ssize_t smc_write(struct file *filp,
 	spin_lock_irqsave(&smc->slock, flags);
 
 	if (ret == 0) {
+
 		start = smc->send_start;
 		end = smc->send_end;
 
@@ -2181,21 +2377,21 @@ static ssize_t smc_write(struct file *filp,
 		} else {
 			ret = size;
 			if (ret >= SEND_BUF_SIZE)
-				ret = SEND_BUF_SIZE - 1;
+				ret = SEND_BUF_SIZE-1;
 		}
 	}
 
 	if (ret > 0) {
-		int cnt = SEND_BUF_SIZE - start;
+		int cnt = SEND_BUF_SIZE-start;
 		long cr;
 
 		if (cnt >= ret) {
-			cr = copy_from_user(smc->send_buf + start, buff, ret);
+			cr = copy_from_user(smc->send_buf+start, buff, ret);
 		} else {
-			int cnt1 = ret - cnt;
+			int cnt1 = ret-cnt;
 
-			cr = copy_from_user(smc->send_buf + start, buff, cnt);
-			cr = copy_from_user(smc->send_buf, buff + cnt, cnt1);
+			cr = copy_from_user(smc->send_buf+start, buff, cnt);
+			cr = copy_from_user(smc->send_buf, buff+cnt, cnt1);
 		}
 		_atomic_wrap_add(&smc->send_start, ret, SEND_BUF_SIZE);
 	}
@@ -2208,7 +2404,7 @@ static ssize_t smc_write(struct file *filp,
 		sc_int_reg->recv_fifo_bytes_threshold_int_mask = 0;
 #endif
 		sc_int_reg->send_fifo_last_byte_int_mask = 1;
-		SMC_WRITE_REG(INTR, sc_int | 0x3FF);
+		SMC_WRITE_REG(INTR, sc_int|0x3FF);
 
 		pr_dbg("write %d bytes\n", ret);
 
@@ -2220,7 +2416,8 @@ static ssize_t smc_write(struct file *filp,
 	return ret;
 }
 
-static unsigned int smc_poll(struct file *filp, struct poll_table_struct *wait)
+static unsigned int smc_poll(struct file *filp,
+	struct poll_table_struct *wait)
 {
 	struct smc_dev *smc = (struct smc_dev *)filp->private_data;
 	unsigned int ret = 0;
@@ -2232,9 +2429,9 @@ static unsigned int smc_poll(struct file *filp, struct poll_table_struct *wait)
 	spin_lock_irqsave(&smc->slock, flags);
 
 	if (smc->recv_start != smc->recv_end)
-		ret |= POLLIN | POLLRDNORM;
+		ret |= POLLIN|POLLRDNORM;
 	if (smc->send_start == smc->send_end)
-		ret |= POLLOUT | POLLWRNORM;
+		ret |= POLLOUT|POLLWRNORM;
 	if (!smc->cardin)
 		ret |= POLLERR;
 
@@ -2251,82 +2448,82 @@ static long smc_ioctl(struct file *file, unsigned int cmd, ulong arg)
 
 	switch (cmd) {
 	case AMSMC_IOC_RESET:
-		{
-			ret = mutex_lock_interruptible(&smc->lock);
-			if (ret)
-				return ret;
-			ret = smc_hw_reset(smc);
-			if (ret >= 0)
-				cr = copy_to_user((void *)arg, &smc->atr,
-						  sizeof(struct am_smc_atr));
-			mutex_unlock(&smc->lock);
-		}
-		break;
+	{
+		ret = mutex_lock_interruptible(&smc->lock);
+		if (ret)
+			return ret;
+		ret = smc_hw_reset(smc);
+		if (ret >= 0)
+			cr = copy_to_user((void *)arg, &smc->atr,
+				sizeof(struct am_smc_atr));
+		mutex_unlock(&smc->lock);
+	}
+	break;
 	case AMSMC_IOC_GET_STATUS:
-		{
-			int status;
+	{
+		int status;
 
-			smc_hw_get_status(smc, &status);
-			cr = copy_to_user((void *)arg, &status, sizeof(int));
-		}
-		break;
+		smc_hw_get_status(smc, &status);
+		cr = copy_to_user((void *)arg, &status, sizeof(int));
+	}
+	break;
 	case AMSMC_IOC_ACTIVE:
-		{
-			ret = mutex_lock_interruptible(&smc->lock);
-			if (ret)
-				return ret;
+	{
+		ret = mutex_lock_interruptible(&smc->lock);
+		if (ret)
+			return ret;
 
-			ret = smc_hw_active(smc);
+		ret = smc_hw_active(smc);
 
-			mutex_unlock(&smc->lock);
-		}
-		break;
+		mutex_unlock(&smc->lock);
+	}
+	break;
 	case AMSMC_IOC_DEACTIVE:
-		{
-			ret = mutex_lock_interruptible(&smc->lock);
-			if (ret)
-				return ret;
+	{
+		ret = mutex_lock_interruptible(&smc->lock);
+		if (ret)
+			return ret;
 
-			ret = smc_hw_deactive(smc);
+		ret = smc_hw_deactive(smc);
 
-			mutex_unlock(&smc->lock);
-		}
-		break;
+		mutex_unlock(&smc->lock);
+	}
+	break;
 	case AMSMC_IOC_GET_PARAM:
-		{
-			ret = mutex_lock_interruptible(&smc->lock);
-			if (ret)
-				return ret;
-			cr = copy_to_user((void *)arg, &smc->param,
-					  sizeof(struct am_smc_param));
+	{
+		ret = mutex_lock_interruptible(&smc->lock);
+		if (ret)
+			return ret;
+		cr = copy_to_user((void *)arg, &smc->param,
+			sizeof(struct am_smc_param));
 
-			mutex_unlock(&smc->lock);
-		}
-		break;
+		mutex_unlock(&smc->lock);
+	}
+	break;
 	case AMSMC_IOC_SET_PARAM:
-		{
-			ret = mutex_lock_interruptible(&smc->lock);
-			if (ret)
-				return ret;
+	{
+		ret = mutex_lock_interruptible(&smc->lock);
+		if (ret)
+			return ret;
 
-			cr = copy_from_user(&smc->param, (void *)arg,
-					    sizeof(struct am_smc_param));
-			ret = smc_hw_set_param(smc);
+		cr = copy_from_user(&smc->param, (void *)arg,
+			sizeof(struct am_smc_param));
+		ret = smc_hw_set_param(smc);
 
-			mutex_unlock(&smc->lock);
-		}
-		break;
+		mutex_unlock(&smc->lock);
+	}
+	break;
 	default:
 		ret = -EINVAL;
-		break;
+	break;
 	}
 
 	return ret;
 }
 
 #ifdef CONFIG_COMPAT
-static long smc_ioctl_compat(struct file *filp, unsigned int cmd,
-			     unsigned long args)
+static long smc_ioctl_compat(struct file *filp,
+		unsigned int cmd, unsigned long args)
 {
 	unsigned long ret;
 
@@ -2335,6 +2532,7 @@ static long smc_ioctl_compat(struct file *filp, unsigned int cmd,
 	return ret;
 }
 #endif
+
 
 static const struct file_operations smc_fops = {
 	.owner = THIS_MODULE,
@@ -2345,7 +2543,7 @@ static const struct file_operations smc_fops = {
 	.unlocked_ioctl = smc_ioctl,
 	.poll = smc_poll,
 #ifdef CONFIG_COMPAT
-	.compat_ioctl = smc_ioctl_compat,
+	.compat_ioctl  = smc_ioctl_compat,
 #endif
 };
 
@@ -2356,19 +2554,14 @@ static int smc_probe(struct platform_device *pdev)
 
 	mutex_lock(&smc_lock);
 
-	if (smc_addr(pdev) != 0) {
-		dev_err(&pdev->dev, "get smartcard reg map fail\n");
-		mutex_unlock(&smc_lock);
-		return -1;
-	}
-
 	for (i = 0; i < SMC_DEV_COUNT; i++) {
 		if (!smc_dev[i].init) {
 			smc = &smc_dev[i];
 			break;
 		}
 	}
-	aml_smartcard_clk = devm_clk_get(&pdev->dev, "smartcard");
+	aml_smartcard_clk =
+		devm_clk_get(&pdev->dev, "smartcard");
 	if (IS_ERR_OR_NULL(aml_smartcard_clk)) {
 		dev_err(&pdev->dev, "get smartcard clk fail\n");
 		return -1;
@@ -2382,11 +2575,7 @@ static int smc_probe(struct platform_device *pdev)
 		if (ret < 0)
 			smc = NULL;
 	}
-	if (smc) {
-		ret = sysfs_create_group(&pdev->dev.kobj, &smc_attribute_group);
-		if (ret)
-			pr_error("sysfs_create_group fail\n");
-	}
+
 	mutex_unlock(&smc_lock);
 
 	return smc ? 0 : -1;
@@ -2400,21 +2589,19 @@ static int smc_remove(struct platform_device *pdev)
 
 	smc_dev_deinit(smc);
 
-	sysfs_remove_group(&pdev->dev.kobj, &smc_attribute_group);
-
 	mutex_unlock(&smc_lock);
 
 	return 0;
 }
 
 static struct platform_driver smc_driver = {
-	.probe = smc_probe,
-	.remove = smc_remove,
-	.driver = {
-		   .name = "amlogic-smc",
-		   .owner = THIS_MODULE,
-		   .of_match_table = smc_dt_match,
-		   },
+	.probe		 = smc_probe,
+	.remove		 = smc_remove,
+	.driver		 = {
+		.name	 = "amlogic-smc",
+		.owner	 = THIS_MODULE,
+		.of_match_table = smc_dt_match,
+	},
 };
 
 static int __init smc_mod_init(void)

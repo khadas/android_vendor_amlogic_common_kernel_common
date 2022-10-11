@@ -1,8 +1,11 @@
-// SPDX-License-Identifier: GPL-2.0-only
 /*
  *  linux/arch/arm/mm/mmu.c
  *
  *  Copyright (C) 1995-2005 Russell King
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
  */
 #include <linux/module.h>
 #include <linux/kernel.h>
@@ -29,18 +32,18 @@
 #include <asm/traps.h>
 #include <asm/procinfo.h>
 #include <asm/memory.h>
-#include <asm/kasan_def.h>
 
 #include <asm/mach/arch.h>
 #include <asm/mach/map.h>
 #include <asm/mach/pci.h>
 #include <asm/fixmap.h>
+#ifdef CONFIG_AMLOGIC_KASAN32
+#include <asm/kasan.h>
+#endif
 
 #include "fault.h"
 #include "mm.h"
 #include "tcm.h"
-
-extern unsigned long __atags_pointer;
 
 /*
  * empty_zero_page is a special page that is used for
@@ -86,8 +89,6 @@ struct cachepolicy {
 #else
 #define s2_policy(policy)	0
 #endif
-
-unsigned long kimage_voffset __ro_after_init;
 
 static struct cachepolicy cache_policies[] __initdata = {
 	{
@@ -416,11 +417,6 @@ void __set_fixmap(enum fixed_addresses idx, phys_addr_t phys, pgprot_t prot)
 		     FIXADDR_END);
 	BUG_ON(idx >= __end_of_fixed_addresses);
 
-	/* we only support device mappings until pgprot_kernel has been set */
-	if (WARN_ON(pgprot_val(prot) != pgprot_val(FIXMAP_PAGE_IO) &&
-		    pgprot_val(pgprot_kernel) == 0))
-		return;
-
 	if (pgprot_val(prot))
 		set_pte_at(NULL, vaddr, pte,
 			pfn_pte(phys >> PAGE_SHIFT, prot));
@@ -719,22 +715,23 @@ EXPORT_SYMBOL(phys_mem_access_prot);
 
 #define vectors_base()	(vectors_high() ? 0xffff0000 : 0)
 
+static void __init *early_alloc_aligned(unsigned long sz, unsigned long align)
+{
+	void *ptr = __va(memblock_alloc(sz, align));
+	memset(ptr, 0, sz);
+	return ptr;
+}
+
 static void __init *early_alloc(unsigned long sz)
 {
-	void *ptr = memblock_alloc(sz, sz);
-
-	if (!ptr)
-		panic("%s: Failed to allocate %lu bytes align=0x%lx\n",
-		      __func__, sz, sz);
-
-	return ptr;
+	return early_alloc_aligned(sz, sz);
 }
 
 static void *__init late_alloc(unsigned long sz)
 {
-	void *ptr = (void *)__get_free_pages(GFP_PGTABLE_KERNEL, get_order(sz));
+	void *ptr = (void *)__get_free_pages(PGALLOC_GFP, get_order(sz));
 
-	if (!ptr || !pgtable_pte_page_ctor(virt_to_page(ptr)))
+	if (!ptr || !pgtable_page_ctor(virt_to_page(ptr)))
 		BUG();
 	return ptr;
 }
@@ -957,7 +954,11 @@ static void __init __create_mapping(struct mm_struct *mm, struct map_desc *md,
  * offsets, and we take full advantage of sections and
  * supersections.
  */
+#ifdef CONFIG_AMLOGIC_KASAN32
+void __init create_mapping(struct map_desc *md)
+#else
 static void __init create_mapping(struct map_desc *md)
+#endif
 {
 	if (md->virtual != vectors_base() && md->virtual < TASK_SIZE) {
 		pr_warn("BUG: not creating mapping for 0x%08llx at 0x%08lx in user region\n",
@@ -965,7 +966,7 @@ static void __init create_mapping(struct map_desc *md)
 		return;
 	}
 
-	if (md->type == MT_DEVICE &&
+	if ((md->type == MT_DEVICE || md->type == MT_ROM) &&
 	    md->virtual >= PAGE_OFFSET && md->virtual < FIXADDR_START &&
 	    (md->virtual < VMALLOC_START || md->virtual >= VMALLOC_END)) {
 		pr_warn("BUG: mapping for 0x%08llx at 0x%08lx out of vmalloc space\n",
@@ -999,10 +1000,7 @@ void __init iotable_init(struct map_desc *io_desc, int nr)
 	if (!nr)
 		return;
 
-	svm = memblock_alloc(sizeof(*svm) * nr, __alignof__(*svm));
-	if (!svm)
-		panic("%s: Failed to allocate %zu bytes align=0x%zx\n",
-		      __func__, sizeof(*svm) * nr, __alignof__(*svm));
+	svm = early_alloc_aligned(sizeof(*svm) * nr, __alignof__(*svm));
 
 	for (md = io_desc; nr; md++, nr--) {
 		create_mapping(md);
@@ -1024,10 +1022,7 @@ void __init vm_reserve_area_early(unsigned long addr, unsigned long size,
 	struct vm_struct *vm;
 	struct static_vm *svm;
 
-	svm = memblock_alloc(sizeof(*svm), __alignof__(*svm));
-	if (!svm)
-		panic("%s: Failed to allocate %zu bytes align=0x%zx\n",
-		      __func__, sizeof(*svm), __alignof__(*svm));
+	svm = early_alloc_aligned(sizeof(*svm), __alignof__(*svm));
 
 	vm = &svm->vm;
 	vm->addr = (void *)addr;
@@ -1133,6 +1128,7 @@ void __init debug_ll_io_init(void)
 }
 #endif
 
+#ifndef CONFIG_AMLOGIC_KASAN32
 static void * __initdata vmalloc_min =
 	(void *)(VMALLOC_END - (240 << 20) - VMALLOC_OFFSET);
 
@@ -1161,6 +1157,7 @@ static int __init early_vmalloc(char *arg)
 	return 0;
 }
 early_param("vmalloc", early_vmalloc);
+#endif
 
 phys_addr_t arm_lowmem_limit __initdata = 0;
 
@@ -1178,7 +1175,11 @@ void __init adjust_lowmem_bounds(void)
 	 * and may itself be outside the valid range for which phys_addr_t
 	 * and therefore __pa() is defined.
 	 */
+#ifdef CONFIG_AMLOGIC_KASAN32
+	vmalloc_limit = (u64)(KMEM_END - PAGE_OFFSET + PHYS_OFFSET);
+#else
 	vmalloc_limit = (u64)(uintptr_t)vmalloc_min - PAGE_OFFSET + PHYS_OFFSET;
+#endif
 
 	/*
 	 * The first usable region must be PMD aligned. Mark its start
@@ -1275,21 +1276,15 @@ static inline void prepare_page_table(void)
 	/*
 	 * Clear out all the mappings below the kernel image.
 	 */
-#ifdef CONFIG_KASAN
-	/*
-	 * KASan's shadow memory inserts itself between the TASK_SIZE
-	 * and MODULES_VADDR. Do not clear the KASan shadow memory mappings.
-	 */
-	for (addr = 0; addr < KASAN_SHADOW_START; addr += PMD_SIZE)
-		pmd_clear(pmd_off_k(addr));
-	/*
-	 * Skip over the KASan shadow area. KASAN_SHADOW_END is sometimes
-	 * equal to MODULES_VADDR and then we exit the pmd clearing. If we
-	 * are using a thumb-compiled kernel, there there will be 8MB more
-	 * to clear as KASan always offset to 16 MB below MODULES_VADDR.
-	 */
-	for (addr = KASAN_SHADOW_END; addr < MODULES_VADDR; addr += PMD_SIZE)
-		pmd_clear(pmd_off_k(addr));
+#ifdef CONFIG_AMLOGIC_KASAN32
+	for (addr = 0; addr < MODULES_VADDR; addr += PMD_SIZE) {
+		/*
+		 * keep pre-initialized kasan shadow memory MMU before
+		 * kasan really eanbled
+		 */
+		if (addr < KASAN_SHADOW_START || addr >= KASAN_SHADOW_END)
+			pmd_clear(pmd_off_k(addr));
+	}
 #else
 	for (addr = 0; addr < MODULES_VADDR; addr += PMD_SIZE)
 		pmd_clear(pmd_off_k(addr));
@@ -1369,17 +1364,16 @@ static void __init devicemaps_init(const struct machine_desc *mdesc)
 	/*
 	 * Clear page table except top pmd used by early fixmaps
 	 */
+#ifdef CONFIG_AMLOGIC_KASAN32
+	/* we have adjusted memory map layout */
+	for (addr =  VMALLOC_START;
+	     addr <  (PAGE_OFFSET & PMD_MASK);
+	     addr += PMD_SIZE)
+		pmd_clear(pmd_off_k(addr));
+#else
 	for (addr = VMALLOC_START; addr < (FIXADDR_TOP & PMD_MASK); addr += PMD_SIZE)
 		pmd_clear(pmd_off_k(addr));
-
-	if (__atags_pointer) {
-		/* create a read-only mapping of the device tree */
-		map.pfn = __phys_to_pfn(__atags_pointer & SECTION_MASK);
-		map.virtual = FDT_FIXED_BASE;
-		map.length = FDT_FIXED_SIZE;
-		map.type = MT_ROM;
-		create_mapping(&map);
-	}
+#endif
 
 	/*
 	 * Map the kernel if it is XIP.
@@ -1479,7 +1473,11 @@ static void __init kmap_init(void)
 static void __init map_lowmem(void)
 {
 	struct memblock_region *reg;
-	phys_addr_t kernel_x_start = round_down(__pa(KERNEL_START), SECTION_SIZE);
+#ifdef CONFIG_XIP_KERNEL
+	phys_addr_t kernel_x_start = round_down(__pa(_sdata), SECTION_SIZE);
+#else
+	phys_addr_t kernel_x_start = round_down(__pa(_stext), SECTION_SIZE);
+#endif
 	phys_addr_t kernel_x_end = round_up(__pa(__init_end), SECTION_SIZE);
 
 	/* Map all the lowmem memory banks. */
@@ -1541,19 +1539,21 @@ static void __init map_lowmem(void)
 }
 
 #ifdef CONFIG_ARM_PV_FIXUP
-typedef void pgtables_remap(long long offset, unsigned long pgd);
+extern unsigned long __atags_pointer;
+typedef void pgtables_remap(long long offset, unsigned long pgd, void *bdata);
 pgtables_remap lpae_pgtables_remap_asm;
 
 /*
  * early_paging_init() recreates boot time page table setup, allowing machines
  * to switch over to a high (>4G) address space on LPAE systems
  */
-static void __init early_paging_init(const struct machine_desc *mdesc)
+void __init early_paging_init(const struct machine_desc *mdesc)
 {
 	pgtables_remap *lpae_pgtables_remap;
 	unsigned long pa_pgd;
 	unsigned int cr, ttbcr;
 	long long offset;
+	void *boot_data;
 
 	if (!mdesc->pv_fixup)
 		return;
@@ -1570,6 +1570,7 @@ static void __init early_paging_init(const struct machine_desc *mdesc)
 	 */
 	lpae_pgtables_remap = (pgtables_remap *)(unsigned long)__pa(lpae_pgtables_remap_asm);
 	pa_pgd = __pa(swapper_pg_dir);
+	boot_data = __va(__atags_pointer);
 	barrier();
 
 	pr_info("Switching physical address space to 0x%08llx\n",
@@ -1605,7 +1606,7 @@ static void __init early_paging_init(const struct machine_desc *mdesc)
 	 * needs to be assembly.  It's fairly simple, as we're using the
 	 * temporary tables setup by the initial assembly code.
 	 */
-	lpae_pgtables_remap(offset, pa_pgd);
+	lpae_pgtables_remap(offset, pa_pgd, boot_data);
 
 	/* Re-enable the caches and cacheable TLB walks */
 	asm volatile("mcr p15, 0, %0, c2, c0, 2" : : "r" (ttbcr));
@@ -1614,7 +1615,7 @@ static void __init early_paging_init(const struct machine_desc *mdesc)
 
 #else
 
-static void __init early_paging_init(const struct machine_desc *mdesc)
+void __init early_paging_init(const struct machine_desc *mdesc)
 {
 	long long offset;
 
@@ -1670,6 +1671,7 @@ void __init paging_init(const struct machine_desc *mdesc)
 {
 	void *zero_page;
 
+	build_mem_type_table();
 	prepare_page_table();
 	map_lowmem();
 	memblock_set_current_limit(arm_lowmem_limit);
@@ -1688,13 +1690,44 @@ void __init paging_init(const struct machine_desc *mdesc)
 
 	empty_zero_page = virt_to_page(zero_page);
 	__flush_dcache_page(NULL, empty_zero_page);
-
-	/* Compute the virt/idmap offset, mostly for the sake of KVM */
-	kimage_voffset = (unsigned long)&kimage_voffset - virt_to_idmap(&kimage_voffset);
 }
 
-void __init early_mm_init(const struct machine_desc *mdesc)
+#ifdef CONFIG_AMLOGIC_MODIFY
+unsigned long notrace phys_check(phys_addr_t x)
 {
-	build_mem_type_table();
-	early_paging_init(mdesc);
+	unsigned long addr;
+
+	addr = x - PHYS_OFFSET + PAGE_OFFSET;
+#ifndef CONFIG_AMLOGIC_KASAN32
+	if (scheduler_running) {
+		struct page *page;
+		page = phys_to_page(x);
+
+		/*
+		 * if physical address is not in linear mapping range,
+		 * then this will cause BUG
+		 */
+		if (is_vmalloc_or_module_addr((const void *)addr) ||
+		    PageHighMem(page)) {
+			pr_err("BAD USING of phys_to_virt, addr:%x, page:%lx\n",
+				x, page_to_pfn(page));
+			dump_stack();
+		}
+	}
+#endif
+	return addr;
 }
+EXPORT_SYMBOL(phys_check);
+
+unsigned long notrace virt_check(unsigned long x)
+{
+#ifndef CONFIG_AMLOGIC_KASAN32
+	if (scheduler_running && (x >= VMALLOC_START || x < PAGE_OFFSET)) {
+		pr_err("bad input of virt:%lx\n", x);
+		dump_stack();
+	}
+#endif
+	return (phys_addr_t)x - PAGE_OFFSET + PHYS_OFFSET;
+}
+EXPORT_SYMBOL(virt_check);
+#endif

@@ -1,6 +1,18 @@
-/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * include/linux/amlogic/media/video_sink/video_signal_notify.h
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
 #ifndef VIDEO_SIGNAL_NOTIFY_H
@@ -18,6 +30,7 @@ enum vd_format_e {
 	SIGNAL_HLG = 2,
 	SIGNAL_HDR10PLUS = 3,
 	SIGNAL_DOVI = 4,
+	SIGNAL_CUVA = 5,
 };
 
 struct vd_signal_info_s {

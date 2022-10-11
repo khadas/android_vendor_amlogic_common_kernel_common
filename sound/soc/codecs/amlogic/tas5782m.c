@@ -1,11 +1,19 @@
-// SPDX-License-Identifier: GPL-2.0
 /*
- * ALSA SoC Amlogic t9015c interenl codec driver
+ * sound/soc/codecs/amlogic/tas5782m.c
  *
- * Copyright (C) 2019 Amlogic,inc
+ * Copyright (C) 2019 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
  *
  */
-
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/delay.h>
@@ -16,7 +24,7 @@
 #include <sound/pcm_params.h>
 #include <sound/soc.h>
 #include <sound/tlv.h>
-#include "tas57xx.h"
+#include <sound/tas57xx.h>
 #include <linux/amlogic/aml_gpio_consumer.h>
 
 #include "tas5782m.h"
@@ -51,6 +59,8 @@ static void tas5782m_late_resume(struct early_suspend *h);
 #define TAS5782M_REG_3D      (0x3D)
 #define TAS5782M_REG_3E      (0x3E)
 
+
+
 enum BITSIZE_MODE {
 	BITSIZE_MODE_16BITS = 0,
 	BITSIZE_MODE_20BITS = 1,
@@ -62,7 +72,7 @@ enum BITSIZE_MODE {
 struct tas5782m_priv {
 	struct i2c_client *i2c;
 	struct regmap *regmap;
-	struct snd_soc_component *component;
+	struct snd_soc_codec *codec;
 	struct tas57xx_platform_data *pdata;
 	struct work_struct work;
 
@@ -74,10 +84,10 @@ struct tas5782m_priv {
 	const char **eq_conf_texts;
 	int eq_cfg;
 	struct soc_enum eq_conf_enum;
-	unsigned char ch1_vol;
-	unsigned char ch2_vol;
-	unsigned char ch1_mute;
-	unsigned char ch2_mute;
+	unsigned char Ch1_vol;
+	unsigned char Ch2_vol;
+	unsigned char Ch1_mute;
+	unsigned char Ch2_mute;
 	unsigned char master_vol;
 	unsigned int mclk;
 	unsigned int EQ_enum_value;
@@ -119,6 +129,7 @@ static int tas5782m_ch2_vol_info(struct snd_kcontrol *kcontrol,
 	return 0;
 }
 
+
 static int tas5782m_ch1_mute_info(struct snd_kcontrol *kcontrol,
 				struct snd_ctl_elem_info *uinfo)
 {
@@ -149,13 +160,15 @@ static int tas5782m_ch2_mute_info(struct snd_kcontrol *kcontrol,
 	return 0;
 }
 
+
+
 static int tas5782m_ch1_vol_get(struct snd_kcontrol *kcontrol,
 				struct snd_ctl_elem_value *ucontrol)
 {
-	struct snd_soc_component *component = snd_kcontrol_chip(kcontrol);
-	struct tas5782m_priv *tas5782m = snd_soc_component_get_drvdata(component);
+	struct snd_soc_codec *codec = snd_soc_kcontrol_codec(kcontrol);
+	struct tas5782m_priv *tas5782m = snd_soc_codec_get_drvdata(codec);
 
-	ucontrol->value.integer.value[0] = tas5782m->ch1_vol;
+	ucontrol->value.integer.value[0] = tas5782m->Ch1_vol;
 
 	return 0;
 }
@@ -163,21 +176,22 @@ static int tas5782m_ch1_vol_get(struct snd_kcontrol *kcontrol,
 static int tas5782m_ch2_vol_get(struct snd_kcontrol *kcontrol,
 				struct snd_ctl_elem_value *ucontrol)
 {
-	struct snd_soc_component *component = snd_kcontrol_chip(kcontrol);
-	struct tas5782m_priv *tas5782m = snd_soc_component_get_drvdata(component);
+	struct snd_soc_codec *codec = snd_soc_kcontrol_codec(kcontrol);
+	struct tas5782m_priv *tas5782m = snd_soc_codec_get_drvdata(codec);
 
-	ucontrol->value.integer.value[0] = tas5782m->ch2_vol;
+	ucontrol->value.integer.value[0] = tas5782m->Ch2_vol;
 
 	return 0;
 }
 
+
 static int tas5782m_ch1_mute_get(struct snd_kcontrol *kcontrol,
 				struct snd_ctl_elem_value *ucontrol)
 {
-	struct snd_soc_component *component = snd_kcontrol_chip(kcontrol);
-	struct tas5782m_priv *tas5782m = snd_soc_component_get_drvdata(component);
+	struct snd_soc_codec *codec = snd_soc_kcontrol_codec(kcontrol);
+	struct tas5782m_priv *tas5782m = snd_soc_codec_get_drvdata(codec);
 
-	ucontrol->value.integer.value[0] = tas5782m->ch1_mute;
+	ucontrol->value.integer.value[0] = tas5782m->Ch1_mute;
 
 	return 0;
 }
@@ -185,20 +199,21 @@ static int tas5782m_ch1_mute_get(struct snd_kcontrol *kcontrol,
 static int tas5782m_ch2_mute_get(struct snd_kcontrol *kcontrol,
 				struct snd_ctl_elem_value *ucontrol)
 {
-	struct snd_soc_component *component = snd_kcontrol_chip(kcontrol);
-	struct tas5782m_priv *tas5782m = snd_soc_component_get_drvdata(component);
+	struct snd_soc_codec *codec = snd_soc_kcontrol_codec(kcontrol);
+	struct tas5782m_priv *tas5782m = snd_soc_codec_get_drvdata(codec);
 
-	ucontrol->value.integer.value[0] = tas5782m->ch2_mute;
+	ucontrol->value.integer.value[0] = tas5782m->Ch2_mute;
 
 	return 0;
 }
 
-static void tas5782m_set_volume(struct snd_soc_component *component,
+
+static void tas5782m_set_volume(struct snd_soc_codec *codec,
 				int value, int ch_num)
 {
 	unsigned char buf[2];
 	int write_count = 0;
-	struct tas5782m_priv *tas5782m = snd_soc_component_get_drvdata(component);
+	struct tas5782m_priv *tas5782m = snd_soc_codec_get_drvdata(codec);
 
 	if (value < 0)
 		value = 0;
@@ -229,19 +244,20 @@ static void tas5782m_set_volume(struct snd_soc_component *component,
 	if (write_count != i2c_master_send(tas5782m->i2c, buf, write_count))
 		pr_err("%s %d !!!!! i2c_master_send error !!!!!\n",
 				__func__, __LINE__);
+
 }
 
 static int tas5782m_ch1_vol_put(struct snd_kcontrol *kcontrol,
 				struct snd_ctl_elem_value *ucontrol)
 {
-	struct snd_soc_component *component = snd_kcontrol_chip(kcontrol);
-	struct tas5782m_priv *tas5782m = snd_soc_component_get_drvdata(component);
+	struct snd_soc_codec *codec = snd_soc_kcontrol_codec(kcontrol);
+	struct tas5782m_priv *tas5782m = snd_soc_codec_get_drvdata(codec);
 	int value;
 
 	value = ucontrol->value.integer.value[0];
-	tas5782m->ch1_vol = value;
+	tas5782m->Ch1_vol = value;
 	value = 255 - value;
-	tas5782m_set_volume(component, value, 0);
+	tas5782m_set_volume(codec, value, 0);
 
 	return 0;
 }
@@ -249,25 +265,26 @@ static int tas5782m_ch1_vol_put(struct snd_kcontrol *kcontrol,
 static int tas5782m_ch2_vol_put(struct snd_kcontrol *kcontrol,
 				struct snd_ctl_elem_value *ucontrol)
 {
-	struct snd_soc_component *component = snd_kcontrol_chip(kcontrol);
-	struct tas5782m_priv *tas5782m = snd_soc_component_get_drvdata(component);
+	struct snd_soc_codec *codec = snd_soc_kcontrol_codec(kcontrol);
+	struct tas5782m_priv *tas5782m = snd_soc_codec_get_drvdata(codec);
 	int value;
 
 	value = ucontrol->value.integer.value[0];
-	tas5782m->ch2_vol = value;
+	tas5782m->Ch2_vol = value;
 	value = 255 - value;
-	tas5782m_set_volume(component, value, 1);
+	tas5782m_set_volume(codec, value, 1);
 
 	return 0;
 }
 
-static void tas5782m_set_mute(struct snd_soc_component *component,
+static void tas5782m_set_mute(struct snd_soc_codec *codec,
 				unsigned char left_mute,
 				unsigned char right_mute)
 {
 	unsigned char buf[2];
 	int write_count = 0;
-	struct tas5782m_priv *tas5782m = snd_soc_component_get_drvdata(component);
+	struct tas5782m_priv *tas5782m = snd_soc_codec_get_drvdata(codec);
+
 
 	buf[0] = TAS5782M_REG_00, buf[1] = 0x00;
 	write_count = 2;
@@ -293,18 +310,20 @@ static void tas5782m_set_mute(struct snd_soc_component *component,
 	if (write_count != i2c_master_send(tas5782m->i2c, buf, write_count))
 		pr_err("%s %d !!!!! i2c_master_send error !!!!!\n",
 				__func__, __LINE__);
+
 }
+
 
 static int tas5782m_ch1_mute_set(struct snd_kcontrol *kcontrol,
 				struct snd_ctl_elem_value *ucontrol)
 {
-	struct snd_soc_component *component = snd_kcontrol_chip(kcontrol);
-	struct tas5782m_priv *tas5782m = snd_soc_component_get_drvdata(component);
+	struct snd_soc_codec *codec = snd_soc_kcontrol_codec(kcontrol);
+	struct tas5782m_priv *tas5782m = snd_soc_codec_get_drvdata(codec);
 	int value;
 
 	value = ucontrol->value.integer.value[0];
-	tas5782m->ch1_mute = value;
-	tas5782m_set_mute(component, tas5782m->ch1_mute, tas5782m->ch2_mute);
+	tas5782m->Ch1_mute = value;
+	tas5782m_set_mute(codec, tas5782m->Ch1_mute, tas5782m->Ch2_mute);
 
 	return 0;
 }
@@ -312,16 +331,18 @@ static int tas5782m_ch1_mute_set(struct snd_kcontrol *kcontrol,
 static int tas5782m_ch2_mute_set(struct snd_kcontrol *kcontrol,
 				struct snd_ctl_elem_value *ucontrol)
 {
-	struct snd_soc_component *component = snd_kcontrol_chip(kcontrol);
-	struct tas5782m_priv *tas5782m = snd_soc_component_get_drvdata(component);
+	struct snd_soc_codec *codec = snd_soc_kcontrol_codec(kcontrol);
+	struct tas5782m_priv *tas5782m = snd_soc_codec_get_drvdata(codec);
 	int value;
 
 	value = ucontrol->value.integer.value[0];
-	tas5782m->ch2_mute = value;
-	tas5782m_set_mute(component, tas5782m->ch1_mute, tas5782m->ch2_mute);
+	tas5782m->Ch2_mute = value;
+	tas5782m_set_mute(codec, tas5782m->Ch1_mute, tas5782m->Ch2_mute);
 
 	return 0;
 }
+
+
 
 static const struct snd_kcontrol_new tas5782m_snd_controls[] = {
 	{
@@ -363,6 +384,7 @@ static int tas5782m_set_dai_sysclk(struct snd_soc_dai *codec_dai,
 
 static int tas5782m_set_dai_fmt(struct snd_soc_dai *codec_dai, unsigned int fmt)
 {
+
 	switch (fmt & SND_SOC_DAIFMT_MASTER_MASK) {
 	case SND_SOC_DAIFMT_CBS_CFS:
 		break;
@@ -404,7 +426,7 @@ static int tas5782m_hw_params(struct snd_pcm_substream *substream,
 	case SNDRV_PCM_FORMAT_S24_LE:
 	case SNDRV_PCM_FORMAT_S24_BE:
 		pr_debug("24bit\n");
-	/* go through */
+	/* fall through */
 	case SNDRV_PCM_FORMAT_S32_LE:
 	case SNDRV_PCM_FORMAT_S20_3LE:
 	case SNDRV_PCM_FORMAT_S20_3BE:
@@ -423,7 +445,7 @@ static int tas5782m_hw_params(struct snd_pcm_substream *substream,
 	return 0;
 }
 
-static int tas5782m_set_bias_level(struct snd_soc_component *component,
+static int tas5782m_set_bias_level(struct snd_soc_codec *codec,
 				enum snd_soc_bias_level level)
 {
 	pr_debug("level = %d\n", level);
@@ -443,7 +465,7 @@ static int tas5782m_set_bias_level(struct snd_soc_component *component,
 		/* The chip runs through the power down sequence for us. */
 		break;
 	}
-	component->dapm.bias_level = level;
+	codec->component.dapm.bias_level = level;
 
 	return 0;
 }
@@ -466,16 +488,17 @@ static struct snd_soc_dai_driver tas5782m_dai = {
 	.ops = &tas5782m_dai_ops,
 };
 
-static int reset_tas5782m_GPIO(struct snd_soc_component *component)
+
+static int reset_tas5782m_GPIO(struct snd_soc_codec *codec)
 {
-	struct tas5782m_priv *tas5782m = snd_soc_component_get_drvdata(component);
+	struct tas5782m_priv *tas5782m = snd_soc_codec_get_drvdata(codec);
 	struct tas57xx_platform_data *pdata = tas5782m->pdata;
 	int ret = 0;
 
 	if (pdata->reset_pin < 0)
 		return 0;
 
-	ret = devm_gpio_request_one(component->dev, pdata->reset_pin,
+	ret = devm_gpio_request_one(codec->dev, pdata->reset_pin,
 				GPIOF_OUT_INIT_LOW, "tas5782m-reset-pin");
 
 	if (ret < 0) {
@@ -484,18 +507,18 @@ static int reset_tas5782m_GPIO(struct snd_soc_component *component)
 	}
 
 	gpio_direction_output(pdata->reset_pin, GPIOF_OUT_INIT_HIGH);
-	usleep_range(900, 1100);
+	udelay(1000);
 	gpio_direction_output(pdata->reset_pin, GPIOF_OUT_INIT_LOW);
-	usleep_range(900, 1100);
+	udelay(1000);
 	gpio_direction_output(pdata->reset_pin, GPIOF_OUT_INIT_HIGH);
 	msleep(20);
 
 	return 0;
 }
 
-static int tas5782m_init_i2s_tdm_mode(struct snd_soc_component *component, int bit_size)
+static int tas5782m_init_i2s_tdm_mode(struct snd_soc_codec *codec, int bit_size)
 {
-	struct tas5782m_priv *tas5782m = snd_soc_component_get_drvdata(component);
+	struct tas5782m_priv *tas5782m = snd_soc_codec_get_drvdata(codec);
 	int work_mod = tas5782m->work_mode;
 
 	int tdm_aofs = 0;
@@ -585,7 +608,7 @@ static int tas5782m_init_i2s_tdm_mode(struct snd_soc_component *component, int b
 static void tas5782m_init_func(struct work_struct *p_work)
 {
 	struct tas5782m_priv *tas5782m;
-	struct snd_soc_component *component;
+	struct snd_soc_codec *codec;
 	struct i2c_client *i2c;
 	int i = 0, j = 0, k = 0;
 	int value_count;
@@ -593,15 +616,16 @@ static void tas5782m_init_func(struct work_struct *p_work)
 	int write_count = 0;
 	int data_row = 0;
 
-	tas5782m = container_of(p_work, struct tas5782m_priv, work);
+	tas5782m = container_of(
+				p_work, struct tas5782m_priv, work);
 
-	component = tas5782m->component;
+	codec = tas5782m->codec;
 
-	reset_tas5782m_GPIO(component);
+	reset_tas5782m_GPIO(codec);
 
 	//init register
-	tas5782m = snd_soc_component_get_drvdata(component);
-	dev_info(component->dev, "tas5782m_init id=%d\n", tas5782m->chip_offset);
+	tas5782m = snd_soc_codec_get_drvdata(codec);
+	dev_info(codec->dev, "tas5782m_init id=%d\n", tas5782m->chip_offset);
 
 	i2c = tas5782m->i2c;
 	value_count = ARRAY_SIZE(tas5782m_reg_defaults);
@@ -624,9 +648,9 @@ static void tas5782m_init_func(struct work_struct *p_work)
 			j = 0, k = 0;
 			for (k = 0; k < data_row; k++) {
 				buf[j++] =
-					tas5782m_reg_defaults[i + k].reg;
+					tas5782m_reg_defaults[i+k].reg;
 				buf[j++] =
-					tas5782m_reg_defaults[i + k].def;
+					tas5782m_reg_defaults[i+k].def;
 			}
 
 			i += data_row;
@@ -646,15 +670,15 @@ static void tas5782m_init_func(struct work_struct *p_work)
 		}
 	}
 
-	tas5782m_init_i2s_tdm_mode(component, g_sample_bitsize);
+	tas5782m_init_i2s_tdm_mode(codec, g_sample_bitsize);
 
-	tas5782m_set_mute(component, tas5782m->ch1_mute, tas5782m->ch2_mute);
+	tas5782m_set_mute(codec, tas5782m->Ch1_mute, tas5782m->Ch2_mute);
 
-	tas5782m_set_volume(component, 255 - tas5782m->ch1_vol, 0);
-	tas5782m_set_volume(component, 255 - tas5782m->ch2_vol, 1);
+	tas5782m_set_volume(codec, 255-tas5782m->Ch1_vol, 0);
+	tas5782m_set_volume(codec, 255-tas5782m->Ch2_vol, 1);
 }
 
-static int tas5782m_probe(struct snd_soc_component *component)
+static int tas5782m_probe(struct snd_soc_codec *codec)
 {
 	struct tas5782m_priv *tas5782m;
 
@@ -662,17 +686,17 @@ static int tas5782m_probe(struct snd_soc_component *component)
 	tas5782m->early_suspend.level = EARLY_SUSPEND_LEVEL_BLANK_SCREEN;
 	tas5782m->early_suspend.suspend = tas5782m_early_suspend;
 	tas5782m->early_suspend.resume = tas5782m_late_resume;
-	tas5782m->early_suspend.param = component;
-	register_early_suspend(&tas5782m->early_suspend);
+	tas5782m->early_suspend.param = codec;
+	register_early_suspend(&(tas5782m->early_suspend));
 #endif
 
-	tas5782m = snd_soc_component_get_drvdata(component);
-	tas5782m->component = component;
+	tas5782m = snd_soc_codec_get_drvdata(codec);
+	tas5782m->codec = codec;
 
-	tas5782m->ch1_mute = 0;
-	tas5782m->ch2_mute = 0;
-	tas5782m->ch1_vol = 0;
-	tas5782m->ch2_vol = 0;
+	tas5782m->Ch1_mute = 0;
+	tas5782m->Ch2_mute = 0;
+	tas5782m->Ch1_vol = 0;
+	tas5782m->Ch2_vol = 0;
 
 	INIT_WORK(&tas5782m->work, tas5782m_init_func);
 	schedule_work(&tas5782m->work);
@@ -680,26 +704,28 @@ static int tas5782m_probe(struct snd_soc_component *component)
 	return 0;
 }
 
-static void tas5782m_remove(struct snd_soc_component *component)
+static int tas5782m_remove(struct snd_soc_codec *codec)
 {
 	struct tas5782m_priv *tas5782m;
 
 #ifdef CONFIG_HAS_EARLYSUSPEND
-	struct tas5782m_priv *tas5782m = snd_soc_component_get_drvdata(component);
+	struct tas5782m_priv *tas5782m = snd_soc_codec_get_drvdata(codec);
 
-	unregister_early_suspend(&tas5782m->early_suspend);
+	unregister_early_suspend(&(tas5782m->early_suspend));
 #endif
-	tas5782m = snd_soc_component_get_drvdata(component);
+	tas5782m = snd_soc_codec_get_drvdata(codec);
 
 	cancel_work_sync(&tas5782m->work);
+
+	return 0;
 }
 
 #ifdef CONFIG_PM
-static int tas5782m_suspend(struct snd_soc_component *component)
+static int tas5782m_suspend(struct snd_soc_codec *codec)
 {
-	struct tas57xx_platform_data *pdata = dev_get_platdata(component->dev);
+	struct tas57xx_platform_data *pdata = dev_get_platdata(codec->dev);
 
-	dev_info(component->dev, "%s!\n", __func__);
+	dev_info(codec->dev, "tas5782m_suspend!\n");
 
 	if (pdata && pdata->suspend_func)
 		pdata->suspend_func();
@@ -707,21 +733,22 @@ static int tas5782m_suspend(struct snd_soc_component *component)
 	return 0;
 }
 
-static int tas5782m_resume(struct snd_soc_component *component)
+static int tas5782m_resume(struct snd_soc_codec *codec)
 {
-	struct tas57xx_platform_data *pdata = dev_get_platdata(component->dev);
+	struct tas57xx_platform_data *pdata = dev_get_platdata(codec->dev);
 	struct tas5782m_priv *tas5782m;
 
-	dev_info(component->dev, "%s!\n", __func__);
+	dev_info(codec->dev, "tas5782m_resume!\n");
 
 	if (pdata && pdata->resume_func)
 		pdata->resume_func();
 
-	tas5782m = snd_soc_component_get_drvdata(component);
-	tas5782m->component = component;
+	tas5782m = snd_soc_codec_get_drvdata(codec);
+	tas5782m->codec = codec;
 
 	INIT_WORK(&tas5782m->work, tas5782m_init_func);
 	schedule_work(&tas5782m->work);
+
 
 	return 0;
 }
@@ -741,7 +768,7 @@ static const struct snd_soc_dapm_widget tas5782m_dapm_widgets[] = {
 	SND_SOC_DAPM_DAC("DAC", "HIFI Playback", SND_SOC_NOPM, 0, 0),
 };
 
-static const struct snd_soc_component_driver soc_codec_dev_tas5782m = {
+static const struct snd_soc_codec_driver soc_codec_dev_tas5782m = {
 	.probe = tas5782m_probe,
 	.remove = tas5782m_remove,
 #ifdef CONFIG_PM
@@ -749,10 +776,12 @@ static const struct snd_soc_component_driver soc_codec_dev_tas5782m = {
 	.resume = tas5782m_resume,
 #endif
 	.set_bias_level = tas5782m_set_bias_level,
-	.controls = tas5782m_snd_controls,
-	.num_controls = ARRAY_SIZE(tas5782m_snd_controls),
-	.dapm_widgets = tas5782m_dapm_widgets,
-	.num_dapm_widgets = ARRAY_SIZE(tas5782m_dapm_widgets),
+	.component_driver = {
+		.controls = tas5782m_snd_controls,
+		.num_controls = ARRAY_SIZE(tas5782m_snd_controls),
+		.dapm_widgets = tas5782m_dapm_widgets,
+		.num_dapm_widgets = ARRAY_SIZE(tas5782m_dapm_widgets),
+	}
 };
 
 /*
@@ -785,7 +814,7 @@ static int tas5782m_parse_dts(struct tas5782m_priv *tas5782m,
 
 	ret = of_property_read_u32(np, "work_mode", &tas5782m->work_mode);
 	pr_debug("tas5782m->work_mode:%d(%s)!\n", tas5782m->work_mode,
-		(tas5782m->work_mode == WORK_MODE_I2S) ? "i2s" : "tdm");
+		(tas5782m->work_mode == WORK_MODE_I2S)?"i2s":"tdm");
 
 	ret = of_property_read_u32(np, "chip_offset", &tas5782m->chip_offset);
 	pr_debug("tas5782m->chip_offset:%d!\n", tas5782m->chip_offset);
@@ -808,6 +837,7 @@ static int tas5782m_i2c_probe(struct i2c_client *i2c,
 	if (!tas5782m)
 		return -ENOMEM;
 
+
 	tas5782m->i2c = i2c;
 	/*
 	 * tas5782m->regmap = devm_regmap_init_i2c(i2c, &tas5782m_regmap);
@@ -829,7 +859,7 @@ static int tas5782m_i2c_probe(struct i2c_client *i2c,
 
 	if (of_property_read_string(i2c->dev.of_node,
 		"codec_name", &codec_name)) {
-		pr_info("no component name\n");
+		pr_info("no codec name\n");
 		ret = -1;
 	}
 	pr_debug("aux name = %s\n", codec_name);
@@ -838,17 +868,17 @@ static int tas5782m_i2c_probe(struct i2c_client *i2c,
 
 	i2c_set_clientdata(i2c, tas5782m);
 
-	ret = snd_soc_register_component(&i2c->dev,
+	ret = snd_soc_register_codec(&i2c->dev,
 		&soc_codec_dev_tas5782m, &tas5782m_dai, 1);
 	if (ret != 0)
-		dev_err(&i2c->dev, "Failed to register component (%d)\n", ret);
+		dev_err(&i2c->dev, "Failed to register codec (%d)\n", ret);
 
 	return ret;
 }
 
 static int tas5782m_i2c_remove(struct i2c_client *client)
 {
-	snd_soc_unregister_component(&client->dev);
+	snd_soc_unregister_codec(&client->dev);
 
 	return 0;
 }
@@ -876,6 +906,7 @@ static struct i2c_driver tas5782m_i2c_driver = {
 };
 
 module_i2c_driver(tas5782m_i2c_driver);
+
 
 MODULE_DESCRIPTION("ASoC tas5782m driver");
 MODULE_AUTHOR("AML MM team");

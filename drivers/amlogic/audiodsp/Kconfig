@@ -6,7 +6,6 @@ config AMLOGIC_AUDIO_DSP
 	tristate "audio dsp control support"
 	default n
 	help
-		support the amlogic audio dsp
-		for audio dsp
+		support the amlogic audio dsp;
 
 endmenu

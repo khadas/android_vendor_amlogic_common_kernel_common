@@ -1,10 +1,13 @@
-/* SPDX-License-Identifier: GPL-2.0-only */
 /*
  *  linux/arch/arm/lib/memcpy.S
  *
  *  Author:	Nicolas Pitre
  *  Created:	Sep 28, 2005
  *  Copyright:	MontaVista Software, Inc.
+ *
+ *  This program is free software; you can redistribute it and/or modify
+ *  it under the terms of the GNU General Public License version 2 as
+ *  published by the Free Software Foundation.
  */
 
 #include <linux/linkage.h>
@@ -27,7 +30,7 @@
 	.endm
 
 	.macro ldr1b ptr reg cond=al abort
-	ldrb\cond \reg, [\ptr], #1
+	ldr\cond\()b \reg, [\ptr], #1
 	.endm
 
 	.macro str1w ptr reg abort
@@ -39,7 +42,7 @@
 	.endm
 
 	.macro str1b ptr reg cond=al abort
-	strb\cond \reg, [\ptr], #1
+	str\cond\()b \reg, [\ptr], #1
 	.endm
 
 	.macro enter reg1 reg2
@@ -58,13 +61,18 @@
 
 /* Prototype: void *memcpy(void *dest, const void *src, size_t n); */
 
-.weak memcpy
-ENTRY(__memcpy)
 ENTRY(mmiocpy)
+#ifdef CONFIG_AMLOGIC_KASAN32
+ENTRY(__memcpy)
+#else
 ENTRY(memcpy)
+#endif
 
 #include "copy_template.S"
 
-ENDPROC(memcpy)
-ENDPROC(mmiocpy)
+#ifdef CONFIG_AMLOGIC_KASAN32
 ENDPROC(__memcpy)
+#else
+ENDPROC(memcpy)
+#endif
+ENDPROC(mmiocpy)

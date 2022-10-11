@@ -1,4 +1,3 @@
-/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
  * include/linux/amlogic/media/video_sink/vpp.h
  *
@@ -26,28 +25,28 @@
 
 extern bool super_scaler;
 extern struct sr_info_s sr_info;
-#define VPP_FLAG_WIDEMODE_MASK       0x1F000000
-#define VPP_WIDEMODE_BITS            24
-#define VPP_FLAG_INTERLACE_OUT       0x00000010
-#define VPP_FLAG_INTERLACE_IN        0x00000020
-#define VPP_FLAG_CBCR_SEPARATE       0x00000040
-#define VPP_FLAG_ZOOM_SHORTSIDE      0x00000080
-#define VPP_FLAG_AR_MASK             0x0003ff00
-#define VPP_FLAG_AR_BITS             8
-#define VPP_FLAG_PORTRAIT_MODE       0x00040000
-#define VPP_FLAG_VSCALE_DISABLE      0x00080000
-#define VPP_FLAG_MORE_LOG            0x00100000
-#define VPP_FLAG_FORCE_NO_COMPRESS   0x00200000
+#define VPP_FLAG_WIDEMODE_MASK      0x1F000000
+#define VPP_WIDEMODE_BITS           24
+#define VPP_FLAG_INTERLACE_OUT      0x00000010
+#define VPP_FLAG_INTERLACE_IN       0x00000020
+#define VPP_FLAG_CBCR_SEPARATE      0x00000040
+#define VPP_FLAG_ZOOM_SHORTSIDE     0x00000080
+#define VPP_FLAG_AR_MASK            0x0003ff00
+#define VPP_FLAG_AR_BITS            8
+#define VPP_FLAG_PORTRAIT_MODE      0x00040000
+#define VPP_FLAG_VSCALE_DISABLE     0x00080000
+#define VPP_FLAG_MORE_LOG     0x00100000
+#define VPP_FLAG_FORCE_NO_COMPRESS     0x00200000
 #define VPP_FLAG_FORCE_SWITCH_VF     0x00400000
-#define VPP_FLAG_FORCE_NOT_SWITCH_VF 0x00800000
-#define VPP_FLAG_FROM_TOGGLE_FRAME   0x00000001
+#define VPP_FLAG_FORCE_NOT_SWITCH_VF     0x00800000
+#define VPP_FLAG_FROM_TOGGLE_FRAME	0x00000001
 
 #define IDX_H           (2 << 8)
-#define IDX_V_Y         BIT(13)
+#define IDX_V_Y         (1 << 13)
 #define IDX_V_CBCR      ((1 << 13) | (1 << 8))
 
-#define ASPECT_4_3      ((3 << 8) / 4)
-#define ASPECT_16_9     ((9 << 8) / 16)
+#define ASPECT_4_3      ((3<<8)/4)
+#define ASPECT_16_9     ((9<<8)/16)
 
 #define MAX_VSKIP_COUNT	8
 
@@ -162,8 +161,6 @@ struct vpp_frame_par_s {
 	u32 video_input_h;
 	u32 cm_input_w;
 	u32 cm_input_h;
-	u32 nnhf_input_w;
-	u32 nnhf_input_h;
 	u32 clk_in_pps;
 
 	bool nocomp;
@@ -175,7 +172,7 @@ struct vpp_frame_par_s {
 
 struct disp_info_s {
 	u8 layer_id;
-	u8 layer_support;
+
 	u32 angle;
 	u32 custom_ar;
 
@@ -211,7 +208,6 @@ struct disp_info_s {
 	bool pps_support;
 
 	bool need_no_compress;
-	s32 sideband_type;
 	bool fgrain_support;
 	bool fgrain_enable;
 	bool fgrain_start;
@@ -219,6 +215,7 @@ struct disp_info_s {
 	bool lut_dma_support;
 	bool dv_support;
 	bool alpha_support;
+	s32 sideband_type;
 	u32 mirror;
 	u32 src_width_max;
 	u32 src_height_max;
@@ -242,17 +239,16 @@ enum select_scaler_path_e {
 	PPS_CORE1_CM,
 	SCALER_PATH_MAX,
 };
-
 /*
- * note from vlsi!!!
- * if core0 v enable,core0 input width max=1024;
- * if core0 v disable,core0 input width max=2048;
- * if core1 v enable,core1 input width max=2048;
- * if core1 v disable,core1 input width max=4096;
- * gxlx only have core1,txhd/g12a only have core0
- */
-#define SUPER_CORE0_SUPPORT  BIT(0)
-#define SUPER_CORE1_SUPPORT  BIT(1)
+* note from vlsi!!!
+* if core0 v enable,core0 input width max=1024;
+* if core0 v disable,core0 input width max=2048;
+* if core1 v enable,core1 input width max=2048;
+* if core1 v disable,core1 input width max=4096;
+* gxlx only have core1,txhd/g12a only have core0
+*/
+#define SUPER_CORE0_SUPPORT  (1 << 0)
+#define SUPER_CORE1_SUPPORT  (1 << 1)
 
 struct sr_info_s {
 	u32 sr_support;
@@ -326,32 +322,33 @@ struct sr_info_s {
 #define VPP_PIC0_FIRST	0x0
 #define VPP_PIC1_FIRST	0x8
 
-void get_vpp_3d_mode
-	(u32 process_3d_type,
-	u32 trans_fmt,
-	u32 *vpp_3d_mode);
+extern void get_vpp_3d_mode(u32 process_3d_type,
+	u32 trans_fmt, u32 *vpp_3d_mode);
 #endif
 
-int vpp_set_filters
-	(struct disp_info_s *input,
+extern int vpp_set_filters(
+	struct disp_info_s *input,
 	struct vframe_s *vf,
 	struct vpp_frame_par_s *next_frame_par,
 	const struct vinfo_s *vinfo,
 	bool bypass_sr, u32 op_flag);
 
-s32 vpp_set_nonlinear_factor(struct disp_info_s *info, u32 f);
-u32 vpp_get_nonlinear_factor(struct disp_info_s *info);
+extern s32 vpp_set_nonlinear_factor(
+	struct disp_info_s *info, u32 f);
+extern u32 vpp_get_nonlinear_factor(
+	struct disp_info_s *info);
 s32 vpp_set_nonlinear_t_factor(struct disp_info_s *info, u32 f);
 u32 vpp_get_nonlinear_t_factor(struct disp_info_s *info);
 
-void vpp_disp_info_init(struct disp_info_s *info, u8 id);
+extern void vpp_disp_info_init(
+	struct disp_info_s *info, u8 id);
 
-void vpp_super_scaler_support(void);
+extern void vpp_super_scaler_support(void);
 
-void vpp_bypass_ratio_config(void);
+extern void vpp_bypass_ratio_config(void);
 
-int vpp_set_super_scaler_regs
-	(int scaler_path_sel,
+extern int vpp_set_super_scaler_regs(
+	int scaler_path_sel,
 	int reg_srscl0_enable,
 	int reg_srscl0_hsize,
 	int reg_srscl0_vsize,
@@ -364,9 +361,5 @@ int vpp_set_super_scaler_regs
 	int reg_srscl1_vert_ratio,
 	int vpp_postblend_out_width,
 	int vpp_postblend_out_height);
-void aisr_set_filters(u32 ratio_x, u32 ratio_y,
-			u32 dst_w, u32 dst_h,
-			struct vpp_frame_par_s *aisr_frame_par,
-			struct vframe_s *vf);
-void aisr_sr1_nn_enable(u32 enable);
+
 #endif /* VPP_H */

@@ -1,6 +1,18 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/amlogic/media/vout/lcd/lcd_extern/mipi_KD080D13.c
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
 #include <linux/kernel.h>
@@ -76,7 +88,7 @@ static unsigned char mipi_init_on_table[] = {
 	0x15, 2, 0x35, 0x00,
 	0x05, 1, 0x29,
 	0xff, 30,   /* delay 30ms */
-	0xff, 0xff /* ending flag */
+	0xff, 0xff, /* ending flag */
 };
 
 static unsigned char mipi_init_off_table[] = {
@@ -86,12 +98,12 @@ static unsigned char mipi_init_off_table[] = {
 	0xff, 30,      /* delay 30ms */
 	0x39, 4, 0xc3, 0x40, 0x00, 0x20,
 	0xff, 10,
-	0xff, 0xff   /* ending flag */
+	0xff, 0xff,   /* ending flag */
 };
 
 static int lcd_extern_driver_update(struct aml_lcd_extern_driver_s *ext_drv)
 {
-	if (!ext_drv) {
+	if (ext_drv == NULL) {
 		EXTERR("%s driver is null\n", LCD_EXTERN_NAME);
 		return -1;
 	}

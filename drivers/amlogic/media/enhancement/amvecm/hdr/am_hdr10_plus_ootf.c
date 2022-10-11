@@ -1,4 +1,3 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
  * drivers/amlogic/media/enhancement/amvecm/hdr/am_hdr10_plus_ootf.c
  *
@@ -60,8 +59,9 @@ void ebzcurveparametersinit(struct ebzcurveparameters *ebzcurveparameters)
 }
 
 /*percentile actually obtained from metadata */
-void percentileinit(struct percentiles *percentile,
-		    struct hdr10_plus_sei_s *hdr10_plus_sei)
+void percentileinit(
+	struct percentiles *percentile,
+	struct hdr10_plus_sei_s *hdr10_plus_sei)
 {
 	int i;
 
@@ -75,8 +75,9 @@ void percentileinit(struct percentiles *percentile,
 }
 
 /*metadata should obtained from 3C or 2094 metadata*/
-void metadatainit(struct scene2094metadata *metadata,
-		  struct hdr10_plus_sei_s *hdr10_plus_sei)
+void metadatainit(
+	struct scene2094metadata *metadata,
+	struct hdr10_plus_sei_s *hdr10_plus_sei)
 {
 	int i;
 
@@ -105,8 +106,9 @@ void metadatainit(struct scene2094metadata *metadata,
 }
 
 /* get EBZcurve params from metadata.*/
-void getmetadata(struct scene2094metadata *metadata,
-		 struct ebzcurveparameters *referencebezierparams)
+void getmetadata(
+	struct scene2094metadata *metadata,
+	struct ebzcurveparameters *referencebezierparams)
 {
 	int i;
 
@@ -194,8 +196,9 @@ void basisootf_params_init(struct basisootf_params *basisootf_params)
 
 /*obtain percentile info on psl50 and psl99,*/
 /*to calculate content average level and distribution later*/
-void getpercentile_50_99(struct percentiles *scenepercentiles,
-			 int *psll50, int *psll99)
+void getpercentile_50_99(
+	struct percentiles *scenepercentiles,
+	int *psll50, int *psll99)
 {
 	int i;
 	int npsll  = PERCENTILE_ORDER;
@@ -222,7 +225,8 @@ void getpercentile_50_99(struct percentiles *scenepercentiles,
 		curpsll	= scenepercentiles->percentilevalue[i];
 		if (curpercent == 50) {
 			*psll50 = curpsll;
-		} else if (*psll50 == -1 &&
+		} else if (
+			*psll50 == -1 &&
 			curpercent > 50 &&
 			prevpercent < 50) {
 			per50_1  = prevpercent;
@@ -260,27 +264,28 @@ void getpercentile_50_99(struct percentiles *scenepercentiles,
 /* function to calculate linear interpolation*/
 int rampweight(int v1,  int v2, int t1, int t2, int t)
 {
-	int retval = v1;
+	int retVal = v1;
 
-	if (t1 == t2) {
-		retval = (t < t1) ? (v1) : (v2);
-	} else {
+	if (t1 == t2)
+		retVal = (t < t1) ? (v1) : (v2);
+	else {
 		if (t <= t1)
-			retval = v1;
+			retVal = v1;
 		else if (t >= t2)
-			retval = v2;
+			retVal = v2;
 		else
-			retval = v1 + (v2 - v1) * (t - t1) / (t2 - t1);
+			retVal = v1 + (v2 - v1) * (t - t1) / (t2 - t1);
 	}
 
-	return retval;
+	return retVal;
 }
 
 /*p1 calculation based on default setting and*/
 /*content statistic information(percentile)*/
-int calcp1(int sx, int sy, int tgtL, int calcmaxl,
-	   struct basisootf_params *basisootf_params,
-	   int *p1_red_gain)
+int calcp1(
+	int sx, int sy, int tgtL, int calcmaxl,
+	struct basisootf_params *basisootf_params,
+	int *p1_red_gain)
 
 {
 	int ax, ay, k, p1_limit, k2, p1_t, p1;
@@ -290,8 +295,9 @@ int calcp1(int sx, int sy, int tgtL, int calcmaxl,
 	ay = min(sy, PORCESSING_DATA_MAX);
 
 	k = tgtL * PORCESSING_DATA_MAX / max(tgtL, calcmaxl);
-	p1_limit = rampweight(basisootf_params->P1_LIMIT_V2,
-			      basisootf_params->P1_LIMIT_V1,
+	p1_limit = rampweight(
+		basisootf_params->P1_LIMIT_V2,
+		basisootf_params->P1_LIMIT_V1,
 		basisootf_params->P1_LIMIT_T1,
 		basisootf_params->P1_LIMIT_T2,
 		sy);
@@ -299,23 +305,26 @@ int calcp1(int sx, int sy, int tgtL, int calcmaxl,
 		(ORDER * (PORCESSING_DATA_MAX + 1 - ay));
 	p1_t = k2 * PORCESSING_DATA_MAX / k;
 	p1 = max(min(p1_t, p1_limit), 0);
-	low_sy_g = rampweight(PORCESSING_DATA_MAX + 1, 0,
-			      basisootf_params->LOW_SY_T1,
+	low_sy_g = rampweight(
+		PORCESSING_DATA_MAX + 1, 0,
+		basisootf_params->LOW_SY_T1,
 		basisootf_params->LOW_SY_T2,
 		sy);
-	high_k_g = rampweight(PORCESSING_DATA_MAX + 1, 0,
-			      basisootf_params->LOW_K_T1,
-			      basisootf_params->LOW_K_T2,
+	high_k_g = rampweight(
+		PORCESSING_DATA_MAX + 1, 0,
+		basisootf_params->LOW_K_T1,
+		basisootf_params->LOW_K_T2,
 		k);
 	high_tm_g = low_sy_g * high_k_g >> PROCESSING_MAX;
-	red_p1 = rampweight(PORCESSING_DATA_MAX + 1,
-			    basisootf_params->RED_P1_V1,
+	red_p1 = rampweight(
+		PORCESSING_DATA_MAX + 1,
+		basisootf_params->RED_P1_V1,
 		basisootf_params->RED_P1_T1,
 		basisootf_params->RED_P1_T2,
 		high_tm_g);
 	p1 = min(max((p1 * red_p1) >> PROCESSING_MAX, P1MIN), p1_limit);
 
-	if (p1_red_gain)
+	if (p1_red_gain != NULL)
 		*p1_red_gain = high_tm_g;
 
 	return p1;
@@ -323,9 +332,10 @@ int calcp1(int sx, int sy, int tgtL, int calcmaxl,
 
 /*gen BasisOOTF parameters (sx,sy,p1~pn-1),based on content percentiles*/
 	/*and default bezier params*/
-int basisootf(struct scene2094metadata *metadata,
-	      struct basisootf_params *basisootf_params, int productpeak,
-	      int sourcemaxl, struct ebzcurveparameters *scenebezierparams)
+int basisootf(
+	struct scene2094metadata *metadata,
+	struct basisootf_params *basisootf_params, int productpeak,
+	int sourcemaxl, struct ebzcurveparameters *scenebezierparams)
 {
 	int order = ORDER;
 	int psll50, psll99, centerluminance, k, sy1, sy2, sy, sx, rem;
@@ -341,23 +351,27 @@ int basisootf(struct scene2094metadata *metadata,
 	k = targetluminance * PORCESSING_DATA_MAX / sourceluminance;
 
 	if (hdr10_plus_printk & 2)
-		pr_hdr("basisOOTF precision: ctrL=%d, k=%d\n",
-		       centerluminance, k);
-	sy1 = rampweight(basisootf_params->SY1_V1,
-			 basisootf_params->SY1_V2,
-			 basisootf_params->SY1_T1,
-			 basisootf_params->SY1_T2,
-			 k);
-	sy2 = rampweight(basisootf_params->SY2_V1,
-			 basisootf_params->SY2_V2,
-			 basisootf_params->SY2_T1,
-			 basisootf_params->SY2_T2,
-			 k);
-	rem = rampweight(basisootf_params->KP_G_V1,
-			 basisootf_params->KP_G_V2,
-			 basisootf_params->KP_G_T1,
-			 basisootf_params->KP_G_T2,
-			 centerluminance);
+		pr_hdr(
+			"basisOOTF precision: psll50 = %d, psll99 = %d, ctrL=%d, k=%d\n",
+			psll50, psll99, centerluminance, k);
+	sy1 = rampweight(
+		basisootf_params->SY1_V1,
+		basisootf_params->SY1_V2,
+		basisootf_params->SY1_T1,
+		basisootf_params->SY1_T2,
+		k);
+	sy2 = rampweight(
+		basisootf_params->SY2_V1,
+		basisootf_params->SY2_V2,
+		basisootf_params->SY2_T1,
+		basisootf_params->SY2_T2,
+		k);
+	rem = rampweight(
+		basisootf_params->KP_G_V1,
+		basisootf_params->KP_G_V2,
+		basisootf_params->KP_G_T1,
+		basisootf_params->KP_G_T2,
+		centerluminance);
 	sy = (rem * sy1 + (PORCESSING_DATA_MAX + 1 - rem) * sy2) >>
 		PROCESSING_MAX;
 	sx = sy * k;
@@ -365,51 +379,58 @@ int basisootf(struct scene2094metadata *metadata,
 	/*P coefficient*/
 	high_tm_g = 0;
 
-	p1 = calcp1(sx, sy, targetluminance, sourcemaxl,
-		    basisootf_params, &high_tm_g);
+	p1 = calcp1(
+		sx, sy, targetluminance, sourcemaxl,
+		basisootf_params, &high_tm_g);
 
 	if (hdr10_plus_printk & 2)
 		pr_hdr("basisOOTF precision: p1=(int) %d\n\n", p1);
 	for (i = 0; i < (NPCOEFF - 1); i++) {
-		rem_p29 = rampweight(basisootf_params->P2TOP9_MAX2[i],
-				     basisootf_params->P2TOP9_MAX1[i],
-				     basisootf_params->P2TO9_T1,
-				     basisootf_params->P2TO9_T2,
-				     centerluminance);
+		rem_p29 = rampweight(
+			basisootf_params->P2TOP9_MAX2[i],
+			basisootf_params->P2TOP9_MAX1[i],
+			basisootf_params->P2TO9_T1,
+			basisootf_params->P2TO9_T2,
+			centerluminance);
 		ps2to9[i] = (rem_p29 * basisootf_params->P2TOP9_MAX1[i] +
 		(PORCESSING_DATA_MAX + 1 - rem_p29) *
 		basisootf_params->P2TOP9_MAX2[i]) >> PROCESSING_MAX;
 		if (hdr10_plus_printk & 2)
-			pr_hdr("basisOOTF precision: g=%d ps2to9[%d] = %d\n",
-			       rem_p29, i, ps2to9[i]);
+			pr_hdr(
+				"basisOOTF precision: g=%d ps2to9[%d] = %d\n",
+				rem_p29, i, ps2to9[i]);
 	}
 
-	rem_ps = rampweight(PORCESSING_DATA_MAX + 1, 0,
-			    basisootf_params->PS_G_T1,
-			    basisootf_params->PS_G_T2, k);
+	rem_ps = rampweight(
+		PORCESSING_DATA_MAX + 1, 0,
+		basisootf_params->PS_G_T1, basisootf_params->PS_G_T2, k);
 
 	pcoeff[0] = p1;
 	for (i = 1; i < NPCOEFF; i++) {
 		coeffi = i + 1;
 		plin[i] = (coeffi * PORCESSING_DATA_MAX / order);
-		pcoeff[i] = max(min((rem_ps * ps2to9[i - 1] +
+		pcoeff[i] = max(
+			min((rem_ps * ps2to9[i - 1] +
 				(PORCESSING_DATA_MAX + 1 - rem_ps) * plin[i])
 				>> PROCESSING_MAX,
 				coeffi * p1),
 			plin[i]);
 		if (hdr10_plus_printk & 2)
-			pr_hdr("basisOOTF precision: g=%d, pcoeff[%d] = %d\n",
-			       rem_ps, i, pcoeff[i]);
+			pr_hdr(
+				"basisOOTF precision: g=%d, pcoeff[%d] = %d\n",
+				rem_ps, i, pcoeff[i]);
 	}
 
 	/*p[1] recalc precision:0.01,bad*/
-	rem_red_p2 = rampweight(PORCESSING_DATA_MAX + 1,
-				basisootf_params->RED_P2_V1,
-				basisootf_params->RED_P2_T1,
-				basisootf_params->RED_P2_T2,
-				high_tm_g);
-	pcoeff[1] = max(min((pcoeff[1] * rem_red_p2) >> PROCESSING_MAX, 2 * p1),
-			2 * PORCESSING_DATA_MAX / ORDER);
+	rem_red_p2 = rampweight(
+		PORCESSING_DATA_MAX + 1,
+		basisootf_params->RED_P2_V1,
+		basisootf_params->RED_P2_T1,
+		basisootf_params->RED_P2_T2,
+		high_tm_g);
+	pcoeff[1] = max(
+		min((pcoeff[1] * rem_red_p2) >> PROCESSING_MAX, 2 * p1),
+		2 * PORCESSING_DATA_MAX / ORDER);
 
 	/*finally  pcoeff[ORDER-1],sy,sx*/
 	scenebezierparams->sx = sx;
@@ -427,11 +448,12 @@ int basisootf(struct scene2094metadata *metadata,
 
 /* receive bezier parameter(Kx,ky,P)and return guided parameter base on*/
 /*product panel luminance out: product curve params(Kx,ky,P) */
-int guidedootf(struct scene2094metadata *metadata,
-	       struct basisootf_params *basisootf_params,
-	       struct ebzcurveparameters *referencebezierparams,
-	       int productpeak,
-	       struct ebzcurveparameters *productbezierparams)
+int guidedootf(
+	struct scene2094metadata *metadata,
+	struct basisootf_params *basisootf_params,
+	struct ebzcurveparameters *referencebezierparams,
+	int productpeak,
+	struct ebzcurveparameters *productbezierparams)
 {
 	int KP_BYPASS = 1229;
 	int refenceluminance = metadata->referenceluminance;
@@ -441,8 +463,8 @@ int guidedootf(struct scene2094metadata *metadata,
 	int order = referencebezierparams->order;
 	int nump = order - 1;
 
-	int blendcoeff, norm;
-	int anchorlinear[14];
+	int blendCoeff, norm;
+	int anchorLinear[14];
 	int i;
 	int ps1;
 
@@ -451,14 +473,16 @@ int guidedootf(struct scene2094metadata *metadata,
 	ebzcurveparametersinit(&minbezierparams);
 
 	for (i = 0; i < nump; i++)
-		anchorlinear[i] = (i + 1) * PORCESSING_DATA_MAX / order;
+		anchorLinear[i] = (i + 1) * PORCESSING_DATA_MAX / order;
 
 	if (hdr10_plus_printk & 2) {
-		pr_hdr("order = %d, linear ps[i]:\n",
-		       order);
+		pr_hdr(
+			"order = %d, linear ps[i]:\n",
+			order);
 		for (i = 0; i < nump; i++)
-			pr_hdr("	%2d: %4d\n",
-			       i, anchorlinear[i]);
+			pr_hdr(
+				"	%2d: %4d\n",
+				i, anchorLinear[i]);
 	}
 
 	/*patch for low luminance panel tm calculate, find rootcause next step*/
@@ -471,13 +495,14 @@ int guidedootf(struct scene2094metadata *metadata,
 	if (productluminance < minluminance) {
 		if (hdr10_plus_printk & 2) {
 			pr_hdr("case: P < minL\n\n...processing...\n");
-			pr_hdr("error GuidedOOTF: < %d nit not supported\n",
-			       productluminance);
+			pr_hdr(
+				"error GuidedOOTF: < %d nit not supported\n",
+				productluminance);
 		}
 		productbezierparams->sx = 0;
 		productbezierparams->sy = 0;
 		for (i = 0; i < nump; i++)
-			productbezierparams->anchor[i] = anchorlinear[i];
+			productbezierparams->anchor[i] = anchorLinear[i];
 		productbezierparams->order = order;
 		return -1;
 	}
@@ -493,67 +518,69 @@ int guidedootf(struct scene2094metadata *metadata,
 			productbezierparams->anchor[i] =
 				referencebezierparams->anchor[i];
 		if (hdr10_plus_printk & 2) {
-			pr_hdr("order:%2d,   (sx,sy):(%4d, %4d)\n",
-			       productbezierparams->order,
-			       productbezierparams->sx,
-			       productbezierparams->sy);
+			pr_hdr(
+				"order:%2d,   (sx,sy):(%4d, %4d)\n",
+				productbezierparams->order,
+				productbezierparams->sx,
+				productbezierparams->sy);
 			for (i = 0; i < nump; i++)
-				pr_hdr("	%2d: %4d\n",
-				       i, productbezierparams->anchor[i]);
+				pr_hdr(
+					"	%2d: %4d\n",
+					i, productbezierparams->anchor[i]);
 		}
+	}
 /*---------case 2: productPeak > maxL ----------------- */
-	} else if (productluminance > maxluminance) {
+	else if (productluminance > maxluminance) {
 		if (hdr10_plus_printk & 2)
 			pr_hdr("case: P > maxL\n\n...processing...\n");
 		productbezierparams->sx = KP_BYPASS;
 		productbezierparams->sy = KP_BYPASS;
 		productbezierparams->order = order;
 		for (i = 0; i < nump; i++)
-			productbezierparams->anchor[i] = anchorlinear[i];
+			productbezierparams->anchor[i] = anchorLinear[i];
+	}
 /*---------case 3: minL < productPeak < maxL ----------------- */
-	} else {
+	else {
 		productbezierparams->order = referencebezierparams->order;
 /*---------case 3.1: minL < productPeak < ref ----------------- */
 		if (productluminance < refenceluminance) {
 			if (hdr10_plus_printk & 2)
-				pr_hdr("case: P < ref\n\n...processing...\n");
+			pr_hdr("case: P < ref\n\n...processing...\n");
 			norm = refenceluminance - minluminance;
-			blendcoeff = refenceluminance - productluminance;
+			blendCoeff = refenceluminance - productluminance;
 
-			basisootf(metadata, basisootf_params, minluminance,
-				  maxluminance, &minbezierparams);
+			basisootf(
+				metadata, basisootf_params, minluminance,
+				maxluminance, &minbezierparams);
 
 			productbezierparams->sy =
-			(blendcoeff * minbezierparams.sy +
-			(norm - blendcoeff) * referencebezierparams->sy +
+			(blendCoeff * minbezierparams.sy +
+			(norm - blendCoeff) * referencebezierparams->sy +
 			(norm >> 1)) / norm;
 			productbezierparams->sx =
 			productbezierparams->sy * productluminance /
 				maxluminance;
 			for (i = 0; i < nump ; i++) {
 				productbezierparams->anchor[i] =
-				(blendcoeff * minbezierparams.anchor[i] +
-				(norm - blendcoeff) *
+				(blendCoeff * minbezierparams.anchor[i] +
+				(norm - blendCoeff) *
 				referencebezierparams->anchor[i] +
 				(norm >> 1)) / norm;
 			}
 			if (hdr10_plus_printk & 2) {
-				pr_hdr("p-1=>Anchor[i] = ");
-				pr_hdr("(blendcoeff *referenceBezierParams->Anchor[i] ");
-				pr_hdr("+ (norm - blendcoeff)*minBezierParams.Anchor[i]");
-				pr_hdr(" + (norm>>1) )/norm\n");
+				pr_hdr(
+					"p-1=>Anchor[i]  = (blendCoeff *referenceBezierParams->Anchor[i] + (norm - blendCoeff)*minBezierParams.Anchor[i] + (norm>>1) )/norm\n");
 				for (i = 0; i < nump; i++) {
-					pr_hdr("p-1=> %2d: %4d = ",
-					       i,
-					       productbezierparams->anchor[i]);
-					pr_hdr(" %4d * %4d + ",
-					       blendcoeff,
-					       referencebezierparams->anchor[i]);
-					pr_hdr("(%4d - %4d) * %4d / %4d\n",
-					       norm,
-					       blendcoeff,
-					       minbezierparams.anchor[i],
-					       norm);
+					pr_hdr(
+					"p-1=> %2d: %4d = %4d * %4d + (%4d - %4d) * %4d / %4d\n",
+					i,
+					productbezierparams->anchor[i],
+					blendCoeff,
+					referencebezierparams->anchor[i],
+					norm,
+					blendCoeff,
+					minbezierparams.anchor[i],
+					norm);
 				}
 			}
 	/*---------case 3.2: ref < productPeak < maxL ----------------- */
@@ -561,56 +588,56 @@ int guidedootf(struct scene2094metadata *metadata,
 			if (hdr10_plus_printk & 2)
 				pr_hdr("case: P > ref\n\n...processing...\n");
 			norm	   =  maxluminance - refenceluminance;
-			blendcoeff =  productluminance - refenceluminance;
+			blendCoeff =  productluminance - refenceluminance;
 
-			productbezierparams->sy = (blendcoeff * KP_BYPASS +
-			(norm - blendcoeff) * referencebezierparams->sy +
+			productbezierparams->sy = (blendCoeff * KP_BYPASS +
+			(norm - blendCoeff) * referencebezierparams->sy +
 			(norm >> 1)) / norm;
 			productbezierparams->sx = productbezierparams->sy *
 			productluminance / maxluminance;
 
 			for (i = 0; i < nump; i++) {
 				productbezierparams->anchor[i] =
-				(blendcoeff * anchorlinear[i] +
-				(norm - blendcoeff) *
+				(blendCoeff * anchorLinear[i] +
+				(norm - blendCoeff) *
 				referencebezierparams->anchor[i] +
 				(norm >> 1)) / norm;
 			}
 			if (hdr10_plus_printk & 2) {
 				for (i = 0; i < nump; i++) {
-					pr_hdr("p-1=> %2d: %4d = ",
-					       i,
-					       productbezierparams->anchor[i]);
-					pr_hdr(" %4d * %4d + ",
-					       blendcoeff,
-					       anchorlinear[i]);
-					pr_hdr("(%4d - %4d) * %4d / %4d\n",
-					       norm,
-					       blendcoeff,
-					       referencebezierparams->anchor[i],
-					       norm);
+					pr_hdr(
+					"p-1=> %2d: %4d = %4d * %4d + (%4d - %4d) * %4d/ %4d\n",
+					i,
+					productbezierparams->anchor[i],
+					blendCoeff,
+					anchorLinear[i],
+					norm,
+					blendCoeff,
+					referencebezierparams->anchor[i],
+					norm);
 				}
 			}
 		}
 
-		ps1 = calcp1(productbezierparams->sx,
-			     productbezierparams->sy,
-			     productluminance, maxluminance,
-			     basisootf_params, NULL);
+		ps1 = calcp1(
+			productbezierparams->sx, productbezierparams->sy,
+			productluminance, maxluminance, basisootf_params, NULL);
 
 		productbezierparams->anchor[0] = ps1;
 
 		for (i = 1; i < nump; i++) {
 			productbezierparams->anchor[i] =
-			min(productbezierparams->anchor[i],
-			    (i + 1) * productbezierparams->anchor[0]);
+			min(
+				productbezierparams->anchor[i],
+				(i + 1) * productbezierparams->anchor[0]);
 		}
 		if (hdr10_plus_printk & 2) {
 			pr_hdr("p-2: %2d, %4d\n", 0, ps1);
 			// p process, form curve below CI line slope
 			for (i = 1; i < nump; i++)
-				pr_hdr("p-2=> %2d-> %d\n",
-				       i, productbezierparams->anchor[i]);
+				pr_hdr(
+					"p-2=> %2d-> %d\n",
+					i, productbezierparams->anchor[i]);
 		}
 	}
 
@@ -618,8 +645,9 @@ int guidedootf(struct scene2094metadata *metadata,
 }
 
 /*bezier optimise method to gen bezier function*/
-int decasteliau(u64 *beziercurve, u64 *anchory,
-		u64 u, int order, u64 range_ebz_x)
+int Decasteliau(
+	u64 *beziercurve, u64 *anchory,
+	u64 u, int order, u64 range_ebz_x)
 {
 	u64 pointy[16];
 	int i, j;
@@ -640,7 +668,7 @@ int decasteliau(u64 *beziercurve, u64 *anchory,
 
 #define org_anchory
 
-u64 oo_lut_x[OOLUT_NUM] = {
+static u64 oo_lut_x[OOLUT_NUM] = {
 	1, 16, 32, 64, 128, 256, 512, 1024, 2048, 2560, 3072, 3584, 4096,
 	5120, 6144, 7168, 8192, 10240, 12288, 14336, 16384, 20480, 24576,
 	28672, 32768, 40960, 49152, 57344, 65536, 81920, 98304, 114688,
@@ -666,12 +694,13 @@ u64 oo_lut_x[OOLUT_NUM] = {
 };
 
 /*gen OOTF curve and gain from (sx,sy) and P1~pn-1*/
-int gen_ebzurve(u64 *curvex, u64 *curvey,
-		unsigned int *gain,
+int genEBZCurve(
+	u64 *curvex, u64 *curvey,
+	unsigned int *gain,
 	u64 nkx, uint64_t nky,
 	u64 *anchory, int order)
 {
-	u64 my_anchor_y[16];
+	u64 myAnchorY[16];
 	u64 temp;
 	u64 kx, ky;
 
@@ -683,7 +712,7 @@ int gen_ebzurve(u64 *curvex, u64 *curvey,
 	int i;
 	int nump;
 
-	if (order > 1 && order <= N)
+	if ((order > 1) && (order <= N))
 		nump = order - 1;
 	else
 		nump = N - 1;
@@ -697,20 +726,23 @@ int gen_ebzurve(u64 *curvex, u64 *curvey,
 #ifdef org_anchory
 	for (i = 0; i < nump; i++)/* u12-> ebz_y, u32*/
 		/*anchorY default range:PROCESSING_MAX */
-		my_anchor_y[i + 1] = anchory[i] << (U32 - PROCESSING_MAX);
-	my_anchor_y[0] = 0;
-	my_anchor_y[N] = _U32_MAX; /* u12 */
+		myAnchorY[i + 1] = anchory[i] << (U32 - PROCESSING_MAX);
+	myAnchorY[0] = 0;
+	myAnchorY[nump + 1] = _U32_MAX; /* u12 */
 #else
 	for (i = 0; i < nump; i++)/* u12-> ebz_y, u32*/
 		/*anchorY default range:PROCESSING_MAX */
-		my_anchor_y[i + 1] =
-		(anchory[i] * range_ebz_y) >> PROCESSING_MAX;
-	my_anchor_y[0] = 0;
-	my_anchor_y[N] = range_ebz_y; /*u12 -> U32*/
+		myAnchorY[i + 1] = (anchory[i] * range_ebz_y) >> PROCESSING_MAX;
+	myAnchorY[0] = 0;
+	myAnchorY[N] = range_ebz_y; /*u12 -> U32*/
 #endif  /* org_anchory */
 
-	for (i = 0; i < POINTS; i++)
+	for (i = 0; i < POINTS; i++) {
+		#if 0
+		linearX[i] = (uint64_t)(i*_U32_MAX/POINTS); /* x index sample */
+		#endif
 		curvey[i] = 0;
+	}
 
 	for (i = 0; i < POINTS; i++) {
 		if (oo_lut_x[i] < kx) {
@@ -719,12 +751,13 @@ int gen_ebzurve(u64 *curvex, u64 *curvey,
 			curvey[i] = div64_u64(curvey[i], kx ? kx : 1);
 			temp = curvey[i] << GAIN_BIT;/*u12*/
 			gain[i] = div64_u64(temp, oo_lut_x[i]);
-		} else {
+		} else{
 			/*norm in Decasteliau() function*/
 			step_alpha = (oo_lut_x[i] - kx);
 			/* calc each point from 1st to N-th layer*/
-			decasteliau(&beziercurve[0], my_anchor_y, step_alpha,
-				    order, range_ebz_x);
+			Decasteliau(
+				&beziercurve[0], myAnchorY, step_alpha,
+				order, range_ebz_x);
 			#ifdef org_anchory   /*range_ebz_y = _U32_MAX*/
 			curvey[i] = ky +
 			((range_ebz_y * beziercurve[1] + range_ebz_y / 2)
@@ -751,19 +784,13 @@ int gen_ebzurve(u64 *curvex, u64 *curvey,
 
 void vframe_hdr_plus_sei_s_init(struct hdr10_plus_sei_s *hdr10_plus_sei)
 {
-	struct hdr10_plus_sei_s *p;
-	struct vframe_hdr_plus_sei *pvf;
+
 	int i;
 	int P_init[N - 1] = {181, 406, 607, 796, 834, 863, 890, 917, 938};
 	int percentilepercent_init[PERCENTILE_ORDER] = {
 		1, 5, 10, 25, 50, 75, 90, 95, 99};
 	/*int percentilevalue_init[PERCENTILE_ORDER] = {*/
 	/*	0, 1, 2, 79, 2537, 9900, 9901, 9902, 9904};*/
-
-	p = hdr10_plus_sei;
-	pvf = &hdr_plus_sei;
-
-	hdr10_plus_sei->num_distributions[0] = PERCENTILE_ORDER - 1;
 
 	for (i = 0; i < 3; i++)
 		hdr10_plus_sei->maxscl[0][i] = hdr_plus_sei.maxscl[0][i];
@@ -772,8 +799,11 @@ void vframe_hdr_plus_sei_s_init(struct hdr10_plus_sei_s *hdr10_plus_sei)
 		hdr_plus_sei.tgt_sys_disp_max_lumi;
 
 	/*for hdmitx output no number, default 9*/
-	if (hdr10_plus_sei->num_distributions[0] == 0)
+	if (hdr_plus_sei.num_distribution_maxrgb_percentiles[0] == 0)
 		hdr10_plus_sei->num_distributions[0] = 9;
+	else
+		hdr10_plus_sei->num_distributions[0] =
+			hdr_plus_sei.num_distribution_maxrgb_percentiles[0];
 
 	for (i = 0; i < (hdr10_plus_sei->num_distributions[0]); i++) {
 		hdr10_plus_sei->distribution_index[0][i] =
@@ -809,54 +839,65 @@ void vframe_hdr_plus_sei_s_init(struct hdr10_plus_sei_s *hdr10_plus_sei)
 	/*debug--*/
 	if (hdr10_plus_printk & 1) {
 		for (i = 0; i < 3; i++)
-			pr_hdr("hdr10_plus_sei->maxscl[0][%d]=%d\n",
-			       i, hdr10_plus_sei->maxscl[0][i]);
+			pr_hdr(
+			"hdr10_plus_sei->maxscl[0][%d]=%d\n",
+			i, hdr10_plus_sei->maxscl[0][i]);
 
-		pr_hdr("targeted_system_display_maximum_luminance=%d\n",
-		       p->targeted_system_display_maximum_luminance);
+		pr_hdr(
+		"targeted_system_display_maximum_luminance=%d\n",
+		hdr10_plus_sei->targeted_system_display_maximum_luminance);
 
 		for (i = 0; i < (hdr10_plus_sei->num_distributions[0]); i++) {
-			pr_hdr("distribution_values[0][%d]=%d\n",
-			       i, hdr10_plus_sei->distribution_values[0][i]);
-			pr_hdr("hdr10_plus_sei->distribution_index[0][%d]=%d\n",
-			       i, hdr10_plus_sei->distribution_index[0][i]);
+			pr_hdr(
+				"distribution_values[0][%d]=%d\n",
+				i, hdr10_plus_sei->distribution_values[0][i]);
+			pr_hdr(
+				"hdr10_plus_sei->distribution_index[0][%d]=%d\n",
+				i, hdr10_plus_sei->distribution_index[0][i]);
 		}
 
-		pr_hdr("hdr10_plus_sei->knee_point_x = %d\n"
+		pr_hdr(
+			"hdr10_plus_sei->knee_point_x = %d\n"
 			"hdr10_plus_sei->knee_point_y = %d\n",
 			hdr10_plus_sei->knee_point_x[0],
 			hdr10_plus_sei->knee_point_y[0]);
 
-		pr_hdr("hdr10_plus_sei->num_bezier_curve_anchors[0] = %d\n",
-		       hdr_plus_sei.num_bezier_curve_anchors[0]);
+		pr_hdr(
+			"hdr10_plus_sei->num_bezier_curve_anchors[0] = %d\n",
+			hdr_plus_sei.num_bezier_curve_anchors[0]);
 
 		for (i = 0; i < (hdr10_plus_sei->num_bezier_curve_anchors[0]);
-		     i++) {
-			pr_hdr("bezier_curve_anchors[0][%d] = %d\n",
-			       i, hdr_plus_sei.bezier_curve_anchors[0][i]);
+			i++) {
+			pr_hdr(
+				"bezier_curve_anchors[0][%d] = %d\n",
+				i, hdr_plus_sei.bezier_curve_anchors[0][i]);
 		}
 		for (i = 0; i < 3; i++) {
-			pr_hdr("average_maxrgb[%d] = %d\n",
-			       i, hdr_plus_sei.average_maxrgb[i]);
+			pr_hdr(
+				"average_maxrgb[%d] = %d\n",
+				i, hdr_plus_sei.average_maxrgb[i]);
 		}
 
 		for (i = 0;
-		     i < (pvf->num_distribution_maxrgb_percentiles[0]);
-		     i++) {
-			pr_hdr("distribution_maxrgb_percentages[0][%d] = %d\n",
-			       i, pvf->distribution_maxrgb_percentages[0][i]);
+		i < (hdr_plus_sei.num_distribution_maxrgb_percentiles[0]);
+		i++) {
+			pr_hdr(
+			"distribution_maxrgb_percentages[0][%d] = %d\n",
+			i, hdr_plus_sei.distribution_maxrgb_percentages[0][i]);
 		}
 		for (i = 0;
-		     i < (pvf->num_distribution_maxrgb_percentiles[0]);
-		     i++) {
-			pr_hdr("distribution_maxrgb_percentiles[0][%d] = %d\n",
-			       i, pvf->distribution_maxrgb_percentiles[0][i]);
+		i < (hdr_plus_sei.num_distribution_maxrgb_percentiles[0]);
+		i++) {
+			pr_hdr(
+			"distribution_maxrgb_percentiles[0][%d] = %d\n",
+			i, hdr_plus_sei.distribution_maxrgb_percentiles[0][i]);
 		}
 	}
 }
 
-void vframe_hdr_sei_s_init(struct hdr10_plus_sei_s *hdr10_plus_sei,
-			   int source_lumin)
+void vframe_hdr_sei_s_init(
+	struct hdr10_plus_sei_s *hdr10_plus_sei,
+	int source_lumin)
 {
 	int i;
 	int P_init[N - 1] = {181, 406, 607, 796, 834, 863, 890, 917, 938};
@@ -872,8 +913,9 @@ void vframe_hdr_sei_s_init(struct hdr10_plus_sei_s *hdr10_plus_sei,
 
 	if (hdr10_plus_printk & 8) {
 		for (i = 0; i < 9; i++) {
-			pr_hdr("percentilevalue_init[%d] = %d\n",
-			       i, percentilevalue_init[i]);
+			pr_hdr(
+				"percentilevalue_init[%d] = %d\n",
+				i, percentilevalue_init[i]);
 		}
 	}
 
@@ -910,8 +952,9 @@ unsigned int gain[POINTS];
 u64 curvex[POINTS], curvey[POINTS];
 
 /*input o->10000, should adaptive scale by shift and gamut*/
-static int match_ootf_output(struct scene2094metadata *metadata,
-			     struct hdr10pgen_param_s *p_hdr10pgen_param,
+static int match_ootf_output(
+	struct scene2094metadata *metadata,
+	struct hdr10pgen_param_s *p_hdr10pgen_param,
 	int panel_lumin)
 {
 	unsigned int scale_float;
@@ -933,22 +976,22 @@ static int match_ootf_output(struct scene2094metadata *metadata,
 			scale_float >> p_hdr10pgen_param->shift;
 	memcpy(p_hdr10pgen_param->gain, gain, sizeof(unsigned int) * POINTS);
 
-	if (hdr10_plus_printk & 4) {
-		pr_hdr("maxl=%d, scale=%d, shift=%d, ",
-		       maxl, scale_float,
-		       p_hdr10pgen_param->shift);
-		pr_hdr("scale_gmt=%d, gain=%d-%d-%d\n",
-		       p_hdr10pgen_param->scale_gmt,
-		       gain[0], gain[86], gain[148]);
-	}
+	if (hdr10_plus_printk & 4)
+		pr_hdr(
+			"maxl=%d, scale=%d, shift=%d, scale_gmt=%d, gain=%d-%d-%d\n",
+			maxl, scale_float,
+			p_hdr10pgen_param->shift,
+			p_hdr10pgen_param->scale_gmt,
+			gain[0], gain[86], gain[148]);
 	return 0;
 }
 
 // //mapping
 // struct hdr_proc_lut_param_s _hdr_lut_param;
 
-int hdr10_plus_ootf_gen(int panel_lumin,
-			int force_source_lumin,
+int hdr10_plus_ootf_gen(
+	int panel_lumin,
+	int force_source_lumin,
 	struct hdr10pgen_param_s *p_hdr10pgen_param)
 {
 	/*int referenceCurve_flag = 1;*/
@@ -957,11 +1000,11 @@ int hdr10_plus_ootf_gen(int panel_lumin,
 	u64 anchory[15];
 
 	/* bezier params obtained from metadata */
-	static struct hdr10_plus_sei_s hdr10_plus_sei;
-	static struct scene2094metadata metadata;
-	static struct ebzcurveparameters referencebezierparams;
-	static struct ebzcurveparameters productbezierparams;
-	static struct basisootf_params basisootf_params;
+	struct hdr10_plus_sei_s hdr10_plus_sei;
+	struct scene2094metadata metadata;
+	struct ebzcurveparameters referencebezierparams;
+	struct ebzcurveparameters productbezierparams;
+	struct basisootf_params basisootf_params;
 
 	int productpeak = panel_lumin;
 
@@ -998,21 +1041,25 @@ int hdr10_plus_ootf_gen(int panel_lumin,
 		/*metadata.maxscenesourceluminance, &productBezierParams);*/
 	/*else*/
 
-	guidedootf(&metadata, &basisootf_params,
-		   &referencebezierparams, productpeak,
+	guidedootf(
+		&metadata, &basisootf_params,
+		&referencebezierparams, productpeak,
 		&productbezierparams);
 
 	if (hdr10_plus_printk & 2) {
 		pr_hdr("productPeak=%d\n", panel_lumin);
 		pr_hdr("\n===================guided out ===================\n");
-		pr_hdr("1. knee point		 : (%4d,%4d)\n",
-		       productbezierparams.sx, productbezierparams.sy);
-		pr_hdr("2. Bezier order	   : %d\n",
-		       referencebezierparams.order);
+		pr_hdr(
+			"1. knee point		 : (%4d,%4d)\n",
+			productbezierparams.sx, productbezierparams.sy);
+		pr_hdr(
+			"2. Bezier order	   : %d\n",
+			referencebezierparams.order);
 		pr_hdr("3. Bezier P coeffs	:\n");
 		for (i = 0; i < (productbezierparams.order - 1); i++)
-			pr_hdr("				%2d: %4d\n",
-			       i, productbezierparams.anchor[i]);
+			pr_hdr(
+				"					%2d: %4d\n",
+				i, productbezierparams.anchor[i]);
 		pr_hdr("\n=================================================\n");
 	}
 
@@ -1024,14 +1071,16 @@ int hdr10_plus_ootf_gen(int panel_lumin,
 		anchory[i] = (uint64_t)productbezierparams.anchor[i];
 
 	/*step 5. gen bezier curve*/
-	gen_ebzurve(&curvex[0], &curvey[0], &gain[0],
-		    kx, ky, &anchory[0], order);
+	genEBZCurve(
+		&curvex[0], &curvey[0], &gain[0],
+		kx, ky, &anchory[0], order);
 
 	/* debug */
 	if (hdr10_plus_printk & 8) {
 		for (i = 0; i < POINTS; i++) {
-			pr_hdr("fixed : %3d:(%lld, %lld)->%4d\n",
-			       i, curvex[i], curvey[i], gain[i]);
+			pr_hdr(
+				"fixed : %3d:(%lld, %lld)->%4d\n",
+				i, curvex[i], curvey[i], gain[i]);
 		}
 	}
 

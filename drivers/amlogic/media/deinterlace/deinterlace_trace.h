@@ -1,4 +1,3 @@
-/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
  * drivers/amlogic/media/deinterlace/deinterlace_trace.h
  *
@@ -49,10 +48,26 @@ DEFINE_EVENT(di_event_class, name, \
 
 DEFINE_DI_EVENT(di_pre);
 DEFINE_DI_EVENT(di_post);
+DEFINE_DI_EVENT(di_pre_cnt0);
+DEFINE_DI_EVENT(di_pre_cnt1);
+DEFINE_DI_EVENT(di_pos_cnt0);
+DEFINE_DI_EVENT(di_pos_cnt1);
+DEFINE_DI_EVENT(di_pre_getxx);
+DEFINE_DI_EVENT(di_pre_setxx);
+DEFINE_DI_EVENT(di_pre_ready);
+DEFINE_DI_EVENT(di_pst_ready);
+DEFINE_DI_EVENT(di_pst_getxx);
+DEFINE_DI_EVENT(di_pst_setxx);
+DEFINE_DI_EVENT(di_pst_irxxx);
+DEFINE_DI_EVENT(di_pst_doing);
+DEFINE_DI_EVENT(di_pst_peekx);
+DEFINE_DI_EVENT(di_pst_get2x);
 #endif /* _VDEC_TRACE_H */
 
+#if 0
 #undef TRACE_INCLUDE_PATH
 #undef TRACE_INCLUDE_FILE
-#define TRACE_INCLUDE_PATH  ../../drivers/amlogic/media/deinterlace
+#define TRACE_INCLUDE_PATH .
 #define TRACE_INCLUDE_FILE deinterlace_trace
 #include <trace/define_trace.h>
+#endif

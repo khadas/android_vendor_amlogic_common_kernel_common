@@ -1,6 +1,18 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/amlogic/media/vout/vout_serve/vout2_notify.c
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
 /* Linux Headers */
@@ -54,15 +66,13 @@ struct vinfo_s *get_current_vinfo2(void)
 {
 	struct vinfo_s *vinfo = NULL;
 	struct vout_module_s *p_module = NULL;
-	void *data;
 
 	p_module = vout_func_get_vout2_module();
 	if (!IS_ERR_OR_NULL(p_module->curr_vout_server)) {
-		data = p_module->curr_vout_server->data;
 		if (p_module->curr_vout_server->op.get_vinfo)
-			vinfo = p_module->curr_vout_server->op.get_vinfo(data);
+			vinfo = p_module->curr_vout_server->op.get_vinfo();
 	}
-	if (!vinfo) /* avoid crash mistake */
+	if (vinfo == NULL) /* avoid crash mistake */
 		vinfo = get_invalid_vinfo(2, p_module->init_flag);
 
 	return vinfo;
@@ -86,13 +96,11 @@ enum vmode_e get_current_vmode2(void)
 	const struct vinfo_s *vinfo;
 	struct vout_module_s *p_module = NULL;
 	enum vmode_e mode = VMODE_MAX;
-	void *data;
 
 	p_module = vout_func_get_vout2_module();
 	if (!IS_ERR_OR_NULL(p_module->curr_vout_server)) {
-		data = p_module->curr_vout_server->data;
 		if (p_module->curr_vout_server->op.get_vinfo) {
-			vinfo = p_module->curr_vout_server->op.get_vinfo(data);
+			vinfo = p_module->curr_vout_server->op.get_vinfo();
 			if (vinfo)
 				mode = vinfo->mode;
 		}
@@ -107,15 +115,13 @@ const char *get_name_by_vmode2(enum vmode_e mode)
 	const char *str = NULL;
 	const struct vinfo_s *vinfo = NULL;
 	struct vout_module_s *p_module = NULL;
-	void *data;
 
 	p_module = vout_func_get_vout2_module();
 	if (!IS_ERR_OR_NULL(p_module->curr_vout_server)) {
-		data = p_module->curr_vout_server->data;
 		if (p_module->curr_vout_server->op.get_vinfo)
-			vinfo = p_module->curr_vout_server->op.get_vinfo(data);
+			vinfo = p_module->curr_vout_server->op.get_vinfo();
 	}
-	if (!vinfo)
+	if (vinfo == NULL)
 		vinfo = get_invalid_vinfo(2, p_module->init_flag);
 	str = vinfo->name;
 
@@ -164,6 +170,13 @@ int get_vframe2_rate_hint(void)
 	return vout_func_get_vframe_rate_hint(2);
 }
 EXPORT_SYMBOL(get_vframe2_rate_hint);
+
+/* dummy for temp */
+int set_vframe2_rate_end_hint(void)
+{
+	return vout_func_set_vframe_rate_hint(2, 0);
+}
+EXPORT_SYMBOL(set_vframe2_rate_end_hint);
 
 /*
  *interface export to client who want to notify about source fr_policy.

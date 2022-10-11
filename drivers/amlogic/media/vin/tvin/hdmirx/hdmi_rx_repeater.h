@@ -1,6 +1,18 @@
-/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/amlogic/media/vin/tvin/hdmirx/hdmirx_repeater.h
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
 #ifndef __HDMIRX_REPEATER__
@@ -24,6 +36,9 @@
 #define KSV_LIST_WR_MAX			5
 #define KSV_LIST_WAIT_DELAY		500/*according to the timer,5s*/
 
+#define is_audio_support(x) (((x) == AUDIO_FORMAT_LPCM) || \
+		((x) == AUDIO_FORMAT_DTS) || ((x) == AUDIO_FORMAT_DDP))
+
 enum repeater_state_e {
 	REPEATER_STATE_WAIT_KSV,
 	REPEATER_STATE_WAIT_ACK,
@@ -45,7 +60,7 @@ struct hdcp_hw_info_s {
 	unsigned int open:4;
 	unsigned int frame_rate:8;
 	unsigned int signal_stable:1;
-	unsigned int reserved:15;
+	unsigned int reseved:15;
 };
 
 extern int receive_edid_len;
@@ -59,24 +74,24 @@ extern bool repeat_plug;
 extern int up_phy_addr;/*d c b a 4bit*/
 extern unsigned char receive_hdcp[MAX_KSV_LIST_SIZE];
 
-void rx_set_repeater_support(bool enable);
-int rx_set_receiver_edid(const char *data, int len);
-void rx_start_repeater_auth(void);
-void rx_set_repeat_signal(bool repeat);
-bool rx_set_repeat_aksv(unsigned char *data, int len, int depth,
-			bool dev_exceed, bool cascade_exceed);
-unsigned char *rx_get_dw_edid_addr(void);
-void repeater_dwork_handle(struct work_struct *work);
+extern void rx_set_repeater_support(bool enable);
+extern int rx_set_receiver_edid(const char *data, int len);
+extern void rx_start_repeater_auth(void);
+extern void rx_set_repeat_signal(bool repeat);
+extern bool rx_set_repeat_aksv(unsigned char *data, int len, int depth,
+		bool dev_exceed, bool cascade_exceed);
+extern unsigned char *rx_get_dw_edid_addr(void);
+extern void repeater_dwork_handle(struct work_struct *work);
 bool rx_set_receive_hdcp(unsigned char *data,
-			 int len, int depth,
-			 bool cas_exceed, bool devs_exceed);
+	int len, int depth, bool cas_exceed, bool devs_exceed);
 void rx_repeat_hpd_state(bool plug);
 void rx_repeat_hdcp_ver(int version);
 void rx_check_repeat(void);
-bool hdmirx_is_key_write(void);
-void rx_reload_firm_reset(int reset);
-void rx_firm_reset_end(void);
-unsigned char *rx_get_dw_hdcp_addr(void);
-unsigned char *rx_get_dw_edid_addr(void);
+extern bool hdmirx_is_key_write(void);
+extern void rx_reload_firm_reset(int reset);
+extern void rx_firm_reset_end(void);
+extern unsigned char *rx_get_dw_hdcp_addr(void);
+extern unsigned char *rx_get_dw_edid_addr(void);
+
 
 #endif

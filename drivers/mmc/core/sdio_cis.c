@@ -1,4 +1,3 @@
-// SPDX-License-Identifier: GPL-2.0-or-later
 /*
  * linux/drivers/mmc/core/sdio_cis.c
  *
@@ -7,6 +6,11 @@
  * Copyright:	MontaVista Software Inc.
  *
  * Copyright 2007 Pierre Ossman
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or (at
+ * your option) any later version.
  */
 
 #include <linux/kernel.h>
@@ -76,7 +80,7 @@ static int cistpl_manfid(struct mmc_card *card, struct sdio_func *func,
 			 const unsigned char *buf, unsigned size)
 {
 	unsigned int vendor, device;
-#ifdef CONFIG_AMLOGIC_MODIFY
+#ifdef CONFIG_AMLOGIC_MMC
 	int i;
 #endif
 
@@ -94,7 +98,7 @@ static int cistpl_manfid(struct mmc_card *card, struct sdio_func *func,
 		card->cis.device = device;
 	}
 
-#ifdef CONFIG_AMLOGIC_MODIFY
+#ifdef CONFIG_AMLOGIC_MMC
 	for (i = 0; i < ARRAY_SIZE(aWifi_clk); i++) {
 		if (aWifi_clk[i].m_device_id == device) {
 			aWifi_clk[i].m_use_flag = 1;
@@ -274,8 +278,7 @@ static int sdio_read_cis(struct mmc_card *card, struct sdio_func *func)
 	else
 		prev = &card->tuples;
 
-	if (*prev)
-		return -EINVAL;
+	BUG_ON(*prev);
 
 	do {
 		unsigned char tpl_code, tpl_link;

@@ -1,4 +1,3 @@
-/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
  * drivers/amlogic/media/video_processor/ppmgr/ppmgr_log.h
  *
@@ -19,7 +18,6 @@
 #ifndef OSD_LOG_H
 #define OSD_LOG_H
 
-#undef DEBUG
 #define DEBUG
 #ifdef DEBUG
 #define  AMLOG   1

@@ -1,4 +1,3 @@
-/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
  * drivers/amlogic/media/video_sink/video_priv.h
  *
@@ -34,9 +33,9 @@
 #define DEBUG_FLAG_PRINT_DISBUF_PER_VSYNC        0x10
 #define DEBUG_FLAG_PRINT_PATH_SWITCH        0x20
 #define DEBUG_FLAG_TRACE_EVENT	        0x40
+#define DEBUG_FLAG_PRINT_DISPLAY_TIME       0x80
 #define DEBUG_FLAG_LOG_RDMA_LINE_MAX         0x100
 #define DEBUG_FLAG_BLACKOUT     0x200
-#define DEBUG_FLAG_NO_CLIP_SETTING     0x400
 #define DEBUG_FLAG_TOGGLE_SKIP_KEEP_CURRENT  0x10000
 #define DEBUG_FLAG_TOGGLE_FRAME_PER_VSYNC    0x20000
 #define DEBUG_FLAG_RDMA_WAIT_1		     0x40000
@@ -51,8 +50,13 @@
 #define DEBUG_FLAG_OMX_DV_DROP_FRAME        0x8000000
 #define DEBUG_FLAG_COMPOSER_NO_DROP_FRAME     0x10000000
 #define DEBUG_FLAG_AXIS_NO_UPDATE     0x20000000
-#define DEBUG_FLAG_HDMI_AVSYNC_DEBUG     0x40000000
+#define DEBUG_FLAG_NO_CLIP_SETTING    0x40000000
+#define DEBUG_FLAG_HDMI_AVSYNC_DEBUG  0x40000000
 #define DEBUG_FLAG_HDMI_DV_CRC     0x80000000
+
+/*for performance_debug*/
+#define DEBUG_FLAG_VSYNC_PROCESS_TIME  0x1
+#define DEBUG_FLAG_OVER_VSYNC          0x2
 
 #define VOUT_TYPE_TOP_FIELD 0
 #define VOUT_TYPE_BOT_FIELD 1
@@ -69,12 +73,11 @@
 #define VIDEO_NOTIFY_POS_CHANGED  0x10
 #define VIDEO_NOTIFY_NEED_NO_COMP  0x20
 
-#define MAX_VD_LAYER 3
+#define MAX_VD_LAYER 2
 #define COMPOSE_MODE_NONE			0
 #define COMPOSE_MODE_3D			1
 #define COMPOSE_MODE_DV			2
 #define COMPOSE_MODE_BYPASS_CM	4
-
 #define VIDEO_PROP_CHANGE_NONE		0
 #define VIDEO_PROP_CHANGE_SIZE		0x1
 #define VIDEO_PROP_CHANGE_FMT		0x2
@@ -88,7 +91,6 @@
 
 #define LAYER1_CANVAS_BASE_INDEX 0x58
 #define LAYER2_CANVAS_BASE_INDEX 0x64
-#define LAYER3_CANVAS_BASE_INDEX 0xd8
 
 #ifdef CONFIG_AMLOGIC_MEDIA_VSYNC_RDMA
 #define CANVAS_TABLE_CNT 2
@@ -100,19 +102,21 @@
 
 #define DISPBUF_TO_PUT_MAX 3
 
-#define IS_DI_PROCESSED(vftype) ((vftype) & (VIDTYPE_PRE_INTERLACE | VIDTYPE_DI_PW))
+#define IS_DI_PROCESSED(vftype) \
+	((vftype) & (VIDTYPE_PRE_INTERLACE | VIDTYPE_DI_PW))
 #define IS_DI_POST(vftype) \
 	(((vftype) & (VIDTYPE_PRE_INTERLACE | VIDTYPE_DI_PW)) \
 	 == VIDTYPE_PRE_INTERLACE)
 #define IS_DI_POSTWRTIE(vftype) ((vftype) & VIDTYPE_DI_PW)
 #define MAX_PIP_WINDOW    16
+
 #define VPP_FILER_COEFS_NUM   33
-#define VPP_NUM 3
-#define RDMA_INTERFACE_NUM 4
 
 #define OP_VPP_MORE_LOG 1
 #define OP_FORCE_SWITCH_VF 2
 #define OP_FORCE_NOT_SWITCH_VF 4
+
+#define IS_DI_POSTWRTIE(vftype) ((vftype) & VIDTYPE_DI_PW)
 
 enum vd_path_id {
 	VFM_PATH_DEF = -1,
@@ -120,14 +124,8 @@ enum vd_path_id {
 	VFM_PATH_PIP = 1,
 	VFM_PATH_VIDEO_RENDER0 = 2,
 	VFM_PATH_VIDEO_RENDER1 = 3,
-	VFM_PATH_PIP2 = 4,
-	VFM_PATH_VIDEO_RENDER2 = 5,
-	VFM_PATH_VIDEO_RENDER3 = 6,
-	VFM_PATH_VIDEO_RENDER4 = 7,
-	VFM_PATH_VIDEO_RENDER5 = 8,
-	VFM_PATH_VIDEO_RENDER6 = 9,
 	VFM_PATH_AUTO = 0xfe,
-	VFM_PATH_INVALID = 0xff
+	VFM_PATH_INVAILD = 0xff
 };
 
 enum toggle_out_fl_frame_e {
@@ -136,47 +134,9 @@ enum toggle_out_fl_frame_e {
 	OUT_FA_B_FRAME
 };
 
-enum pre_hscaler_e {
-	PRE_HSCALER_2TAP = 2,
-	PRE_HSCALER_4TAP = 4,
-	PRE_HSCALER_6TAP = 6,
-	PRE_HSCALER_8TAP = 8
-};
-
-enum vpp_type_e {
-	VPP0,
-	VPP1,
-	VPP2,
-};
-
-enum reshape_mode_e {
-	MODE_2X2 = 1,
-	MODE_3X3 = 2,
-	MODE_4X4 = 3,
-};
-
-typedef u32 (*rdma_rd_op)(u32 reg);
-typedef int (*rdma_wr_op)(u32 reg, u32 val);
-typedef int (*rdma_wr_bits_op)(u32 reg, u32 val, u32 start, u32 len);
-
-struct rdma_fun_s {
-	rdma_rd_op rdma_rd;
-	rdma_wr_op rdma_wr;
-	rdma_wr_bits_op rdma_wr_bits;
-};
-
 struct video_dev_s {
 	int vpp_off;
 	int viu_off;
-	int mif_linear;
-	int t7_display;
-	int max_vd_layers;
-	int vd2_independ_blend_ctrl;
-	int aisr_support;
-	int scaler_sep_coef_en;
-	struct hw_pps_reg_s aisr_pps_reg;
-	struct vpp_frame_par_s aisr_frame_parms;
-	struct rdma_fun_s rdma_func[RDMA_INTERFACE_NUM];
 };
 
 struct video_layer_s;
@@ -224,7 +184,6 @@ struct mif_pos_s {
 
 	bool skip_afbc;
 	u32 vpp_3d_mode;
-	u8 block_mode;
 };
 
 struct scaler_setting_s {
@@ -303,20 +262,6 @@ struct fgrain_setting_s {
 	u32 table_size;
 };
 
-struct aisr_setting_s {
-	u32 aisr_enable;
-	u32 in_ratio; /* 1:2x2  2:3x3 3:4x4 */
-	u32 src_w;
-	u32 src_h;
-	u32 x_start;
-	u32 x_end;
-	u32 y_start;
-	u32 y_end;
-	u32 little_endian;
-	u32 swap_64bit;
-	ulong phy_addr;
-};
-
 enum mode_3d_e {
 	mode_3d_disable = 0,
 	mode_3d_enable,
@@ -325,15 +270,12 @@ enum mode_3d_e {
 
 struct video_layer_s {
 	u8 layer_id;
-	u8 layer_support;
+
 	/* reg map offsett*/
 	u32 misc_reg_offt;
 	struct hw_vd_reg_s vd_mif_reg;
-	struct hw_vd_linear_reg_s vd_mif_linear_reg;
 	struct hw_afbc_reg_s vd_afbc_reg;
 	struct hw_fg_reg_s fg_reg;
-	struct hw_pps_reg_s pps_reg;
-	struct hw_vpp_blend_reg_s vpp_blend_reg;
 	u8 cur_canvas_id;
 #ifdef CONFIG_AMLOGIC_MEDIA_VSYNC_RDMA
 	u8 next_canvas_id;
@@ -366,8 +308,6 @@ struct video_layer_s {
 	struct blend_setting_s bld_setting;
 	struct fgrain_setting_s fgrain_setting;
 	struct clip_setting_s clip_setting;
-	struct aisr_setting_s aisr_mif_setting;
-	struct scaler_setting_s aisr_sc_setting;
 
 	u32 new_vframe_count;
 
@@ -378,8 +318,6 @@ struct video_layer_s {
 
 	u32 disable_video;
 	u32 enabled;
-	u32 pre_blend_en;
-	u32 post_blend_en;
 	u32 enabled_status_saved;
 	u32 onoff_state;
 	u32 onoff_time;
@@ -396,9 +334,8 @@ struct video_layer_s {
 	bool need_switch_vf;
 	bool do_switch;
 	bool force_black;
-	u8 vpp_index;
-	u8 vppx_blend_en;
 	bool vd1_vd2_mux;
+
 	u32 video_en_bg_color;
 	u32 video_dis_bg_color;
 };
@@ -409,23 +346,15 @@ enum {
 	NEW_CORE0_CORE1,
 	OLD_CORE0_CORE1,
 };
+
 enum cpu_type_e {
 	MESON_CPU_MAJOR_ID_COMPATIBALE = 0x1,
 	MESON_CPU_MAJOR_ID_TM2_REVB,
 	MESON_CPU_MAJOR_ID_SC2_,
 	MESON_CPU_MAJOR_ID_T5_,
 	MESON_CPU_MAJOR_ID_T5D_,
-	MESON_CPU_MAJOR_ID_T7_,
-	MESON_CPU_MAJOR_ID_S4_,
 	MESON_CPU_MAJOR_ID_T5D_REVB_,
-	MESON_CPU_MAJOR_ID_T3_,
-	MESON_CPU_MAJOR_ID_UNKNOWN_,
-};
-
-struct video_device_hw_s {
-	u32 vd2_independ_blend_ctrl;
-	u32 aisr_support;
-	u32 frc_support;
+	MESON_CPU_MAJOR_ID_UNKNOWN,
 };
 
 struct amvideo_device_data_s {
@@ -444,19 +373,19 @@ struct amvideo_device_data_s {
 	u8 supscl_path;
 	u8 fgrain_support[MAX_VD_LAYER];
 	u8 has_hscaler_8tap[MAX_VD_LAYER];
-	/* 1: 4tap; 2: 8tap */
 	u8 has_pre_hscaler_ntap[MAX_VD_LAYER];
 	u8 has_pre_vscaler_ntap[MAX_VD_LAYER];
 	u32 src_width_max[MAX_VD_LAYER];
 	u32 src_height_max[MAX_VD_LAYER];
 	u32 ofifo_size;
 	u32 afbc_conv_lbuf_len;
-	u8 mif_linear;
-	u8 t7_display;
-	u8 max_vd_layers;
-	u8 has_vpp1;
-	u8 has_vpp2;
-	struct video_device_hw_s dev_property;
+};
+
+struct time_info_t {
+	u32 toogle_index;
+	u32 set_index;
+	long long hwc_time;
+	long long display_time;
 };
 
 /* from video_hw.c */
@@ -467,11 +396,8 @@ extern bool legacy_vpp;
 extern bool hscaler_8tap_enable[MAX_VD_LAYER];
 extern int pre_hscaler_ntap_enable[MAX_VD_LAYER];
 extern int pre_hscaler_ntap_set[MAX_VD_LAYER];
-extern int pre_hscaler_ntap[MAX_VD_LAYER];
 extern int pre_vscaler_ntap_enable[MAX_VD_LAYER];
 extern int pre_vscaler_ntap_set[MAX_VD_LAYER];
-extern int pre_vscaler_ntap[MAX_VD_LAYER];
-extern bool vd1_vd2_mux;
 bool is_dolby_vision_enable(void);
 bool is_dolby_vision_on(void);
 bool is_dolby_vision_stb_mode(void);
@@ -481,101 +407,107 @@ bool for_dolby_vision_certification(void);
 struct video_dev_s *get_video_cur_dev(void);
 u32 get_video_enabled(void);
 u32 get_videopip_enabled(void);
-u32 get_videopip2_enabled(void);
-u32 get_video_onoff_state(void);
-u32 get_videopip_onoff_state(void);
-u32 get_videopip2_onoff_state(void);
 
 bool is_di_on(void);
 bool is_di_post_on(void);
 bool is_di_post_link_on(void);
 bool is_di_post_mode(struct vframe_s *vf);
+
 bool is_afbc_enabled(u8 layer_id);
 bool is_local_vf(struct vframe_s *vf);
-bool is_picmode_changed(u8 layer_id, struct vframe_s *vf);
 
-void safe_switch_videolayer(u8 layer_id,
-			    bool on, bool async);
-
-#ifndef CONFIG_AMLOGIC_MEDIA_ENHANCEMENT_DOLBYVISION
-bool is_dolby_vision_enable(void);
-bool is_dolby_vision_on(void);
-bool is_dolby_vision_stb_mode(void);
-bool for_dolby_vision_certification(void);
-bool is_dovi_frame(struct vframe_s *vf);
-void dolby_vision_set_toggle_flag(int flag);
-#endif
+void safe_switch_videolayer(
+	u8 layer_id, bool on, bool async);
 
 #ifdef CONFIG_AMLOGIC_MEDIA_ENHANCEMENT_DOLBYVISION
-void correct_vd1_mif_size_for_DV(struct vpp_frame_par_s *par,
-				 struct vframe_s *el_vf);
-void config_dvel_position(struct video_layer_s *layer,
-			  struct mif_pos_s *setting,
-			  struct vframe_s *el_vf);
-s32 config_dvel_pps(struct video_layer_s *layer,
-		    struct scaler_setting_s *setting,
-		    const struct vinfo_s *info);
-s32 config_dvel_blend(struct video_layer_s *layer,
-		      struct blend_setting_s *setting,
-		      struct vframe_s *dvel_vf);
+void correct_vd1_mif_size_for_DV(
+	struct vpp_frame_par_s *par, struct vframe_s *el_vf);
+void config_dvel_position(
+	struct video_layer_s *layer,
+	struct mif_pos_s *setting,
+	struct vframe_s *el_vf);
+s32 config_dvel_pps(
+	struct video_layer_s *layer,
+	struct scaler_setting_s *setting,
+	const struct vinfo_s *info);
+s32 config_dvel_blend(
+	struct video_layer_s *layer,
+	struct blend_setting_s *setting,
+	struct vframe_s *dvel_vf);
 #endif
 
 #ifdef TV_3D_FUNCTION_OPEN
-void config_3d_vd2_position(struct video_layer_s *layer,
-			    struct mif_pos_s *setting);
-s32 config_3d_vd2_pps(struct video_layer_s *layer,
-		      struct scaler_setting_s *setting,
-		      const struct vinfo_s *info);
-s32 config_3d_vd2_blend(struct video_layer_s *layer,
-			struct blend_setting_s *setting);
-void switch_3d_view_per_vsync(struct video_layer_s *layer);
+void config_3d_vd2_position(
+	struct video_layer_s *layer,
+	struct mif_pos_s *setting);
+s32 config_3d_vd2_pps(
+	struct video_layer_s *layer,
+	struct scaler_setting_s *setting,
+	const struct vinfo_s *info);
+s32 config_3d_vd2_blend(
+	struct video_layer_s *layer,
+	struct blend_setting_s *setting);
+void switch_3d_view_per_vsync(
+	struct video_layer_s *layer);
 #endif
 
-s32 config_vd_position(struct video_layer_s *layer,
-		       struct mif_pos_s *setting);
-s32 config_vd_pps(struct video_layer_s *layer,
-		  struct scaler_setting_s *setting,
-		  const struct vinfo_s *info);
-s32 config_vd_blend(struct video_layer_s *layer,
-		    struct blend_setting_s *setting);
-void vd_set_dcu(u8 layer_id,
-		struct video_layer_s *layer,
-		struct vpp_frame_par_s *frame_par,
-		struct vframe_s *vf);
-void vd_mif_setting(struct video_layer_s *layer,
-		    struct mif_pos_s *setting);
-void vd_scaler_setting(struct video_layer_s *layer,
-		       struct scaler_setting_s *setting);
-void vd_blend_setting(struct video_layer_s *layer,
-		      struct blend_setting_s *setting);
-void vd_clip_setting(u8 layer_id,
-		     struct clip_setting_s *setting);
-void proc_vd_vsc_phase_per_vsync(struct video_layer_s *layer,
-				 struct vpp_frame_par_s *frame_par,
-				 struct vframe_s *vf);
+s32 config_vd_position(
+	struct video_layer_s *layer,
+	struct mif_pos_s *setting);
+s32 config_vd_pps(
+	struct video_layer_s *layer,
+	struct scaler_setting_s *setting,
+	const struct vinfo_s *info);
+s32 config_vd_blend(
+	struct video_layer_s *layer,
+	struct blend_setting_s *setting);
+void vd_set_dcu(
+	u8 layer_id,
+	struct video_layer_s *layer,
+	struct vpp_frame_par_s *frame_par,
+	struct vframe_s *vf);
+void vd_mif_setting(
+	u8 layer_id,
+	struct mif_pos_s *setting);
+void vd_scaler_setting(
+	u8 layer_id,
+	struct scaler_setting_s *setting);
+void vd_blend_setting(
+	u8 layer_id,
+	struct blend_setting_s *setting);
+void vd_clip_setting(
+	u8 layer_id,
+	struct clip_setting_s *setting);
+void proc_vd_vsc_phase_per_vsync(
+	u8 layer_id,
+	struct video_layer_s *layer,
+	struct vpp_frame_par_s *frame_par,
+	struct vframe_s *vf);
 
-void vpp_blend_update(const struct vinfo_s *vinfo);
-void vpp_blend_update_t7(const struct vinfo_s *vinfo);
-void vppx_vd_blend_setting(struct video_layer_s *layer, struct blend_setting_s *setting);
-void vppx_blend_update(const struct vinfo_s *vinfo, u32 vpp_index);
+void vpp_blend_update(
+	const struct vinfo_s *vinfo);
+
+void set_video_ipt(u8 layer_id, u32 enable);
 int get_layer_display_canvas(u8 layer_id);
-int set_layer_display_canvas(struct video_layer_s *layer,
-			     struct vframe_s *vf,
-			     struct vpp_frame_par_s *cur_frame_par,
-			     struct disp_info_s *disp_info);
+int set_layer_display_canvas(
+	u8 layer_id, struct vframe_s *vf,
+	struct vpp_frame_par_s *cur_frame_par,
+	struct disp_info_s *disp_info);
 u32 *get_canvase_tbl(u8 layer_id);
-s32 layer_swap_frame(struct vframe_s *vf, struct video_layer_s *layer,
-		     bool force_toggle,
-		     const struct vinfo_s *vinfo);
-int detect_vout_type(const struct vinfo_s *vinfo);
+s32 layer_swap_frame(
+	struct vframe_s *vf, u8 layer_id,
+	bool force_toggle,
+	const struct vinfo_s *vinfo);
+
+int detect_vout_type(
+	const struct vinfo_s *vinfo);
 int calc_hold_line(void);
 u32 get_cur_enc_line(void);
 void vpu_work_process(void);
-int vpp_crc_check(u32 vpp_crc_en, u8 vpp_index);
+int vpp_crc_check(u32 vpp_crc_en);
 void enable_vpp_crc_viu2(u32 vpp_crc_en);
 int vpp_crc_viu2_check(u32 vpp_crc_en);
 void dump_pps_coefs_info(u8 layer_id, u8 bit9_mode, u8 coef_type);
-struct video_layer_s *get_layer_by_layer_id(u8 layer_id);
 
 int video_hw_init(void);
 int video_early_init(struct amvideo_device_data_s *p_amvideo);
@@ -598,36 +530,17 @@ extern u32  mirror;
 extern struct vframe_s vf_local;
 extern struct vframe_s vf_local2;
 extern struct vframe_s local_pip;
-extern struct vframe_s local_pip2;
 extern struct vframe_s *cur_dispbuf;
 extern struct vframe_s *cur_pipbuf;
-extern struct vframe_s *cur_pipbuf2;
 extern bool need_disable_vd2;
-extern bool need_disable_vd3;
 extern u32 last_el_status;
 extern u32 video_prop_status;
 extern u32 force_blackout;
 extern atomic_t video_unreg_flag;
-extern atomic_t video_unreg_flag_vpp[2];
 extern atomic_t video_inirq_flag;
-extern atomic_t video_inirq_flag_vpp[2];
+extern struct video_recv_s *gvideo_recv[2];
 extern uint load_pps_coef;
-extern struct video_recv_s *gvideo_recv[3];
-extern struct video_recv_s *gvideo_recv_vpp[2];
-extern uint load_pps_coef;
-extern atomic_t gafbc_request;
-extern atomic_t video_unreg_flag;
-extern atomic_t video_pause_flag;
-extern bool video_suspend;
-extern u32 video_suspend_cycle;
-extern int log_out;
-extern int debug_flag;
-extern bool bypass_pps;
-extern bool rdma_enable_pre;
-extern struct vpp_frame_par_s *curpip_frame_par;
-extern struct vpp_frame_par_s *curpip2_frame_par;
-extern struct video_layer_s vd_layer_vpp[2];
-extern u32 force_switch_vf_mode;
+extern bool vd1_vd2_mux;
 
 bool black_threshold_check(u8 id);
 extern atomic_t primary_src_fmt;
@@ -642,146 +555,41 @@ void video_module_lock(void);
 void video_module_unlock(void);
 int get_video_debug_flags(void);
 int _video_set_disable(u32 val);
-int _videopip_set_disable(u32 index, u32 val);
+int _videopip_set_disable(u32 val);
 struct device *get_video_device(void);
 #ifdef CONFIG_AMLOGIC_MEDIA_ENHANCEMENT_DOLBYVISION
-struct vframe_s *dvel_toggle_frame(struct vframe_s *vf,
-				   bool new_frame);
+struct vframe_s *dvel_toggle_frame(
+	struct vframe_s *vf, bool new_frame);
 #endif
 
 #ifdef CONFIG_AMLOGIC_MEDIA_VIDEOCAPTURE
 int ext_frame_capture_poll(int endflags);
 #endif
 bool is_meson_tm2_revb(void);
-bool video_is_meson_sc2_cpu(void);
-bool video_is_meson_t5d_cpu(void);
-bool video_is_meson_t7_cpu(void);
-bool video_is_meson_s4_cpu(void);
+bool is_meson_sc2_cpu(void);
+bool is_meson_t5_cpu(void);
 bool video_is_meson_t5d_revb_cpu(void);
-bool video_is_meson_t3_cpu(void);
-void set_alpha(struct video_layer_s *layer,
+void set_alpha(u8 layer_id,
 	       u32 win_en,
 	       struct pip_alpha_scpxn_s *alpha_win);
-void fgrain_config(struct video_layer_s *layer,
+
+#ifdef CONFIG_AMLOGIC_MEDIA_DEINTERLACE
+void di_trig_free_mirror_mem(void);
+#endif
+void fgrain_config(u8 layer_id,
 		   struct vpp_frame_par_s *frame_par,
 		   struct mif_pos_s *mif_setting,
 		   struct fgrain_setting_s *setting,
 		   struct vframe_s *vf);
-void fgrain_setting(struct video_layer_s *layer,
+void fgrain_setting(u8 layer_id,
 		    struct fgrain_setting_s *setting,
 		    struct vframe_s *vf);
-void fgrain_update_table(struct video_layer_s *layer,
+void fgrain_update_table(u8 layer_id,
 			 struct vframe_s *vf);
 void video_secure_set(void);
 bool has_hscaler_8tap(u8 layer_id);
 bool has_pre_hscaler_ntap(u8 layer_id);
-bool has_pre_hscaler_8tap(u8 layer_id);
 bool has_pre_vscaler_ntap(u8 layer_id);
-void _set_video_window(struct disp_info_s *layer, int *p);
-void _set_video_crop(struct disp_info_s *layer, int *p);
-void set_alpha_scpxn(struct video_layer_s *layer,
-			   struct componser_info_t *componser_info);
 void di_used_vd1_afbc(bool di_used);
-void pip_swap_frame(struct video_layer_s *layer, struct vframe_s *vf,
-		    const struct vinfo_s *vinfo);
-s32 pip_render_frame(struct video_layer_s *layer, const struct vinfo_s *vinfo);
-void pip2_swap_frame(struct video_layer_s *layer, struct vframe_s *vf,
-		     const struct vinfo_s *vinfo);
-s32 pip2_render_frame(struct video_layer_s *layer, const struct vinfo_s *vinfo);
-void aisr_update_frame_info(struct video_layer_s *layer,
-			 struct vframe_s *vf);
-void aisr_reshape_cfg(struct aisr_setting_s *aisr_mif_setting);
-void aisr_pps_cfg(struct aisr_setting_s *aisr_mif_setting,
-		     struct scaler_setting_s *setting,
-		     struct scaler_setting_s *aisr_setting,
-		     struct vframe_s *vf);
-void aisr_scaler_setting(struct video_layer_s *layer,
-				    struct scaler_setting_s *setting);
-#ifdef CONFIG_AMLOGIC_MEDIA_VSYNC_RDMA
-void vsync_rdma_process(void);
-#endif
-
-
-#ifndef CONFIG_AMLOGIC_MEDIA_FRAME_SYNC
-enum avevent_e {
-	VIDEO_START,
-	VIDEO_PAUSE,
-	VIDEO_STOP,
-	VIDEO_TSTAMP_DISCONTINUITY,
-	AUDIO_START,
-	AUDIO_PAUSE,
-	AUDIO_RESUME,
-	AUDIO_STOP,
-	AUDIO_TSTAMP_DISCONTINUITY,
-	AUDIO_PRE_START,
-	AUDIO_WAIT
-};
-
-enum tsync_mode_e {
-	TSYNC_MODE_VMASTER,
-	TSYNC_MODE_AMASTER,
-	TSYNC_MODE_PCRMASTER,
-};
-
-enum {
-	PTS_TYPE_VIDEO = 0,
-	PTS_TYPE_AUDIO = 1,
-	PTS_TYPE_HEVC = 2,
-	PTS_TYPE_MAX = 3
-};
-
-static inline void tsync_avevent_locked(enum avevent_e event, u32 param) {}
-static inline void tsync_avevent(enum avevent_e event, u32 param) {}
-static inline int tsync_get_mode(void) { return 0; }
-static inline void tsync_set_enable(int enable) {}
-static inline void tsync_set_syncthresh(unsigned int sync_thresh) {}
-
-static inline int tsync_get_sync_adiscont(void) { return 0; }
-static inline int tsync_get_sync_vdiscont(void) { return 0; }
-static inline void tsync_set_sync_adiscont(int syncdiscont) {}
-static inline void tsync_set_sync_vdiscont(int syncdiscont) {}
-static inline u32 tsync_get_sync_adiscont_diff(void) { return 0; }
-static inline u32 tsync_get_sync_vdiscont_diff(void) { return 0; }
-static inline void tsync_set_sync_adiscont_diff(u32 discontinue_diff) {}
-static inline void tsync_set_sync_vdiscont_diff(u32 discontinue_diff) {}
-static inline void tsync_trick_mode(int trick_mode) {}
-static inline int tsync_set_tunnel_mode(int mode) { return 0; }
-static inline void tsync_set_avthresh(unsigned int av_thresh) {}
-static inline u32 tsync_vpts_discontinuity_margin(void)
-{
-	return 0;
-}
-
-static inline u32 timestamp_vpts_get(void) { return 0; }
-static inline void timestamp_vpts_set(u32 pts) {}
-static inline void timestamp_vpts_inc(s32 val)  {}
-static inline u32 timestamp_apts_get(void)  { return 0; }
-static inline void timestamp_apts_set(u32 pts) {}
-static inline void timestamp_apts_inc(s32 val) {}
-static inline u32 timestamp_pcrscr_get(void) { return 0; }
-static inline void timestamp_pcrscr_set(u32 pts) {}
-static inline void timestamp_pcrscr_inc(s32 val) {}
-static inline void timestamp_pcrscr_inc_scale(s32 inc, u32 base) {}
-static inline void timestamp_pcrscr_enable(u32 enable) {}
-static inline u32 timestamp_pcrscr_enable_state(void) { return 0; }
-
-static inline int calculation_stream_delayed_ms(u8 type, u32 *latestbirate,
-						u32 *avg_bitare)
-{return 0; }
-
-static inline bool tsync_check_vpts_discontinuity(unsigned int vpts)
-{
-	return false;
-}
-#endif
-
-#ifndef CONFIG_AMLOGIC_MEDIA_ENHANCEMENT_VECM
-enum vd_path_e {
-	VD1_PATH = 0,
-	VD2_PATH = 1,
-	VD3_PATH = 2,
-	VD_PATH_MAX = 3
-};
-#endif
 #endif
 /*VIDEO_PRIV_HEADER_HH*/

@@ -1,4 +1,3 @@
-/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
  * Color Management
  * include/linux/amlogic/media/amvecm/cm.h
@@ -9,6 +8,7 @@
  * it under the terms of the GNU General Public License version 2 as
  * published by the Free Software Foundation.
  */
+
 
 #ifndef _TVOUT_CM_H
 #define _TVOUT_CM_H
@@ -116,7 +116,6 @@ struct cm_cbar_s {
 	unsigned char cb;
 	unsigned char y;
 };
-
 struct cm_demo_s {
 	unsigned char       en;
 	enum cm_demo_pos_e  pos;
@@ -152,7 +151,6 @@ struct am_reg_s {
 	unsigned int mask; /* 32-bits; Valid bits */
 	unsigned int  val; /* 32-bits; Register Value */
 };
-
 #define am_reg_size 900
 struct am_regs_s {
 	unsigned int    length; /* Length of total am_reg */

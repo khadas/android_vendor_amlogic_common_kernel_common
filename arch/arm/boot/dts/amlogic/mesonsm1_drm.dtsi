@@ -1,8 +1,19 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * arch/arm/boot/dts/amlogic/mesonsm1_drm.dtsi
+ *
+ * Copyright (C) 2015 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
-
 #include <dt-bindings/display/meson-drm-ids.h>
 
 / {
@@ -30,7 +41,7 @@
 	drm_amhdmitx: drm-amhdmitx {
 		status = "disabled";
 		hdcp = "disabled";
-		compatible = "amlogic, drm-amhdmitx";
+		compatible = "amlogic,drm-amhdmitx";
 		dev_name = "meson-amhdmitx";
 		interrupts = <GIC_SPI 57 IRQ_TYPE_EDGE_RISING>;
 		ports {
@@ -47,7 +58,7 @@
 
 	drm_amcvbsout: drm-amcvbsout {
 		status = "disabled";
-		compatible = "amlogic, drm-cvbsout";
+		compatible = "amlogic,drm-cvbsout";
 		dev_name = "meson-amcvbsout";
 		ports {
 			port {
@@ -63,7 +74,7 @@
 
 	drm_lcd: drm-lcd {
 		status = "disabled";
-		compatible = "amlogic, drm-lcd";
+		compatible = "amlogic,drm-lcd";
 		dev_name = "meson-lcd";
 		ports {
 			port {
@@ -81,6 +92,7 @@
 		status = "disabled";
 		compatible = "amlogic, meson-sm1-vpu";
 		memory-region = <&logo_reserved>;
+		osd_ver = /bits/ 8 <OSD_V4>;
 		reg = <0xff900000 0x40000>,
 			  <0xff63c000 0x2000>,
 			  <0xff638000 0x2000>;
@@ -100,11 +112,11 @@
 				remote-endpoint = <&hdmi_in_vpu>;
 			};
 			vpu_out_cvbs: endpoint@1 {
-				reg = <1>;
+				reg = <0>;
 				remote-endpoint = <&cvbs_in_vpu>;
 			};
 			vpu_out_lcd: endpoint@2 {
-				reg = <2>;
+				reg = <1>;
 				remote-endpoint = <&lcd_in_vpu>;
 			};
 		};
@@ -112,8 +124,13 @@
 
 	drm_subsystem: drm-subsystem {
 		status = "okay";
-		compatible = "amlogic, drm-subsystem";
+		compatible = "amlogic,drm-subsystem";
 		ports = <&vpu_out>;
+		fbdev_ui_w = <1920>;
+		fbdev_ui_h = <1080>;
+		fbdev_fb_w = <1920>;
+		fbdev_fb_h = <2160>;
+		fbdev_fb_bpp = <32>;
 
 		vpu_topology: vpu_topology {
 			vpu_blocks {
@@ -254,7 +271,7 @@
 		};
 
 		vpu_hw_para: vpu_hw_para@0 {
-			osd_ver = /bits/ 8 <0x5>;
+			osd_ver = /bits/ 8 <0x2>;
 			afbc_type = /bits/ 8 <0x2>;
 			has_deband = /bits/ 8 <0x1>;
 			has_lut = /bits/ 8 <0x1>;

@@ -1,37 +1,70 @@
-// SPDX-License-Identifier: GPL-2.0
 /*
- * misc function interface
+ * sound/soc/amlogic/common/misc.c
  *
- * Copyright (C) 2019 Amlogic,inc
+ * Copyright (C) 2018 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
  *
  */
+#include <linux/amlogic/media/sound/misc.h>
 
-#if (defined CONFIG_AMLOGIC_ATV_DEMOD ||\
-		defined CONFIG_AMLOGIC_ATV_DEMOD_MODULE)
+#ifdef CONFIG_AMLOGIC_ATV_DEMOD
 #include <linux/amlogic/aml_atvdemod.h>
 #endif
 
-#if (defined CONFIG_AMLOGIC_MEDIA_TVIN_HDMI ||\
-		defined CONFIG_AMLOGIC_MEDIA_TVIN_HDMI_MODULE)
+#ifdef CONFIG_AMLOGIC_MEDIA_TVIN_HDMI
 #include <linux/amlogic/media/frame_provider/tvin/tvin.h>
 #endif
 
-#include "misc.h"
+bool audio_debug;
+
+static const char *const audio_debug_text[] = {
+	"off",
+	"on"
+};
+
+const struct soc_enum audio_debug_enum =
+	SOC_ENUM_SINGLE(SND_SOC_NOPM, 0, ARRAY_SIZE(audio_debug_text),
+			audio_debug_text);
+
+int audio_debug_get(struct snd_kcontrol *kcontrol,
+		    struct snd_ctl_elem_value *ucontrol)
+{
+	ucontrol->value.integer.value[0] = audio_debug;
+
+	return 0;
+}
+
+int audio_debug_put(struct snd_kcontrol *kcontrol,
+		    struct snd_ctl_elem_value *ucontrol)
+{
+	audio_debug = ucontrol->value.integer.value[0];
+
+	return 0;
+}
 
 static const char *const audio_is_stable[] = {
 	"false",
 	"true"
 };
 
-#if (defined CONFIG_AMLOGIC_ATV_DEMOD ||\
-		defined CONFIG_AMLOGIC_ATV_DEMOD_MODULE)
+#ifdef CONFIG_AMLOGIC_ATV_DEMOD
 
 const struct soc_enum atv_audio_status_enum =
 	SOC_ENUM_SINGLE(SND_SOC_NOPM, 0, ARRAY_SIZE(audio_is_stable),
 			audio_is_stable);
 
-int aml_get_atv_audio_stable(struct snd_kcontrol *kcontrol,
-			     struct snd_ctl_elem_value *ucontrol)
+int aml_get_atv_audio_stable(
+	struct snd_kcontrol *kcontrol,
+	struct snd_ctl_elem_value *ucontrol)
 {
 	int state = 0;
 
@@ -41,8 +74,7 @@ int aml_get_atv_audio_stable(struct snd_kcontrol *kcontrol,
 }
 #endif /* CONFIG_AMLOGIC_ATV_DEMOD */
 
-#if (defined CONFIG_AMLOGIC_MEDIA_TVIN_AVDETECT ||\
-		defined CONFIG_AMLOGIC_MEDIA_TVIN_AVDETECT_MODULE)
+#ifdef CONFIG_AMLOGIC_MEDIA_TVIN_AVDETECT
 
 const struct soc_enum av_audio_status_enum =
 	SOC_ENUM_SINGLE(SND_SOC_NOPM, 0, ARRAY_SIZE(audio_is_stable),
@@ -56,8 +88,7 @@ int aml_get_av_audio_stable(struct snd_kcontrol *kcontrol,
 }
 #endif /* CONFIG_AMLOGIC_MEDIA_TVIN_AVDETECT */
 
-#if (defined CONFIG_AMLOGIC_MEDIA_TVIN_HDMI ||\
-		defined CONFIG_AMLOGIC_MEDIA_TVIN_HDMI_MODULE)
+#ifdef CONFIG_AMLOGIC_MEDIA_TVIN_HDMI
 int hdmiin_fifo_disable_count;
 
 int get_hdmi_sample_rate_index(void)
@@ -104,7 +135,7 @@ int update_spdifin_audio_type(int audio_type)
 	struct rx_audio_stat_s aud_sts;
 
 	rx_get_audio_status(&aud_sts);
-	if (aud_sts.afifo_thres_pass)
+	if (aud_sts.afifo_thres_pass == true)
 		hdmiin_fifo_disable_count = 0;
 	else
 		hdmiin_fifo_disable_count++;
@@ -216,8 +247,9 @@ int get_hdmiin_audio_stable(void)
 	return (aud_sts.aud_stb_flag & audio_packet);
 }
 
-int aml_get_hdmiin_audio_stable(struct snd_kcontrol *kcontrol,
-				struct snd_ctl_elem_value *ucontrol)
+int aml_get_hdmiin_audio_stable(
+	struct snd_kcontrol *kcontrol,
+	struct snd_ctl_elem_value *ucontrol)
 {
 	ucontrol->value.integer.value[0] =
 		get_hdmiin_audio_stable();
@@ -225,8 +257,9 @@ int aml_get_hdmiin_audio_stable(struct snd_kcontrol *kcontrol,
 	return 0;
 }
 
-int aml_get_hdmiin_audio_samplerate(struct snd_kcontrol *kcontrol,
-				    struct snd_ctl_elem_value *ucontrol)
+int aml_get_hdmiin_audio_samplerate(
+	struct snd_kcontrol *kcontrol,
+	struct snd_ctl_elem_value *ucontrol)
 {
 	int val = get_hdmi_sample_rate_index();
 
@@ -235,8 +268,9 @@ int aml_get_hdmiin_audio_samplerate(struct snd_kcontrol *kcontrol,
 	return 0;
 }
 
-int aml_get_hdmiin_audio_channels(struct snd_kcontrol *kcontrol,
-				  struct snd_ctl_elem_value *ucontrol)
+int aml_get_hdmiin_audio_channels(
+	struct snd_kcontrol *kcontrol,
+	struct snd_ctl_elem_value *ucontrol)
 {
 	struct rx_audio_stat_s aud_sts;
 
@@ -247,8 +281,9 @@ int aml_get_hdmiin_audio_channels(struct snd_kcontrol *kcontrol,
 	return 0;
 }
 
-int aml_get_hdmiin_audio_format(struct snd_kcontrol *kcontrol,
-				struct snd_ctl_elem_value *ucontrol)
+int aml_get_hdmiin_audio_format(
+	struct snd_kcontrol *kcontrol,
+	struct snd_ctl_elem_value *ucontrol)
 {
 	struct rx_audio_stat_s aud_sts;
 
@@ -259,9 +294,11 @@ int aml_get_hdmiin_audio_format(struct snd_kcontrol *kcontrol,
 	return 0;
 }
 
+
 /* call HDMI CEC API to enable arc audio */
-int aml_set_atmos_audio_edid(struct snd_kcontrol *kcontrol,
-			     struct snd_ctl_elem_value *ucontrol)
+int aml_set_atmos_audio_edid(
+	struct snd_kcontrol *kcontrol,
+	struct snd_ctl_elem_value *ucontrol)
 {
 	bool enable = ucontrol->value.integer.value[0];
 
@@ -270,8 +307,9 @@ int aml_set_atmos_audio_edid(struct snd_kcontrol *kcontrol,
 	return 0;
 }
 
-int aml_get_atmos_audio_edid(struct snd_kcontrol *kcontrol,
-			     struct snd_ctl_elem_value *ucontrol)
+int aml_get_atmos_audio_edid(
+	struct snd_kcontrol *kcontrol,
+	struct snd_ctl_elem_value *ucontrol)
 {
 	bool flag = rx_get_atmos_flag();
 
@@ -280,8 +318,9 @@ int aml_get_atmos_audio_edid(struct snd_kcontrol *kcontrol,
 	return 0;
 }
 
-int aml_get_hdmiin_audio_packet(struct snd_kcontrol *kcontrol,
-				struct snd_ctl_elem_value *ucontrol)
+int aml_get_hdmiin_audio_packet(
+	struct snd_kcontrol *kcontrol,
+	struct snd_ctl_elem_value *ucontrol)
 {
 	struct rx_audio_stat_s aud_sts;
 	int val;

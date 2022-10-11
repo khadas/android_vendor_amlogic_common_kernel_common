@@ -1,6 +1,18 @@
-/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/amlogic/media/vin/tvin/tvafe/tvafe_vbi.h
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
 #ifndef TVIN_VBI_H_
@@ -50,6 +62,7 @@
 #define VBI_SYS_TT_525C            6
 #define VBI_SYS_TT_525D            7
 
+
 /* vbi data type setting */
 #define VBI_DATA_TYPE_NULL         0x00
 #define VBI_DATA_TYPE_USCC         0x11
@@ -64,6 +77,7 @@
 #define VBI_DATA_TYPE_TT_525D      0xbb
 #define VBI_DATA_TYPE_WSS625       0xcc
 #define VBI_DATA_TYPE_WSSJ         0xdd
+
 
 /* vbi start code,TT start code is programmable by software,*/
 /* but our ic use the programmable value as reverse!!*/
@@ -114,6 +128,7 @@
 #define VBI_DTO_WSSJ		0x1e2c
 #define VBI_DTO_VPS		0x1333
 
+
 #define VBI_LINE_MIN               6
 #define VBI_LINE_MAX               25
 
@@ -139,6 +154,7 @@ enum vbi_package_type_e {
 #define VBI_IOC_S_BUF_SIZE         _IOW(VBI_IOC_MAGIC, 0x04, int)
 #define VBI_IOC_START              _IO(VBI_IOC_MAGIC, 0x05)
 #define VBI_IOC_STOP               _IO(VBI_IOC_MAGIC, 0x06)
+
 
 /*#define VBI_MEM_SIZE               0x80000*/
 /* 0x8000   // 32768 hw address with 8bit not 64bit */
@@ -186,6 +202,7 @@ enum vbi_slicer_e {
 #define VBI_DEFAULT_BUFFER_SIZE 8192 /*set default buffer size--8KByte*/
 #define VBI_DEFAULT_BUFFER_PACKAGE_NUM 100 /* default buffer size */
 
+
 /**** enum definitions *************************/
 
 enum field_id_e {
@@ -201,6 +218,7 @@ enum vbi_state_e {
 	VBI_STATE_DONE      = 4,
 	VBI_STATE_TIMEDOUT  = 5
 };
+
 
 /**** structure definitions ******/
 #define VBI_DATA_BYTE_MAX    42
@@ -225,7 +243,7 @@ struct vbi_ringbuffer_s {
 	/* 0: write struct vbi_data_s;1:write vbi_data_s->b */
 	unsigned int data_wmode;
 	wait_queue_head_t queue;
-	spinlock_t lock; /* ringbuffer lock */
+	spinlock_t lock;
 };
 
 struct vbi_slicer_s {
@@ -233,8 +251,8 @@ struct vbi_slicer_s {
 	enum vbi_state_e state;
 
 	struct vbi_ringbuffer_s buffer;
-	struct mutex mutex; /* slicer lock */
-	struct mutex task_mutex; /* task lock */
+	struct mutex mutex;
+	struct mutex task_mutex;
 	unsigned int busy;
 	unsigned int slicer_cnt;
 
@@ -253,7 +271,7 @@ struct vbi_dev_s {
 	char irq_name[12];
 	unsigned int vs_irq;
 	unsigned int irq_free_status;
-	spinlock_t vbi_isr_lock; /* vbi isr lock */
+	spinlock_t vbi_isr_lock;
 
 	/* vbi memory */
 	unsigned int mem_start;
@@ -275,8 +293,8 @@ struct vbi_dev_s {
 	unsigned int vbi_dto_vps;
 	struct vbi_slicer_s *slicer;
 	bool vbi_start;
-	struct mutex mutex; /* vbi_dev lock */
-	spinlock_t lock; /* slicer buffer lock */
+	struct mutex mutex;
+	spinlock_t lock;
 	struct timer_list timer;
 	bool slicer_enable;
 

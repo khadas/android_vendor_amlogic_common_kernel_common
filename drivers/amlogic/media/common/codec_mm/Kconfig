@@ -7,4 +7,3 @@ config AMLOGIC_MEDIA_CODEC_MM
 	default n
 	help
 		Select to enable codec related memory management driver.
-

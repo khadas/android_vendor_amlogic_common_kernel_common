@@ -1,10 +1,11 @@
 #!/usr/bin/perl -W
-# SPDX-License-Identifier: (GPL-2.0+ OR MIT)
-#
-# Copyright (c) 2019 Amlogic, Inc. All rights reserved.
-#
+
+
 my $FILE;
 $flist = "  ";
+$driv = "drivers/amlogic/";
+$incs = "include/linux/amlogic/";
+$dts = "arch/arm64/boot/dts/amlogic/";
 open($FILE, '<&STDIN');
 while (<$FILE>) {
 	chomp;
@@ -20,7 +21,10 @@ while (<$FILE>) {
 	}
 	if( -e $new)
 	{
-		$flist = $flist.$new."  ";
+		if($new =~/$driv/ || $new =~/$incs/ || $new =~/$dts/)
+		{
+			$flist = $flist.$new."  ";
+		}
 	}
 
 }

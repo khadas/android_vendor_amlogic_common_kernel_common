@@ -1,5 +1,5 @@
 #
-# Amlogic video2 device configuration
+# Amlogic video2 device configuation
 #
 
 menu "V4L2 Video Support"

@@ -1,12 +1,22 @@
-/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/amlogic/drm/vpu-hw/meson_osd_afbc.h
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
 #ifndef _MESON_OSD_AFBC_H_
 #define _MESON_OSD_AFBC_H_
-
-#include "meson_vpu_pipeline.h"
 
 /*VPU_MAFBC_FORMAT_SPECIFIER_S0 define as follow*/
 #define AFBC_EN			BIT(31)
@@ -14,9 +24,6 @@
 #define SUPER_BLOCK_ASPECT	BIT(16)
 #define BLOCK_SPLIT		BIT(9)
 #define YUV_TRANSFORM		BIT(8)
-
-/* osd afbc control*/
-#define MALI_AFBCD_TOP_CTRL 0x1a0f
 
 /* osd afbc on g12a */
 #define VPU_MAFBC_BLOCK_ID 0x3a00
@@ -130,8 +137,5 @@ enum afbc_pix_format_e {
 	YUV422_8B = 11,
 	YUV422_10B = 14,
 };
-
-void arm_fbc_start(struct meson_vpu_pipeline_state *pipeline_state);
-void arm_fbc_check_error(void);
 
 #endif

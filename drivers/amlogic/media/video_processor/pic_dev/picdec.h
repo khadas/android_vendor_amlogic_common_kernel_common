@@ -1,6 +1,18 @@
-/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/amlogic/media/video_processor/pic_dev/picdec.h
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
 #ifndef _PICDEC_INCLUDE__
@@ -100,12 +112,12 @@ struct source_input_s)
 void stop_picdec_task(void);
 int picdec_buffer_init(void);
 void get_picdec_buf_info(resource_size_t *start, unsigned int *size,
-			 struct io_mapping **mapping);
+						 struct io_mapping **mapping);
 int picdec_fill_buffer(struct vframe_s *vf, struct ge2d_context_s *context,
-		       struct config_para_ex_s *ge2d_config);
-void set_freerun_mode(int mode);
+	struct config_para_ex_s *ge2d_config);
+extern void set_freerun_mode(int mode);
 int picdec_cma_buf_init(void);
 int picdec_cma_buf_uninit(void);
-int start_picdec_task(void);
-int start_picdec_simulate_task(void);
-#endif /* _PICDEC_INCLUDE__ */
+extern int start_picdec_task(void);
+extern int start_picdec_simulate_task(void);
+#endif				/* _PICDEC_INCLUDE__ */

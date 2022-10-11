@@ -29,11 +29,8 @@ config AMLOGIC_LCD_TABLET
 	help
 		LCD Tablet output module
 		Configure the LCD output model for Tablet output
-		tablet mode mainly includes panel interface display
-		Through the environment variable is only choose panel
 
 if AMLOGIC_LCD
-source "drivers/amlogic/media/vout/lcd/backlight/Kconfig"
 source "drivers/amlogic/media/vout/lcd/lcd_extern/Kconfig"
 endif
 

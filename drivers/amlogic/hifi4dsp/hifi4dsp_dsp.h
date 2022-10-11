@@ -1,6 +1,18 @@
-/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/amlogic/hifi4dsp/hifi4dsp_dsp.h
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
 #ifndef _HIFI4DSP_DSP_H
@@ -17,12 +29,6 @@
 struct firmware;
 struct hifi4dsp_pdata;
 struct hifi4dsp_dsp;
-
-enum dsp_start_mode {
-	SCPI_START_MODE,
-	SMC_START_MODE,
-	MAX_START_MODE,
-};
 
 /*
  * DSP memory offsets and addresses.
@@ -109,6 +115,7 @@ struct hifi4dsp_dsp {
 	u32 id;
 	int irq;
 	int freq;
+	int regionsize;
 	/* runtime */
 	spinlock_t spinlock;	/* used for IPC */
 	struct mutex mutex;		/* used for fw */
@@ -137,22 +144,10 @@ struct hifi4dsp_dsp {
 	struct clk *dsp_clk;
 	struct clk *dsp_gate;
 
-	/*power domain for dsp*/
-	struct device *pd_dsp;
-	enum dsp_start_mode start_mode;
-	u32 dspstarted;
-	u32 dsphang;
-	void __iomem *status_reg;
-
 	void *info;
 	void *priv;
 };
 
-/* Internal generic low-level hifi4dsp share memory write/read functions*/
-void hifi4dsp_smem_write(void __iomem *addr, u32 offset, u32 value);
-u32  hifi4dsp_smem_read(void __iomem *addr, u32 offset);
-void hifi4dsp_smem_write64(void __iomem *addr, u32 offset, u64 value);
-u64  hifi4dsp_smem_read64(void __iomem *addr, u32 offset);
 void hifi4dsp_memcpy_toio_32(struct hifi4dsp_dsp *dsp,
 			     void __iomem *dest,
 			     void *src, size_t bytes);
@@ -160,39 +155,6 @@ void hifi4dsp_memcpy_fromio_32(struct hifi4dsp_dsp *dsp,
 			       void *dest,
 			       void __iomem *src,
 			       size_t bytes);
-
-void hifi4dsp_dsp_smem_write(struct hifi4dsp_dsp *dsp,
-			     u32 offset, u32 value);
-u32 hifi4dsp_dsp_smem_read(struct hifi4dsp_dsp *dsp, u32 offset);
-void hifi4dsp_dsp_smem_write64(struct hifi4dsp_dsp *dsp,
-			       u32 offset, u64 value);
-u64 hifi4dsp_dsp_smem_read64(struct hifi4dsp_dsp *dsp,
-			     u32 offset);
-void hifi4dsp_dsp_smem_write_unlocked(struct hifi4dsp_dsp *dsp,
-				      u32 offset, u32 value);
-u32 hifi4dsp_dsp_smem_read_unlocked(struct hifi4dsp_dsp *dsp, u32 offset);
-void hifi4dsp_dsp_smem_write64_unlocked(struct hifi4dsp_dsp *dsp,
-					u32 offset, u64 value);
-u64 hifi4dsp_dsp_smem_read64_unlocked(struct hifi4dsp_dsp *dsp,
-				      u32 offset);
-int hifi4dsp_dsp_smem_update_bits_unlocked
-(struct hifi4dsp_dsp *dsp, u32 offset, u32 mask, u32 value);
-void hifi4dsp_dsp_smem_update_bits_forced_unlocked
-(struct hifi4dsp_dsp *dsp, u32 offset, u32 mask, u32 value);
-int hifi4dsp_dsp_smem_update_bits64_unlocked
-(struct hifi4dsp_dsp *dsp, u32 offset, u64 mask, u64 value);
-int hifi4dsp_dsp_smem_update_bits(struct hifi4dsp_dsp *dsp,
-				  u32 offset,
-				  u32 mask,
-				  u32 value);
-void hifi4dsp_dsp_smem_update_bits_forced(struct hifi4dsp_dsp *dsp,
-					  u32 offset,
-					  u32 mask,
-					  u32 value);
-int hifi4dsp_dsp_smem_update_bits64(struct hifi4dsp_dsp *dsp,
-				    u32 offset,
-				    u64 mask,
-				    u64 value);
 
 int hifi4dsp_dsp_boot(struct hifi4dsp_dsp *dsp);
 void hifi4dsp_dsp_reset(struct hifi4dsp_dsp *dsp);
@@ -205,9 +167,4 @@ void hifi4dsp_dsp_dump(struct hifi4dsp_dsp *dsp);
 struct hifi4dsp_dsp *hifi4dsp_dsp_new(struct hifi4dsp_priv *priv,
 				      struct hifi4dsp_pdata *pdata,
 				      struct hifi4dsp_dsp_device *dsp_dev);
-
-void create_hifi4_syslog(void);
-void hifi4_syslog_reomve(void);
-struct hifi4dsp_addr *hifi4dsp_get_share_memory(void);
-
 #endif /*_HIFI4DSP_DSP_H*/

@@ -1,4 +1,3 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
  * drivers/amlogic/memory_ext/page_trace.c
  *
@@ -29,19 +28,8 @@
 #include <linux/list.h>
 #include <linux/uaccess.h>
 #include <linux/vmalloc.h>
-#include <linux/sched.h>
-#include <linux/memcontrol.h>
-#include <linux/mm_inline.h>
-#include <linux/sched/clock.h>
-#include <linux/gfp.h>
 #include <linux/mm.h>
 #include <linux/amlogic/page_trace.h>
-#ifdef CONFIG_AMLOGIC_VMAP
-#include <linux/amlogic/vmap_stack.h>
-#endif
-#ifdef CONFIG_AMLOGIC_CMA
-#include <linux/amlogic/aml_cma.h>
-#endif
 #include <asm/stacktrace.h>
 #include <asm/sections.h>
 
@@ -54,7 +42,7 @@
 #ifdef CONFIG_NUMA
 #define COMMON_CALLER_SIZE	64	/* more function names if NUMA */
 #else
-#define COMMON_CALLER_SIZE	64
+#define COMMON_CALLER_SIZE	32
 #endif
 
 /*
@@ -82,7 +70,6 @@ struct alloc_caller {
 struct fun_symbol {
 	const char *name;
 	int full_match;
-	int matched;
 };
 
 static struct alloc_caller common_caller[COMMON_CALLER_SIZE];
@@ -93,51 +80,37 @@ static struct alloc_caller common_caller[COMMON_CALLER_SIZE];
  * functions
  */
 static struct fun_symbol common_func[] __initdata = {
-	{"__alloc_pages_nodemask",	1, 0},
-	{"kmem_cache_alloc",		1, 0},
-	{"__get_free_pages",		1, 0},
-	{"__kmalloc",			1, 0},
-	{"cma_alloc",			1, 0},
-	{"dma_alloc_from_contiguous",	1, 0},
-	{"dma_alloc_contiguous",	1, 0},
-	{"alloc_slab_page",		1, 0},
-	{"aml_cma_alloc_post_hook",	1, 0},
-#ifdef CONFIG_ARM
-	{"__dma_alloc",			1, 0},
-	{"arm_dma_alloc",		1, 0},
-	{"__alloc_from_contiguous",	1, 0},
-	{"cma_allocator_alloc",		1, 0},
-#endif
-	{"__kmalloc_track_caller",	1, 0},
-	{"kmem_cache_alloc_trace",	1, 0},
-	{"alloc_pages_exact",		1, 0},
-	{"alloc_pages_exact_nid",	1, 0},
-	{"get_zeroed_page",		1, 0},
-	{"__vmalloc_node_range",	1, 0},
-	{"__vmalloc_area_node",		1, 0},
-	{"sk_prot_alloc",		1, 0},
-	{"__alloc_skb",			1, 0},
-	{"__vmalloc_node_flags",	0, 0},
-	{"vzalloc",			1, 0},
-	{"vmalloc",			1, 0},
-	{"__vmalloc",			1, 0},
-	{"kzalloc",			1, 0},
-	{"kstrdup_const",		1, 0},
-	{"kvmalloc_node",		1, 0},
-	{"kmalloc_order",		1, 0},
-	{"kmalloc_order_trace",		1, 0},
-	{"aml_slub_alloc_large",	1, 0},
+	{"__alloc_pages_nodemask",	1},
+	{"kmem_cache_alloc",		1},
+	{"__get_free_pages",		1},
+	{"__kmalloc",			1},
+	{"cma_alloc",			1},
+	{"dma_alloc_from_contiguous",	1},
+	{"aml_cma_alloc_post_hook",	1},
+	{"__dma_alloc",			1},
+	{"arm_dma_alloc",		1},
+	{"__kmalloc_track_caller",	1},
+	{"kmem_cache_alloc_trace",	1},
+	{"__alloc_from_contiguous",	1},
+	{"cma_allocator_alloc",		1},
+	{"alloc_pages_exact",		1},
+	{"get_zeroed_page",		1},
+	{"__vmalloc_node_range",	1},
+	{"vzalloc",			1},
+	{"vmalloc",			1},
+	{"__alloc_page_frag",		1},
+	{"kmalloc_order",		0},
 #ifdef CONFIG_NUMA
-	{"alloc_pages_current",		1, 0},
-	{"alloc_page_interleave",	1, 0},
-	{"kmalloc_large_node",		1, 0},
-	{"__kmalloc_node",		1, 0},
-	{"alloc_pages_vma",		1, 0},
+	{"alloc_pages_current",		1},
+	{"alloc_page_interleave",	1},
+	{"kmalloc_large_node",		1},
+	{"kmem_cache_alloc_node",	1},
+	{"__kmalloc_node",		1},
+	{"alloc_pages_vma",		1},
 #endif
 #ifdef CONFIG_SLUB	/* for some static symbols not exported in headfile */
-	{"new_slab",			0, 0},
-	{"___slab_alloc",		0, 0},
-	{"allocate_slab",		0, 0},
+	{"new_slab",			0},
+	{"slab_alloc",			0},
 #endif
 	{}		/* tail */
 };
@@ -162,7 +135,6 @@ static int __init early_page_trace_param(char *buf)
 
 	return 0;
 }
-
 early_param("page_trace", early_page_trace_param);
 
 static int early_page_trace_step(char *buf)
@@ -175,7 +147,6 @@ static int early_page_trace_step(char *buf)
 
 	return 0;
 }
-
 early_param("page_trace_step", early_page_trace_step);
 #endif
 
@@ -206,7 +177,7 @@ static bool check_trace_valid(struct page_trace *trace)
 	    trace->migrate_type >= MIGRATE_TYPES ||
 	    !range_ok(trace)) {
 		offset = (unsigned long)((trace - trace_buffer));
-		pr_err("bad trace:%p, %x, pfn:%lx, ip:%ps\n", trace,
+		pr_err("bad trace:%p, %x, pfn:%lx, ip:%pf\n", trace,
 			*((unsigned int *)trace),
 			offset / sizeof(struct page_trace),
 			(void *)_RET_IP_);
@@ -249,12 +220,109 @@ static inline int is_module_addr(unsigned long ip)
 }
 
 /*
+ * following 3 functions are modify from kernel/kallsyms.c
+ */
+static unsigned int __init kallsyms_expand_symbol(unsigned int off,
+					   char *result, size_t maxlen)
+{
+	int len, skipped_first = 0;
+	const u8 *tptr, *data;
+
+	/* Get the compressed symbol length from the first symbol byte. */
+	data = &kallsyms_names[off];
+	len = *data;
+	data++;
+
+	/*
+	 * Update the offset to return the offset for the next symbol on
+	 * the compressed stream.
+	 */
+	off += len + 1;
+
+	/*
+	 * For every byte on the compressed symbol data, copy the table
+	 * entry for that byte.
+	 */
+	while (len) {
+		tptr = &kallsyms_token_table[kallsyms_token_index[*data]];
+		data++;
+		len--;
+
+		while (*tptr) {
+			if (skipped_first) {
+				if (maxlen <= 1)
+					goto tail;
+				*result = *tptr;
+				result++;
+				maxlen--;
+			} else
+				skipped_first = 1;
+			tptr++;
+		}
+	}
+
+tail:
+	if (maxlen)
+		*result = '\0';
+
+	/* Return to offset to the next symbol. */
+	return off;
+}
+
+static unsigned long __init kallsyms_sym_address(int idx)
+{
+	if (!IS_ENABLED(CONFIG_KALLSYMS_BASE_RELATIVE))
+		return kallsyms_addresses[idx];
+
+	/* values are unsigned offsets if --absolute-percpu is not in effect */
+	if (!IS_ENABLED(CONFIG_KALLSYMS_ABSOLUTE_PERCPU))
+		return kallsyms_relative_base + (u32)kallsyms_offsets[idx];
+
+	/* ...otherwise, positive offsets are absolute values */
+	if (kallsyms_offsets[idx] >= 0)
+		return kallsyms_offsets[idx];
+
+	/* ...and negative offsets are relative to kallsyms_relative_base - 1 */
+	return kallsyms_relative_base - 1 - kallsyms_offsets[idx];
+}
+
+/* Lookup the address for this symbol. Returns 0 if not found. */
+static unsigned long __init kallsyms_contain_name(const char *name, long full,
+						  unsigned int *offset)
+{
+	char namebuf[KSYM_NAME_LEN];
+	unsigned long i;
+	unsigned int off = 0;
+
+	for (i = 0; i < kallsyms_num_syms; i++) {
+		off = kallsyms_expand_symbol(off, namebuf, ARRAY_SIZE(namebuf));
+
+		if (full && strcmp(namebuf, name) == 0)
+			return kallsyms_sym_address(i);
+		if (!full && strstr(namebuf, name)) {
+			/* not include tab */
+			if (!strstr(namebuf, "__kstrtab") &&
+			    !strstr(namebuf, "__kcrctab") &&
+			    !strstr(namebuf, "__ksymtab") &&
+			    (off > *offset)) {
+				/* update offset for next loop */
+				*offset = off;
+				return kallsyms_sym_address(i);
+			}
+		}
+	}
+	return 0;
+}
+
+/*
  * set up information for common caller in memory allocate API
  */
-static int __init setup_common_caller(unsigned long kaddr)
+static void __init setup_common_caller(unsigned long kaddr)
 {
 	unsigned long size, offset;
-	int i = 0, ret;
+	int i = 0;
+	const char *name;
+	char str[KSYM_NAME_LEN];
 
 	for (i = 0; i < COMMON_CALLER_SIZE; i++) {
 		/* find a empty caller */
@@ -263,20 +331,34 @@ static int __init setup_common_caller(unsigned long kaddr)
 	}
 	if (i >= COMMON_CALLER_SIZE) {
 		pr_err("%s, out of memory\n", __func__);
-		return -1;
+		return;
 	}
 
-	ret = kallsyms_lookup_size_offset(kaddr, &size, &offset);
-	if (ret) {
+	name = kallsyms_lookup(kaddr, &size, &offset, NULL, str);
+	if (name) {
 		common_caller[i].func_start_addr = kaddr;
 		common_caller[i].size = size;
-		pr_debug("setup %d caller:%lx + %lx, %ps\n",
+		pr_debug("setup %d caller:%lx + %lx, %pf\n",
 			i, kaddr, size, (void *)kaddr);
-		return 0;
-	}
+	} else
+		pr_err("can't find symbol %pf\n", (void *)kaddr);
+}
 
-	pr_err("can't find symbol %ps\n", (void *)kaddr);
-	return -1;
+static int __init fuzzy_match(const char *name)
+{
+	unsigned int off = 0;
+	unsigned long addr;
+	int find = 0;
+
+	while (1) {
+		addr = kallsyms_contain_name(name, 0, &off);
+		if (addr) {
+			setup_common_caller(addr);
+			find++;
+		} else
+			break;
+	}
+	return find;
 }
 
 static void __init dump_common_caller(void)
@@ -285,7 +367,7 @@ static void __init dump_common_caller(void)
 
 	for (i = 0; i < COMMON_CALLER_SIZE; i++) {
 		if (common_caller[i].func_start_addr)
-			pr_debug("%2d, addr:%lx + %4lx, %ps\n", i,
+			pr_debug("%2d, addr:%lx + %4lx, %pf\n", i,
 				common_caller[i].func_start_addr,
 				common_caller[i].size,
 				(void *)common_caller[i].func_start_addr);
@@ -305,40 +387,28 @@ static int __init sym_cmp(const void *x1, const void *x2)
 	return p1->func_start_addr < p2->func_start_addr ? 1 : -1;
 }
 
-static int __init match_common_caller(void *data, const char *name,
-				       struct module *module,
-				       unsigned long addr)
-{
-	int i, ret;
-	struct fun_symbol *s;
-
-	if (module)
-		return -1;
-
-	if (!strcmp(name, "_etext"))	/* end of text */
-		return -1;
-
-	for (i = 0; i < ARRAY_SIZE(common_func); i++) {
-		s = &common_func[i];
-		if (!s->name)
-			break;		/* end */
-		if (s->full_match && !s->matched) {
-			if (!strcmp(name, s->name)) {	/* strict match */
-				ret = setup_common_caller(addr);
-				s->matched = 1;
-			}
-		} else if (!s->full_match) {
-			if (strstr(name, s->name))	/* contians */
-				setup_common_caller(addr);
-		}
-	}
-	return 0;
-}
-
 static void __init find_static_common_symbol(void)
 {
+	int i;
+	unsigned long addr;
+	struct fun_symbol *s;
+
 	memset(common_caller, 0, sizeof(common_caller));
-	kallsyms_on_each_symbol(match_common_caller, NULL);
+	for (i = 0; i < COMMON_CALLER_SIZE; i++) {
+		s = &common_func[i];
+		if (!s->name)
+			break;  /* end */
+		if (s->full_match) {
+			addr = kallsyms_contain_name(s->name, 1, NULL);
+			if (addr)
+				setup_common_caller(addr);
+			else
+				pr_debug("can't find symbol:%s\n", s->name);
+		} else {
+			if (!fuzzy_match(s->name))
+				pr_info("can't fuzzy match:%s\n", s->name);
+		}
+	}
 	sort(common_caller, COMMON_CALLER_SIZE, sizeof(struct alloc_caller),
 		sym_cmp, NULL);
 	dump_common_caller();
@@ -398,13 +468,11 @@ unsigned long find_back_trace(void)
 
 #ifdef CONFIG_ARM64
 	frame.fp = (unsigned long)__builtin_frame_address(0);
+	frame.sp = current_stack_pointer;
 	frame.pc = _RET_IP_;
 #ifdef CONFIG_FUNCTION_GRAPH_TRACER
-	frame.graph = 0;
+	frame.graph = current->curr_ret_stack;
 #endif
-	bitmap_zero(frame.stacks_done, __NR_STACK_TYPES);
-	frame.prev_fp = 0;
-	frame.prev_type = STACK_TYPE_UNKNOWN;
 #else
 	frame.fp = (unsigned long)__builtin_frame_address(0);
 	frame.sp = current_stack_pointer;
@@ -437,13 +505,11 @@ int save_obj_stack(unsigned long *stack, int depth)
 
 #ifdef CONFIG_ARM64
 	frame.fp = (unsigned long)__builtin_frame_address(0);
+	frame.sp = current_stack_pointer;
 	frame.pc = _RET_IP_;
 #ifdef CONFIG_FUNCTION_GRAPH_TRACER
-	frame.graph = 0;
+	frame.graph = current->curr_ret_stack;
 #endif
-	bitmap_zero(frame.stacks_done, __NR_STACK_TYPES);
-	frame.prev_fp = 0;
-	frame.prev_type = STACK_TYPE_UNKNOWN;
 #else
 	frame.fp = (unsigned long)__builtin_frame_address(0);
 	frame.sp = current_stack_pointer;
@@ -500,7 +566,6 @@ struct page_trace *find_page_base(struct page *page)
 	return NULL;
 }
 #endif
-EXPORT_SYMBOL_GPL(find_page_base);
 
 unsigned long get_page_trace(struct page *page)
 {
@@ -512,7 +577,6 @@ unsigned long get_page_trace(struct page *page)
 
 	return 0;
 }
-EXPORT_SYMBOL_GPL(get_page_trace);
 
 #ifndef CONFIG_64BIT
 static void __init set_init_page_trace(struct page *page, int order, gfp_t flag)
@@ -525,11 +589,13 @@ static void __init set_init_page_trace(struct page *page, int order, gfp_t flag)
 		text = (unsigned long)_text;
 
 		trace.ret_ip = (ip - text) >> 2;
+		WARN_ON(trace.ret_ip > IP_RANGE_MASK);
 		trace.migrate_type = gfpflags_to_migratetype(flag);
 		trace.order = order;
 		base = find_page_base(page);
 		push_ip(base, &trace);
 	}
+
 }
 #endif
 
@@ -539,16 +605,16 @@ unsigned int pack_ip(unsigned long ip, int order, gfp_t flag)
 	struct page_trace trace = {};
 
 	text = (unsigned long)_text;
-	if (ip >= (unsigned long)_text) {
+	if (ip >= (unsigned long)_text)
 		text = (unsigned long)_text;
-	} else if (is_module_addr(ip)) {
+	else if (is_module_addr(ip)) {
 		text = MODULES_VADDR;
 		trace.module_flag = 1;
 	}
 
 	trace.ret_ip = (ip - text) >> 2;
 #ifdef CONFIG_AMLOGIC_CMA
-	if (flag == __GFP_NO_CMA)
+	if (flag == __GFP_BDEV)
 		trace.migrate_type = MIGRATE_CMA;
 	else
 		trace.migrate_type = gfpflags_to_migratetype(flag);
@@ -572,35 +638,34 @@ void set_page_trace(struct page *page, int order, gfp_t flag, void *func)
 	struct page_trace *base;
 	unsigned int val, i;
 
-	if (!page)
-		return;
-#ifndef CONFIG_64BIT
-	if (!trace_buffer)
-		return;
+#ifdef CONFIG_64BIT
+	if (page) {
+#else
+	if (page && trace_buffer) {
 #endif
-	if (!func)
-		ip = find_back_trace();
-	else
-		ip = (unsigned long)func;
-
-	if (!ip) {
-		pr_debug("can't find backtrace for page:%lx\n",
-			 page_to_pfn(page));
-		return;
-	}
-	val = pack_ip(ip, order, flag);
-	base = find_page_base(page);
-	push_ip(base, (struct page_trace *)&val);
-	if (order) {
-		/* in order to easy get trace for high order alloc */
-		val = pack_ip(ip, 0, flag);
-		for (i = 1; i < (1 << order); i++) {
-		#ifdef CONFIG_64BIT
-			base = find_page_base(++page);
-		#else
-			base += (trace_step);
-		#endif
-			push_ip(base, (struct page_trace *)&val);
+		if (!func)
+			ip = find_back_trace();
+		else
+			ip = (unsigned long)func;
+		if (!ip) {
+			pr_debug("can't find backtrace for page:%lx\n",
+				page_to_pfn(page));
+			return;
+		}
+		val = pack_ip(ip, order, flag);
+		base = find_page_base(page);
+		push_ip(base, (struct page_trace *)&val);
+		if (order) {
+			/* in order to easy get trace for high order alloc */
+			val = pack_ip(ip, 0, flag);
+			for (i = 1; i < (1 << order); i++) {
+			#ifdef CONFIG_64BIT
+				base = find_page_base(++page);
+			#else
+				base += (trace_step);
+			#endif
+				push_ip(base, (struct page_trace *)&val);
+			}
 		}
 	}
 }
@@ -701,8 +766,8 @@ static int __init page_trace_pre_work(unsigned long size)
 #endif
 
 /*--------------------------sysfs node -------------------------------*/
-#define LARGE	1024
-#define SMALL	256
+#define LARGE	512
+#define SMALL	128
 
 /* caller for unmovalbe are max */
 #define MT_UNMOVABLE_IDX	0                            /* 0,UNMOVABLE   */
@@ -739,23 +804,27 @@ struct pagetrace_summary {
 static unsigned long find_ip_base(unsigned long ip)
 {
 	unsigned long size, offset;
-	int ret;
+	const char *name;
+	char str[KSYM_NAME_LEN];
 
-	ret = kallsyms_lookup_size_offset(ip, &size, &offset);
-	if (ret)	/* find */
+	name = kallsyms_lookup(ip, &size, &offset, NULL, str);
+	if (name)	/* find */
 		return ip - offset;
 	else		/* not find */
 		return ip;
 }
 
-static int find_page_ip(struct page_trace *trace, struct page_summary *sum,
-			int range, int *mt_cnt, struct rb_root *root)
+static int find_page_ip(struct page_trace *trace,
+			struct page_summary *sum, int *o,
+			int range, int *mt_cnt, int size,
+			struct rb_root *root)
 {
 	int order;
 	unsigned long ip;
 	struct rb_node **link, *parent = NULL;
 	struct page_summary *tmp;
 
+	*o = 0;
 	ip = unpack_ip(trace);
 	if (!ip || !trace->ip_data)	/* invalid ip */
 		return 0;
@@ -766,27 +835,28 @@ static int find_page_ip(struct page_trace *trace, struct page_summary *sum,
 		parent = *link;
 		tmp = rb_entry(parent, struct page_summary, entry);
 		if (ip == tmp->ip) { /* match */
-			tmp->cnt++;
+			tmp->cnt += ((1 << order) * size);
+			*o = order;
 			return 0;
-		} else if (ip < tmp->ip) {
+		} else if (ip < tmp->ip)
 			link = &tmp->entry.rb_left;
-		} else {
+		else
 			link = &tmp->entry.rb_right;
-		}
 	}
 	/* not found, get a new page summary */
 	if (mt_cnt[trace->migrate_type] >= range)
 		return -ERANGE;
 	tmp       = &sum[mt_cnt[trace->migrate_type]];
 	tmp->ip   = ip;
-	tmp->cnt++;
+	tmp->cnt += ((1 << order) * size);
+	*o        = order;
 	mt_cnt[trace->migrate_type]++;
 	rb_link_node(&tmp->entry, parent, link);
 	rb_insert_color(&tmp->entry, root);
 	return 0;
 }
 
-#define K(x)		((unsigned long)(x) << (PAGE_SHIFT - 10))
+#define K(x)		((x) << (PAGE_SHIFT - 10))
 static int trace_cmp(const void *x1, const void *x2)
 {
 	struct page_summary *s1, *s2;
@@ -804,9 +874,10 @@ static void show_page_trace(struct seq_file *m, struct zone *zone,
 	unsigned long total_mt, total_used = 0;
 
 	seq_printf(m, "%s            %s, %s\n",
-		   "count(KB)", "kaddr", "function");
+		  "count(KB)", "kaddr", "function");
 	seq_puts(m, "------------------------------\n");
 	for (j = 0; j < MIGRATE_TYPES; j++) {
+
 		if (!mt_cnt[j])	/* this migrate type is empty */
 			continue;
 
@@ -819,7 +890,7 @@ static void show_page_trace(struct seq_file *m, struct zone *zone,
 				continue;
 
 			if (K(p[i].cnt) >= page_trace_filter) {
-				seq_printf(m, "%8ld, %16lx, %ps\n",
+				seq_printf(m, "%8ld, %16lx, %pf\n",
 					   K(p[i].cnt), p[i].ip,
 					   (void *)p[i].ip);
 			}
@@ -834,7 +905,7 @@ static void show_page_trace(struct seq_file *m, struct zone *zone,
 		total_used += total_mt;
 	}
 	seq_printf(m, "Zone %8s, managed:%6ld KB, free:%6ld kB, used:%6ld KB\n",
-		   zone->name, K(atomic_long_read(&zone->managed_pages)),
+		   zone->name, K(zone->managed_pages),
 		   K(zone_page_state(zone, NR_FREE_PAGES)), K(total_used));
 	seq_puts(m, "------------------------------\n");
 }
@@ -884,6 +955,7 @@ static int update_page_trace(struct seq_file *m, struct zone *zone,
 	unsigned long start_pfn = zone->zone_start_pfn;
 	unsigned long end_pfn = zone_end_pfn(zone);
 	int    ret = 0, mt;
+	int    order;
 	struct page_trace *trace;
 	struct page_summary *p;
 	struct rb_root root[MIGRATE_TYPES];
@@ -893,6 +965,7 @@ static int update_page_trace(struct seq_file *m, struct zone *zone,
 	for (pfn = start_pfn; pfn < end_pfn; pfn++) {
 		struct page *page;
 
+		order = 0;
 		if (!pfn_valid(pfn))
 			continue;
 
@@ -914,13 +987,16 @@ static int update_page_trace(struct seq_file *m, struct zone *zone,
 
 		mt = trace->migrate_type;
 		p  = sum + mt_offset[mt];
-		ret = find_page_ip(trace, p, mt_offset[mt + 1] - mt_offset[mt],
-				   mt_cnt, &root[mt]);
+		ret = find_page_ip(trace, p, &order,
+				   mt_offset[mt + 1] - mt_offset[mt],
+				   mt_cnt, 1, &root[mt]);
 		if (ret) {
 			pr_err("mt type:%d, out of range:%d\n",
 			       mt, mt_offset[mt + 1] - mt_offset[mt]);
 			break;
 		}
+		if (order)
+			pfn += ((1 << order) - 1);
 	}
 	if (merge_function)
 		merge_same_function(sum, mt_cnt);
@@ -982,7 +1058,7 @@ static int pagetrace_open(struct inode *inode, struct file *file)
 }
 
 static ssize_t pagetrace_write(struct file *file, const char __user *buffer,
-			       size_t count, loff_t *ppos)
+			      size_t count, loff_t *ppos)
 {
 	char *buf;
 	unsigned long arg = 0;
@@ -1038,9 +1114,8 @@ static const struct file_operations pagetrace_file_ops = {
 #ifdef CONFIG_AMLOGIC_SLAB_TRACE
 /*---------------- part 2 for slab trace ---------------------*/
 #include <linux/jhash.h>
-#include <linux/slub_def.h>
 
-#define SLAB_TRACE_FLAG		(__GFP_ZERO | __GFP_NOFAIL | GFP_ATOMIC)
+#define SLAB_TRACE_FLAG		(__GFP_ZERO | __GFP_REPEAT | GFP_ATOMIC)
 
 static LIST_HEAD(st_root);
 static int slab_trace_en __read_mostly;
@@ -1062,7 +1137,6 @@ static int __init early_slab_trace_param(char *buf)
 
 	return 0;
 }
-
 early_param("slab_trace", early_slab_trace_param);
 
 int __init slab_trace_init(void)
@@ -1077,7 +1151,7 @@ int __init slab_trace_init(void)
 		return -EINVAL;
 
 	for (i = 0; i <= KMALLOC_SHIFT_HIGH; i++) {
-		cache = kmalloc_caches[KMALLOC_NORMAL][i];
+		cache = kmalloc_caches[i];
 		if (!cache || cache->size >= PAGE_SIZE)
 			continue;
 
@@ -1114,7 +1188,7 @@ int __init slab_trace_init(void)
 	return 0;
 nomem:
 	pr_err("%s, failed to create trace group for %s\n",
-	       __func__, buf);
+		__func__, buf);
 	kfree(group);
 	return -ENOMEM;
 }
@@ -1187,14 +1261,14 @@ int slab_trace_add_page(struct page *page, int order,
 	group->trace_count++;
 	spin_unlock_irqrestore(&group->lock, flags);
 	pr_debug("%s, add:%lx-%lx, buf:%p, trace:%p to group:%p, %ld, obj:%d\n",
-		 s->name, addr, trace->e_addr,
-		 buf, trace, group, group->trace_count, obj_cnt);
+		s->name, addr, trace->e_addr,
+		buf, trace, group, group->trace_count, obj_cnt);
 	return 0;
 
 nomem:
-	pr_err("%s, failed to trace obj %p for %s, trace:%p\n", __func__,
-	       page_address(page), s->name, trace);
 	kfree(trace);
+	pr_err("%s, failed to trace obj %p for %s, trace:%p\n", __func__,
+		page_address(page), s->name, trace);
 	return -ENOMEM;
 }
 
@@ -1220,8 +1294,8 @@ int slab_trace_remove_page(struct page *page, int order, struct kmem_cache *s)
 	spin_unlock_irqrestore(&group->lock, flags);
 	WARN_ON((addr + PAGE_SIZE * (1 << order)) != trace->e_addr);
 	pr_debug("%s, rm: %lx-%lx, buf:%p, trace:%p to group:%p, %ld\n",
-		 s->name, addr, trace->e_addr,
-		 trace->object_ip, trace, group, group->trace_count);
+		s->name, addr, trace->e_addr,
+		trace->object_ip, trace, group, group->trace_count);
 	kfree(trace->object_ip);
 	kfree(trace);
 	return 0;
@@ -1252,7 +1326,7 @@ static int record_stack(unsigned int hash, unsigned long *stack)
 				pr_err("%s stack hash confilct:%x\n",
 				       __func__, hash);
 				for (i = 0; i < SLAB_STACK_DEP; i++) {
-					pr_err("%16lx %16lx, %ps, %ps\n",
+					pr_err("%16lx %16lx, %pf, %pf\n",
 					       tmp->stack[i], stack[i],
 					       (void *)tmp->stack[i],
 					       (void *)stack[i]);
@@ -1261,11 +1335,10 @@ static int record_stack(unsigned int hash, unsigned long *stack)
 			spin_unlock_irqrestore(&stm->stack_lock, flags);
 			kfree(new);
 			return 0;
-		} else if (hash < tmp->hash) {
+		} else if (hash < tmp->hash)
 			link = &tmp->entry.rb_left;
-		} else {
+		else
 			link = &tmp->entry.rb_right;
-		}
 	}
 	/* add to stack tree */
 	new->hash    = hash;
@@ -1305,7 +1378,7 @@ int slab_trace_mark_object(void *object, unsigned long ip,
 	struct slab_trace_group *group;
 	unsigned long addr, flags, index;
 	unsigned long stack[SLAB_STACK_DEP] = {0};
-	unsigned int hash, len;
+	unsigned int hash;
 
 	if (!slab_trace_en || !object || !s || !s->trace_group)
 		return -EINVAL;
@@ -1318,19 +1391,18 @@ int slab_trace_mark_object(void *object, unsigned long ip,
 	if (!trace)
 		return -ENODEV;
 
-	len  = sizeof(stack);
-	len /= sizeof(int);
 	group->total_obj_size += s->size;
 	index = (addr - trace->s_addr) / s->size;
 	WARN_ON(index >= trace->object_count);
 	if (save_obj_stack(stack, SLAB_STACK_DEP))
 		return -EINVAL;
-	hash = jhash2((unsigned int *)stack, len, 0x9747b28c);
+	hash = jhash2((unsigned int *)stack,
+		      sizeof(stack) / sizeof(int), 0x9747b28c);
 	record_stack(hash, stack);
 	trace->object_ip[index] = hash;
-	pr_debug("%s, mk object:%p,%lx, idx:%ld, trace:%p, group:%p,%ld, %ps\n",
-		 s->name, object, trace->s_addr, index,
-		 trace, group, group->total_obj_size, (void *)ip);
+	pr_debug("%s, mk object:%p,%lx, idx:%ld, trace:%p, group:%p,%ld, %pf\n",
+		s->name, object, trace->s_addr, index,
+		trace, group, group->total_obj_size, (void *)ip);
 	return 0;
 }
 
@@ -1374,8 +1446,8 @@ int slab_trace_remove_object(void *object, struct kmem_cache *s)
 	if (need_free)
 		kfree(ss);
 	pr_debug("%s, rm object: %p, %lx, idx:%ld, trace:%p, group:%p, %ld\n",
-		 s->name, object, trace->s_addr, index,
-		 trace, group, group->total_obj_size);
+		s->name, object, trace->s_addr, index,
+		trace, group, group->total_obj_size);
 	return 0;
 }
 
@@ -1397,11 +1469,10 @@ static int find_slab_hash(unsigned int hash, struct page_summary *sum,
 		if (hash == tmp->ip) { /* match */
 			tmp->cnt += size;
 			return 0;
-		} else if (hash < tmp->ip) {
+		} else if (hash < tmp->ip)
 			link = &tmp->entry.rb_left;
-		} else {
+		else
 			link = &tmp->entry.rb_right;
-		}
 	}
 	/* not found, get a new page summary */
 	if (*funcs >= range)
@@ -1456,7 +1527,7 @@ static void show_slab_trace(struct seq_file *m, struct page_summary *p,
 	struct slab_stack *stack;
 
 	seq_printf(m, "%s          %s, %s\n",
-		   "size(bytes)", "kaddr", "function");
+		  "size(bytes)", "kaddr", "function");
 	seq_puts(m, "------------------------------\n");
 
 	sort(p, count, sizeof(*p), trace_cmp, NULL);
@@ -1473,11 +1544,11 @@ static void show_slab_trace(struct seq_file *m, struct page_summary *p,
 			if (!stack)
 				continue;
 
-			seq_printf(m, "%8ld, %16lx, %ps\n",
+			seq_printf(m, "%8ld, %16lx, %pf\n",
 				   p[i].cnt, stack->stack[0],
 				   (void *)stack->stack[0]);
 			for (j = 1; j < SLAB_STACK_DEP; j++) {
-				seq_printf(m, "%8s  %16lx, %ps\n",
+				seq_printf(m, "%8s  %16lx, %pf\n",
 					   " ", stack->stack[j],
 					   (void *)stack->stack[j]);
 			}
@@ -1496,7 +1567,7 @@ static int slabtrace_show(struct seq_file *m, void *arg)
 	unsigned long ticks, group_time = 0, funcs = 0;
 
 	alloc = stm->stack_cnt + 200;
-	sum   = vzalloc(sizeof(*sum) * alloc);
+	sum   = vzalloc(sizeof(struct page_summary) * alloc);
 	if (!sum)
 		return -ENOMEM;
 	m->private = sum;
@@ -1538,7 +1609,6 @@ static int slabtrace_open(struct inode *inode, struct file *file)
 {
 	return single_open(file, slabtrace_show, NULL);
 }
-
 static const struct file_operations slabtrace_file_ops = {
 	.open		= slabtrace_open,
 	.read		= seq_read,
@@ -1546,254 +1616,6 @@ static const struct file_operations slabtrace_file_ops = {
 	.release	= single_release,
 };
 #endif
-
-/*------- part 3, for usage statistics of file cache --------*/
-
-static struct proc_dir_entry *d_filecache;
-static int record_fct(struct page *page, struct file_cache_trace *fct,
-		      int *used, struct rb_root *root, int mc,
-		      int active, int lock)
-{
-	struct address_space *mapping;
-	struct file_cache_trace *tmp;
-	struct rb_node **link, *parent = NULL;
-
-	mapping = page_mapping(page);
-	if (!mapping)
-		return -1;
-
-	link  = &root->rb_node;
-	while (*link) {
-		parent = *link;
-		tmp = rb_entry(parent, struct file_cache_trace, entry);
-		if (mapping == tmp->mapping) { /* match */
-			tmp->count++;
-			tmp->mapcnt += mc;
-			if (active)
-				tmp->active_count++;
-			else
-				tmp->inactive_count++;
-			if (lock)
-				tmp->lock_count++;
-			return 0;
-		} else if (mapping < tmp->mapping) {
-			link = &tmp->entry.rb_left;
-		} else {
-			link = &tmp->entry.rb_right;
-		}
-	}
-	/* not found, get a new page summary */
-	if (*used >= MAX_FCT) {
-		pr_err("file out of range\n");
-		return -ERANGE;
-	}
-	tmp = &fct[*used];
-	*used = (*used) + 1;
-	tmp->mapping = mapping;
-	tmp->count++;
-	tmp->mapcnt += mc;
-	tmp->off = page_to_pgoff(page);
-	if (active)
-		tmp->active_count++;
-	else
-		tmp->inactive_count++;
-	if (lock)
-		tmp->lock_count++;
-	rb_link_node(&tmp->entry, parent, link);
-	rb_insert_color(&tmp->entry, root);
-	return 0;
-}
-
-struct filecache_stat {
-	unsigned int total;
-	unsigned int nomap[4];		/* include active/inactive */
-	unsigned int files;
-};
-
-static void update_file_cache(struct filecache_stat *fs,
-			      struct file_cache_trace *fct)
-{
-	struct lruvec *lruvec;
-	pg_data_t *pgdat, *tmp;
-	struct page *page, *next;
-	struct list_head *list;
-	struct rb_root fct_root = RB_ROOT;
-	unsigned int t = 0, in = 0, an = 0;
-	int r, mc, lru = 0, a = 0, l = 0, tl = 0;
-	struct mem_cgroup *root = NULL, *memcg;
-
-	for_each_online_pgdat(pgdat) {
-		memcg = mem_cgroup_iter(root, NULL, NULL);
-		do {
-			lruvec = mem_cgroup_lruvec(memcg, pgdat);
-			tmp = lruvec_pgdat(lruvec);
-
-			for_each_lru(lru) {
-				/* only count for filecache */
-				if (!is_file_lru(lru) &&
-				   (lru != LRU_UNEVICTABLE))
-					continue;
-
-				if (lru == LRU_ACTIVE_FILE)
-					a = 1;
-				else
-					a = 0;
-
-				list = &lruvec->lists[lru];
-				spin_lock_irq(&tmp->lru_lock);
-				list_for_each_entry_safe(page, next,
-							 list, lru) {
-
-					if (!page_is_file_cache(page))
-						continue;
-
-					t++;
-				#ifndef CONFIG_KASAN
-					if (PageCmaAllocating(page))
-						l = 1;
-					else
-				#endif
-						l = 0;
-					tl += l;
-					mc = page_mapcount(page);
-					if (mc <= 0) {
-						if (a)
-							an++;
-						else
-							in++;
-						continue;
-					}
-					r = record_fct(page, fct, &fs->files,
-						       &fct_root, mc, a, l);
-					/* some data may lost */
-					if (r == -ERANGE) {
-						spin_unlock_irq(&tmp->lru_lock);
-						goto out;
-					}
-					if (r) {
-						if (a)
-							an++;
-						else
-							in++;
-					}
-				}
-				spin_unlock_irq(&tmp->lru_lock);
-			}
-		} while ((memcg =  mem_cgroup_iter(root, memcg, NULL)));
-	}
-out:	/* update final statistics */
-	fs->total    = t;
-	fs->nomap[0] = an + in;
-	fs->nomap[1] = in;
-	fs->nomap[2] = an;
-	fs->nomap[3] = tl;
-}
-
-static int fcmp(const void *x1, const void *x2)
-{
-	struct file_cache_trace *s1, *s2;
-
-	s1 = (struct file_cache_trace *)x1;
-	s2 = (struct file_cache_trace *)x2;
-	return s2->count - s1->count;
-}
-
-static char *parse_fct_name(struct file_cache_trace *fct, char *buf)
-{
-	struct address_space *mapping = fct->mapping;
-	pgoff_t pgoff;
-	struct vm_area_struct *vma;
-	struct file *file;
-
-	pgoff = fct->off;
-	vma = vma_interval_tree_iter_first(&mapping->i_mmap, pgoff, pgoff);
-	if (!vma) {
-		pr_err("%s, can't find vma for mapping:%p\n",
-		       __func__, mapping);
-		return NULL;
-	}
-	memset(buf, 0, 256);
-	file = vma->vm_file;
-	if (file) {
-		char *p = d_path(&file->f_path, buf, 256);
-
-		if (!IS_ERR(p))
-			mangle_path(buf, p, "\n");
-		else
-			return NULL;
-	}
-	if (mapping->flags & (1 << 6))
-		strncat(buf, " [pin]", 255);
-
-	return buf;
-}
-
-static int filecache_show(struct seq_file *m, void *arg)
-{
-	int i;
-	unsigned long tick = 0;
-	unsigned long long now;
-	u64 iow = 0, cputime = 0;
-	char fname[256];
-	struct file_cache_trace *fct;
-	struct filecache_stat fs = {0};
-	unsigned int small_files = 0, small_fcache = 0;
-	unsigned int small_active = 0, small_inactive = 0;
-
-	fct  = vzalloc(sizeof(*fct) * MAX_FCT);
-	if (!fct)
-		return -ENOMEM;
-
-	tick = sched_clock();
-	update_file_cache(&fs, fct);
-	now  = sched_clock();
-	tick = now - tick;
-
-	sort(fct, fs.files, sizeof(struct file_cache_trace), fcmp, NULL);
-	seq_puts(m, "------------------------------\n");
-	seq_puts(m, "count(KB), active, inactive,     mc,   lc, amc, file name\n");
-	for (i = 0; i < fs.files; i++) {
-		if (K(fct[i].count) < page_trace_filter) {
-			small_files++;
-			small_fcache   += fct[i].count;
-			small_active   += fct[i].active_count;
-			small_inactive += fct[i].inactive_count;
-			continue;
-		}
-		seq_printf(m, "   %6lu, %6lu,   %6lu, %6u, %4ld, %3u, %s\n",
-			   K(fct[i].count), K(fct[i].active_count),
-			   K(fct[i].inactive_count), fct[i].mapcnt,
-			   K(fct[i].lock_count),
-			   fct[i].mapcnt / fct[i].count,
-			   parse_fct_name(&fct[i], fname));
-	}
-	iow = get_iow_time(&cputime);
-	seq_printf(m, "small files:%u, cache:%lu [%lu/%lu] KB, time:%ld\n",
-		   small_files, K(small_fcache),
-		   K(small_inactive), K(small_active), tick);
-	seq_printf(m, "total:%lu KB, nomap[I/A]:%lu [%lu/%lu] KB, locked:%lu KB, files:%u\n",
-		   K(fs.total), K(fs.nomap[0]),
-		   K(fs.nomap[1]), K(fs.nomap[2]),
-		   K(fs.nomap[3]),
-		   fs.files);
-	seq_printf(m, "ktime:%12lld, iow:%12lld, cputime:%12lld\n",
-		   now, iow, cputime);
-	seq_puts(m, "------------------------------\n");
-	vfree(fct);
-	return 0;
-}
-
-static int filecache_open(struct inode *inode, struct file *file)
-{
-	return single_open(file, filecache_show, NULL);
-}
-
-static const struct file_operations filecache_ops = {
-	.open		= filecache_open,
-	.read		= seq_read,
-	.llseek		= seq_lseek,
-	.release	= single_release,
-};
 
 /*---------------- end for slab trace -----------------*/
 
@@ -1808,14 +1630,7 @@ static int __init page_trace_module_init(void)
 					  NULL, &pagetrace_file_ops);
 #endif
 	if (IS_ERR_OR_NULL(d_pagetrace)) {
-		pr_err("%s, create pagetrace failed\n", __func__);
-		return -1;
-	}
-
-	d_filecache = proc_create("filecache", 0444,
-				  NULL, &filecache_ops);
-	if (IS_ERR_OR_NULL(d_filecache)) {
-		pr_err("%s, create filecache failed\n", __func__);
+		pr_err("%s, create sysfs failed\n", __func__);
 		return -1;
 	}
 
@@ -1824,7 +1639,7 @@ static int __init page_trace_module_init(void)
 		d_slabtrace = proc_create("slabtrace", 0444,
 					  NULL, &slabtrace_file_ops);
 	if (IS_ERR_OR_NULL(d_slabtrace)) {
-		pr_err("%s, create slabtrace failed\n", __func__);
+		pr_err("%s, create sysfs failed\n", __func__);
 		return -1;
 	}
 #endif
@@ -1886,17 +1701,6 @@ void __init page_trace_mem_init(void)
 		pr_err("%s reserve memory failed\n", __func__);
 		return;
 	}
-#endif
-}
-
-void arch_report_meminfo(struct seq_file *m)
-{
-#ifdef CONFIG_AMLOGIC_CMA
-	seq_printf(m, "DriverCma:      %8ld kB\n",
-		   get_cma_allocated() * (1 << (PAGE_SHIFT - 10)));
-#endif
-#ifdef CONFIG_AMLOGIC_VMAP
-	vmap_report_meminfo(m);
 #endif
 }
 

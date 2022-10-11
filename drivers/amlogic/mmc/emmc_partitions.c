@@ -1,6 +1,18 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/amlogic/mmc/emmc_partitions.c
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
 #include <linux/types.h>
@@ -17,33 +29,34 @@
 #include <linux/uaccess.h>
 #include <linux/vmalloc.h>
 #include <linux/mmc/emmc_partitions.h>
+#include <linux/amlogic/cpu_version.h>
+#include <linux/amlogic/iomap.h>
+#include <linux/amlogic/sd.h>
 #include "emmc_key.h"
-#include <linux/amlogic/aml_sd.h>
-#include "../../mmc/core/mmc_ops.h"
-#include "../../mmc/core/core.h"
 #include <linux/dma-contiguous.h>
+#define DTB_NAME	"dtb"
+#define DDR_NAME	"ddr_parameter"
+#define	SZ_1M	0x00100000
+#define		MMC_DTB_PART_OFFSET		(40*SZ_1M)
+#define		DDR_PARAMETER_OFFSET		(8*SZ_1M)
+#define		EMMC_BLOCK_SIZE		(0x100)
+#define		MAX_EMMC_BLOCK_SIZE		(128*1024)
 
-#define DTB_NAME		"dtb"
-#define	SZ_1M			0x00100000
-#define	MMC_DTB_PART_OFFSET	(40 * SZ_1M)
-#define	EMMC_BLOCK_SIZE		(0x100)
-#define	MAX_EMMC_BLOCK_SIZE	(128 * 1024)
-
-#define DTB_RESERVE_OFFSET	(4 * SZ_1M)
+#define DTB_RESERVE_OFFSET (4 * SZ_1M)
 #define	DTB_BLK_SIZE		(0x200)
-#define	DTB_BLK_CNT		(512)
-#define	DTB_SIZE		(DTB_BLK_CNT * DTB_BLK_SIZE)
-#define DTB_COPIES		(2)
+#define	DTB_BLK_CNT			(512)
+#define	DTB_SIZE			(DTB_BLK_CNT * DTB_BLK_SIZE)
+#define DTB_COPIES			(2)
 #define DTB_AREA_BLK_CNT	(DTB_BLK_CNT * DTB_COPIES)
 /* pertransfer for internal opearations. */
 #define MAX_TRANS_BLK		(256)
 #define	MAX_TRANS_SIZE		(MAX_TRANS_BLK * DTB_BLK_SIZE)
 #define stamp_after(a, b)	((int)(b) - (int)(a)  < 0)
 
-#define GPT_HEADER_SIGNATURE	0x5452415020494645ULL
+#define GPT_HEADER_SIGNATURE 0x5452415020494645ULL
 
 struct aml_dtb_rsv {
-	u8 data[DTB_BLK_SIZE * DTB_BLK_CNT - 4 * sizeof(unsigned int)];
+	u8 data[DTB_BLK_SIZE*DTB_BLK_CNT - 4*sizeof(unsigned int)];
 	unsigned int magic;
 	unsigned int version;
 	unsigned int timestamp;
@@ -80,7 +93,10 @@ static dev_t amlmmc_dtb_no;
 struct cdev amlmmc_dtb;
 struct device *dtb_dev;
 struct class *amlmmc_dtb_class;
-static char *glb_dtb_buf;
+static dev_t amlmmc_ddr_no;
+struct cdev amlmmc_ddr;
+struct device *ddr_dev;
+struct class *amlmmc_ddr_class;
 struct mmc_card *card_dtb;
 static struct aml_dtb_info dtb_infos = {{0, 0}, {0, 0} };
 struct mmc_partitions_fmt *pt_fmt;
@@ -94,7 +110,7 @@ static unsigned int _calc_dtb_checksum(struct aml_dtb_rsv *dtb)
 	unsigned int checksum = 0;
 
 	size = size >> 2;
-	buffer = (unsigned int *)dtb;
+	buffer = (unsigned int *) dtb;
 	while (i < size)
 		checksum += buffer[i++];
 
@@ -106,17 +122,16 @@ static int _verify_dtb_checksum(struct aml_dtb_rsv *dtb)
 	unsigned int checksum;
 
 	checksum = _calc_dtb_checksum(dtb);
-	pr_info("calc %x, store %x\n", checksum, dtb->checksum);
+	pr_debug("calc %x, store %x\n", checksum, dtb->checksum);
 
 	return !(checksum == dtb->checksum);
 }
 
-static int _dtb_write(struct mmc_card *mmc, int blk, unsigned char *buf)
+static int _amlmmc_write(struct mmc_card *mmc,
+		      int blk, unsigned char *buf, int cnt)
 {
 	int ret = 0;
 	unsigned char *src = NULL;
-	int bit = mmc->csd.read_blkbits;
-	int cnt = CONFIG_DTB_SIZE >> bit;
 
 	src = (unsigned char *)buf;
 
@@ -137,12 +152,11 @@ static int _dtb_write(struct mmc_card *mmc, int blk, unsigned char *buf)
 	return ret;
 }
 
-static int _dtb_read(struct mmc_card *mmc, int blk, unsigned char *buf)
+static int _amlmmc_read(struct mmc_card *mmc,
+		     int blk, unsigned char *buf, int cnt)
 {
 	int ret = 0;
 	unsigned char *dst = NULL;
-	int bit = mmc->csd.read_blkbits;
-	int cnt = CONFIG_DTB_SIZE >> bit;
 
 	dst = (unsigned char *)buf;
 	mmc_claim_host(mmc->host);
@@ -169,45 +183,46 @@ static int _dtb_init(struct mmc_card *mmc)
 	int cpy = 1, valid = 0;
 	int bit = mmc->csd.read_blkbits;
 	int blk;
+	int cnt = CONFIG_DTB_SIZE >> bit;
 
-	if (!glb_dtb_buf) {
-		glb_dtb_buf = kmalloc(CONFIG_DTB_SIZE, GFP_KERNEL);
-		if (!glb_dtb_buf)
-			return -ENOMEM;
-	}
-	dtb = (struct aml_dtb_rsv *)glb_dtb_buf;
+	dtb = kmalloc(CONFIG_DTB_SIZE, GFP_KERNEL);
+	if (!dtb)
+		return -ENOMEM;
 
 	/* read dtb2 1st, for compatibility without checksum. */
 	while (cpy >= 0) {
 		blk = ((get_reserve_partition_off_from_tbl()
 					+ DTB_RESERVE_OFFSET) >> bit)
 			+ cpy * DTB_BLK_CNT;
-		if (_dtb_read(mmc, blk, (unsigned char *)dtb)) {
-			pr_err("%s: block # %#x ERROR!\n", __func__, blk);
+		if (_amlmmc_read(mmc, blk, (unsigned char *)dtb, cnt)) {
+			pr_err("%s: block # %#x ERROR!\n",
+					__func__, blk);
 		} else {
 			ret = _verify_dtb_checksum(dtb);
 			if (!ret) {
 				info->stamp[cpy] = dtb->timestamp;
 				info->valid[cpy] = 1;
-			} else {
+			} else
 				pr_err("cpy %d is not valid\n", cpy);
-			}
 		}
 		valid += info->valid[cpy];
 		cpy--;
 	}
 	pr_info("total valid %d\n", valid);
 
+	kfree(dtb);
 	return ret;
 }
 
-int amlmmc_dtb_write(struct mmc_card *mmc, unsigned char *buf, int len)
+int amlmmc_dtb_write(struct mmc_card *mmc,
+		unsigned char *buf, int len)
 {
 	int ret = 0, blk;
 	int bit = mmc->csd.read_blkbits;
 	int cpy, valid;
-	struct aml_dtb_rsv *dtb = (struct aml_dtb_rsv *)buf;
+	struct aml_dtb_rsv *dtb = (struct aml_dtb_rsv *) buf;
 	struct aml_dtb_info *info = &dtb_infos;
+	int cnt = CONFIG_DTB_SIZE >> bit;
 
 	if (len > CONFIG_DTB_SIZE) {
 		pr_err("%s dtb data len too much", __func__);
@@ -215,10 +230,10 @@ int amlmmc_dtb_write(struct mmc_card *mmc, unsigned char *buf, int len)
 	}
 	/* set info */
 	valid = info->valid[0] + info->valid[1];
-	if (valid == 0) {
+	if (valid == 0)
 		dtb->timestamp = 0;
-	} else if (valid == 1) {
-		dtb->timestamp = 1 + info->stamp[info->valid[0] ? 0 : 1];
+	else if (valid == 1) {
+		dtb->timestamp = 1 + info->stamp[info->valid[0]?0:1];
 	} else {
 		/* both are valid */
 		if (info->stamp[0] != info->stamp[1]) {
@@ -226,10 +241,9 @@ int amlmmc_dtb_write(struct mmc_card *mmc, unsigned char *buf, int len)
 				info->stamp[0], info->stamp[1]);
 			dtb->timestamp = 1 +
 				(stamp_after(info->stamp[1], info->stamp[0]) ?
-				info->stamp[1] : info->stamp[0]);
-		} else {
+				info->stamp[1]:info->stamp[0]);
+		} else
 			dtb->timestamp = 1 + info->stamp[0];
-		}
 	}
 	/*setting version and magic*/
 	dtb->version = 1; /* base version */
@@ -243,13 +257,14 @@ int amlmmc_dtb_write(struct mmc_card *mmc, unsigned char *buf, int len)
 		blk = ((get_reserve_partition_off_from_tbl()
 					+ DTB_RESERVE_OFFSET) >> bit)
 			+ cpy * DTB_BLK_CNT;
-		ret |= _dtb_write(mmc, blk, buf);
+		ret |= _amlmmc_write(mmc, blk, buf, cnt);
 	}
 
 	return ret;
 }
 
-int amlmmc_dtb_read(struct mmc_card *card, unsigned char *buf, int len)
+int amlmmc_dtb_read(struct mmc_card *card,
+		unsigned char *buf, int len)
 {
 	int ret = 0, start_blk, size, blk_cnt;
 	int bit = card->csd.read_blkbits;
@@ -263,41 +278,48 @@ int amlmmc_dtb_read(struct mmc_card *card, unsigned char *buf, int len)
 	memset(buf, 0x0, len);
 
 	start_blk = MMC_DTB_PART_OFFSET;
-	buffer = kmalloc(DTB_CELL_SIZE, GFP_KERNEL | __GFP_RECLAIM);
+	buffer = kmalloc(CONFIG_DTB_SIZE, GFP_KERNEL|__GFP_RECLAIM);
 	if (!buffer)
 		return -ENOMEM;
 
 	start_blk >>= bit;
 	size = CONFIG_DTB_SIZE;
-	blk_cnt = size >> bit;
+	blk_cnt = size>>bit;
 	dst = (unsigned char *)buffer;
 	while (blk_cnt != 0) {
 		memset(buffer, 0x0, DTB_CELL_SIZE);
-		ret = mmc_read_internal(card, start_blk,
-					(DTB_CELL_SIZE >> bit), dst);
+		ret = mmc_read_internal(card, start_blk, (DTB_CELL_SIZE>>bit), dst);
 		if (ret) {
 			pr_err("%s read dtb error", __func__);
 			ret = -EFAULT;
 			kfree(buffer);
 			return ret;
 		}
-		start_blk += (DTB_CELL_SIZE >> bit);
-		blk_cnt -= (DTB_CELL_SIZE >> bit);
+		start_blk += (DTB_CELL_SIZE>>bit);
+		blk_cnt -= (DTB_CELL_SIZE>>bit);
 		memcpy(buf, dst, DTB_CELL_SIZE);
 		buf += DTB_CELL_SIZE;
 	}
 	kfree(buffer);
 	return ret;
 }
-static CLASS_ATTR_STRING(emmcdtb, 0644, NULL);
+static CLASS_ATTR(emmcdtb, 0644, NULL, NULL);
+static CLASS_ATTR(emmcddr, 0644, NULL, NULL);
 
 int mmc_dtb_open(struct inode *node, struct file *file)
 {
 	return 0;
 }
 
-ssize_t mmc_dtb_read(struct file *file, char __user *buf,
-		     size_t count, loff_t *ppos)
+int mmc_ddr_parameter_open(struct inode *node, struct file *file)
+{
+	return 0;
+}
+
+ssize_t mmc_dtb_read(struct file *file,
+		char __user *buf,
+		size_t count,
+		loff_t *ppos)
 {
 	unsigned char *dtb_ptr = NULL;
 	ssize_t read_size = 0;
@@ -311,13 +333,14 @@ ssize_t mmc_dtb_read(struct file *file, char __user *buf,
 		return -EFAULT;
 	}
 
-	dtb_ptr = glb_dtb_buf;
+	dtb_ptr = kmalloc(CONFIG_DTB_SIZE, GFP_KERNEL);
 	if (!dtb_ptr)
 		return -ENOMEM;
 
 	mmc_claim_host(card_dtb->host);
-	ret = amlmmc_dtb_read(card_dtb, (unsigned char *)dtb_ptr,
-			      CONFIG_DTB_SIZE);
+	ret = amlmmc_dtb_read(card_dtb,
+			(unsigned char *)dtb_ptr,
+			CONFIG_DTB_SIZE);
 	if (ret) {
 		pr_err("%s: read failed:%d", __func__, ret);
 		ret = -EFAULT;
@@ -332,11 +355,58 @@ ssize_t mmc_dtb_read(struct file *file, char __user *buf,
 
 exit:
 	mmc_release_host(card_dtb->host);
+	kfree(dtb_ptr);
+	return read_size;
+}
+
+ssize_t mmc_ddr_parameter_read(struct file *file,
+		char __user *buf,
+		size_t count,
+		loff_t *ppos)
+{
+	unsigned char *dtb_ptr = NULL;
+	ssize_t read_size = 0;
+	int bit = card_dtb->csd.read_blkbits;
+	int ret = 0;
+	int cnt = CONFIG_DDR_PARAMETER_SIZE >> bit;
+	int blk = ((get_reserve_partition_off_from_tbl()
+			+ DDR_PARAMETER_OFFSET) >> bit);
+
+	if (*ppos == CONFIG_DDR_PARAMETER_SIZE)
+		return 0;
+
+	if (*ppos >= CONFIG_DDR_PARAMETER_SIZE) {
+		pr_err("%s: out of space!", __func__);
+		return -EFAULT;
+	}
+
+	dtb_ptr = kmalloc(CONFIG_DDR_PARAMETER_SIZE, GFP_KERNEL);
+	if (!dtb_ptr)
+		return -ENOMEM;
+
+	mmc_claim_host(card_dtb->host);
+	ret = _amlmmc_read(card_dtb, blk, (unsigned char *)dtb_ptr, cnt);
+	if (ret) {
+		pr_err("%s: read failed:%d", __func__, ret);
+		ret = -EFAULT;
+		goto exit;
+	}
+	if ((*ppos + count) > CONFIG_DDR_PARAMETER_SIZE)
+		read_size = CONFIG_DDR_PARAMETER_SIZE - *ppos;
+	else
+		read_size = count;
+	ret = copy_to_user(buf, (dtb_ptr + *ppos), read_size);
+	*ppos += read_size;
+
+exit:
+	mmc_release_host(card_dtb->host);
+	kfree(dtb_ptr);
 	return read_size;
 }
 
 ssize_t mmc_dtb_write(struct file *file,
-		      const char __user *buf, size_t count, loff_t *ppos)
+		const char __user *buf,
+		size_t count, loff_t *ppos)
 {
 	unsigned char *dtb_ptr = NULL;
 	ssize_t write_size = 0;
@@ -349,7 +419,7 @@ ssize_t mmc_dtb_write(struct file *file,
 		return -EFAULT;
 	}
 
-	dtb_ptr = glb_dtb_buf;
+	dtb_ptr = kmalloc(CONFIG_DTB_SIZE, GFP_KERNEL);
 	if (!dtb_ptr)
 		return -ENOMEM;
 
@@ -363,7 +433,7 @@ ssize_t mmc_dtb_write(struct file *file,
 	ret = copy_from_user((dtb_ptr + *ppos), buf, write_size);
 
 	ret = amlmmc_dtb_write(card_dtb,
-			       dtb_ptr, CONFIG_DTB_SIZE);
+			dtb_ptr, CONFIG_DTB_SIZE);
 	if (ret) {
 		pr_err("%s: write dtb failed", __func__);
 		ret = -EFAULT;
@@ -373,10 +443,63 @@ ssize_t mmc_dtb_write(struct file *file,
 	*ppos += write_size;
 exit:
 	mmc_release_host(card_dtb->host);
+	kfree(dtb_ptr);
+	return write_size;
+}
+
+ssize_t mmc_ddr_parameter_write(struct file *file,
+		const char __user *buf,
+		size_t count, loff_t *ppos)
+{
+	unsigned char *dtb_ptr = NULL;
+	ssize_t write_size = 0;
+	int bit = card_dtb->csd.read_blkbits;
+	int ret = 0;
+	int cnt = CONFIG_DDR_PARAMETER_SIZE >> bit;
+	int blk = ((get_reserve_partition_off_from_tbl()
+			+ DDR_PARAMETER_OFFSET) >> bit);
+
+	if (*ppos == CONFIG_DDR_PARAMETER_SIZE)
+		return 0;
+	if (*ppos >= CONFIG_DDR_PARAMETER_SIZE) {
+		pr_err("%s: out of space!", __func__);
+		return -EFAULT;
+	}
+
+	dtb_ptr = kmalloc(CONFIG_DDR_PARAMETER_SIZE, GFP_KERNEL);
+	if (!dtb_ptr)
+		return -ENOMEM;
+
+	mmc_claim_host(card_dtb->host);
+
+	if ((*ppos + count) > CONFIG_DDR_PARAMETER_SIZE)
+		write_size = CONFIG_DDR_PARAMETER_SIZE - *ppos;
+	else
+		write_size = count;
+
+	ret = copy_from_user((dtb_ptr + *ppos), buf, write_size);
+
+	ret = _amlmmc_write(card_dtb, blk, (unsigned char *)dtb_ptr, cnt);
+	if (ret) {
+		pr_err("%s: write dtb failed", __func__);
+		ret = -EFAULT;
+		goto exit;
+	}
+
+	*ppos += write_size;
+exit:
+	mmc_release_host(card_dtb->host);
+	kfree(dtb_ptr);
 	return write_size;
 }
 
 long mmc_dtb_ioctl(struct file *file, unsigned int cmd, unsigned long args)
+{
+	return 0;
+}
+
+long mmc_ddr_parameter_ioctl(struct file *file,
+			     unsigned int cmd, unsigned long args)
 {
 	return 0;
 }
@@ -388,10 +511,16 @@ static const struct file_operations dtb_ops = {
 	.unlocked_ioctl = mmc_dtb_ioctl,
 };
 
+static const struct file_operations ddr_parameter_ops = {
+	.open = mmc_ddr_parameter_open,
+	.read = mmc_ddr_parameter_read,
+	.write = mmc_ddr_parameter_write,
+	.unlocked_ioctl = mmc_ddr_parameter_ioctl,
+};
+
 int amlmmc_dtb_init(struct mmc_card *card)
 {
 	int ret = 0;
-
 	card_dtb = card;
 	pr_info("%s: register dtb chardev", __func__);
 
@@ -420,15 +549,18 @@ int amlmmc_dtb_init(struct mmc_card *card)
 		goto exit_err2;
 	}
 
-	ret = class_create_file(amlmmc_dtb_class, &class_attr_emmcdtb.attr);
+	ret = class_create_file(amlmmc_dtb_class, &class_attr_emmcdtb);
 	if (ret) {
 		pr_err("dtb dev add failed");
 		ret = -1;
 		goto exit_err2;
 	}
 
-	dtb_dev = device_create(amlmmc_dtb_class, NULL,
-				amlmmc_dtb_no, NULL, DTB_NAME);
+	dtb_dev = device_create(amlmmc_dtb_class,
+			NULL,
+			amlmmc_dtb_no,
+			NULL,
+			DTB_NAME);
 	if (IS_ERR(dtb_dev)) {
 		pr_err("dtb dev add failed");
 		ret = -1;
@@ -440,12 +572,74 @@ int amlmmc_dtb_init(struct mmc_card *card)
 	return ret;
 
 exit_err3:
-	class_remove_file(amlmmc_dtb_class, &class_attr_emmcdtb.attr);
+	class_remove_file(amlmmc_dtb_class, &class_attr_emmcdtb);
 	class_destroy(amlmmc_dtb_class);
 exit_err2:
 	cdev_del(&amlmmc_dtb);
 exit_err1:
 	unregister_chrdev_region(amlmmc_dtb_no, 1);
+exit_err:
+	return ret;
+}
+
+int amlmmc_ddr_init(struct mmc_card *card)
+{
+	int ret = 0;
+
+	pr_info("%s: register ddr_parameter chardev", __func__);
+
+	ret = alloc_chrdev_region(&amlmmc_ddr_no, 0, 1, DDR_NAME);
+	if (ret < 0) {
+		pr_err("alloc ddr parameter dev_t no failed");
+		ret = -1;
+		goto exit_err;
+	}
+
+	cdev_init(&amlmmc_ddr, &ddr_parameter_ops);
+	amlmmc_ddr.owner = THIS_MODULE;
+	ret = cdev_add(&amlmmc_ddr, amlmmc_ddr_no, 1);
+	if (ret) {
+		pr_err("ddr parameter dev add failed");
+		ret = -1;
+		goto exit_err1;
+	}
+
+	amlmmc_ddr_class = class_create(THIS_MODULE, DDR_NAME);
+	if (IS_ERR(amlmmc_ddr_class)) {
+		pr_err("ddr parameter dev add failed");
+		ret = -1;
+		goto exit_err2;
+	}
+
+	ret = class_create_file(amlmmc_ddr_class, &class_attr_emmcddr);
+	if (ret) {
+		pr_err("ddr parameter dev add failed");
+		ret = -1;
+		goto exit_err2;
+	}
+
+	ddr_dev = device_create(amlmmc_ddr_class,
+			NULL,
+			amlmmc_ddr_no,
+			NULL,
+			DDR_NAME);
+	if (IS_ERR(ddr_dev)) {
+		pr_err("ddr parameter dev add failed");
+		ret = -1;
+		goto exit_err3;
+	}
+
+	pr_info("%s: register ddr parameter chardev OK", __func__);
+
+	return ret;
+
+exit_err3:
+	class_remove_file(amlmmc_ddr_class, &class_attr_emmcddr);
+	class_destroy(amlmmc_ddr_class);
+exit_err2:
+	cdev_del(&amlmmc_ddr);
+exit_err1:
+	unregister_chrdev_region(amlmmc_ddr_no, 1);
 exit_err:
 	return ret;
 }
@@ -478,10 +672,9 @@ static int mmc_check_result(struct mmc_request *mrq)
 }
 
 static void mmc_prepare_mrq(struct mmc_card *card,
-			    struct mmc_request *mrq, struct scatterlist *sg,
-			    unsigned int sg_len, unsigned int dev_addr,
-			    unsigned int blocks,
-			    unsigned int blksz, int write)
+		struct mmc_request *mrq, struct scatterlist *sg,
+		unsigned int sg_len, unsigned int dev_addr, unsigned int blocks,
+		unsigned int blksz, int write)
 {
 	WARN_ON(!mrq || !mrq->cmd || !mrq->data || !mrq->stop);
 
@@ -494,14 +687,14 @@ static void mmc_prepare_mrq(struct mmc_card *card,
 	}
 
 	mrq->cmd->arg = dev_addr;
-	if (!mmc_card_is_blockaddr(card))
+	if (!mmc_card_blockaddr(card))
 		mrq->cmd->arg <<= 9;
 
 	mrq->cmd->flags = MMC_RSP_R1 | MMC_CMD_ADTC;
 
-	if (blocks == 1) {
+	if (blocks == 1)
 		mrq->stop = NULL;
-	} else {
+	else {
 		mrq->stop->opcode = MMC_STOP_TRANSMISSION;
 		mrq->stop->arg = 0;
 		mrq->stop->flags = MMC_RSP_R1B | MMC_CMD_AC;
@@ -518,14 +711,14 @@ static void mmc_prepare_mrq(struct mmc_card *card,
 
 unsigned int mmc_capacity(struct mmc_card *card)
 {
-	if (!mmc_card_sd(card) && mmc_card_is_blockaddr(card))
+	if (!mmc_card_sd(card) && mmc_card_blockaddr(card))
 		return card->ext_csd.sectors;
 	else
 		return card->csd.capacity << (card->csd.read_blkbits - 9);
 }
 
 static int mmc_transfer(struct mmc_card *card, unsigned int dev_addr,
-			unsigned int blocks, void *buf, int write)
+		unsigned int blocks, void *buf, int write)
 {
 	u8 original_part_config;
 	u8 user_part_number = 0;
@@ -538,17 +731,16 @@ static int mmc_transfer(struct mmc_card *card, unsigned int dev_addr,
 	struct mmc_command stop = {0};
 	struct mmc_data data = {0};
 	int ret;
-
 	cur_part_number = card->ext_csd.part_config
-		& EXT_CSD_PART_CONFIG_ACC_MASK;
+		&EXT_CSD_PART_CONFIG_ACC_MASK;
 	if (cur_part_number != user_part_number) {
 		switch_partition = true;
 		original_part_config = card->ext_csd.part_config;
 		cur_part_number = original_part_config
-			& (~EXT_CSD_PART_CONFIG_ACC_MASK);
+			&(~EXT_CSD_PART_CONFIG_ACC_MASK);
 		ret = mmc_switch(card, EXT_CSD_CMD_SET_NORMAL,
-				 EXT_CSD_PART_CONFIG, cur_part_number,
-				 card->ext_csd.part_time);
+				EXT_CSD_PART_CONFIG, cur_part_number,
+				card->ext_csd.part_time);
 		if (ret)
 			return ret;
 
@@ -556,7 +748,7 @@ static int mmc_transfer(struct mmc_card *card, unsigned int dev_addr,
 	}
 	if ((dev_addr + blocks) >= mmc_capacity(card)) {
 		pr_info("[%s] %s range exceeds device capacity!\n",
-			__func__, write ? "write" : "read");
+				__func__, write?"write":"read");
 		ret = -1;
 		return ret;
 	}
@@ -569,15 +761,15 @@ static int mmc_transfer(struct mmc_card *card, unsigned int dev_addr,
 	mrq.stop = &stop;
 
 	mmc_prepare_mrq(card, &mrq, &sg, 1, dev_addr,
-			blocks, 1 << card->csd.read_blkbits, write);
+			blocks, 1<<card->csd.read_blkbits, write);
 
 	mmc_wait_for_req(card->host, &mrq);
 
 	ret = mmc_check_result(&mrq);
-	if (switch_partition) {
+	if (switch_partition == true) {
 		ret = mmc_switch(card, EXT_CSD_CMD_SET_NORMAL,
-				 EXT_CSD_PART_CONFIG, original_part_config,
-				 card->ext_csd.part_time);
+				EXT_CSD_PART_CONFIG, original_part_config,
+				card->ext_csd.part_time);
 		if (ret)
 			return ret;
 		card->ext_csd.part_config = original_part_config;
@@ -591,14 +783,13 @@ static int amlmmc_write_tuning_para(struct mmc_card *card,
 				    unsigned int dev_addr)
 {
 	unsigned int size;
-	struct mmc_host *mmc = card->host;
-	struct meson_host *host = mmc_priv(mmc);
-	struct aml_tuning_para *parameter = &host->para;
+	struct amlsd_platform *pdata = mmc_priv(card->host);
+	struct aml_tuning_para *parameter = &pdata->para;
 	unsigned int *buf;
 	int para_size;
 	int blocks;
 
-	if (host->save_para == 0)
+	if (pdata->save_para == 0)
 		return 0;
 
 	if (parameter->update == 0)
@@ -623,19 +814,20 @@ static int amlmmc_write_tuning_para(struct mmc_card *card,
 }
 
 int mmc_read_internal(struct mmc_card *card, unsigned int dev_addr,
-		      unsigned int blocks, void *buf)
+		unsigned int blocks, void *buf)
 {
 	return mmc_transfer(card, dev_addr, blocks, buf, 0);
 }
 
 int mmc_write_internal(struct mmc_card *card, unsigned int dev_addr,
-		       unsigned int blocks, void *buf)
+		unsigned int blocks, void *buf)
 {
 	return mmc_transfer(card, dev_addr, blocks, buf, 1);
 }
 
-static int mmc_partition_tbl_checksum_calc(struct partitions *part,
-					   int part_num)
+
+static int mmc_partition_tbl_checksum_calc(
+		struct partitions *part, int part_num)
 {
 	int i, j;
 	u32 checksum = 0, *p;
@@ -643,7 +835,7 @@ static int mmc_partition_tbl_checksum_calc(struct partitions *part,
 	for (i = 0; i < part_num; i++) {
 		p = (u32 *)part;
 
-		for (j = sizeof(struct partitions) / sizeof(checksum);
+		for (j = sizeof(struct partitions)/sizeof(checksum);
 				j > 0; j--) {
 			checksum += *p;
 			p++;
@@ -653,11 +845,35 @@ static int mmc_partition_tbl_checksum_calc(struct partitions *part,
 	return checksum;
 }
 
-static int get_reserve_partition_off(struct mmc_card *card) /* byte unit */
+int get_reserve_partition_off(struct mmc_card *card) /* byte unit */
 {
-	int off = -1;
+	int off = -1, storage_flag;
+	struct mmc_host *mmc_host = card->host;
+	struct amlsd_host *host = mmc_priv(mmc_host);
 
-	off = MMC_BOOT_PARTITION_SIZE + MMC_BOOT_PARTITION_RESERVED;
+	storage_flag = host->storage_flag;
+	if (!strcmp(mmc_hostname(mmc_host), "emmc"))
+		storage_flag = EMMC_BOOT_FLAG;
+	if ((storage_flag == EMMC_BOOT_FLAG)
+			|| (storage_flag == SPI_EMMC_FLAG))	{
+		off = MMC_BOOT_PARTITION_SIZE + MMC_BOOT_PARTITION_RESERVED;
+	} else if ((storage_flag == 0) || (storage_flag == -1)) {
+		if (POR_EMMC_BOOT()) {
+			off = MMC_BOOT_PARTITION_SIZE
+				+ MMC_BOOT_PARTITION_RESERVED;
+		} else if (POR_SPI_BOOT() || POR_CARD_BOOT()) {
+			off = 0;
+		} else { /* POR_NAND_BOOT */
+			off = -1;
+		}
+	} else { /* error, the storage device does NOT relate to eMMC */
+		off = -1;
+	}
+
+	if (off == -1)
+		pr_info(
+				"[%s] Error, NOT relate to eMMC,\"\" storage_flag=%d\n",
+				__func__, storage_flag);
 
 	return off;
 }
@@ -695,7 +911,7 @@ int get_reserve_partition_off_from_tbl(void)
  */
 
 static int mmc_read_partition_tbl(struct mmc_card *card,
-				  struct mmc_partitions_fmt *pt_fmt)
+		struct mmc_partitions_fmt *pt_fmt)
 {
 	int ret = 0, start_blk, size, blk_cnt;
 	int bit = card->csd.read_blkbits;
@@ -703,13 +919,14 @@ static int mmc_read_partition_tbl(struct mmc_card *card,
 	char *buf, *dst;
 
 	buf = kmalloc(blk_size, GFP_KERNEL);
-	if (!buf) {
+	if (buf == NULL) {
 		/*	pr_info("malloc failed for buffer!\n");*/
 		ret = -ENOMEM;
 		goto exit_err;
 	}
 	memset(pt_fmt, 0, sizeof(struct mmc_partitions_fmt));
 	memset(buf, 0, blk_size);
+
 	start_blk = get_reserve_partition_off(card);
 	if (start_blk < 0) {
 		ret = -EINVAL;
@@ -739,26 +956,38 @@ static int mmc_read_partition_tbl(struct mmc_card *card,
 	/* pt_fmt->magic, pt_fmt->version, pt_fmt->checksum); */
 	/* show_mmc_patition(pt_fmt->partitions, pt_fmt->part_num); */
 
-	if ((strncmp(pt_fmt->magic, MMC_PARTITIONS_MAGIC,
-		     sizeof(pt_fmt->magic)) == 0) && pt_fmt->part_num > 0 &&
-			pt_fmt->part_num <= MAX_MMC_PART_NUM &&
-			pt_fmt->checksum == mmc_partition_tbl_checksum_calc
-			(pt_fmt->partitions, pt_fmt->part_num)) {
+	if ((strncmp(pt_fmt->magic,
+				MMC_PARTITIONS_MAGIC,
+				sizeof(pt_fmt->magic)) == 0) /* the same */
+			&& (pt_fmt->part_num > 0)
+			&& (pt_fmt->part_num <= MAX_MMC_PART_NUM)
+			&& (pt_fmt->checksum ==
+				mmc_partition_tbl_checksum_calc(
+					pt_fmt->partitions,
+					pt_fmt->part_num))) {
+
 		ret = 0; /* everything is OK now */
 
 	} else {
 		if (strncmp(pt_fmt->magic, MMC_PARTITIONS_MAGIC,
-			    sizeof(pt_fmt->magic)) != 0) {
-			pr_info("magic error: %s\n", pt_fmt->magic);
-		} else if ((pt_fmt->part_num < 0) ||
-			    (pt_fmt->part_num > MAX_MMC_PART_NUM)) {
+					sizeof(pt_fmt->magic)) != 0) {
+
+			pr_info("magic error: %s\n",
+					(pt_fmt->magic)?pt_fmt->magic:"NULL");
+
+		} else if ((pt_fmt->part_num < 0)
+				|| (pt_fmt->part_num > MAX_MMC_PART_NUM)) {
+
 			pr_info("partition number error: %d\n",
-				pt_fmt->part_num);
+					pt_fmt->part_num);
+
 		} else {
-			pr_info("checksum error: pt_fmt->checksum=%d,calc_result=%d\n",
+			pr_info(
+				"checksum error: pt_fmt->checksum=%d,calc_result=%d\n",
 				pt_fmt->checksum,
-				mmc_partition_tbl_checksum_calc
-				(pt_fmt->partitions, pt_fmt->part_num));
+				mmc_partition_tbl_checksum_calc(
+					pt_fmt->partitions,
+					pt_fmt->part_num));
 		}
 
 		pr_info("[%s]: partition verified error\n", __func__);
@@ -769,15 +998,15 @@ exit_err:
 	kfree(buf);
 
 	pr_info("[%s] mmc read partition %s!\n",
-		__func__, (ret == 0) ? "OK" : "ERROR");
+			__func__, (ret == 0) ? "OK" : "ERROR");
 
 	return ret;
 }
 
 /* This function is copy and modified from kernel function add_partition() */
 static struct hd_struct *add_emmc_each_part(struct gendisk *disk, int partno,
-					    sector_t start, sector_t len,
-					    int flags, char *pname)
+		sector_t start, sector_t len, int flags,
+		char *pname)
 {
 	struct hd_struct *p;
 	dev_t devt = MKDEV(0, 0);
@@ -841,14 +1070,8 @@ static struct hd_struct *add_emmc_each_part(struct gendisk *disk, int partno,
 	if (!p->holder_dir)
 		goto out_del;
 
-	dev_set_uevent_suppress(pdev, 0);
-
 	/* everything is up and running, commence */
 	rcu_assign_pointer(ptbl->part[partno], p);
-
-	/* suppress uevent if the disk suppresses it */
-	if (!dev_get_uevent_suppress(ddev))
-		kobject_uevent(&pdev->kobj, KOBJ_ADD);
 
 	hd_ref_init(p);
 	return p;
@@ -869,14 +1092,14 @@ out_put:
 
 static inline int card_proc_info(struct seq_file *m, char *dev_name, int i)
 {
-	struct partitions *this = &pt_fmt->partitions[i];
+	struct partitions *this = &(pt_fmt->partitions[i]);
 
 	if (i >= pt_fmt->part_num)
 		return 0;
 
 	seq_printf(m, "%s%02d: %9llx %9x \"%s\"\n", dev_name,
-		   i + 1, (unsigned long long)this->size,
-		   512 * 1024, this->name);
+			i+1, (unsigned long long)this->size,
+			512*1024, this->name);
 	return 0;
 }
 
@@ -904,39 +1127,50 @@ static const struct file_operations card_proc_fops = {
 };
 
 static int add_emmc_partition(struct gendisk *disk,
-			      struct mmc_partitions_fmt *pt_fmt)
+		struct mmc_partitions_fmt *pt_fmt)
 {
 	unsigned int i;
 	struct hd_struct *ret = NULL;
-	u64 offset, size, cap;
+	uint64_t offset, size, cap;
 	struct partitions *pp;
 	struct proc_dir_entry *proc_card;
+	struct disk_part_iter piter;
+	struct hd_struct *part;
 
-	pr_info("%s\n", __func__);
+	pr_info("add_emmc_partition\n");
 
 	cap = get_capacity(disk); /* unit:512 bytes */
 	for (i = 0; i < pt_fmt->part_num; i++) {
-		pp = &pt_fmt->partitions[i];
+		pp = &(pt_fmt->partitions[i]);
 		offset = pp->offset >> 9; /* unit:512 bytes */
 		size = pp->size >> 9; /* unit:512 bytes */
 		if ((offset + size) <= cap) {
-			ret = add_emmc_each_part(disk, 1 + i, offset,
-						 size, 0, pp->name);
+			ret = add_emmc_each_part(disk, 1+i, offset,
+					size, 0, pp->name);
 
-			pr_info("[%sp%02d] %20s  offset 0x%012llx, size 0x%012llx %s\n",
-				disk->disk_name, 1 + i,
-				pp->name, offset << 9,
-				size << 9, IS_ERR(ret) ? "add fail" : "");
+			pr_debug("[%sp%02d] %20s  offset 0x%012llx, size 0x%012llx %s\n",
+				 disk->disk_name, 1 + i,
+				 pp->name, offset << 9,
+				 size << 9, IS_ERR(ret) ? "add fail" : "");
+			if (IS_ERR(ret))
+				return -1;
 		} else {
 			pr_info("[%s] %s: partition exceeds device capacity:\n",
-				__func__, disk->disk_name);
+					__func__, disk->disk_name);
 
 			pr_info("%20s	offset 0x%012llx, size 0x%012llx\n",
-				pp->name, offset << 9, size << 9);
+					pp->name, offset<<9, size<<9);
 
 			break;
 		}
 	}
+	/* announce all partitions */
+	disk_part_iter_init(&piter, disk, 0);
+	while ((part = disk_part_iter_next(&piter))) {
+		dev_set_uevent_suppress(part_to_dev(part), 0);
+		kobject_uevent(&part_to_dev(part)->kobj, KOBJ_ADD);
+	}
+	disk_part_iter_exit(&piter);
 	/* create /proc/inand */
 
 	proc_card = proc_create("inand", 0444, NULL, &card_proc_fops);
@@ -953,18 +1187,17 @@ static int add_emmc_partition(struct gendisk *disk,
 static int is_card_emmc(struct mmc_card *card)
 {
 	struct mmc_host *mmc = card->host;
-	struct meson_host *host = mmc_priv(mmc);
 
 	/* emmc port, so it must be an eMMC or TSD */
-	if (aml_card_type_mmc(host))
-		return 0;
-	else
+	if (!strcmp(mmc_hostname(mmc), "emmc"))
 		return 1;
+	else
+		return 0;
 	/*return mmc->is_emmc_port;*/
 }
 
 static ssize_t emmc_version_get(struct class *class,
-				struct class_attribute *attr, char *buf)
+		struct class_attribute *attr, char *buf)
 {
 	int num = 0;
 
@@ -981,25 +1214,25 @@ static void show_partition_table(struct partitions *table)
 		par_table = &table[i];
 		if (par_table->size == -1)
 			pr_info("part: %d, name : %10s, size : %-4s mask_flag %d\n",
-				i, par_table->name, "end",
-				par_table->mask_flags);
+					i, par_table->name, "end",
+					par_table->mask_flags);
 		else
 			pr_info("part: %d, name : %10s, size : %-4llx  mask_flag %d\n",
-				i, par_table->name, par_table->size,
-				par_table->mask_flags);
+					i, par_table->name, par_table->size,
+					par_table->mask_flags);
 	}
 }
 
 static ssize_t emmc_part_table_get(struct class *class,
-				   struct class_attribute *attr, char *buf)
+		struct class_attribute *attr, char *buf)
 {
 	struct partitions *part_table = NULL;
 	struct partitions *tmp_table = NULL;
 	int i = 0, part_num = 0;
 
 	tmp_table = pt_fmt->partitions;
-	part_table = kmalloc_array(MAX_MMC_PART_NUM,
-				   sizeof(struct partitions), GFP_KERNEL);
+	part_table = kmalloc(MAX_MMC_PART_NUM
+			*sizeof(struct partitions), GFP_KERNEL);
 
 	if (!part_table) {
 		pr_info("[%s] malloc failed for  part_table!\n", __func__);
@@ -1009,8 +1242,8 @@ static ssize_t emmc_part_table_get(struct class *class,
 	for (i = 0; i < MAX_MMC_PART_NUM; i++) {
 		if (tmp_table[i].mask_flags == STORE_CODE) {
 			strncpy(part_table[part_num].name,
-				tmp_table[i].name,
-				MAX_MMC_PART_NAME_LEN);
+					tmp_table[i].name,
+					MAX_MMC_PART_NAME_LEN);
 
 			part_table[part_num].size = tmp_table[i].size;
 			part_table[part_num].offset = tmp_table[i].offset;
@@ -1023,8 +1256,8 @@ static ssize_t emmc_part_table_get(struct class *class,
 	for (i = 0; i < MAX_MMC_PART_NUM; i++) {
 		if (tmp_table[i].mask_flags == STORE_CACHE) {
 			strncpy(part_table[part_num].name,
-				tmp_table[i].name,
-				MAX_MMC_PART_NAME_LEN);
+					tmp_table[i].name,
+					MAX_MMC_PART_NAME_LEN);
 
 			part_table[part_num].size = tmp_table[i].size;
 			part_table[part_num].offset = tmp_table[i].offset;
@@ -1038,8 +1271,8 @@ static ssize_t emmc_part_table_get(struct class *class,
 	for (i = 0; i < MAX_MMC_PART_NUM; i++) {
 		if (tmp_table[i].mask_flags == STORE_DATA) {
 			strncpy(part_table[part_num].name,
-				tmp_table[i].name,
-				MAX_MMC_PART_NAME_LEN);
+					tmp_table[i].name,
+					MAX_MMC_PART_NAME_LEN);
 
 			part_table[part_num].size = tmp_table[i].size;
 			part_table[part_num].offset = tmp_table[i].offset;
@@ -1047,36 +1280,37 @@ static ssize_t emmc_part_table_get(struct class *class,
 				tmp_table[i].mask_flags;
 
 			if (!strncmp(part_table[part_num].name, "data",
-				     MAX_MMC_PART_NAME_LEN))
+						MAX_MMC_PART_NAME_LEN))
 				/* last part size is FULL */
 				part_table[part_num].size = -1;
+
 			part_num++;
 		}
 	}
 
 	show_partition_table(part_table);
-	memcpy(buf, part_table, MAX_MMC_PART_NUM * sizeof(struct partitions));
+	memcpy(buf, part_table, MAX_MMC_PART_NUM*sizeof(struct partitions));
 
 	kfree(part_table);
 	part_table = NULL;
 
-	return MAX_MMC_PART_NUM * sizeof(struct partitions);
+	return MAX_MMC_PART_NUM*sizeof(struct partitions);
 }
 
 static int store_device = -1;
 static ssize_t store_device_flag_get(struct class *class,
-				     struct class_attribute *attr, char *buf)
+		struct class_attribute *attr, char *buf)
 {
 	if (store_device == -1) {
 		pr_info("[%s]  get store device flag something wrong !\n",
-			__func__);
+				__func__);
 	}
 
 	return sprintf(buf, "%d", store_device);
 }
 
 static ssize_t get_bootloader_offset(struct class *class,
-				     struct class_attribute *attr, char *buf)
+		struct class_attribute *attr, char *buf)
 {
 	int offset = 0;
 
@@ -1114,12 +1348,22 @@ int add_fake_boot_partition(struct gendisk *disk, char *name, int idx)
 	char fake_name[80];
 	int offset = 1;
 	struct hd_struct *ret = NULL;
+	struct disk_part_iter piter;
+	struct hd_struct *part;
 
 	idx ^= 1;
 	sprintf(fake_name, name, idx);
-	ret = add_emmc_each_part(disk, 1, offset, boot_size, 0, fake_name);
+	ret = add_emmc_each_part(disk, 1 + idx,
+			offset, boot_size, 0, fake_name);
 	if (IS_ERR(ret))
 		pr_info("%s added failed\n", fake_name);
+
+	disk_part_iter_init(&piter, disk, 0);
+	while ((part = disk_part_iter_next(&piter))) {
+		dev_set_uevent_suppress(part_to_dev(part), 0);
+		kobject_uevent(&part_to_dev(part)->kobj, KOBJ_ADD);
+	}
+	disk_part_iter_exit(&piter);
 
 	return 0;
 }
@@ -1127,6 +1371,8 @@ int add_fake_boot_partition(struct gendisk *disk, char *name, int idx)
 int aml_emmc_partition_ops(struct mmc_card *card, struct gendisk *disk)
 {
 	int ret = 0;
+	struct mmc_host *mmc_host = card->host;
+	struct amlsd_host *host = mmc_priv(mmc_host);
 	struct disk_part_iter piter;
 	struct hd_struct *part;
 	struct class *aml_store_class = NULL;
@@ -1134,7 +1380,8 @@ int aml_emmc_partition_ops(struct mmc_card *card, struct gendisk *disk)
 	unsigned char *buffer = NULL;
 
 	pr_info("Enter %s\n", __func__);
-	if (is_card_emmc(card)) /* not emmc, nothing to do */
+
+	if (is_card_emmc(card) == 0) /* not emmc, nothing to do */
 		return 0;
 
 	buffer = kmalloc(512, GFP_KERNEL);
@@ -1151,7 +1398,7 @@ int aml_emmc_partition_ops(struct mmc_card *card, struct gendisk *disk)
 		goto out;
 	}
 
-	gpt_h = (struct gpt_header *)buffer;
+	gpt_h = (struct gpt_header *) buffer;
 
 	if (le64_to_cpu(gpt_h->signature) == GPT_HEADER_SIGNATURE) {
 		kfree(buffer);
@@ -1161,8 +1408,10 @@ int aml_emmc_partition_ops(struct mmc_card *card, struct gendisk *disk)
 
 	kfree(buffer);
 
-	pt_fmt = kmalloc(sizeof(*pt_fmt), GFP_KERNEL);
-	if (!pt_fmt) {
+	store_device = host->storage_flag;
+
+	pt_fmt = kmalloc(sizeof(struct mmc_partitions_fmt), GFP_KERNEL);
+	if (pt_fmt == NULL) {
 		/*	pr_info(
 		 *	"[%s] malloc failed for struct mmc_partitions_fmt!\n",
 		 *	__func__);
@@ -1174,7 +1423,7 @@ int aml_emmc_partition_ops(struct mmc_card *card, struct gendisk *disk)
 
 	while ((part = disk_part_iter_next(&piter))) {
 		pr_info("Delete invalid mbr partition part %p, part->partno %d\n",
-			part, part->partno);
+				part, part->partno);
 		delete_partition(disk, part->partno);
 	}
 	disk_part_iter_exit(&piter);
@@ -1187,11 +1436,14 @@ int aml_emmc_partition_ops(struct mmc_card *card, struct gendisk *disk)
 
 	if (ret == 0) /* ok */
 		ret = emmc_key_init(card);
-	if (ret)
+	if (ret) {
+		kfree(pt_fmt);
 		goto out;
-
+	}
 	amlmmc_dtb_init(card);
 	amlmmc_write_tuning_para(card, MMC_TUNING_OFFSET);
+
+	amlmmc_ddr_init(card);
 
 	aml_store_class = class_create(THIS_MODULE, "aml_store");
 	if (IS_ERR(aml_store_class)) {
@@ -1222,13 +1474,13 @@ int aml_emmc_partition_ops(struct mmc_card *card, struct gendisk *disk)
 		goto out_class3;
 	}
 
-	/*ret = class_create_file(aml_store_class, &cd_irq_cnt_);
+	/* ret = class_create_file(aml_store_class, &cd_irq_cnt_);
 	 *if (ret) {
 	 *	pr_info("[%s] can't create aml_store_class file .\n", __func__);
 	 *	goto out_class3;
 	 *}
 	 */
-	pr_info("Exit %s %s.\n", __func__, (ret == 0) ? "OK" : "ERROR");
+	pr_info("Exit %s %s.\n", __func__, (ret == 0)?"OK":"ERROR");
 	return ret;
 
 out_class3:
@@ -1238,6 +1490,8 @@ out_class2:
 out_class1:
 	class_destroy(aml_store_class);
 out:
-	kfree(pt_fmt);
 	return ret;
 }
+
+
+

@@ -1,4 +1,3 @@
-/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
  * drivers/amlogic/media/enhancement/amvecm/dnlp_cal.h
  *
@@ -116,11 +115,11 @@ extern ulong ve_dnlp_reg_v2[32];
 extern ulong ve_dnlp_reg_def[16];
 extern struct dnlp_parse_cmd_s dnlp_parse_cmd[];
 
-int ve_dnlp_calculate_tgtx(struct vframe_s *vf);
-void ve_set_v3_dnlp(struct ve_dnlp_curve_param_s *p);
-void ve_dnlp_calculate_lpf(void);
-void ve_dnlp_calculate_reg(void);
-void dnlp_alg_param_init(void);
+extern int ve_dnlp_calculate_tgtx(struct vframe_s *vf);
+extern void ve_set_v3_dnlp(struct ve_dnlp_curve_param_s *p);
+extern void ve_dnlp_calculate_lpf(void);
+extern void ve_dnlp_calculate_reg(void);
+extern void dnlp_alg_param_init(void);
 
 extern int *dnlp_scurv_low_copy;
 extern int *dnlp_scurv_mid1_copy;
@@ -141,7 +140,7 @@ extern int *ro_scurv_gain_copy;
 extern int *ro_blk_wht_ext0_copy;
 extern int *ro_blk_wht_ext1_copy;
 extern int *ro_dnlp_brightness_copy;
-extern int *gmscurve_copy;
+extern int *GmScurve_copy;
 extern int *clash_curve_copy;
 extern int *clsh_scvbld_copy;
 extern int *blkwht_ebld_copy;
@@ -150,9 +149,10 @@ extern unsigned int *ve_dnlp_luma_sum_copy;
 extern unsigned char *ve_dnlp_tgt_copy;
 extern unsigned int *ve_dnlp_tgt_10b_copy;
 
-void dnlp_dbg_node_copy(void);
+extern void dnlp_dbg_node_copy(void);
 extern bool dnlp_insmod_ok; /*0:fail, 1:ok*/
 extern int *dnlp_printk_copy;
 void ai_dnlp_param_update(int value);
 #endif
+
 

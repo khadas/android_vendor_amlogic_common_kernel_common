@@ -1,4 +1,3 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
  * drivers/amlogic/tee/tee.c
  *
@@ -109,7 +108,7 @@ struct tee_smc_calls_revision_result {
 	unsigned long reserved1;
 };
 
-static int tee_msg_os_revision(u32 *major, u32 *minor)
+static int tee_msg_os_revision(uint32_t *major, uint32_t *minor)
 {
 	union {
 		struct arm_smccc_res smccc;
@@ -117,14 +116,14 @@ static int tee_msg_os_revision(u32 *major, u32 *minor)
 	} res;
 
 	arm_smccc_smc(TEE_SMC_CALL_GET_OS_REVISION,
-		      0, 0, 0, 0, 0, 0, 0, &res.smccc);
+			0, 0, 0, 0, 0, 0, 0, &res.smccc);
 	*major = res.result.major;
 	*minor = res.result.minor;
 
 	return 0;
 }
 
-static int tee_msg_api_revision(u32 *major, u32 *minor)
+static int tee_msg_api_revision(uint32_t *major, uint32_t *minor)
 {
 	union {
 		struct arm_smccc_res smccc;
@@ -132,7 +131,7 @@ static int tee_msg_api_revision(u32 *major, u32 *minor)
 	} res;
 
 	arm_smccc_smc(TEE_SMC_CALLS_REVISION,
-		      0, 0, 0, 0, 0, 0, 0, &res.smccc);
+			0, 0, 0, 0, 0, 0, 0, &res.smccc);
 	*major = res.result.major;
 	*minor = res.result.minor;
 
@@ -148,7 +147,7 @@ static int tee_set_sys_boot_complete(void)
 
 	if (!inited) {
 		arm_smccc_smc(TEE_SMC_SYS_BOOT_COMPLETE,
-			      0, 0, 0, 0, 0, 0, 0, &res);
+				0, 0, 0, 0, 0, 0, 0, &res);
 
 		if (!res.a0)
 			inited = 1;
@@ -157,11 +156,11 @@ static int tee_set_sys_boot_complete(void)
 	return res.a0;
 }
 
-static ssize_t os_version_show(struct class *class,
-			       struct class_attribute *attr, char *buf)
+static ssize_t tee_os_version_show(struct class *class,
+		struct class_attribute *attr, char *buf)
 {
 	int ret;
-	u32 major, minor;
+	uint32_t major, minor;
 
 	ret = tee_msg_os_revision(&major, &minor);
 	if (ret)
@@ -172,11 +171,11 @@ static ssize_t os_version_show(struct class *class,
 	return ret;
 }
 
-static ssize_t api_version_show(struct class *class,
-				struct class_attribute *attr, char *buf)
+static ssize_t tee_api_version_show(struct class *class,
+		struct class_attribute *attr, char *buf)
 {
 	int ret;
-	u32 major, minor;
+	uint32_t major, minor;
 
 	ret = tee_msg_api_revision(&major, &minor);
 	if (ret)
@@ -187,9 +186,9 @@ static ssize_t api_version_show(struct class *class,
 	return ret;
 }
 
-static ssize_t sys_boot_complete_store(struct class *class,
-				struct class_attribute *attr,
-				const char *buf, size_t count)
+static ssize_t tee_sys_boot_complete_store(struct class *class,
+						struct class_attribute *attr,
+						const char *buf, size_t count)
 {
 	bool val;
 	int ret = 0;
@@ -206,31 +205,34 @@ static ssize_t sys_boot_complete_store(struct class *class,
 	return count;
 }
 
-static CLASS_ATTR_RO(os_version);
-static CLASS_ATTR_RO(api_version);
-static CLASS_ATTR_WO(sys_boot_complete);
+static CLASS_ATTR(os_version, 0644, tee_os_version_show,
+		NULL);
+static CLASS_ATTR(api_version, 0644, tee_api_version_show,
+		NULL);
+static CLASS_ATTR(sys_boot_complete, 0644, NULL,
+		tee_sys_boot_complete_store);
 
 /*
  * index: firmware index
  * vdec:  vdec type(0: compatible, 1: legency vdec, 2: HEVC vdec)
  */
-static int tee_load_firmware(u32 index, u32 vdec, bool is_swap)
+static int tee_load_firmware(uint32_t index, uint32_t vdec, bool is_swap)
 {
 	struct arm_smccc_res res;
 
 	arm_smccc_smc(TEE_SMC_LOAD_VIDEO_FW,
-		      index, vdec, is_swap, 0, 0, 0, 0, &res);
+			index, vdec, is_swap, 0, 0, 0, 0, &res);
 
 	return res.a0;
 }
 
-int tee_load_video_fw(u32 index, u32 vdec)
+int tee_load_video_fw(uint32_t index, uint32_t vdec)
 {
 	return tee_load_firmware(index, vdec, false);
 }
 EXPORT_SYMBOL(tee_load_video_fw);
 
-int tee_load_video_fw_swap(u32 index, u32 vdec, bool is_swap)
+int tee_load_video_fw_swap(uint32_t index, uint32_t vdec, bool is_swap)
 {
 	return tee_load_firmware(index, vdec, is_swap);
 }
@@ -253,15 +255,15 @@ bool tee_enabled(void)
 }
 EXPORT_SYMBOL(tee_enabled);
 
-u32 tee_protect_tvp_mem(u32 start, u32 size, u32 *handle)
+uint32_t tee_protect_tvp_mem(uint32_t start, uint32_t size, uint32_t *handle)
 {
 	struct arm_smccc_res res;
 
-	if (!handle)
+	if (handle == NULL)
 		return 0xFFFF0006;
 
 	arm_smccc_smc(TEE_SMC_PROTECT_TVP_MEM,
-		      start, size, 0, 0, 0, 0, 0, &res);
+			start, size, 0, 0, 0, 0, 0, &res);
 
 	*handle = res.a1;
 
@@ -269,18 +271,18 @@ u32 tee_protect_tvp_mem(u32 start, u32 size, u32 *handle)
 }
 EXPORT_SYMBOL(tee_protect_tvp_mem);
 
-void tee_unprotect_tvp_mem(u32 handle)
+void tee_unprotect_tvp_mem(uint32_t handle)
 {
 	struct arm_smccc_res res;
 
 	arm_smccc_smc(TEE_SMC_UNPROTECT_TVP_MEM,
-		      handle, 0, 0, 0, 0, 0, 0, &res);
+			handle, 0, 0, 0, 0, 0, 0, &res);
 }
 EXPORT_SYMBOL(tee_unprotect_tvp_mem);
 
-u32 tee_protect_mem_by_type(u32 type,
-		u32 start, u32 size,
-		u32 *handle)
+uint32_t tee_protect_mem_by_type(uint32_t type,
+		uint32_t start, uint32_t size,
+		uint32_t *handle)
 {
 	struct arm_smccc_res res;
 
@@ -359,8 +361,8 @@ int tee_vp9_prob_process(u32 cur_frame_type, u32 prev_frame_type,
 	struct arm_smccc_res res;
 
 	arm_smccc_smc(TEE_SMC_VP9_PROB_PROCESS,
-			cur_frame_type, prev_frame_type, prob_status,
-			prob_addr, 0, 0, 0, &res);
+			cur_frame_type, prev_frame_type, prob_status, prob_addr,
+			0, 0, 0, &res);
 
 	return res.a0;
 }
@@ -435,5 +437,5 @@ MODULE_PARM_DESC(disable_flag, "\n tee firmload disable_flag flag\n");
 module_exit(aml_tee_modexit);
 
 MODULE_AUTHOR("pengguang.zhu<pengguang.zhu@amlogic.com>");
-MODULE_DESCRIPTION("AMLOGIC tee driver");
+MODULE_DESCRIPTION(DRIVER_TEE);
 MODULE_LICENSE("GPL");

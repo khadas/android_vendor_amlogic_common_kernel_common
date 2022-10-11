@@ -1,15 +1,27 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/amlogic/media/common/ge2d/stretchblt.c
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
 /* Amlogic Headers */
 #include <linux/amlogic/media/ge2d/ge2d.h>
 
 static void _stretchblt(struct ge2d_context_s *wq,
-			int src_x, int src_y, int src_w, int src_h,
-			int dst_x, int dst_y, int dst_w, int dst_h,
-			int block)
+			       int src_x, int src_y, int src_w, int src_h,
+			       int dst_x, int dst_y, int dst_w, int dst_h,
+			       int block)
 {
 	struct ge2d_cmd_s *ge2d_cmd_cfg = ge2d_wq_get_cmd(wq);
 
@@ -76,6 +88,8 @@ static void _stretchblt_noalpha(struct ge2d_context_s *wq,
 		dp_gen_cfg->alu_const_color = 0xff;
 		wq->config.update_flag |= UPDATE_DP_GEN;
 	}
+
+
 
 	ge2d_cmd_cfg->src1_x_start = src_x;
 	ge2d_cmd_cfg->src1_x_end   = src_x + src_w - 1;

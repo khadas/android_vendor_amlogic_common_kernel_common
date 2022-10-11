@@ -1,14 +1,18 @@
-/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * tlv320aic32x4.h
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
  */
+
 
 #ifndef _TLV320ADC3101_H
 #define _TLV320ADC3101_H
 
 /* tlv320aic32x4 register space (in decimal to match datasheet) */
 
-#define ADC3101_REG(page, reg)	(((page) * 128) + (reg))
+#define ADC3101_REG(page, reg)	((page * 128) + reg)
 
 #define ADC3101_PAGE1		128
 
@@ -113,8 +117,8 @@
 #define ADC3101_WORD_LEN_24BITS		0x02
 #define ADC3101_WORD_LEN_32BITS		0x03
 
-#define ADC3101_LADC_EN			BIT(7)
-#define ADC3101_RADC_EN			BIT(6)
+#define ADC3101_LADC_EN			(1 << 7)
+#define ADC3101_RADC_EN			(1 << 6)
 
 #define ADC3101_I2S_MODE		0x00
 #define ADC3101_DSP_MODE		0x01

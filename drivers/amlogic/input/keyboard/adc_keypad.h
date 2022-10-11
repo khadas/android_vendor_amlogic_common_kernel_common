@@ -1,6 +1,18 @@
-/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/amlogic/input/keyboard/adc_keypad.h
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
 #ifndef __LINUX_ADC_KEYPAD_H
@@ -12,9 +24,7 @@
 #include <linux/workqueue.h>
 #include <linux/mutex.h>
 #include <linux/iio/consumer.h>
-#ifdef CONFIG_AMLOGIC_LEGACY_EARLY_SUSPEND
-#include <linux/amlogic/pm.h>
-#endif
+#include <dt-bindings/iio/adc/amlogic-saradc.h>
 
 #define DRIVE_NAME "adc_keypad"
 #define MAX_NAME_LEN 20
@@ -39,20 +49,19 @@ struct adc_key {
 };
 
 struct meson_adc_kp {
-	unsigned char chan[8];
+	unsigned char chan[SARADC_CH_NUM];
 	unsigned char chan_num;   /*number of channel exclude duplicate*/
 	unsigned char count;
 	unsigned int report_code;
 	unsigned int prev_code;
 	unsigned int poll_period; /*key scan period*/
+	unsigned int pwrkey_code;
 	struct mutex kp_lock;
 	struct class kp_class;
 	struct list_head adckey_head;
-	struct input_polled_dev *poll_dev;
-	struct iio_channel *pchan[8];
-#ifdef CONFIG_AMLOGIC_LEGACY_EARLY_SUSPEND
-	struct early_suspend early_suspend;
-#endif
+	struct delayed_work work;
+	struct input_dev *input;
+	struct iio_channel *pchan[SARADC_CH_NUM];
 };
 
 #endif

@@ -1,4 +1,3 @@
-/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
  * drivers/amlogic/media/video_processor/v4lvideo/v4lvideo.h
  *
@@ -48,9 +47,8 @@
 
 #include <linux/amlogic/media/frame_sync/timestamp.h>
 #include <linux/amlogic/media/frame_sync/tsync.h>
-#ifdef CONFIG_AMLOGIC_MEDIA_VIDEO
 #include <linux/amlogic/media/video_sink/v4lvideo_ext.h>
-#endif
+
 #define MAX_WIDTH 4096
 #define MAX_HEIGHT 4096
 
@@ -62,7 +60,7 @@
 #define V4LVID_ERR(fmt, args...) pr_err("v4lvid: err: " fmt, ## args)
 
 #define dprintk(dev, level, fmt, arg...)                    \
-v4l2_dbg(level, debug, &(dev)->v4l2_dev, fmt, ## arg)
+v4l2_dbg(level, v4lvideo_debug, &(dev)->v4l2_dev, fmt, ## arg)
 
 struct v4l2q_s {
 	int rp;
@@ -158,7 +156,7 @@ static inline bool v4l2q_pop_specific(struct v4l2q_s *q, void *vf)
 	int i = v4l2q_level(q);
 
 	if (i <= 0) {
-		pr_err("%s fail i =%d\n", __func__, i);
+		pr_err("v4l2q_pop_specific fail i =%d\n", i);
 		return false;
 	}
 
@@ -168,7 +166,7 @@ static inline bool v4l2q_pop_specific(struct v4l2q_s *q, void *vf)
 		if (vf_tmp != vf) {
 			v4l2q_push(q, vf_tmp);
 			if (i < 1) {
-				pr_err("%s fail\n", __func__);
+				pr_err("v4l2q_pop_specific fail\n");
 				return false;
 			}
 		} else {

@@ -1,4 +1,3 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
  * drivers/amlogic/media/deinterlace/pulldown_drv.c
  *
@@ -86,6 +85,7 @@ module_param_named(pldn_cmb0, pldn_cmb0, uint, 0644);
 
 static unsigned int pldn_cmb1;
 module_param_named(pldn_cmb1, pldn_cmb1, uint, 0644);
+
 
 /* static unsigned int flmxx_sure_num[7]
  * = {50, 50, 50, 50, 50, 50, 50};
@@ -347,7 +347,7 @@ unsigned int pulldown_detection(struct pulldown_detected_s *res,
 
 unsigned char pulldown_init(unsigned short width, unsigned short height)
 {
-	flm22_sure_num = (height * 100)/480;
+	flm22_sure_num = (height * 100) / 480;
 	flm22_sure_smnum = (flm22_sure_num * flm22_ratio)/100;
 	pd_param.width = width;
 	pd_param.height = height;

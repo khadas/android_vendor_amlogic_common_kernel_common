@@ -1,6 +1,18 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/amlogic/media/gdc/app/gdc_main.c
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
 #include "system_log.h"
@@ -10,14 +22,15 @@
 //gdc api functions
 #include "gdc_api.h"
 
-int gdc_run(struct gdc_cmd_s *g, struct gdc_dma_cfg_t *dma_cfg)
+int gdc_run(struct gdc_cmd_s *g)
 {
+
 	gdc_stop(g);
 
 	gdc_log(LOG_DEBUG, "Done gdc load..\n");
 
 	//initialise the gdc by the first configuration
-	if (gdc_init(g, dma_cfg) != 0) {
+	if (gdc_init(g) != 0) {
 		gdc_log(LOG_ERR, "Failed to initialise GDC block");
 		return -1;
 	}
@@ -26,25 +39,25 @@ int gdc_run(struct gdc_cmd_s *g, struct gdc_dma_cfg_t *dma_cfg)
 
 	switch (g->gdc_config.format) {
 	case NV12:
-		gdc_process(g, g->y_base_addr, g->uv_base_addr, dma_cfg);
+		gdc_process(g, g->y_base_addr, g->uv_base_addr);
 	break;
 	case YV12:
 		gdc_process_yuv420p(g, g->y_base_addr,
-				    g->u_base_addr,
-				    g->v_base_addr, dma_cfg);
+				g->u_base_addr,
+				g->v_base_addr);
 	break;
 	case Y_GREY:
-		gdc_process_y_grey(g, g->y_base_addr, dma_cfg);
+		gdc_process_y_grey(g, g->y_base_addr);
 	break;
 	case YUV444_P:
 		gdc_process_yuv444p(g, g->y_base_addr,
-				    g->u_base_addr,
-				    g->v_base_addr, dma_cfg);
+				g->u_base_addr,
+				g->v_base_addr);
 	break;
 	case RGB444_P:
 		gdc_process_rgb444p(g, g->y_base_addr,
-				    g->u_base_addr,
-				g->v_base_addr, dma_cfg);
+				g->u_base_addr,
+				g->v_base_addr);
 	break;
 	default:
 		gdc_log(LOG_ERR, "Error config format\n");

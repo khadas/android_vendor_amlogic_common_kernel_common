@@ -1,4 +1,3 @@
-// SPDX-License-Identifier: GPL-2.0-only
 /*
  * drivers/acpi/device_sysfs.c - ACPI device sysfs attributes and modalias.
  *
@@ -7,6 +6,15 @@
  * Author: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
  *
  * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ *
+ *  This program is free software; you can redistribute it and/or modify
+ *  it under the terms of the GNU General Public License version 2 as published
+ *  by the Free Software Foundation.
+ *
+ *  This program is distributed in the hope that it will be useful, but
+ *  WITHOUT ANY WARRANTY; without even the implied warranty of
+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ *  General Public License for more details.
  *
  * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
  */
@@ -44,7 +52,7 @@ struct acpi_data_node_attr {
 
 static ssize_t data_node_show_path(struct acpi_data_node *dn, char *buf)
 {
-	return dn->handle ? acpi_object_path(dn->handle, buf) : 0;
+	return acpi_object_path(dn->handle, buf);
 }
 
 DATA_NODE_ATTR(path);
@@ -97,10 +105,10 @@ static void acpi_expose_nondev_subnodes(struct kobject *kobj,
 		init_completion(&dn->kobj_done);
 		ret = kobject_init_and_add(&dn->kobj, &acpi_data_node_ktype,
 					   kobj, "%s", dn->name);
-		if (!ret)
-			acpi_expose_nondev_subnodes(&dn->kobj, &dn->data);
-		else if (dn->handle)
+		if (ret)
 			acpi_handle_err(dn->handle, "Failed to expose (%d)\n", ret);
+		else
+			acpi_expose_nondev_subnodes(&dn->kobj, &dn->data);
 	}
 }
 
@@ -345,7 +353,7 @@ static ssize_t real_power_state_show(struct device *dev,
 	return sprintf(buf, "%s\n", acpi_power_state_string(state));
 }
 
-static DEVICE_ATTR_RO(real_power_state);
+static DEVICE_ATTR(real_power_state, 0444, real_power_state_show, NULL);
 
 static ssize_t power_state_show(struct device *dev,
 				struct device_attribute *attr, char *buf)
@@ -355,7 +363,7 @@ static ssize_t power_state_show(struct device *dev,
 	return sprintf(buf, "%s\n", acpi_power_state_string(adev->power.state));
 }
 
-static DEVICE_ATTR_RO(power_state);
+static DEVICE_ATTR(power_state, 0444, power_state_show, NULL);
 
 static ssize_t
 acpi_eject_store(struct device *d, struct device_attribute *attr,
@@ -412,10 +420,8 @@ static ssize_t acpi_device_adr_show(struct device *dev,
 {
 	struct acpi_device *acpi_dev = to_acpi_device(dev);
 
-	if (acpi_dev->pnp.bus_address > U32_MAX)
-		return sprintf(buf, "0x%016llx\n", acpi_dev->pnp.bus_address);
-	else
-		return sprintf(buf, "0x%08llx\n", acpi_dev->pnp.bus_address);
+	return sprintf(buf, "0x%08x\n",
+		       (unsigned int)(acpi_dev->pnp.bus_address));
 }
 static DEVICE_ATTR(adr, 0444, acpi_device_adr_show, NULL);
 
@@ -452,7 +458,7 @@ static ssize_t description_show(struct device *dev,
 
 	return result;
 }
-static DEVICE_ATTR_RO(description);
+static DEVICE_ATTR(description, 0444, description_show, NULL);
 
 static ssize_t
 acpi_device_sun_show(struct device *dev, struct device_attribute *attr,

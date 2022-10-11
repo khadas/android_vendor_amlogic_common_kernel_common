@@ -247,21 +247,28 @@
 #define RDMIFXN_CFMT_W                             0x541e
 //t7
 #define RDMIFXN_BADDR_Y                            0x5420
-//Bit 31:0      cntl_f0_baddr_y                        //unsigned, RW, default = 0
+//Bit 31:0      cntl_f0_baddr_y
+//unsigned, RW, default = 0
 #define RDMIFXN_BADDR_CB                           0x5421
-//Bit 31:0      cntl_f0_baddr_cb                       //unsigned, RW, default = 0
+//Bit 31:0      cntl_f0_baddr_cb
+//unsigned, RW, default = 0
 #define RDMIFXN_BADDR_CR                           0x5422
-//Bit 31:0      cntl_f0_baddr_cr                       //unsigned, RW, default = 0
+//Bit 31:0      cntl_f0_baddr_cr
+//unsigned, RW, default = 0
 #define RDMIFXN_STRIDE_0                           0x5423
 //Bit 31:29     reserved
-//Bit 28:16     cntl_f0_stride_cb                      //unsigned, RW, default = 256
+//Bit 28:16     cntl_f0_stride_cb
+//unsigned, RW, default = 256
 //Bit 15:13     reserved
-//Bit 12:0      cntl_f0_stride_y                       //unsigned, RW, default = 256
+//Bit 12:0      cntl_f0_stride_y
+//unsigned, RW, default = 256
 #define RDMIFXN_STRIDE_1                           0x5424
 //Bit 31:17     reserved
-//Bit 16        cntl_f0_acc_mode                       //unsigned, RW, default = 0
+//Bit 16        cntl_f0_acc_mode
+//unsigned, RW, default = 0
 //Bit 15:13     reserved
-//Bit 12:0      cntl_f0_stride_cr                      //unsigned, RW, default = 256
+//Bit 12:0      cntl_f0_stride_cr
+//unsigned, RW, default = 256
 #define DI_SC2_INP_GEN_REG                            0x5400
 #define DI_SC2_INP_CANVAS0                            0x5401
 #define DI_SC2_INP_CANVAS1                            0x5402
@@ -499,8 +506,10 @@
 //Bit  21:16       reg_afbc_gclk_ctrl    // unsigned, RW, default = 0
 //Bit  15          reg_frm_start_sel     // unsigned, RW, default = 0
 //Bit  14          reg_use_4kram         // unsigned, RW, default = 0
-//Bit  13          reg_afbc_vd_sel       // unsigned, RW, default = 0, 0:nor_rdmif 1:afbc_dec
-//Bit  12          reg_rdmif_lbuf_bypas  // unsigned, RW, default = 1, 1:rdmif lbuf bypass
+//Bit  13          reg_afbc_vd_sel
+// unsigned, RW, default = 0, 0:nor_rdmif 1:afbc_dec
+//Bit  12          reg_rdmif_lbuf_bypas
+// unsigned, RW, default = 1, 1:rdmif lbuf bypass
 //Bit  11:0        reg_rdmif_lbuf_depth  // unsigned, RW, default = 512
 
 /*afbcd*/
@@ -1016,8 +1025,10 @@
 //Bit  21:16       reg_afbc_gclk_ctrl    // unsigned, RW, default = 0
 //Bit  15          reg_frm_start_sel     // unsigned, RW, default = 0
 //Bit  14          reg_use_4kram         // unsigned, RW, default = 0
-//Bit  13          reg_afbc_vd_sel       // unsigned, RW, default = 0, 0:nor_rdmif 1:afbc_dec
-//Bit  12          reg_rdmif_lbuf_bypas  // unsigned, RW, default = 1, 1:rdmif lbuf bypass
+//Bit  13          reg_afbc_vd_sel
+// unsigned, RW, default = 0, 0:nor_rdmif 1:afbc_dec
+//Bit  12          reg_rdmif_lbuf_bypas
+// unsigned, RW, default = 1, 1:rdmif lbuf bypass
 //Bit  11:0        reg_rdmif_lbuf_depth  // unsigned, RW, default = 512
 
 /*afbcd add*/
@@ -1069,8 +1080,10 @@
 //Bit  21:16       reg_afbc_gclk_ctrl    // unsigned, RW, default = 0
 //Bit  15          reg_frm_start_sel     // unsigned, RW, default = 0
 //Bit  14          reg_use_4kram         // unsigned, RW, default = 0
-//Bit  13          reg_afbc_vd_sel       // unsigned, RW, default = 0, 0:nor_rdmif 1:afbc_dec
-//Bit  12          reg_rdmif_lbuf_bypas  // unsigned, RW, default = 1, 1:rdmif lbuf bypass
+//Bit  13          reg_afbc_vd_sel
+// unsigned, RW, default = 0, 0:nor_rdmif 1:afbc_dec
+//Bit  12          reg_rdmif_lbuf_bypas
+// unsigned, RW, default = 1, 1:rdmif lbuf bypass
 //Bit  11:0        reg_rdmif_lbuf_depth  // unsigned, RW, default = 512
 
 #define AFBCDM_CHAN2_ENABLE                              0x54c0	//0x80
@@ -1121,8 +1134,10 @@
 //Bit  21:16       reg_afbc_gclk_ctrl    // unsigned, RW, default = 0
 //Bit  15          reg_frm_start_sel     // unsigned, RW, default = 0
 //Bit  14          reg_use_4kram         // unsigned, RW, default = 0
-//Bit  13          reg_afbc_vd_sel       // unsigned, RW, default = 0, 0:nor_rdmif 1:afbc_dec
-//Bit  12          reg_rdmif_lbuf_bypas  // unsigned, RW, default = 1, 1:rdmif lbuf bypass
+//Bit  13          reg_afbc_vd_sel
+// unsigned, RW, default = 0, 0:nor_rdmif 1:afbc_dec
+//Bit  12          reg_rdmif_lbuf_bypas
+// unsigned, RW, default = 1, 1:rdmif lbuf bypass
 //Bit  11:0        reg_rdmif_lbuf_depth  // unsigned, RW, default = 512
 
 #define AFBCDM_MEM_ENABLE                              0x5540	/*0x100*/
@@ -1173,8 +1188,10 @@
 //Bit  21:16       reg_afbc_gclk_ctrl    // unsigned, RW, default = 0
 //Bit  15          reg_frm_start_sel     // unsigned, RW, default = 0
 //Bit  14          reg_use_4kram         // unsigned, RW, default = 0
-//Bit  13          reg_afbc_vd_sel       // unsigned, RW, default = 0, 0:nor_rdmif 1:afbc_dec
-//Bit  12          reg_rdmif_lbuf_bypas  // unsigned, RW, default = 1, 1:rdmif lbuf bypass
+//Bit  13          reg_afbc_vd_sel
+// unsigned, RW, default = 0, 0:nor_rdmif 1:afbc_dec
+//Bit  12          reg_rdmif_lbuf_bypas
+// unsigned, RW, default = 1, 1:rdmif lbuf bypass
 //Bit  11:0        reg_rdmif_lbuf_depth  // unsigned, RW, default = 512
 
 #define AFBCDM_IF1_ENABLE                              0x55c0	/*0x180*/
@@ -1225,8 +1242,10 @@
 //Bit  21:16       reg_afbc_gclk_ctrl    // unsigned, RW, default = 0
 //Bit  15          reg_frm_start_sel     // unsigned, RW, default = 0
 //Bit  14          reg_use_4kram         // unsigned, RW, default = 0
-//Bit  13          reg_afbc_vd_sel       // unsigned, RW, default = 0, 0:nor_rdmif 1:afbc_dec
-//Bit  12          reg_rdmif_lbuf_bypas  // unsigned, RW, default = 1, 1:rdmif lbuf bypass
+//Bit  13          reg_afbc_vd_sel
+// unsigned, RW, default = 0, 0:nor_rdmif 1:afbc_dec
+//Bit  12          reg_rdmif_lbuf_bypas
+// unsigned, RW, default = 1, 1:rdmif lbuf bypass
 //Bit  11:0        reg_rdmif_lbuf_depth  // unsigned, RW, default = 512
 
 #define AFBCDM_IF0_ENABLE                              0x5640	/*0x200*/
@@ -1277,8 +1296,10 @@
 //Bit  21:16       reg_afbc_gclk_ctrl    // unsigned, RW, default = 0
 //Bit  15          reg_frm_start_sel     // unsigned, RW, default = 0
 //Bit  14          reg_use_4kram         // unsigned, RW, default = 0
-//Bit  13          reg_afbc_vd_sel       // unsigned, RW, default = 0, 0:nor_rdmif 1:afbc_dec
-//Bit  12          reg_rdmif_lbuf_bypas  // unsigned, RW, default = 1, 1:rdmif lbuf bypass
+//Bit  13          reg_afbc_vd_sel
+// unsigned, RW, default = 0, 0:nor_rdmif 1:afbc_dec
+//Bit  12          reg_rdmif_lbuf_bypas
+// unsigned, RW, default = 1, 1:rdmif lbuf bypass
 //Bit  11:0        reg_rdmif_lbuf_depth  // unsigned, RW, default = 512
 
 #define AFBCDM_IF2_ENABLE                              0x56c0

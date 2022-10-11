@@ -1,9 +1,18 @@
-// SPDX-License-Identifier: GPL-2.0
 /*
- * Copyright (C) 2019 Amlogic, Inc. All rights reserved.
+ * sound/soc/amlogic/auge/vad.c
  *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
  */
-
 #define DEBUG
 
 #include <linux/module.h>
@@ -27,7 +36,7 @@
 #include <linux/kthread.h>
 #include <linux/freezer.h>
 
-//#include <linux/amlogic/pm.h>
+#include <linux/amlogic/pm.h>
 #include <linux/pm_wakeirq.h>
 #include <linux/pm_wakeup.h>
 
@@ -138,7 +147,6 @@ static void vad_key_report(void)
 
 	if (!p_vad)
 		return;
-
 	pr_info("%s\n", __func__);
 
 	input_event(p_vad->input_device, EV_KEY, KEY_POWER, 1);
@@ -262,12 +270,9 @@ EXPORT_SYMBOL(unregister_vad_callback);
  * 0: no wake word found
  * 1: contained wake word, should wake up system
  */
-static int vad_transfer_data_to_algorithm(struct vad *p_vad,
-	char *buf,
-	int frames,
-	int rate,
-	int channels,
-	int bitdepth)
+static int vad_transfer_data_to_algorithm(
+	struct vad *p_vad, char *buf, int frames,
+	int rate, int channels, int bitdepth)
 {
 	int ret = 0;
 
@@ -281,7 +286,7 @@ static int vad_transfer_data_to_algorithm(struct vad *p_vad,
 	}
 
 	/* Do check by algorithm */
-	if (p_vad->callback)
+	if (p_vad->callback != NULL)
 		ret = p_vad->callback(buf, frames, rate, channels, bitdepth);
 
 	return ret;
@@ -337,8 +342,11 @@ static int vad_engine_check(struct vad *p_vad)
 
 	if (!p_vad->buf) {
 		p_vad->buf = kzalloc(read_bytes, GFP_KERNEL);
-		if (!p_vad->buf)
+		if (!p_vad->buf) {
+			pr_err("%s failed to allocate buffer for vad\n",
+				__func__);
 			return -ENOMEM;
+		}
 	}
 	memset(p_vad->buf, 0x0, read_bytes);
 
@@ -409,17 +417,17 @@ static int vad_freeze_thread(void *data)
 	return 0;
 }
 
+
 static irqreturn_t vad_wakeup_isr(int irq, void *data)
 {
 	struct vad *p_vad = (struct vad *)data;
 
 	if (vad_in_kernel_test &&
-	    p_vad->level == LEVEL_KERNEL &&
+	    (p_vad->level == LEVEL_KERNEL) &&
 	    p_vad->a2v_buf) {
 		vad_wakeup_count++;
 		pr_info("%s vad_wakeup_count:%d\n", __func__, vad_wakeup_count);
 	}
-
 	return IRQ_HANDLED;
 }
 
@@ -739,7 +747,8 @@ void vad_enable(bool enable)
 	vad_set_enable(enable);
 }
 
-static int vad_get_enable_enum(struct snd_kcontrol *kcontrol,
+static int vad_get_enable_enum(
+	struct snd_kcontrol *kcontrol,
 	struct snd_ctl_elem_value *ucontrol)
 {
 	struct vad *p_vad = snd_kcontrol_chip(kcontrol);
@@ -754,7 +763,8 @@ static int vad_get_enable_enum(struct snd_kcontrol *kcontrol,
 	return 0;
 }
 
-static int vad_set_enable_enum(struct snd_kcontrol *kcontrol,
+static int vad_set_enable_enum(
+	struct snd_kcontrol *kcontrol,
 	struct snd_ctl_elem_value *ucontrol)
 {
 	struct vad *p_vad = snd_kcontrol_chip(kcontrol);
@@ -782,6 +792,7 @@ static int vad_set_enable_enum(struct snd_kcontrol *kcontrol,
 	return 0;
 }
 
+
 static const char *const vad_src_txt[] = {
 	"TDMIN_A",
 	"TDMIN_B",
@@ -797,7 +808,8 @@ const struct soc_enum vad_src_enum =
 	SOC_ENUM_SINGLE(SND_SOC_NOPM, 0, ARRAY_SIZE(vad_src_txt),
 			vad_src_txt);
 
-static int vad_get_src_enum(struct snd_kcontrol *kcontrol,
+static int vad_get_src_enum(
+	struct snd_kcontrol *kcontrol,
 	struct snd_ctl_elem_value *ucontrol)
 {
 	struct vad *p_vad = snd_kcontrol_chip(kcontrol);
@@ -812,7 +824,8 @@ static int vad_get_src_enum(struct snd_kcontrol *kcontrol,
 	return 0;
 }
 
-static int vad_set_src_enum(struct snd_kcontrol *kcontrol,
+static int vad_set_src_enum(
+	struct snd_kcontrol *kcontrol,
 	struct snd_ctl_elem_value *ucontrol)
 {
 	struct vad *p_vad = snd_kcontrol_chip(kcontrol);
@@ -859,7 +872,8 @@ static int vad_set_switch_enum(struct snd_kcontrol *kcontrol,
 	return 0;
 }
 
-static int vad_test_get_enum(struct snd_kcontrol *kcontrol,
+static int vad_test_get_enum(
+	struct snd_kcontrol *kcontrol,
 	struct snd_ctl_elem_value *ucontrol)
 {
 	ucontrol->value.integer.value[0] = vad_in_kernel_test;
@@ -867,13 +881,15 @@ static int vad_test_get_enum(struct snd_kcontrol *kcontrol,
 	return 0;
 }
 
-static int vad_test_set_enum(struct snd_kcontrol *kcontrol,
+static int vad_test_set_enum(
+	struct snd_kcontrol *kcontrol,
 	struct snd_ctl_elem_value *ucontrol)
 {
 	vad_in_kernel_test = ucontrol->value.integer.value[0];
 
 	return 0;
 }
+
 
 static const struct snd_kcontrol_new vad_controls[] = {
 	SOC_SINGLE_BOOL_EXT("VAD enable",
@@ -957,14 +973,15 @@ static int vad_platform_probe(struct platform_device *pdev)
 		pr_err("%s, failed to get vad wakeup sample rate\n", __func__);
 		p_vad->wakeup_sample_rate = DEFAULT_WAKEUP_SAMPLERATE;
 	}
-	pr_info("%s, vad wakeup sample rate = %d\n", __func__, p_vad->wakeup_sample_rate);
+	pr_info("%s, vad wakeup sample rate = %d\n", __func__,
+		p_vad->wakeup_sample_rate);
 
 	p_vad->dev = dev;
 	dev_set_drvdata(dev, p_vad);
 
 	/* get audio controller */
 	node_prt = of_get_parent(node);
-	if (!node_prt)
+	if (node_prt == NULL)
 		return -ENXIO;
 
 	pdev_parent = of_find_device_by_node(node_prt);
@@ -1056,7 +1073,8 @@ static int vad_platform_probe(struct platform_device *pdev)
 	return 0;
 }
 
-static int vad_platform_suspend(struct platform_device *pdev, pm_message_t state)
+static int vad_platform_suspend(
+	struct platform_device *pdev, pm_message_t state)
 {
 	struct device *dev = &pdev->dev;
 	struct vad *p_vad = dev_get_drvdata(dev);
@@ -1064,7 +1082,8 @@ static int vad_platform_suspend(struct platform_device *pdev, pm_message_t state
 	pr_info("%s\n", __func__);
 
 	/* whether in freeze */
-	if (/* is_pm_freeze_mode() && */vad_is_enable()) {
+	if (is_pm_freeze_mode()
+		&& vad_is_enable()) {
 		pr_info("%s, Entry in freeze\n", __func__);
 
 		if (p_vad->level == LEVEL_USER)
@@ -1074,7 +1093,8 @@ static int vad_platform_suspend(struct platform_device *pdev, pm_message_t state
 	return 0;
 }
 
-static int vad_platform_resume(struct platform_device *pdev)
+static int vad_platform_resume(
+	struct platform_device *pdev)
 {
 	struct device *dev = &pdev->dev;
 	struct vad *p_vad = dev_get_drvdata(dev);
@@ -1082,7 +1102,8 @@ static int vad_platform_resume(struct platform_device *pdev)
 	pr_info("%s\n", __func__);
 
 	/* whether in freeze mode */
-	if (/* is_pm_freeze_mode() && */vad_is_enable()) {
+	if (is_pm_freeze_mode()
+		&& vad_is_enable()) {
 		pr_info("%s, Exist from freeze\n", __func__);
 
 		if (p_vad->level == LEVEL_USER)
@@ -1102,22 +1123,10 @@ struct platform_driver vad_driver = {
 	.resume  = vad_platform_resume,
 };
 
-int __init vad_drv_init(void)
-{
-	return platform_driver_register(&vad_driver);
-}
+module_platform_driver(vad_driver);
 
-void __exit vad_drv_exit(void)
-{
-	platform_driver_unregister(&vad_driver);
-}
-
-#ifndef MODULE
-module_init(vad_drv_init);
-module_exit(vad_drv_exit);
 MODULE_AUTHOR("Amlogic, Inc.");
 MODULE_DESCRIPTION("Amlogic Voice Activity Detection ASoc driver");
 MODULE_LICENSE("GPL");
 MODULE_ALIAS("Platform:" DRV_NAME);
 MODULE_DEVICE_TABLE(of, vad_device_id);
-#endif

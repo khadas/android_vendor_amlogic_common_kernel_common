@@ -4,9 +4,6 @@ menuconfig AMLOGIC_LCD_EXTERN
 	default n
 	help
 		Amlogic LCD external driver support, such as i2c initial
-		Once the power on, according to the timing requirements,
-		through the panel interface to write data to the LCD,
-		make its initialization
 
 config AMLOGIC_LCD_EXTERN_I2C_T5800Q
 	bool "lcd external i2c T5800Q init driver"

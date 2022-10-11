@@ -1,7 +1,17 @@
-/* SPDX-License-Identifier: GPL-2.0+ */
 /*
+ * include/linux/amlogic/media/vout/lcd/lcd_notify.h
  *
- * Copyright (C) 2019 Amlogic, Inc. All rights reserved.
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
  *
  */
 
@@ -22,15 +32,15 @@
 #define LCD_PRIORITY_POWER_BL_ON       1
 #define LCD_PRIORITY_SCREEN_RESTORE    0
 
-/* original event */
-#define LCD_EVENT_SCREEN_BLACK      BIT(0)
-#define LCD_EVENT_BL_OFF            BIT(1)
-#define LCD_EVENT_IF_OFF            BIT(2)
-#define LCD_EVENT_ENCL_OFF          BIT(3)
-#define LCD_EVENT_ENCL_ON           BIT(4)
-#define LCD_EVENT_IF_ON             BIT(5)
-#define LCD_EVENT_BL_ON             BIT(6)
-#define LCD_EVENT_SCREEN_RESTORE    BIT(7)
+/* orignal event */
+#define LCD_EVENT_SCREEN_BLACK      (1 << 0)
+#define LCD_EVENT_BL_OFF            (1 << 1)
+#define LCD_EVENT_IF_OFF            (1 << 2)
+#define LCD_EVENT_ENCL_OFF          (1 << 3)
+#define LCD_EVENT_ENCL_ON           (1 << 4)
+#define LCD_EVENT_IF_ON             (1 << 5)
+#define LCD_EVENT_BL_ON             (1 << 6)
+#define LCD_EVENT_SCREEN_RESTORE    (1 << 7)
 
 /* combined event */
 #define LCD_EVENT_POWER_ON          (LCD_EVENT_BL_ON | LCD_EVENT_IF_ON | \
@@ -50,25 +60,31 @@
 				LCD_EVENT_BL_OFF | LCD_EVENT_IF_OFF)
 #define LCD_EVENT_UNPREPARE         (LCD_EVENT_ENCL_OFF)
 
-#define LCD_EVENT_GAMMA_UPDATE      BIT(10)
-#define LCD_EVENT_EXTERN_SEL        BIT(11)
+#define LCD_EVENT_GAMMA_UPDATE      (1 << 10)
+#define LCD_EVENT_EXTERN_SEL        (1 << 11)
 
+/* lcd frame rate change occurred */
+#define LCD_EVENT_FRAME_RATE_ADJUST (1 << 12)
+/* lcd config change occurred */
+#define LCD_EVENT_CONFIG_UPDATE     (1 << 13)
 /* lcd bist pattern test occurred */
-#define LCD_EVENT_TEST_PATTERN      BIT(14)
+#define LCD_EVENT_TEST_PATTERN      (1 << 14)
 
 #define LCD_VLOCK_PARAM_NUM         5
-#define LCD_VLOCK_PARAM_BIT_UPDATE  BIT(4)
-#define LCD_VLOCK_PARAM_BIT_VALID   BIT(0)
-#define LCD_EVENT_VLOCK_PARAM       BIT(16)
+#define LCD_VLOCK_PARAM_BIT_UPDATE  (1 << 4)
+#define LCD_VLOCK_PARAM_BIT_VALID   (1 << 0)
+#define LCD_EVENT_VLOCK_PARAM       (1 << 16)
 
 /* lcd backlight index select */
 #define LCD_EVENT_BACKLIGHT_SEL     BIT(24)
 /* lcd backlight pwm_vs vfreq change occurred */
 #define LCD_EVENT_BACKLIGHT_UPDATE  BIT(25)
-/* lcd backlight brightness update by dimming */
-#define LCD_EVENT_BACKLIGHT_DV_DIM  BIT(26)
-/* lcd backlight brightness on/off by dolby vision */
-#define LCD_EVENT_BACKLIGHT_DV_SEL  BIT(27)
+/* lcd backlight brightness update by global dimming */
+#define LCD_EVENT_BACKLIGHT_GD_DIM  BIT(26)
+/* lcd backlight brightness on/off by global dimming */
+#define LCD_EVENT_BACKLIGHT_GD_SEL  BIT(27)
+/* lcd backlight brightness on/off by local dimming */
+#define LCD_EVENT_BACKLIGHT_LD_SEL  BIT(28)
 
 /* blocking notify */
 int aml_lcd_notifier_register(struct notifier_block *nb);

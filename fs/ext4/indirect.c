@@ -1,4 +1,3 @@
-// SPDX-License-Identifier: GPL-2.0
 /*
  *  linux/fs/ext4/indirect.c
  *
@@ -294,12 +293,14 @@ static int ext4_blks_to_allocate(Indirect *branch, int k, unsigned int blks,
 }
 
 /**
- * ext4_alloc_branch() - allocate and set up a chain of blocks
- * @handle: handle for this transaction
- * @ar: structure describing the allocation request
- * @indirect_blks: number of allocated indirect blocks
- * @offsets: offsets (in the blocks) to store the pointers to next.
- * @branch: place to store the chain in.
+ *	ext4_alloc_branch - allocate and set up a chain of blocks.
+ *	@handle: handle for this transaction
+ *	@inode: owner
+ *	@indirect_blks: number of allocated indirect blocks
+ *	@blks: number of allocated direct blocks
+ *	@goal: preferred place for allocation
+ *	@offsets: offsets (in the blocks) to store the pointers to next.
+ *	@branch: place to store the chain in.
  *
  *	This function allocates blocks, zeroes out all but the last one,
  *	links them into chain and (if we are synchronous) writes them to disk.
@@ -394,11 +395,15 @@ failed:
 }
 
 /**
- * ext4_splice_branch() - splice the allocated branch onto inode.
+ * ext4_splice_branch - splice the allocated branch onto inode.
  * @handle: handle for this transaction
- * @ar: structure describing the allocation request
+ * @inode: owner
+ * @block: (logical) number of block we are adding
+ * @chain: chain of indirect blocks (with a missing link - see
+ *	ext4_alloc_branch)
  * @where: location of missing link
  * @num:   number of indirect blocks we are adding
+ * @blks:  number of direct blocks we are adding
  *
  * This function fills the missing link and does all housekeeping needed in
  * inode (->i_blocks, etc.). In case of success we end up with the full
@@ -830,14 +835,12 @@ static int ext4_clear_blocks(handle_t *handle, struct inode *inode,
 	int	flags = EXT4_FREE_BLOCKS_VALIDATED;
 	int	err;
 
-	if (S_ISDIR(inode->i_mode) || S_ISLNK(inode->i_mode) ||
-	    ext4_test_inode_flag(inode, EXT4_INODE_EA_INODE))
+	if (S_ISDIR(inode->i_mode) || S_ISLNK(inode->i_mode))
 		flags |= EXT4_FREE_BLOCKS_FORGET | EXT4_FREE_BLOCKS_METADATA;
 	else if (ext4_should_journal_data(inode))
 		flags |= EXT4_FREE_BLOCKS_FORGET;
 
-	if (!ext4_data_block_valid(EXT4_SB(inode->i_sb), block_to_free,
-				   count)) {
+	if (!ext4_inode_block_valid(inode, block_to_free, count)) {
 		EXT4_ERROR_INODE(inode, "attempt to clear invalid "
 				 "blocks %llu len %lu",
 				 (unsigned long long) block_to_free, count);
@@ -999,8 +1002,7 @@ static void ext4_free_branches(handle_t *handle, struct inode *inode,
 			if (!nr)
 				continue;		/* A hole */
 
-			if (!ext4_data_block_valid(EXT4_SB(inode->i_sb),
-						   nr, 1)) {
+			if (!ext4_inode_block_valid(inode, nr, 1)) {
 				EXT4_ERROR_INODE(inode,
 						 "invalid indirect mapped "
 						 "block %lu (level %d)",
@@ -1177,21 +1179,18 @@ do_indirects:
 			ext4_free_branches(handle, inode, NULL, &nr, &nr+1, 1);
 			i_data[EXT4_IND_BLOCK] = 0;
 		}
-		/* fall through */
 	case EXT4_IND_BLOCK:
 		nr = i_data[EXT4_DIND_BLOCK];
 		if (nr) {
 			ext4_free_branches(handle, inode, NULL, &nr, &nr+1, 2);
 			i_data[EXT4_DIND_BLOCK] = 0;
 		}
-		/* fall through */
 	case EXT4_DIND_BLOCK:
 		nr = i_data[EXT4_TIND_BLOCK];
 		if (nr) {
 			ext4_free_branches(handle, inode, NULL, &nr, &nr+1, 3);
 			i_data[EXT4_TIND_BLOCK] = 0;
 		}
-		/* fall through */
 	case EXT4_TIND_BLOCK:
 		;
 	}
@@ -1431,7 +1430,6 @@ do_indirects:
 			ext4_free_branches(handle, inode, NULL, &nr, &nr+1, 1);
 			i_data[EXT4_IND_BLOCK] = 0;
 		}
-		/* fall through */
 	case EXT4_IND_BLOCK:
 		if (++n >= n2)
 			break;
@@ -1440,7 +1438,6 @@ do_indirects:
 			ext4_free_branches(handle, inode, NULL, &nr, &nr+1, 2);
 			i_data[EXT4_DIND_BLOCK] = 0;
 		}
-		/* fall through */
 	case EXT4_DIND_BLOCK:
 		if (++n >= n2)
 			break;
@@ -1449,7 +1446,6 @@ do_indirects:
 			ext4_free_branches(handle, inode, NULL, &nr, &nr+1, 3);
 			i_data[EXT4_TIND_BLOCK] = 0;
 		}
-		/* fall through */
 	case EXT4_TIND_BLOCK:
 		;
 	}

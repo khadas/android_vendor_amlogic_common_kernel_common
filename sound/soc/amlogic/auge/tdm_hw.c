@@ -1,23 +1,34 @@
-// SPDX-License-Identifier: GPL-2.0
 /*
- * Copyright (C) 2019 Amlogic, Inc. All rights reserved.
+ * sound/soc/amlogic/auge/tdm_hw.c
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
  *
  */
-
 #include <sound/soc.h>
 
 #include "tdm_hw.h"
 #include "iomap.h"
 
-#define MST_CLK_INVERT_PH0_PAD_BCLK       BIT(0)
-#define MST_CLK_INVERT_PH0_PAD_FCLK       BIT(1)
-#define MST_CLK_INVERT_PH1_TDMIN_BCLK     BIT(2)
-#define MST_CLK_INVERT_PH1_TDMIN_FCLK     BIT(3)
-#define MST_CLK_INVERT_PH2_TDMOUT_BCLK    BIT(4)
-#define MST_CLK_INVERT_PH2_TDMOUT_FCLK    BIT(5)
+#define MST_CLK_INVERT_PH0_PAD_BCLK       (1 << 0)
+#define MST_CLK_INVERT_PH0_PAD_FCLK       (1 << 1)
+#define MST_CLK_INVERT_PH1_TDMIN_BCLK     (1 << 2)
+#define MST_CLK_INVERT_PH1_TDMIN_FCLK     (1 << 3)
+#define MST_CLK_INVERT_PH2_TDMOUT_BCLK    (1 << 4)
+#define MST_CLK_INVERT_PH2_TDMOUT_FCLK    (1 << 5)
 
 /* without audio handler, it should be improved */
-void aml_tdm_enable(struct aml_audio_controller *actrl,
+void aml_tdm_enable(
+	struct aml_audio_controller *actrl,
 	int stream, int index,
 	bool is_enable)
 {
@@ -29,14 +40,17 @@ void aml_tdm_enable(struct aml_audio_controller *actrl,
 		offset = EE_AUDIO_TDMOUT_B_CTRL0
 				- EE_AUDIO_TDMOUT_A_CTRL0;
 		reg = EE_AUDIO_TDMOUT_A_CTRL0 + offset * index;
-		aml_audiobus_update_bits(actrl, reg, 1 << 31, is_enable << 31);
+		aml_audiobus_update_bits(actrl, reg, 1<<31, is_enable<<31);
 	} else {
 		pr_debug("tdm capture enable\n");
 
 		offset = EE_AUDIO_TDMIN_B_CTRL
 				- EE_AUDIO_TDMIN_A_CTRL;
 		reg = EE_AUDIO_TDMIN_A_CTRL + offset * index;
-		aml_audiobus_update_bits(actrl, reg, 1 << 31 | 1 << 26, is_enable << 31 | 1 << 26);
+		aml_audiobus_update_bits(actrl,
+					 reg,
+					 1 << 31 | 1 << 26,
+					 is_enable << 31 | 1 << 26);
 	}
 
 }
@@ -47,7 +61,8 @@ void aml_tdm_arb_config(struct aml_audio_controller *actrl)
 	aml_audiobus_write(actrl, EE_AUDIO_ARB_CTRL, 1 << 31 | 0xff << 0);
 }
 
-void aml_tdm_fifo_reset(struct aml_audio_controller *actrl,
+void aml_tdm_fifo_reset(
+	struct aml_audio_controller *actrl,
 	int stream, int index)
 {
 	unsigned int reg, offset;
@@ -71,6 +86,7 @@ void aml_tdm_fifo_reset(struct aml_audio_controller *actrl,
 	}
 
 }
+
 
 void tdm_enable(int tdm_index, int is_enable)
 {
@@ -108,9 +124,8 @@ void tdm_fifo_enable(int tdm_index, int is_enable)
 		if (is_enable) {
 			audiobus_update_bits(reg, 1 << 29, 1 << 29);
 			audiobus_update_bits(reg, 1 << 28, 1 << 28);
-		} else {
+		} else
 			audiobus_update_bits(reg, 3 << 28, 0);
-		}
 
 	} else if (tdm_index < 6) {
 		tdm_index -= 3;
@@ -121,9 +136,8 @@ void tdm_fifo_enable(int tdm_index, int is_enable)
 		if (is_enable) {
 			audiobus_update_bits(reg, 1 << 29, 1 << 29);
 			audiobus_update_bits(reg, 1 << 28, 1 << 28);
-		} else {
+		} else
 			audiobus_update_bits(reg, 3 << 28, 0);
-		}
 	}
 }
 
@@ -143,14 +157,16 @@ int tdmout_get_frddr_type(int bitwidth)
 		frddr_type = 4;
 		break;
 	default:
-		pr_err("invalid bit_depth: %d\n", bitwidth);
+		pr_err("invalid bit_depth: %d\n",
+			bitwidth);
 		break;
 	}
 
 	return frddr_type;
 }
 
-void aml_tdm_fifo_ctrl(struct aml_audio_controller *actrl,
+void aml_tdm_fifo_ctrl(
+	struct aml_audio_controller *actrl,
 	int bitwidth, int stream,
 	int index, unsigned int fifo_id)
 {
@@ -165,14 +181,16 @@ void aml_tdm_fifo_ctrl(struct aml_audio_controller *actrl,
 		reg = EE_AUDIO_TDMOUT_A_CTRL1 + offset * index;
 		aml_audiobus_update_bits(actrl, reg,
 				0x3 << 24 | 0x1f << 8 | 0x7 << 4,
-				fifo_id << 24 | (bitwidth - 1) << 8 | frddr_type << 4);
+				fifo_id << 24 | (bitwidth - 1) << 8
+				| frddr_type << 4);
 	} else {
 		pr_debug("tdm prepare----capture\n");
 	}
 
 }
 
-static void aml_clk_set_tdmout_by_id(struct aml_audio_controller *actrl,
+static void aml_clk_set_tdmout_by_id(
+		struct aml_audio_controller *actrl,
 		unsigned int tdm_index,
 		unsigned int sclk_sel,
 		unsigned int lrclk_sel,
@@ -197,7 +215,8 @@ static void aml_clk_set_tdmout_by_id(struct aml_audio_controller *actrl,
 			sclk_sel << 24 | lrclk_sel << 20);
 }
 
-static void aml_clk_set_tdmin_by_id(struct aml_audio_controller *actrl,
+static void aml_clk_set_tdmin_by_id(
+		struct aml_audio_controller *actrl,
 		unsigned int tdm_index,
 		unsigned int sclk_sel,
 		unsigned int lrclk_sel)
@@ -210,7 +229,8 @@ static void aml_clk_set_tdmin_by_id(struct aml_audio_controller *actrl,
 		sclk_sel << 24 | lrclk_sel << 20);
 }
 
-static void aml_tdmout_invert_lrclk(struct aml_audio_controller *actrl,
+static void aml_tdmout_invert_lrclk(
+		struct aml_audio_controller *actrl,
 		unsigned int tdm_index,
 		bool finv)
 {
@@ -222,7 +242,8 @@ static void aml_tdmout_invert_lrclk(struct aml_audio_controller *actrl,
 		reg_out, 0x1 << 28, finv << 28);
 }
 
-static void aml_tdmout_bclk_skew(struct aml_audio_controller *actrl,
+static void aml_tdmout_bclk_skew(
+		struct aml_audio_controller *actrl,
 		unsigned int tdm_index,
 		unsigned int bclkout_skew)
 {
@@ -230,10 +251,12 @@ static void aml_tdmout_bclk_skew(struct aml_audio_controller *actrl,
 		EE_AUDIO_TDMOUT_B_CTRL0 - EE_AUDIO_TDMOUT_A_CTRL0;
 	unsigned int reg_out =
 		EE_AUDIO_TDMOUT_A_CTRL0 + off_set * tdm_index;
-	aml_audiobus_update_bits(actrl, reg_out, 0x1f << 15, bclkout_skew << 15);
+	aml_audiobus_update_bits(actrl,
+		reg_out, 0x1f << 15, bclkout_skew << 15);
 }
 
-void aml_tdm_set_format(struct aml_audio_controller *actrl,
+void aml_tdm_set_format(
+	struct aml_audio_controller *actrl,
 	struct pcm_setting *p_config,
 	unsigned int clk_sel,
 	unsigned int index,
@@ -276,9 +299,8 @@ void aml_tdm_set_format(struct aml_audio_controller *actrl,
 				bclkout_skew = 2;
 			else
 				bclkout_skew = 3;
-		} else {
+		} else
 			bclkout_skew = 1;
-		}
 		bclkin_skew = 3;
 
 		clkctl |= MST_CLK_INVERT_PH0_PAD_FCLK
@@ -307,9 +329,8 @@ void aml_tdm_set_format(struct aml_audio_controller *actrl,
 				bclkout_skew = 2;
 			else
 				bclkout_skew = 3;
-		} else {
+		} else
 			bclkout_skew = 1;
-		}
 		bclkin_skew = 3;
 
 		if (capture_active)
@@ -326,9 +347,8 @@ void aml_tdm_set_format(struct aml_audio_controller *actrl,
 				bclkout_skew = 3;
 			else
 				bclkout_skew = 4;
-		} else {
+		} else
 			bclkout_skew = 2;
-		}
 		bclkin_skew = 2;
 
 		if (capture_active)
@@ -394,8 +414,6 @@ void aml_tdm_set_format(struct aml_audio_controller *actrl,
 
 	/* TDM in */
 	if (capture_active) {
-		int mode;
-
 		reg_in = EE_AUDIO_CLK_TDMIN_A_CTRL + id;
 		aml_audiobus_update_bits(actrl, reg_in,
 			0x3 << 30, 0x3 << 30);
@@ -412,8 +430,10 @@ void aml_tdm_set_format(struct aml_audio_controller *actrl,
 		aml_audiobus_update_bits(actrl, reg_in,
 			0x1 << 25, finv << 25);
 
-		mode = (p_config->pcm_mode == SND_SOC_DAIFMT_I2S) ? 0x1 : 0x0;
-		aml_audiobus_update_bits(actrl, reg_in, 0x1 << 30, mode << 30);
+		if (p_config->pcm_mode == SND_SOC_DAIFMT_I2S)
+			aml_audiobus_update_bits(actrl, reg_in,
+				1 << 30,
+				1 << 30);
 	}
 }
 
@@ -435,10 +455,13 @@ void aml_update_tdmin_rev_ws(struct aml_audio_controller *actrl,
 
 	off_set = EE_AUDIO_TDMIN_B_CTRL - EE_AUDIO_TDMIN_A_CTRL;
 	reg_in = EE_AUDIO_TDMIN_A_CTRL + off_set * idx;
-	aml_audiobus_update_bits(actrl, reg_in, 0x1 << 25, is_rev << 25);
+	aml_audiobus_update_bits
+		(actrl, reg_in,
+		0x1 << 25, is_rev << 25);
 }
 
-void aml_tdm_set_oe_v1(struct aml_audio_controller *actrl,
+void aml_tdm_set_oe_v1(
+	struct aml_audio_controller *actrl,
 	int index, int force_oe, int oe_val)
 {
 	if (force_oe) {
@@ -455,7 +478,8 @@ void aml_tdm_set_oe_v1(struct aml_audio_controller *actrl,
 	}
 }
 
-void aml_tdm_set_oe_v2(struct aml_audio_controller *actrl,
+void aml_tdm_set_oe_v2(
+	struct aml_audio_controller *actrl,
 	int index, int force_oe, int oe_val)
 {
 	if (force_oe) {
@@ -474,7 +498,8 @@ void aml_tdm_set_oe_v2(struct aml_audio_controller *actrl,
 	}
 }
 
-void aml_tdm_set_slot_out(struct aml_audio_controller *actrl,
+void aml_tdm_set_slot_out(
+	struct aml_audio_controller *actrl,
 	int index, int slots, int slot_width)
 {
 	unsigned int reg, offset;
@@ -485,7 +510,8 @@ void aml_tdm_set_slot_out(struct aml_audio_controller *actrl,
 		(actrl, reg, 0x3ff, ((slots - 1) << 5) | (slot_width - 1));
 }
 
-void aml_tdm_set_slot_in(struct aml_audio_controller *actrl,
+void aml_tdm_set_slot_in(
+	struct aml_audio_controller *actrl,
 	int index, int in_src, int slot_width)
 {
 	unsigned int reg, offset;
@@ -494,10 +520,11 @@ void aml_tdm_set_slot_in(struct aml_audio_controller *actrl,
 	reg = EE_AUDIO_TDMIN_A_CTRL + offset * index;
 
 	aml_audiobus_update_bits(actrl, reg,
-		0xf << 20 | 0x1f, in_src << 20 | (slot_width - 1));
+		0xf << 20 | 0x1f, in_src << 20 | (slot_width-1));
 }
 
-void aml_update_tdmin_src(struct aml_audio_controller *actrl,
+void aml_update_tdmin_src(
+	struct aml_audio_controller *actrl,
 	int index, int in_src)
 {
 	unsigned int reg, offset;
@@ -505,10 +532,12 @@ void aml_update_tdmin_src(struct aml_audio_controller *actrl,
 	offset = EE_AUDIO_TDMIN_B_CTRL - EE_AUDIO_TDMIN_A_CTRL;
 	reg = EE_AUDIO_TDMIN_A_CTRL + offset * index;
 
-	aml_audiobus_update_bits(actrl, reg, 0xf << 20, in_src << 20);
+	aml_audiobus_update_bits(actrl, reg,
+		0xf << 20, in_src << 20);
 }
 
-void tdmin_set_chnum_en(struct aml_audio_controller *actrl,
+void tdmin_set_chnum_en(
+	struct aml_audio_controller *actrl,
 	int index, bool enable)
 {
 	unsigned int reg, offset;
@@ -520,7 +549,8 @@ void tdmin_set_chnum_en(struct aml_audio_controller *actrl,
 		0x1 << 6, enable << 6);
 }
 
-void aml_tdm_set_channel_mask(struct aml_audio_controller *actrl,
+void aml_tdm_set_channel_mask(
+	struct aml_audio_controller *actrl,
 	int stream, int index, int lane, int mask)
 {
 	unsigned int offset, reg;
@@ -552,14 +582,16 @@ void aml_tdm_set_channel_mask(struct aml_audio_controller *actrl,
 	aml_audiobus_write(actrl, reg + lane, mask);
 }
 
-void aml_tdm_set_lane_channel_swap(struct aml_audio_controller *actrl,
+void aml_tdm_set_lane_channel_swap(
+	struct aml_audio_controller *actrl,
 	int stream, int index, int swap0, int swap1)
 {
 	unsigned int offset, reg;
 
 	pr_debug("\t %s swap0 = %#x, swap1 = %#x\n",
 		(stream == SNDRV_PCM_STREAM_PLAYBACK) ? "tdmout" : "tdmin",
-		swap0, swap1);
+		swap0,
+		swap1);
 
 	if (stream == SNDRV_PCM_STREAM_PLAYBACK) {
 		offset = EE_AUDIO_TDMOUT_B_SWAP0
@@ -588,7 +620,8 @@ void aml_tdm_set_lane_channel_swap(struct aml_audio_controller *actrl,
 	}
 }
 
-void aml_tdm_set_bclk_ratio(struct aml_audio_controller *actrl,
+void aml_tdm_set_bclk_ratio(
+	struct aml_audio_controller *actrl,
 	int clk_sel, int lrclk_hi, int bclk_ratio)
 {
 	unsigned int reg, reg_step = 2;
@@ -596,11 +629,12 @@ void aml_tdm_set_bclk_ratio(struct aml_audio_controller *actrl,
 	reg = EE_AUDIO_MST_A_SCLK_CTRL0 + reg_step * clk_sel;
 
 	aml_audiobus_update_bits(actrl, reg,
-				(3 << 30) | 0x3ff << 10 | 0x3ff,
-				(3 << 30) | lrclk_hi << 10 | bclk_ratio);
+				(3 << 30)|0x3ff<<10|0x3ff,
+				(3 << 30)|lrclk_hi<<10|bclk_ratio);
 }
 
-void aml_tdm_set_lrclkdiv(struct aml_audio_controller *actrl,
+void aml_tdm_set_lrclkdiv(
+	struct aml_audio_controller *actrl,
 	int clk_sel, int ratio)
 {
 	unsigned int reg, reg_step = 2;
@@ -611,8 +645,8 @@ void aml_tdm_set_lrclkdiv(struct aml_audio_controller *actrl,
 	reg = EE_AUDIO_MST_A_SCLK_CTRL0 + reg_step * clk_sel;
 
 	aml_audiobus_update_bits(actrl, reg,
-		(3 << 30) | (0x3ff << 20),
-		(3 << 30) | (ratio << 20));
+		(3 << 30)|(0x3ff << 20),
+		(3 << 30)|(ratio << 20));
 }
 
 void aml_tdmout_select_aed(bool enable, int tdmout_id)
@@ -706,9 +740,11 @@ void aml_tdm_sclk_pad_select(struct aml_audio_controller *actrl,
 		return;
 	}
 	if (actrl)
-		aml_audiobus_update_bits(actrl, reg, mask_offset, val_offset);
+		aml_audiobus_update_bits(actrl, reg,
+			mask_offset, val_offset);
 	else
-		audiobus_update_bits(reg, mask_offset, val_offset);
+		audiobus_update_bits(reg,
+			mask_offset, val_offset);
 }
 
 void i2s_to_hdmitx_ctrl(int i2s_tohdmitxen_separated, int tdm_index)
@@ -736,8 +772,11 @@ void i2s_to_hdmitx_ctrl(int i2s_tohdmitxen_separated, int tdm_index)
 	}
 }
 
-void aml_tdm_mute_playback(struct aml_audio_controller *actrl,
-		int tdm_index, bool mute, int lane_cnt)
+void aml_tdm_mute_playback(
+		struct aml_audio_controller *actrl,
+		int tdm_index,
+		bool mute,
+		int lane_cnt)
 {
 	unsigned int offset, reg;
 	unsigned int mute_mask = 0xffffffff;
@@ -763,8 +802,11 @@ void aml_tdm_mute_playback(struct aml_audio_controller *actrl,
 	}
 }
 
-void aml_tdm_mute_capture(struct aml_audio_controller *actrl,
-		int tdm_index, bool mute, int lane_cnt)
+void aml_tdm_mute_capture(
+		struct aml_audio_controller *actrl,
+		int tdm_index,
+		bool mute,
+		int lane_cnt)
 {
 	unsigned int offset, reg;
 	unsigned int mute_mask = 0xffffffff;
@@ -795,7 +837,7 @@ void aml_tdm_out_reset(unsigned int tdm_id, int offset)
 {
 	unsigned int reg = 0, val = 0;
 
-	if (offset && offset != 1) {
+	if ((offset != 0) && (offset != 1)) {
 		pr_err("%s(), invalid offset = %d\n", __func__, offset);
 		return;
 	}
@@ -913,13 +955,4 @@ int aml_tdmin_get_status(int tdm_id)
 	reg = EE_AUDIO_TDMIN_A_STAT + offset * tdm_id;
 
 	return audiobus_read(reg);
-}
-
-void aml_tdmin_set_slot_num(struct aml_audio_controller *actrl, int index, int slot_num)
-{
-	unsigned int reg, offset;
-
-	offset = EE_AUDIO_TDMIN_B_CTRL - EE_AUDIO_TDMIN_A_CTRL;
-	reg = EE_AUDIO_TDMIN_A_CTRL + offset * index;
-	aml_audiobus_update_bits(actrl, reg, 0x1f << 8, (slot_num - 1) << 8);
 }

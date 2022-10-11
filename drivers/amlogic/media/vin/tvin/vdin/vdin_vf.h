@@ -1,4 +1,3 @@
-/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
  * drivers/amlogic/media/vin/tvin/vdin/vdin_vf.h
  *
@@ -35,13 +34,11 @@
 /* only log backend opertations */
 #define VF_LOG_BE
 
-#define VDIN_DV_MAX_NUM		        9
-
-#define VF_FLAG_NORMAL_FRAME		 0x00000001
-#define VF_FLAG_FREEZED_FRAME		 0x00000002
-#define VFRAME_DISP_MAX_NUM 20
+#define VF_FLAG_NORMAL_FRAME	0x00000001
+#define VF_FLAG_FREEZED_FRAME	0x00000002
+#define VFRAME_DISP_MAX_NUM	20
 #define VDIN_CANVAS_MAX_CNT	10
-#define VDIN_VF_POOL_FREEZE              0x00000001
+#define VDIN_VF_POOL_FREEZE	0x00000001
 #define ISR_LOG_EN
 
 #define VF_LOG_PRINT_MAX_LEN 100
@@ -88,18 +85,20 @@ struct vf_log_s {
 	/* [2:0]	operation ID */
 	unsigned char  log_buf[VF_LOG_LEN][11];
 	unsigned int   log_cur;
-	struct timespec/*timeval*/ log_time[VF_LOG_LEN];
+	struct timeval log_time[VF_LOG_LEN];
 };
+
 #endif
 
 #ifdef ISR_LOG_EN
 #define ISR_LOG_LEN 2000
 struct isr_log_s {
-	struct timespec /*timeval*/ isr_time[ISR_LOG_LEN];
+	struct timeval isr_time[ISR_LOG_LEN];
 	unsigned int log_cur;
 	unsigned char isr_log_en;
 };
 #endif
+
 
 struct vf_entry {
 	struct vframe_s vf;
@@ -125,12 +124,12 @@ struct vf_pool {
 	spinlock_t wt_lock;
 	unsigned int fz_list_size;
 	struct list_head fz_list;
-	spinlock_t fz_lock;/*fz lock*/
+	spinlock_t fz_lock;
 	unsigned int tmp_list_size;
 	struct list_head tmp_list;
 	struct tvin_dv_vsif_s dv_vsif;/*dolby vsi info*/
-	spinlock_t tmp_lock;/*tmp lock*/
-	spinlock_t log_lock;/*log lock*/
+	spinlock_t tmp_lock;
+	spinlock_t log_lock;
 	spinlock_t dv_lock;/*dolby vision lock*/
 #ifdef VF_LOG_EN
 	struct vf_log_s log;
@@ -140,56 +139,57 @@ struct vf_pool {
 #endif
 	atomic_t buffer_cnt;
 	unsigned int low_latency;
-	unsigned int dv_buf_mem[VDIN_CANVAS_MAX_CNT];/*phy address*/
-	void *dv_buf_vmem[VDIN_CANVAS_MAX_CNT];/*virtual address*/
+	unsigned int dv_buf_mem[VDIN_CANVAS_MAX_CNT];
+	void *dv_buf_vmem[VDIN_CANVAS_MAX_CNT];
 	unsigned int dv_buf_size[VDIN_CANVAS_MAX_CNT];
-	char *dv_buf[VDIN_CANVAS_MAX_CNT];/*temp use*/
-	/*char *dv_buf_ori[VDIN_CANVAS_MAX_CNT];*/
+	char *dv_buf[VDIN_CANVAS_MAX_CNT];
+	char *dv_buf_ori[VDIN_CANVAS_MAX_CNT];
 	unsigned int disp_index[VFRAME_DISP_MAX_NUM];
 	unsigned int skip_vf_num;/*skip pre vframe num*/
 	enum vframe_disp_mode_e	disp_mode[VFRAME_DISP_MAX_NUM];
 };
-
 extern unsigned int dolby_size_byte;
 extern unsigned int dv_dbg_mask;
 
-void vf_log_init(struct vf_pool *p);
-void vf_log_print(struct vf_pool *p);
+extern void vf_log_init(struct vf_pool *p);
+extern void vf_log_print(struct vf_pool *p);
 
-void isr_log_init(struct vf_pool *p);
-void isr_log_print(struct vf_pool *p);
-void isr_log(struct vf_pool *p);
+extern void isr_log_init(struct vf_pool *p);
+extern void isr_log_print(struct vf_pool *p);
+extern void isr_log(struct vf_pool *p);
 
-struct vf_entry *vf_get_master(struct vf_pool *p, int index);
-struct vf_entry *vf_get_slave(struct vf_pool *p, int index);
+extern struct vf_entry *vf_get_master(struct vf_pool *p, int index);
+extern struct vf_entry *vf_get_slave(struct vf_pool *p, int index);
 
-struct vf_pool *vf_pool_alloc(int size);
-int vf_pool_init(struct vf_pool *p, int size);
-void vf_pool_free(struct vf_pool *p);
+extern struct vf_pool *vf_pool_alloc(int size);
+extern int vf_pool_init(struct vf_pool *p, int size);
+extern void vf_pool_free(struct vf_pool *p);
 
-void recycle_tmp_vfs(struct vf_pool *p);
-void tmp_vf_put(struct vf_entry *vfe, struct vf_pool *p);
-void tmp_to_rd(struct vf_pool *p);
+extern void recycle_tmp_vfs(struct vf_pool *p);
+extern void tmp_vf_put(struct vf_entry *vfe, struct vf_pool *p);
+extern void tmp_to_rd(struct vf_pool *p);
 
-struct vf_entry *provider_vf_peek(struct vf_pool *p);
-struct vf_entry *provider_vf_get(struct vf_pool *p);
-void provider_vf_put(struct vf_entry *vf, struct vf_pool *p);
+extern struct vf_entry *provider_vf_peek(struct vf_pool *p);
+extern struct vf_entry *provider_vf_get(struct vf_pool *p);
+extern void provider_vf_put(struct vf_entry *vf, struct vf_pool *p);
 
-struct vf_entry *receiver_vf_peek(struct vf_pool *p);
-struct vf_entry *receiver_vf_get(struct vf_pool *p);
-void receiver_vf_put(struct vframe_s *vf, struct vf_pool *p);
+extern struct vf_entry *receiver_vf_peek(struct vf_pool *p);
+extern struct vf_entry *receiver_vf_get(struct vf_pool *p);
+extern void receiver_vf_put(struct vframe_s *vf, struct vf_pool *p);
 
-struct vframe_s *vdin_vf_peek(void *op_arg);
-struct vframe_s *vdin_vf_get(void *op_arg);
-void vdin_vf_put(struct vframe_s *vf, void *op_arg);
-int vdin_vf_states(struct vframe_states *vf_ste, void *op_arg);
 
-void vdin_vf_freeze(struct vf_pool *p, unsigned int hold_num);
-void vdin_vf_unfreeze(struct vf_pool *p);
-void vdin_dump_vf_state(struct vf_pool *p);
-void vdin_dump_vf_state_seq(struct vf_pool *p, struct seq_file *seq);
+extern struct vframe_s *vdin_vf_peek(void *op_arg);
+extern struct vframe_s *vdin_vf_get(void *op_arg);
+extern void vdin_vf_put(struct vframe_s *vf, void *op_arg);
+extern int vdin_vf_states(struct vframe_states *vf_ste, void *op_arg);
 
-void vdin_vf_disp_mode_update(struct vf_entry *vfe, struct vf_pool *p);
-void vdin_vf_disp_mode_skip(struct vf_pool *p);
+extern void vdin_vf_freeze(struct vf_pool *p, unsigned int hold_num);
+extern void vdin_vf_unfreeze(struct vf_pool *p);
+
+extern void vdin_dump_vf_state(struct vf_pool *p);
+extern void vdin_dump_vf_state_seq(struct vf_pool *p, struct seq_file *seq);
+
+extern void vdin_vf_disp_mode_update(struct vf_entry *vfe, struct vf_pool *p);
+extern void vdin_vf_disp_mode_skip(struct vf_pool *p);
 #endif /* __VDIN_VF_H */
 

@@ -1,8 +1,11 @@
-// SPDX-License-Identifier: GPL-2.0-only
 /* Copyright (C) by Paul Barton-Davis 1998-1999
  *
  * Some portions of this file are taken from work that is
  * copyright (C) by Hannu Savolainen 1993-1996
+ *
+ * This program is distributed under the GNU GENERAL PUBLIC LICENSE (GPL)
+ * Version 2 (June 1991). See the "COPYING" file distributed with this software
+ * for more info.  
  */
 
 /*  
@@ -23,7 +26,6 @@
 #include <linux/delay.h>
 #include <linux/time.h>
 #include <linux/wait.h>
-#include <linux/sched/signal.h>
 #include <linux/firmware.h>
 #include <linux/moduleparam.h>
 #include <linux/slab.h>
@@ -788,6 +790,7 @@ wavefront_send_patch (snd_wavefront_t *dev, wavefront_patch_info *header)
 
 	dev->patch_status[header->number] |= WF_SLOT_FILLED;
 
+	bptr = buf;
 	bptr = munge_int32 (header->number, buf, 2);
 	munge_buf ((unsigned char *)&header->hdr.p, bptr, WF_PATCH_BYTES);
     
@@ -1784,7 +1787,7 @@ wavefront_should_cause_interrupt (snd_wavefront_t *dev,
 				  int val, int port, unsigned long timeout)
 
 {
-	wait_queue_entry_t wait;
+	wait_queue_t wait;
 
 	init_waitqueue_entry(&wait, current);
 	spin_lock_irq(&dev->irq_lock);

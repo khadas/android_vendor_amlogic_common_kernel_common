@@ -1,6 +1,18 @@
-/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * include/linux/amlogic/amsmc.h
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
 #ifndef _AMSMC_H
@@ -48,6 +60,6 @@ struct am_smc_param {
 #define AMSMC_IOC_DEACTIVE     _IO(AMSMC_IOC_MAGIC, 0x03)
 #define AMSMC_IOC_GET_PARAM    _IOR(AMSMC_IOC_MAGIC, 0x04, struct am_smc_param)
 #define AMSMC_IOC_SET_PARAM    _IOW(AMSMC_IOC_MAGIC, 0x05, struct am_smc_param)
-#define AMSMC_IOC_HOT_RESET _IOR(AMSMC_IOC_MAGIC, 0x06, struct am_smc_atr)
+#define AMSMC_IOC_HOT_RESET    _IOR(AMSMC_IOC_MAGIC, 0x06, struct am_smc_atr)
 
 #endif

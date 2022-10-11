@@ -1,6 +1,18 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/amlogic/dvb/demux/sc2_demux/ts_output.c
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
 #include <linux/kernel.h>
@@ -262,8 +274,8 @@ static void dump_file_open(char *path, struct dump_file *dump_file_fp,
 	}
 }
 
-static void dump_file_write(char *buf,
-		size_t count, struct dump_file *dump_file_fp)
+static void dump_file_write(
+	char *buf, size_t count, struct dump_file *dump_file_fp)
 {
 	mm_segment_t old_fs;
 
@@ -407,9 +419,9 @@ static int _check_timer_wakeup(void)
 	return 0;
 }
 
-static void _timer_ts_out_func(struct timer_list *timer)
+static void _timer_ts_out_func(unsigned long arg)
 {
-//    dprint("wakeup ts_out_timer\n");
+//      dprint("wakeup ts_out_timer\n");
 	if (ts_out_task_tmp.ts_out_list) {
 		timer_wake_up = 1;
 		wake_up_interruptible(&ts_out_task_tmp.wait_queue);
@@ -427,10 +439,9 @@ static int _check_timer_es_wakeup(void)
 	return 0;
 }
 
-static void _timer_es_out_func(struct timer_list *timer)
+static void _timer_es_out_func(unsigned long arg)
 {
-//  dprint("wakeup es_out_timer\n");
-
+//      dprint("wakeup ts_out_timer\n");
 	if (es_out_task_tmp.ts_out_list) {
 		timer_es_wake_up = 1;
 		wake_up_interruptible(&es_out_task_tmp.wait_queue);
@@ -636,11 +647,11 @@ static int _task_out_func(void *data)
 				len = MAX_READ_BUF_LEN;
 				if (ptmp->pout->pchan->sec_level) {
 					start_aucpu_non_es(ptmp->pout);
-					ret = aucpu_bufferid_read(ptmp->pout,
-						&pread, len, 0);
+					ret = aucpu_bufferid_read(
+						ptmp->pout, &pread, len, 0);
 				} else {
-					ret = SC2_bufferid_read(ptmp->pout->pchan,
-						&pread, len, 0);
+					ret = SC2_bufferid_read(
+					ptmp->pout->pchan, &pread, len, 0);
 				}
 				if (ret != 0)
 					out_ts_cb_list(ptmp->pout, pread,
@@ -899,8 +910,8 @@ static int write_es_data(struct out_elem *pout, struct es_params_t *es_params)
 				else
 					pr_dbg("audio data lost\n");
 				if (pout->dump_file.file_fp)
-					dump_file_write(ptmp,
-							ret, &pout->dump_file);
+					dump_file_write(
+						ptmp, ret, &pout->dump_file);
 				es_params->data_len += ret;
 				pr_dbg("%s total len:%d, remain:%d\n",
 					   pout->type == AUDIO_TYPE ?
@@ -939,8 +950,7 @@ static int clean_es_data(struct out_elem *pout, struct chan_id *pchan,
 static int start_aucpu_non_es(struct out_elem *pout)
 {
 	int ret;
-	if (!pout || !pout->pchan)
-		return -1;
+
 	if (!pout->aucpu_start &&
 		pout->aucpu_handle >= 0 &&
 		wdma_get_active(pout->pchan->id)) {
@@ -962,8 +972,7 @@ static void create_aucpu_pts(struct out_elem *pout)
 	struct aml_aucpu_strm_buf dst;
 	struct aml_aucpu_inst_config cfg;
 	int ret;
-	if (!pout || !pout->pchan1)
-		return;
+
 	if (pout->aucpu_pts_handle < 0 && pout->pchan1->sec_level) {
 		src.phy_start = pout->pchan1->mem_phy;
 		src.buf_size = pout->pchan1->mem_size;
@@ -1001,14 +1010,13 @@ static void create_aucpu_pts(struct out_elem *pout)
 		pout->aucpu_pts_start = 0;
 	}
 }
+
 static void create_aucpu_inst(struct out_elem *pout)
 {
 	struct aml_aucpu_strm_buf src;
 	struct aml_aucpu_strm_buf dst;
 	struct aml_aucpu_inst_config cfg;
 	int ret;
-	if (!pout)
-		return;
 
 	if (pout->type == NONE_TYPE)
 		return;
@@ -1405,8 +1413,8 @@ static void enforce_flush_cache(char *addr, unsigned int len)
 {
 	if (len == 0)
 		return;
-
-	dma_sync_single_for_cpu(aml_get_device(),
+	dma_sync_single_for_cpu(
+			aml_get_device(),
 			(dma_addr_t)(addr),
 			len, DMA_FROM_DEVICE);
 }
@@ -1448,7 +1456,8 @@ static int write_sec_video_es_data(struct out_elem *pout,
 	if (pout->dump_file.file_fp) {
 		if (flag) {
 			enforce_flush_cache(ptmp, ret);
-			dump_file_write(ptmp - pout->pchan->mem_phy +
+			dump_file_write(
+				ptmp - pout->pchan->mem_phy +
 				pout->pchan->mem, ret,
 				&pout->dump_file);
 		} else {
@@ -1469,7 +1478,8 @@ static int write_sec_video_es_data(struct out_elem *pout,
 			if (pout->dump_file.file_fp) {
 				if (flag) {
 					enforce_flush_cache(ptmp, ret);
-					dump_file_write(ptmp - pout->pchan->mem_phy +
+					dump_file_write(ptmp -
+						pout->pchan->mem_phy +
 						pout->pchan->mem, ret,
 						&pout->dump_file);
 				} else {
@@ -1478,12 +1488,14 @@ static int write_sec_video_es_data(struct out_elem *pout,
 				}
 			}
 			if (ret != len)
-				dprint("get es data error2, req:%d, actual:%d\n",
-					es_params->header.len, es_params->data_len);
+				dprint("get es len err2, req:%d, actual:%d\n",
+					es_params->header.len,
+					es_params->data_len);
 		} else {
 			len = es_params->data_len;
-			dprint("get es data error1, req:%d, actual:%d\n",
-				es_params->header.len, es_params->data_len);
+			dprint("get es len err1, req:%d, actual:%d\n",
+				es_params->header.len,
+				es_params->data_len);
 		}
 	}
 	memset(&sec_es_data, 0, sizeof(struct dmx_sec_es_data));
@@ -1567,9 +1579,11 @@ static int _handle_es(struct out_elem *pout, struct es_params_t *es_params)
 			memcpy(&es_params->last_header, pcur_header,
 					sizeof(es_params->last_header));
 			if (pout->type == VIDEO_TYPE)
-				dprint("video: clean dirty len:0x%0x\n", dirty_len);
+				dprint("video:clean dirty len:0x%0x\n",
+						dirty_len);
 			else
-				dprint("audio: clean dirty len:0x%0x\n", dirty_len);
+				dprint("audio:clean dirty len:0x%0x\n",
+						dirty_len);
 			return 0;
 		}
 		if (pheader->len == 0) {
@@ -1733,11 +1747,6 @@ int ts_output_init(int sid_num, int *sid_info)
 	}
 
 	memset(&remap_table, 0, sizeof(remap_table));
-	for (i = 0; i < MAX_REMAP_NUM; i++) {
-		struct remap_entry *remap_slot = &remap_table[i];
-
-		remap_slot->pid_entry = i;
-	}
 
 	out_elem_table = vmalloc(sizeof(*out_elem_table)
 				 * MAX_OUT_ELEM_NUM);
@@ -1756,13 +1765,15 @@ int ts_output_init(int sid_num, int *sid_info)
 	ts_output_mutex = &advb->mutex;
 
 	init_waitqueue_head(&ts_out_task_tmp.wait_queue);
-	timer_setup(&ts_out_task_tmp.out_timer, _timer_ts_out_func, 0);
-	add_timer(&ts_out_task_tmp.out_timer);
-
 	ts_out_task_tmp.out_task =
 	    kthread_run(_task_out_func, (void *)NULL, "ts_out_task");
 	if (!ts_out_task_tmp.out_task)
 		dprint("create ts_out_task fail\n");
+
+	init_timer(&ts_out_task_tmp.out_timer);
+	ts_out_task_tmp.out_timer.function = _timer_ts_out_func;
+	ts_out_task_tmp.out_timer.data = 0;
+	add_timer(&ts_out_task_tmp.out_timer);
 
 	es_out_task_tmp.running = TASK_RUNNING;
 	es_out_task_tmp.flush_time_ms = out_es_flush_time;
@@ -1770,13 +1781,15 @@ int ts_output_init(int sid_num, int *sid_info)
 	es_out_task_tmp.ts_out_list = NULL;
 
 	init_waitqueue_head(&es_out_task_tmp.wait_queue);
-	timer_setup(&es_out_task_tmp.out_timer, _timer_es_out_func, 0);
-	add_timer(&es_out_task_tmp.out_timer);
-
 	es_out_task_tmp.out_task =
 	    kthread_run(_task_es_out_func, (void *)NULL, "es_out_task");
 	if (!es_out_task_tmp.out_task)
 		dprint("create es_out_task fail\n");
+
+	init_timer(&es_out_task_tmp.out_timer);
+	es_out_task_tmp.out_timer.function = _timer_es_out_func;
+	es_out_task_tmp.out_timer.data = 0;
+	add_timer(&es_out_task_tmp.out_timer);
 
 	return 0;
 }
@@ -1836,51 +1849,6 @@ int ts_output_destroy(void)
 	return 0;
 }
 
-static struct remap_entry *ts_output_find_remap_entry(int sid, int pid)
-{
-	struct remap_entry *remap_slot = NULL;
-	int i;
-
-	for (i = 0; i < MAX_REMAP_NUM; i++) {
-		if (remap_table[i].status == 1 &&
-		    remap_table[i].stream_id == sid &&
-		    remap_table[i].pid == pid) {
-			remap_slot = &remap_table[i];
-			break;
-		}
-	}
-
-	return remap_slot;
-}
-
-static struct remap_entry *ts_output_allocate_remap_entry(void)
-{
-	struct remap_entry *remap_slot = NULL;
-	int i;
-
-	for (i = 0; i < MAX_REMAP_NUM; i++) {
-		if (remap_table[i].status == 0) {
-			remap_slot = &remap_table[i];
-			break;
-		}
-	}
-
-	return remap_slot;
-}
-
-static void ts_output_free_remap_entry(int sid, int pid)
-{
-	struct remap_entry *remap_slot = ts_output_find_remap_entry(sid, pid);
-
-	if (remap_slot) {
-		remap_slot->status = 0;
-		remap_slot->stream_id = 0;
-		remap_slot->remap_flag = 0;
-		remap_slot->pid = 0;
-		remap_slot->pid_new = 0;
-	}
-}
-
 /**
  * remap pid
  * \param sid: stream id
@@ -1891,35 +1859,6 @@ static void ts_output_free_remap_entry(int sid, int pid)
  */
 int ts_output_remap_pid(int sid, int pid, int new_pid)
 {
-	struct remap_entry *remap_slot = NULL;
-
-	remap_slot = ts_output_find_remap_entry(sid, pid);
-	if (!remap_slot) {
-		if (new_pid < 0)
-			return 0;
-
-		remap_slot = ts_output_allocate_remap_entry();
-		if (!remap_slot) {
-			dprint("%s out of remap entry\n", __func__);
-			return -1;
-		}
-	}
-
-	remap_slot->status = 1;
-	remap_slot->stream_id = sid;
-	remap_slot->remap_flag = 1;
-	remap_slot->pid = pid;
-	remap_slot->pid_new = new_pid;
-
-	pr_dbg("%s id : %d, pid : %d, new pid : %d\n",
-			__func__, remap_slot->pid_entry,
-			remap_slot->pid, remap_slot->pid_new);
-
-	tsout_config_remap_table(remap_slot->pid_entry, sid, pid, new_pid);
-
-	if (new_pid < 0)
-		ts_output_free_remap_entry(sid, pid);
-
 	return 0;
 }
 
@@ -2159,6 +2098,7 @@ int ts_output_close(struct out_elem *pout)
 			dvr_dump_file.file_fp)
 			dump_file_close(&dvr_dump_file);
 		remove_ts_out_list(pout, &ts_out_task_tmp);
+		kfree(pout->cache);
 	}
 
 	if (pout->aucpu_handle >= 0) {
@@ -2220,6 +2160,7 @@ int ts_output_close(struct out_elem *pout)
 	pout->use_external_mem = 0;
 
 	pout->used = 0;
+	pr_dbg("%s end\n", __func__);
 	return 0;
 }
 
@@ -2259,10 +2200,6 @@ int ts_output_add_pid(struct out_elem *pout, int pid, int pid_mask, int dmx_id,
 			dprint("get es entry slot error\n");
 			return -1;
 		}
-          	if (!pout->pchan) {
-			dprint("get pout->pchan error\n");
-			return -1;
-		}
 		es_pes->buff_id = pout->pchan->id;
 		es_pes->pid = pid;
 		es_pes->status = pout->format;
@@ -2274,20 +2211,18 @@ int ts_output_add_pid(struct out_elem *pout, int pid, int pid_mask, int dmx_id,
 		if (pout->pchan->sec_level)
 			create_aucpu_inst(pout);
 		if (pout->type == VIDEO_TYPE) {
-			if (((dump_video_es & 0xFFFF) == pout->es_pes->pid &&
-				((dump_video_es >> 16) & 0xFFFF) == pout->sid) ||
+			if (((dump_video_es & 0xFFFF)  == pout->es_pes->pid &&
+			((dump_video_es >> 16) & 0xFFFF) == pout->sid) ||
 				dump_video_es == 0XFFFFFFFF)
-				dump_file_open(VIDEOES_DUMP_FILE,
-						 &pout->dump_file,	pout->sid,
-						 pout->es_pes->pid,	0);
+			dump_file_open(VIDEOES_DUMP_FILE, &pout->dump_file,
+				pout->sid, pout->es_pes->pid, 0);
 		}
 		if (pout->type == AUDIO_TYPE) {
-			if (((dump_audio_es & 0xFFFF) == pout->es_pes->pid &&
-				((dump_audio_es >> 16) & 0xFFFF) ==	pout->sid) ||
+			if (((dump_audio_es & 0xFFFF)  == pout->es_pes->pid &&
+			((dump_audio_es >> 16) & 0xFFFF) ==	pout->sid) ||
 			   dump_audio_es == 0xFFFFFFFF)
-				dump_file_open(AUDIOES_DUMP_FILE,
-						&pout->dump_file, pout->sid,
-						pout->es_pes->pid, 0);
+			dump_file_open(AUDIOES_DUMP_FILE, &pout->dump_file,
+				pout->sid, pout->es_pes->pid, 0);
 		}
 		tsout_config_es_table(es_pes->buff_id, es_pes->pid,
 				      pout->sid, 1, !drop_dup, pout->format);
@@ -2310,10 +2245,6 @@ int ts_output_add_pid(struct out_elem *pout, int pid, int pid_mask, int dmx_id,
 		pid_slot = _malloc_pid_entry_slot(pout->sid, pid);
 		if (!pid_slot) {
 			pr_dbg("malloc pid entry fail\n");
-			return -1;
-		}
-                if (!pout->pchan) {
-			dprint("get pout->pchan NULL error\n");
 			return -1;
 		}
 		pid_slot->pid = pid;
@@ -2530,7 +2461,8 @@ static void remove_udata(struct cb_entry *tmp_cb, void *udata)
 	/*remove the free feed*/
 	for (i = 0; i <= tmp_cb->ref && i < MAX_FEED_NUM; i++) {
 		if (tmp_cb->udata[i] == udata) {
-			for (j = i; j < tmp_cb->ref && j < (MAX_FEED_NUM - 1); j++)
+			for (j = i; j < tmp_cb->ref && j < MAX_FEED_NUM - 1;
+				j++)
 				tmp_cb->udata[j] = tmp_cb->udata[j + 1];
 		}
 	}
@@ -2804,7 +2736,8 @@ int ts_output_dump_info(char *buf)
 			r = sprintf(buf,
 				    "h rp:0x%0x, h wp:0x%0x, ",
 				    es_slot->pout->pchan1->r_offset,
-					SC2_bufferid_get_wp_offset(es_slot->pout->pchan1));
+					SC2_bufferid_get_wp_offset(
+						es_slot->pout->pchan1));
 			buf += r;
 			total += r;
 

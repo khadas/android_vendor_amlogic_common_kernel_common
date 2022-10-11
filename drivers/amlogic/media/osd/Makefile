@@ -1,16 +1,11 @@
-$(MEDIA_MODULE_NAME)-$(CONFIG_AMLOGIC_MEDIA_FB) += osd/osd_hw.o
-$(MEDIA_MODULE_NAME)-$(CONFIG_AMLOGIC_MEDIA_FB) += osd/osd_fb.o
-$(MEDIA_MODULE_NAME)-$(CONFIG_AMLOGIC_MEDIA_FB) += osd/osd_debug.o
-$(MEDIA_MODULE_NAME)-$(CONFIG_AMLOGIC_MEDIA_FB) += osd/osd_backup.o
-$(MEDIA_MODULE_NAME)-$(CONFIG_AMLOGIC_MEDIA_FB) += osd/osd_logo.o
-$(MEDIA_MODULE_NAME)-$(CONFIG_AMLOGIC_MEDIA_FB) += osd/osd_io.o
-$(MEDIA_MODULE_NAME)-$(CONFIG_AMLOGIC_MEDIA_FB) += osd/osd_antiflicker.o
-$(MEDIA_MODULE_NAME)-$(CONFIG_AMLOGIC_MEDIA_FB) += osd/osd_clone.o
-$(MEDIA_MODULE_NAME)-$(CONFIG_AMLOGIC_MEDIA_FB) += osd/osd_drm.o
-$(MEDIA_MODULE_NAME)-$(CONFIG_AMLOGIC_MEDIA_FB) += osd/osd_rdma.o
-$(MEDIA_MODULE_NAME)-$(CONFIG_AMLOGIC_MEDIA_FB) += osd/osd_virtual.o
-$(MEDIA_MODULE_NAME)-$(CONFIG_AMLOGIC_MEDIA_FB) += osd/osd_sw_sync.o
-$(MEDIA_MODULE_NAME)-$(CONFIG_INSTABOOT) += osd/osd_progressbar.o
+obj-$(CONFIG_AMLOGIC_MEDIA_FB) += fb.o
+fb-objs = osd_hw.o osd_fb.o osd_debug.o osd_backup.o osd_logo.o osd_io.o
+fb-objs += osd_antiflicker.o osd_clone.o
 
-ccflags-y += -I$(srctree)/drivers/amlogic/media/common/ion_dev/
-ccflags-y += -I$(srctree)/drivers/staging/android/
+fb-objs += osd_drm.o osd_virtual.o
+fb-objs += osd_rdma.o osd_sw_sync.o
+
+obj-$(CONFIG_INSTABOOT) += osd_progressbar.o
+
+ccflags-y += -Idrivers/amlogic/media/common/ion_dev/
+ccflags-y += -Idrivers/staging/android/

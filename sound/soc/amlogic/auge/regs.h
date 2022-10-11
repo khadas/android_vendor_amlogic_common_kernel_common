@@ -1,6 +1,18 @@
-/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * sound/soc/amlogic/auge/regs.h
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
 #ifndef __AML_REGS_H_
@@ -56,57 +68,58 @@ struct register_table {
  */
 #define EE_AUDIO_CLK_GATE_EN0              0x000
 #define EE_AUDIO_CLK_GATE_EN1              0x001
-#define EE_AUDIO_MCLK_A_CTRL(offset)       (0x001 + (offset))
-#define EE_AUDIO_MCLK_B_CTRL(offset)       (0x002 + (offset))
-#define EE_AUDIO_MCLK_C_CTRL(offset)       (0x003 + (offset))
-#define EE_AUDIO_MCLK_D_CTRL(offset)       (0x004 + (offset))
-#define EE_AUDIO_MCLK_E_CTRL(offset)       (0x005 + (offset))
-#define EE_AUDIO_MCLK_F_CTRL(offset)       (0x006 + (offset))
-#define EE_AUDIO_MST_PAD_CTRL0(offset)     (0x007 + (offset))
-#define EE_AUDIO_MST_PAD_CTRL1(offset)     (0x008 + (offset))
+#define EE_AUDIO_MCLK_A_CTRL(offset)       (0x001 + offset)
+#define EE_AUDIO_MCLK_B_CTRL(offset)       (0x002 + offset)
+#define EE_AUDIO_MCLK_C_CTRL(offset)       (0x003 + offset)
+#define EE_AUDIO_MCLK_D_CTRL(offset)       (0x004 + offset)
+#define EE_AUDIO_MCLK_E_CTRL(offset)       (0x005 + offset)
+#define EE_AUDIO_MCLK_F_CTRL(offset)       (0x006 + offset)
+#define EE_AUDIO_MST_PAD_CTRL0(offset)     (0x007 + offset)
+#define EE_AUDIO_MST_PAD_CTRL1(offset)     (0x008 + offset)
 
-#define REG_BIT_RESET_PDM				BIT(0)
-#define REG_BIT_RESET_TDMINA				BIT(1)
-#define REG_BIT_RESET_TDMINB				BIT(2)
-#define REG_BIT_RESET_TDMINC				BIT(3)
-#define REG_BIT_RESET_TDMIN_LB				BIT(4)
-#define REG_BIT_RESET_LOOPBACK				BIT(5)
-#define REG_BIT_RESET_TODDRA				BIT(6)
-#define REG_BIT_RESET_TODDRB				BIT(7)
-#define REG_BIT_RESET_TODDRC				BIT(8)
-#define REG_BIT_RESET_FRDDRA				BIT(9)
-#define REG_BIT_RESET_FRDDRB				BIT(10)
-#define REG_BIT_RESET_FRDDRC				BIT(11)
-#define REG_BIT_RESET_TDMOUTA				BIT(12)
-#define REG_BIT_RESET_TDMOUTB				BIT(13)
-#define REG_BIT_RESET_TDMOUTC				BIT(14)
-#define REG_BIT_RESET_SPDIFOUTA				BIT(15)
-#define REG_BIT_RESET_SPDIFOUTB				BIT(16)
-#define REG_BIT_RESET_SPDIFIN				BIT(17)
-#define REG_BIT_RESET_EQDRC				BIT(18)
-#define REG_BIT_RESET_RESAMPLE				BIT(19)
-#define REG_BIT_RESET_DDRARB				BIT(20)
-#define REG_BIT_RESET_POWDET				BIT(21)
-#define REG_BIT_RESET_TORAM				BIT(22)
-#define REG_BIT_RESET_TOACODEC				BIT(23)
-#define REG_BIT_RESET_TOHDMITX				BIT(24)
-#define REG_BIT_RESET_CLKTREE				BIT(25)
-#define REG_BIT_RESET_RESAMPLEB				BIT(26)
-#define REG_BIT_RESET_TOVAD				BIT(27)
-#define REG_BIT_RESET_LOCKER				BIT(28)
-#define REG_BIT_RESET_SPDIFIN_LB			BIT(29)
-#define REG_BIT_RESET_FRATV				BIT(30)
-#define REG_BIT_RESET_FRHDMIRX				BIT(31)
+#define REG_BIT_RESET_PDM				(1)
+#define REG_BIT_RESET_TDMINA				(1 << 1)
+#define REG_BIT_RESET_TDMINB				(1 << 2)
+#define REG_BIT_RESET_TDMINC				(1 << 3)
+#define REG_BIT_RESET_TDMIN_LB				(1 << 4)
+#define REG_BIT_RESET_LOOPBACK				(1 << 5)
+#define REG_BIT_RESET_TODDRA				(1 << 6)
+#define REG_BIT_RESET_TODDRB				(1 << 7)
+#define REG_BIT_RESET_TODDRC				(1 << 8)
+#define REG_BIT_RESET_FRDDRA				(1 << 9)
+#define REG_BIT_RESET_FRDDRB				(1 << 10)
+#define REG_BIT_RESET_FRDDRC				(1 << 11)
+#define REG_BIT_RESET_TDMOUTA				(1 << 12)
+#define REG_BIT_RESET_TDMOUTB				(1 << 13)
+#define REG_BIT_RESET_TDMOUTC				(1 << 14)
+#define REG_BIT_RESET_SPDIFOUTA				(1 << 15)
+#define REG_BIT_RESET_SPDIFOUTB				(1 << 16)
+#define REG_BIT_RESET_SPDIFIN				(1 << 17)
+#define REG_BIT_RESET_EQDRC				(1 << 18)
+#define REG_BIT_RESET_RESAMPLE				(1 << 19)
+#define REG_BIT_RESET_DDRARB				(1 << 20)
+#define REG_BIT_RESET_POWDET				(1 << 21)
+#define REG_BIT_RESET_TORAM				(1 << 22)
+#define REG_BIT_RESET_TOACODEC				(1 << 23)
+#define REG_BIT_RESET_TOHDMITX				(1 << 24)
+#define REG_BIT_RESET_CLKTREE				(1 << 25)
+#define REG_BIT_RESET_RESAMPLEB				(1 << 26)
+#define REG_BIT_RESET_TOVAD				(1 << 27)
+#define REG_BIT_RESET_LOCKER				(1 << 28)
+#define REG_BIT_RESET_SPDIFIN_LB			(1 << 29)
+#define REG_BIT_RESET_FRATV				(1 << 30)
+#define REG_BIT_RESET_FRHDMIRX				(1 << 31)
 
-#define EE_AUDIO_SW_RESET0(offset)         (0x009 + (offset))
+#define EE_AUDIO_SW_RESET0(offset)         (0x009 + offset)
 
-#define REG_BIT_RESET_FRDDRD				BIT(0)
-#define REG_BIT_RESET_TODDRD				BIT(1)
-#define REG_BIT_RESET_LOOPBACKB				BIT(2)
+#define REG_BIT_RESET_FRDDRD				(1)
+#define REG_BIT_RESET_TODDRD				(1 << 1)
+#define REG_BIT_RESET_LOOPBACKB				(1 << 2)
 
 #define EE_AUDIO_SW_RESET1                 0x00b
 #define EE_AUDIO_CLK81_CTRL                0x00c
 #define EE_AUDIO_CLK81_EN                  0x00d
+
 
 #define EE_AUDIO_MST_A_SCLK_CTRL0          0x010
 #define EE_AUDIO_MST_A_SCLK_CTRL1          0x011
@@ -648,7 +661,6 @@ struct register_table {
 #define EE_AUDIO_FRHDMIRX_CTRL3            0x203
 #define EE_AUDIO_FRHDMIRX_CTRL4            0x204
 #define EE_AUDIO_FRHDMIRX_CTRL5            0x205
-#define EE_AUDIO_FRHDMIRX_CTRL6            0x206
 #define EE_AUDIO_FRHDMIRX_STAT0            0x20a
 #define EE_AUDIO_FRHDMIRX_STAT1            0x20b
 
@@ -1227,17 +1239,6 @@ struct register_table {
 #define EARCRX_ERR_CORRECT_STAT0           0x017
 #define EARCRX_ANA_RST_CTRL0               0x018
 #define EARCRX_ANA_RST_CTRL1               0x019
-#define EARCRX_SPDIFIN_CTRL4               0x020
-#define EARCRX_SPDIFIN_CTRL5               0x021
-#define EARCRX_SPDIFIN_CTRL6               0x022
-#define EARCRX_DMAC_SYNC_CTRL1             0x023
-#define EARCRX_SPDIFIN_SAMPLE_CTRL6        0x024
-#define EARCRX_DMAC_SYNC_CTRL3             0x025
-#define EARCRX_DMAC_SYNC_CTRL4             0x026
-#define EARCRX_DMAC_SYNC_CTRL5             0x027
-#define EARCRX_DMAC_SYNC_STAT1             0x028
-#define EARCRX_DMAC_SYNC_STAT2             0x029
-#define EARCRX_DMAC_SYNC_STAT3             0x02a
 /* eARC TX DMAC */
 #define EARCTX_DMAC_TOP_CTRL0              0x000
 #define EARCTX_MUTE_VAL                    0x001
@@ -1345,54 +1346,6 @@ struct register_table {
 #define EE_AUDIO_RSAMP_B_CHNUM_ID6         0x366
 #define EE_AUDIO_RSAMP_B_CHNUM_ID7         0x367
 #define EE_AUDIO_RSAMP_B_CHSYNC_CTRL       0x36F
-
-/* AUDIO_TOP_VAD */
-#define EE_AUDIO2_CLK81_CTRL               0x000
-#define EE_AUDIO2_CLK81_EN                 0x001
-#define EE_AUDIO2_SW_RESET0                0x002
-#define EE_AUDIO2_CLK_GATE_EN0             0x003
-#define EE_AUDIO2_SECURITY_CTRL0           0x004
-#define EE_AUDIO2_MCLK_VAD_CTRL            0x010
-#define EE_AUDIO2_CLK_VAD_CTRL             0x011
-#define EE_AUDIO2_MST_DLY_CTRL0            0x012
-#define EE_AUDIO2_MST_VAD_SCLK_CTRL0       0x013
-#define EE_AUDIO2_MST_VAD_SCLK_CTRL1       0x014
-#define EE_AUDIO2_CLK_TDMIN_VAD_CTRL       0x015
-#define EE_AUDIO2_CLK_PDMIN_CTRL0          0x016
-#define EE_AUDIO2_CLK_PDMIN_CTRL1          0x017
-#define EE_AUDIO2_TOVAD_CTRL0              0x020
-#define EE_AUDIO2_TODDR_VAD_CTRL0          0x030
-#define EE_AUDIO2_TODDR_VAD_CTRL1          0x031
-#define EE_AUDIO2_TODDR_VAD_CTRL2          0x032
-#define EE_AUDIO2_TODDR_VAD_START_ADDR     0x033
-#define EE_AUDIO2_TODDR_VAD_INIT_ADDR      0x034
-#define EE_AUDIO2_TODDR_VAD_FINISH_ADDR    0x035
-#define EE_AUDIO2_TODDR_VAD_START_ADDRB    0x036
-#define EE_AUDIO2_TODDR_VAD_FINISH_ADDRB   0x037
-#define EE_AUDIO2_TODDR_VAD_INT_ADDR       0x038
-#define EE_AUDIO2_TODDR_VAD_STATUS1        0x039
-#define EE_AUDIO2_TODDR_VAD_STATUS2        0x03a
-#define EE_AUDIO2_TDMIN_VAD_CTRL           0x040
-#define EE_AUDIO2_TDMIN_VAD_SWAP0          0x041
-#define EE_AUDIO2_TDMIN_VAD_SWAP1          0x042
-#define EE_AUDIO2_TDMIN_VAD_MUTE_VAL       0x043
-#define EE_AUDIO2_TDMIN_VAD_STAT           0x044
-#define EE_AUDIO2_TDMIN_VAD_MUTE0          0x050
-#define EE_AUDIO2_TDMIN_VAD_MUTE1          0x051
-#define EE_AUDIO2_TDMIN_VAD_MUTE2          0x052
-#define EE_AUDIO2_TDMIN_VAD_MUTE3          0x053
-#define EE_AUDIO2_TDMIN_VAD_MUTE4          0x054
-#define EE_AUDIO2_TDMIN_VAD_MUTE5          0x055
-#define EE_AUDIO2_TDMIN_VAD_MUTE6          0x056
-#define EE_AUDIO2_TDMIN_VAD_MUTE7          0x057
-#define EE_AUDIO2_TDMIN_VAD_MASK0          0x058
-#define EE_AUDIO2_TDMIN_VAD_MASK1          0x059
-#define EE_AUDIO2_TDMIN_VAD_MASK2          0x05a
-#define EE_AUDIO2_TDMIN_VAD_MASK3          0x05b
-#define EE_AUDIO2_TDMIN_VAD_MASK4          0x05c
-#define EE_AUDIO2_TDMIN_VAD_MASK5          0x05d
-#define EE_AUDIO2_TDMIN_VAD_MASK6          0x05e
-#define EE_AUDIO2_TDMIN_VAD_MASK7          0x05f
 
 /* 64 exception irq */
 #define EE_AUDIO_EXCEPTION_IRQ_STS0        0x380

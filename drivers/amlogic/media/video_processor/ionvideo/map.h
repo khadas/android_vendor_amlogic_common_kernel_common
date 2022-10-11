@@ -1,6 +1,18 @@
-/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/amlogic/media/video_processor/ionvideo/map.h
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
 #ifndef __ASM_MACH_MAP_H
@@ -30,24 +42,24 @@ struct map_desc {
 #define MT_MEMORY_DMA_READY	15
 
 #ifdef CONFIG_MMU
-void iotable_init(struct map_desc *io_desc, int nr);
-void vm_reserve_area_early(unsigned long addr, unsigned long size,
-			   void *caller);
+extern void iotable_init(struct map_desc *io_desc, int nr);
+extern void vm_reserve_area_early(unsigned long addr, unsigned long size,
+				  void *caller);
 
 #ifdef CONFIG_DEBUG_LL
-void debug_ll_addr(unsigned long *paddr, unsigned long *vaddr);
-void debug_ll_io_init(void);
+extern void debug_ll_addr(unsigned long *paddr, unsigned long *vaddr);
+extern void debug_ll_io_init(void);
 #else
 static inline void debug_ll_io_init(void) {}
 #endif
 
 struct mem_type;
-const struct mem_type *get_mem_type(unsigned int type);
+extern const struct mem_type *get_mem_type(unsigned int type);
 /*
  * external interface to remap single page with appropriate type
  */
-int ioremap_page(unsigned long virt, unsigned long phys,
-		 const struct mem_type *mtype);
+extern int ioremap_page(unsigned long virt, unsigned long phys,
+			const struct mem_type *mtype);
 #else
 #define iotable_init(map, num)	do { } while (0)
 #define vm_reserve_area_early(a, s, c)	do { } while (0)

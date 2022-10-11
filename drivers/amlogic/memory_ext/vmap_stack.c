@@ -1,6 +1,18 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/amlogic/memory_ext/vmap_stack.c
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
 #include <linux/version.h>
@@ -19,11 +31,9 @@
 #include <linux/vmalloc.h>
 #include <linux/arm-smccc.h>
 #include <linux/memcontrol.h>
-#include <linux/kthread.h>
 #include <linux/amlogic/vmap_stack.h>
 #include <linux/highmem.h>
 #include <linux/delay.h>
-#include <linux/sched/task_stack.h>
 #ifdef CONFIG_KASAN
 #include <linux/kasan.h>
 #endif
@@ -34,10 +44,10 @@
 
 #define D(format, args...)					\
 	{ if (DEBUG)						\
-		pr_info("VMAP:%s " format, __func__, ##args);	\
+		pr_info("VMAP:%s "format, __func__, ##args);	\
 	}
 
-#define E(format, args...)	pr_err("VMAP:%s " format, __func__, ##args)
+#define E(format, args...)	pr_err("VMAP:%s "format, __func__, ##args)
 
 static unsigned long stack_shrink_jiffies;
 static unsigned char vmap_shrink_enable;
@@ -45,21 +55,18 @@ static atomic_t vmap_stack_size;
 static atomic_t vmap_fault_count;
 static atomic_t vmap_pre_handle_count;
 static struct aml_vmap *avmap;
-static atomic_t vmap_cache_flag;
 
 #ifdef CONFIG_ARM64
-DEFINE_PER_CPU(unsigned long [THREAD_SIZE / sizeof(long)], vmap_stack)
-	__aligned(PAGE_SIZE);
+DEFINE_PER_CPU(unsigned long [THREAD_SIZE/sizeof(long)], vmap_stack)
+	__aligned(16);
 #else
-static unsigned long irq_stack1[(THREAD_SIZE / sizeof(long))]
+static unsigned long irq_stack1[(THREAD_SIZE/sizeof(long))]
 				__aligned(THREAD_SIZE);
 void *irq_stack[NR_CPUS] = {
 	irq_stack1,	/* only assign 1st irq stack ,other need alloc */
 };
-
-static unsigned long vmap_stack1[(THREAD_SIZE / sizeof(long))]
+static unsigned long vmap_stack1[(THREAD_SIZE/sizeof(long))]
 				__aligned(THREAD_SIZE);
-
 static void *vmap_stack[NR_CPUS] = {
 	vmap_stack1,	/* only assign 1st vmap stack ,other need alloc */
 };
@@ -76,6 +83,17 @@ int get_vmap_stack_size(void)
 	return atomic_read(&vmap_stack_size);
 }
 EXPORT_SYMBOL(get_vmap_stack_size);
+
+#ifdef CONFIG_ARM64
+bool on_vmap_stack(unsigned long sp, int cpu)
+{
+	/* variable names the same as kernel/stacktrace.c */
+	unsigned long low = (unsigned long)per_cpu(vmap_stack, cpu);
+	unsigned long high = low + THREAD_START_SP;
+
+	return (low <= sp && sp <= high);
+}
+#endif
 
 #ifdef CONFIG_ARM
 void notrace __setup_vmap_stack(unsigned long cpu)
@@ -121,7 +139,7 @@ void notrace __setup_vmap_stack(unsigned long cpu)
 	);
 }
 
-int on_vmap_irq_stack(unsigned long sp, int cpu)
+int on_irq_stack(unsigned long sp, int cpu)
 {
 	unsigned long sp_irq;
 
@@ -135,7 +153,7 @@ unsigned long notrace irq_stack_entry(unsigned long sp)
 {
 	int cpu = raw_smp_processor_id();
 
-	if (!on_vmap_irq_stack(sp, cpu)) {
+	if (!on_irq_stack(sp, cpu)) {
 		unsigned long sp_irq = (unsigned long)irq_stack[cpu];
 		void *src, *dst;
 
@@ -219,7 +237,7 @@ int is_vmap_addr(unsigned long addr)
 
 	start = (unsigned long)avmap->root_vm->addr;
 	end   = (unsigned long)avmap->root_vm->addr + avmap->root_vm->size;
-	if (addr >= start && addr < end)
+	if ((addr >= start) && (addr < end))
 		return 1;
 	else
 		return 0;
@@ -320,18 +338,18 @@ static int vmap_mmu_set(struct page *page, unsigned long addr, int set)
 		pte_clear(&init_mm, addr, pte);
 	flush_tlb_kernel_range(addr, addr + PAGE_SIZE);
 #ifdef CONFIG_ARM64
-	D("add:%lx, pgd:%px %llx, pmd:%px %llx, pte:%px %llx\n",
+	D("add:%lx, pgd:%p %llx, pmd:%p %llx, pte:%p %llx\n",
 		addr, pgd, pgd_val(*pgd), pmd, pmd_val(*pmd),
 		pte, pte_val(*pte));
 #elif defined(CONFIG_ARM)
-	D("add:%lx, pgd:%px %x, pmd:%px %x, pte:%px %x\n",
+	D("add:%lx, pgd:%p %x, pmd:%p %x, pte:%p %x\n",
 		addr, pgd, (unsigned int)pgd_val(*pgd),
 		pmd, (unsigned int)pmd_val(*pmd),
 		pte, pte_val(*pte));
 #endif
 	return 0;
 nomem:
-	E("allocation page talbe failed, G:%px, U:%px, M:%px, T:%px",
+	E("allocation page talbe failed, G:%p, U:%p, M:%p, T:%p",
 		pgd, pud, pmd, pte);
 	return -ENOMEM;
 }
@@ -374,8 +392,8 @@ static void dump_backtrace_entry(unsigned long ip, unsigned long fp,
 		if (fp_size >= THREAD_SIZE)
 			fp_size = 0;
 	}
-	pr_info("[%016lx+%4ld][<%px>] %pS\n",
-		fp, fp_size, (void *)ip, (void *)ip);
+	pr_info("[%016lx+%4ld][<%p>] %pS\n",
+		fp, fp_size, (void *) ip, (void *) ip);
 #elif defined(CONFIG_ARM)
 	if (fp >= TASK_SIZE) {
 		fp_size = fp - sp + 4;
@@ -383,47 +401,42 @@ static void dump_backtrace_entry(unsigned long ip, unsigned long fp,
 		if (fp_size >= THREAD_SIZE)
 			fp_size = 0;
 	}
-	pr_info("[%08lx+%4ld][<%px>] %pS\n",
-		fp, fp_size, (void *)ip, (void *)ip);
+	pr_info("[%08lx+%4ld][<%p>] %pS\n",
+		fp, fp_size, (void *) ip, (void *) ip);
 #endif
 }
 
 static noinline void show_fault_stack(unsigned long addr, struct pt_regs *regs)
 {
 	struct stackframe frame;
-	unsigned long sp;
 
 #ifdef CONFIG_ARM64
 	frame.fp = regs->regs[29];
-	frame.prev_fp = addr;
+	frame.sp = addr;
 	frame.pc = (unsigned long)regs->regs[30];
-	sp = addr;
-	frame.prev_type = STACK_TYPE_UNKNOWN;
 #elif defined(CONFIG_ARM)
 	frame.fp = regs->ARM_fp;
 	frame.sp = regs->ARM_sp;
 	frame.lr = regs->ARM_lr;
 	frame.pc = (unsigned long)regs->uregs[15];
-	sp = regs->ARM_sp;
 #endif
 
 	pr_info("Addr:%lx, Call trace:\n", addr);
 #ifdef CONFIG_ARM64
-	pr_info("[%016lx+%4ld][<%px>] %pS\n",
-		addr, frame.fp - addr, (void *)regs->pc, (void *)regs->pc);
+	pr_info("[%016lx+%4ld][<%p>] %pS\n",
+		addr, frame.fp - addr, (void *)regs->pc, (void *) regs->pc);
 #elif defined(CONFIG_ARM)
-	pr_info("[%08lx+%4ld][<%px>] %pS\n",
+	pr_info("[%08lx+%4ld][<%p>] %pS\n",
 		addr, frame.fp - addr, (void *)regs->uregs[15],
-		(void *)regs->uregs[15]);
+		(void *) regs->uregs[15]);
 #endif
 	while (1) {
 		int ret;
 
+		dump_backtrace_entry(frame.pc, frame.fp, frame.sp);
 	#ifdef CONFIG_ARM64
-		dump_backtrace_entry(frame.pc, frame.fp, sp);
 		ret = unwind_frame(current, &frame);
 	#elif defined(CONFIG_ARM)
-		dump_backtrace_entry(frame.pc, frame.fp, frame.sp);
 		ret = unwind_frame(&frame);
 	#endif
 		if (ret < 0)
@@ -467,7 +480,7 @@ static void check_sp_fault_again(struct pt_regs *regs)
 		vmap_mmu_set(page, addr, 1);
 		update_vmap_stack(1);
 	#ifndef CONFIG_KASAN
-		if (THREAD_SIZE_ORDER > 1 && stack_floor_page(addr)) {
+		if ((THREAD_SIZE_ORDER > 1) && stack_floor_page(addr)) {
 			E("task:%d %s, stack near overflow, addr:%lx\n",
 				current->pid, current->comm, addr);
 			show_fault_stack(addr, regs);
@@ -476,7 +489,7 @@ static void check_sp_fault_again(struct pt_regs *regs)
 
 		/* cache is not enough */
 		if (cache <= (VMAP_CACHE_PAGE / 2))
-			atomic_inc(&vmap_cache_flag);
+			mod_delayed_work(system_highpri_wq, &avmap->mwork, 0);
 
 		D("map page:%5lx for addr:%lx\n", page_to_pfn(page), addr);
 		atomic_inc(&vmap_pre_handle_count);
@@ -503,12 +516,12 @@ int handle_vmap_fault(unsigned long addr, unsigned int esr,
 	D("addr:%lx, esr:%x, task:%5d %s\n",
 		addr, esr, current->pid, current->comm);
 #ifdef CONFIG_ARM64
-	D("pc:%ps, %llx, lr:%ps, %llx, sp:%llx, %lx\n",
+	D("pc:%pf, %llx, lr:%pf, %llx, sp:%llx, %lx\n",
 		(void *)regs->pc, regs->pc,
 		(void *)regs->regs[30], regs->regs[30], regs->sp,
 		current_stack_pointer);
 #elif defined(CONFIG_ARM)
-	D("pc:%ps, %lx, lr:%ps, %lx, sp:%lx, %lx\n",
+	D("pc:%pf, %lx, lr:%pf, %lx, sp:%lx, %lx\n",
 		(void *)regs->uregs[15], regs->uregs[15],
 		(void *)regs->uregs[14], regs->uregs[14], regs->uregs[13],
 		current_stack_pointer);
@@ -517,15 +530,15 @@ int handle_vmap_fault(unsigned long addr, unsigned int esr,
 	if (check_addr_up_flow(addr)) {
 		E("address %lx out of range\n", addr);
 	#ifdef CONFIG_ARM64
-		E("PC is:%llx, %ps, LR is:%llx %ps\n",
+		E("PC is:%llx, %pf, LR is:%llx %pf\n",
 			regs->pc, (void *)regs->pc,
 			regs->regs[30], (void *)regs->regs[30]);
 	#elif defined(CONFIG_ARM)
-		E("PC is:%lx, %ps, LR is:%lx %ps\n",
+		E("PC is:%lx, %pf, LR is:%lx %pf\n",
 			regs->uregs[15], (void *)regs->uregs[15],
 			regs->uregs[14], (void *)regs->uregs[14]);
 	#endif
-		E("task:%d %s, stack:%px, %lx\n",
+		E("task:%d %s, stack:%p, %lx\n",
 			current->pid, current->comm, current->stack,
 			current_stack_pointer);
 		show_fault_stack(addr, regs);
@@ -550,7 +563,7 @@ int handle_vmap_fault(unsigned long addr, unsigned int esr,
 	WARN_ON(!page);
 	vmap_mmu_set(page, addr, 1);
 	update_vmap_stack(1);
-	if (THREAD_SIZE_ORDER > 1 && stack_floor_page(addr)) {
+	if ((THREAD_SIZE_ORDER > 1) && stack_floor_page(addr)) {
 		E("task:%d %s, stack near overflow, addr:%lx\n",
 			current->pid, current->comm, addr);
 		show_fault_stack(addr, regs);
@@ -558,7 +571,7 @@ int handle_vmap_fault(unsigned long addr, unsigned int esr,
 
 	/* cache is not enough */
 	if (cache <= (VMAP_CACHE_PAGE / 2))
-		atomic_inc(&vmap_cache_flag);
+		mod_delayed_work(system_highpri_wq, &avmap->mwork, 0);
 
 	atomic_inc(&vmap_fault_count);
 	D("map page:%5lx for addr:%lx\n", page_to_pfn(page), addr);
@@ -572,7 +585,7 @@ EXPORT_SYMBOL(handle_vmap_fault);
 static unsigned long vmap_shrink_count(struct shrinker *s,
 				  struct shrink_control *sc)
 {
-	return global_zone_page_state(NR_KERNEL_STACK_KB);
+	return global_page_state(NR_KERNEL_STACK_KB);
 }
 
 static int shrink_vm_stack(unsigned long low, unsigned long high)
@@ -590,7 +603,7 @@ static int shrink_vm_stack(unsigned long low, unsigned long high)
 	return pages;
 }
 
-void vmap_report_meminfo(struct seq_file *m)
+void arch_report_meminfo(struct seq_file *m)
 {
 	unsigned long kb = 1 << (PAGE_SHIFT - 10);
 	unsigned long tmp1, tmp2, tmp3;
@@ -680,24 +693,27 @@ void aml_account_task_stack(struct task_struct *tsk, int account)
 		mod_zone_page_state(page_zone(first_page), NR_KERNEL_STACK_KB,
 				    THREAD_SIZE / 1024 * account);
 
+		memcg_kmem_update_page_stat(first_page, MEMCG_KERNEL_STACK_KB,
+					    account * (THREAD_SIZE / 1024));
 		update_vmap_stack(account * (THREAD_SIZE / PAGE_SIZE));
-		mod_memcg_obj_state((void *)stack, MEMCG_KERNEL_STACK_KB,
-				    account * (THREAD_SIZE / 1024));
 		return;
 	}
 	stack += STACK_TOP_PAGE_OFF;
 	first_page = vmalloc_to_page((void *)stack);
 	mod_zone_page_state(page_zone(first_page), NR_KERNEL_STACK_KB,
 			    THREAD_SIZE / 1024 * account);
+
+	memcg_kmem_update_page_stat(first_page, MEMCG_KERNEL_STACK_KB,
+				    account * (THREAD_SIZE / 1024));
 	if (time_after(jiffies, vmap_debug_jiff + HZ * 5)) {
 		int ratio, rem;
 
 		vmap_debug_jiff = jiffies;
 		ratio = ((get_vmap_stack_size() << (PAGE_SHIFT - 10)) * 10000) /
-			global_zone_page_state(NR_KERNEL_STACK_KB);
+			global_page_state(NR_KERNEL_STACK_KB);
 		rem   = ratio % 100;
 		D("STACK:%ld KB, vmap:%d KB, cached:%d KB, rate:%2d.%02d%%\n",
-			global_zone_page_state(NR_KERNEL_STACK_KB),
+			global_page_state(NR_KERNEL_STACK_KB),
 			get_vmap_stack_size() << (PAGE_SHIFT - 10),
 			avmap->cached_pages << (PAGE_SHIFT - 10),
 			ratio / 100, rem);
@@ -705,7 +721,7 @@ void aml_account_task_stack(struct task_struct *tsk, int account)
 }
 
 #ifdef CONFIG_KASAN
-DEFINE_MUTEX(stack_shadow_lock);	/* For kasan */
+DEFINE_MUTEX(stack_shadow_lock);
 static void check_and_map_stack_shadow(unsigned long addr)
 {
 	unsigned long shadow;
@@ -715,14 +731,14 @@ static void check_and_map_stack_shadow(unsigned long addr)
 	shadow = (unsigned long)kasan_mem_to_shadow((void *)addr);
 	page   = check_pte_exist(shadow);
 	if (page) {
-		WARN(page_address(page) == (void *)kasan_early_shadow_page,
-		     "bad pte, page:%px, %lx, addr:%lx\n",
+		WARN(page_address(page) == (void *)kasan_zero_page,
+		     "bad pte, page:%p, %lx, addr:%lx\n",
 		     page_address(page), page_to_pfn(page), addr);
 		return;
 	}
 	shadow = shadow & PAGE_MASK;
 	page   = alloc_page(GFP_KERNEL | __GFP_HIGHMEM |
-			    __GFP_ZERO | __GFP_HIGH);
+			    __GFP_ZERO | __GFP_REPEAT);
 	if (!page) {
 		WARN(!page,
 		     "alloc page for addr:%lx, shadow:%lx fail\n",
@@ -833,58 +849,42 @@ void aml_stack_free(struct task_struct *tsk)
 	spin_unlock_irqrestore(&avmap->vmap_lock, flags);
 }
 
-/*
- * page cache maintain task for vmap
- */
-static int vmap_task(void *data)
+static void page_cache_maintain_work(struct work_struct *work)
 {
 	struct page *page;
 	struct list_head head;
 	int i, cnt;
 	unsigned long flags;
-	struct aml_vmap *v = (struct aml_vmap *)data;
 
-	set_user_nice(current, -19);
-	while (1) {
-		if (kthread_should_stop())
-			break;
-
-		if (!atomic_read(&vmap_cache_flag)) {
-			msleep(20);
-			continue;
-		}
-		spin_lock_irqsave(&v->page_lock, flags);
-		cnt = v->cached_pages;
-		spin_unlock_irqrestore(&v->page_lock, flags);
-		if (cnt >= VMAP_CACHE_PAGE) {
-			D("cache full cnt:%d\n", cnt);
-			continue;
-		}
-
-		INIT_LIST_HEAD(&head);
-		for (i = 0; i < VMAP_CACHE_PAGE - cnt; i++) {
-			page = alloc_page(GFP_KERNEL | __GFP_HIGHMEM |
-					  __GFP_ZERO | __GFP_HIGH);
-			if (!page) {
-				E("get page failed, allocated:%d, cnt:%d\n",
-				  i, cnt);
-				break;
-			}
-			list_add(&page->lru, &head);
-		}
-		spin_lock_irqsave(&v->page_lock, flags);
-		list_splice(&head, &v->list);
-		v->cached_pages += i;
-		spin_unlock_irqrestore(&v->page_lock, flags);
-		atomic_set(&vmap_cache_flag, 0);
-		E("add %d pages, cnt:%d\n", i, cnt);
+	spin_lock_irqsave(&avmap->page_lock, flags);
+	cnt = avmap->cached_pages;
+	spin_unlock_irqrestore(&avmap->page_lock, flags);
+	if (cnt >= VMAP_CACHE_PAGE) {
+		D("cache full cnt:%d\n", cnt);
+		schedule_delayed_work(&avmap->mwork, CACHE_MAINTAIN_DELAY);
+		return;
 	}
-	return 0;
+
+	INIT_LIST_HEAD(&head);
+	for (i = 0; i < VMAP_CACHE_PAGE - cnt; i++) {
+		page = alloc_page(GFP_KERNEL | __GFP_HIGHMEM |  __GFP_ZERO);
+		if (!page) {
+			E("get page failed, allocated:%d, cnt:%d\n", i, cnt);
+			break;
+		}
+		list_add(&page->lru, &head);
+	}
+	spin_lock_irqsave(&avmap->page_lock, flags);
+	list_splice(&head, &avmap->list);
+	avmap->cached_pages += i;
+	spin_unlock_irqrestore(&avmap->page_lock, flags);
+	D("add %d pages, cnt:%d\n", i, cnt);
+	schedule_delayed_work(&avmap->mwork, CACHE_MAINTAIN_DELAY);
 }
 
 int __init start_thread_work(void)
 {
-	kthread_run(vmap_task, avmap, "vmap_thread");
+	schedule_delayed_work(&avmap->mwork, CACHE_MAINTAIN_DELAY);
 	return 0;
 }
 arch_initcall(start_thread_work);
@@ -901,7 +901,7 @@ void __init thread_stack_cache_init(void)
 	if (!page)
 		return;
 
-	avmap = kzalloc(sizeof(*avmap), GFP_KERNEL);
+	avmap = kzalloc(sizeof(struct aml_vmap), GFP_KERNEL);
 	if (!avmap) {
 		__free_pages(page, VMAP_CACHE_PAGE_ORDER);
 		return;
@@ -913,7 +913,7 @@ void __init thread_stack_cache_init(void)
 		kfree(avmap);
 		return;
 	}
-	pr_info("%s, vmap:%px, bitmap:%px, cache page:%lx\n",
+	pr_info("%s, vmap:%p, bitmap:%p, cache page:%lx\n",
 		__func__, avmap, avmap->bitmap, page_to_pfn(page));
 #ifdef CONFIG_KASAN
 	align = PGDIR_SIZE << KASAN_SHADOW_SCALE_SHIFT;
@@ -946,7 +946,7 @@ void __init thread_stack_cache_init(void)
 		kfree(avmap);
 		return;
 	}
-	pr_info("%s, allocation vm area:%px, addr:%px, size:%lx\n", __func__,
+	pr_info("%s, allocation vm area:%p, addr:%p, size:%lx\n", __func__,
 		avmap->root_vm, avmap->root_vm->addr,
 		avmap->root_vm->size);
 
@@ -959,11 +959,11 @@ void __init thread_stack_cache_init(void)
 		page++;
 	}
 	avmap->cached_pages = VMAP_CACHE_PAGE;
+	INIT_DELAYED_WORK(&avmap->mwork, page_cache_maintain_work);
 
 #ifdef CONFIG_ARM64
 	for_each_possible_cpu(i) {
 		unsigned long addr;
-
 		addr = (unsigned long)per_cpu_ptr(vmap_stack, i);
 		pr_info("cpu %d, vmap_stack:[%lx-%lx]\n",
 			i, addr, addr + THREAD_START_SP);

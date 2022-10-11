@@ -1,1 +1,2 @@
-$(MEDIA_MODULE_NAME)-$(CONFIG_AMLOGIC_MEDIA_VIUIN) += vin/tvin/viu/viuin.o
+obj-$(CONFIG_AMLOGIC_MEDIA_VIUIN) += tvin_viuin.o
+tvin_viuin-objs := viuin.o

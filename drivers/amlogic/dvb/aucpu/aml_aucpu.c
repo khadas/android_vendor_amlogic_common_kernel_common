@@ -1,6 +1,18 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/amlogic/dvb/aucpu/aml_aucpu.c
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
 #include <linux/kernel.h>
@@ -622,12 +634,12 @@ unsigned long sec_fw_cmd(u32 type, void *fw, size_t size)
 	void __iomem *sharemem_input_base;
 	long sharemem_phy_input_base;
 
-	sharemem_input_base = get_meson_sm_input_base();
+	sharemem_input_base = get_secmon_sharemem_input_base();
 	sharemem_phy_input_base = get_secmon_phy_input_base();
-	if (!sharemem_input_base || !sharemem_phy_input_base)
+	if ((!sharemem_input_base) || (!sharemem_phy_input_base))
 		return -1;
 
-	meson_sm_mutex_lock();
+	sharemem_mutex_lock();
 	if (size)
 		memcpy(sharemem_input_base,
 			(const void *)fw, size);
@@ -635,7 +647,7 @@ unsigned long sec_fw_cmd(u32 type, void *fw, size_t size)
 	//asm __volatile__("" : : : "memory");
 
 	arm_smccc_smc(FID_FW_LOAD, type, size, 0, 0, 0, 0, 0, &smccc);
-	meson_sm_mutex_unlock();
+	sharemem_mutex_unlock();
 
 	return smccc.a0;
 }
@@ -1126,18 +1138,14 @@ static ssize_t aucpu_status_show(struct class *cla,
 	return pbuf - buf;
 }
 
-static CLASS_ATTR_RO(aucpu_status);
-
-static struct attribute *aucpu_class_attrs[] = {
-	&class_attr_aucpu_status.attr,
-	NULL
+static struct class_attribute aucpu_status_class_attrs[] = {
+	__ATTR(aucpu_status, 0644, aucpu_status_show, NULL),
+	__ATTR_NULL
 };
-
-ATTRIBUTE_GROUPS(aucpu_class);
 
 static struct class aucpu_class = {
 	.name = AUCPU_CLASS_NAME,
-	.class_groups = aucpu_class_groups,
+	.class_attrs = aucpu_status_class_attrs,
 };
 
 s32 init_Aucpu_device(void)
@@ -1147,11 +1155,15 @@ s32 init_Aucpu_device(void)
 	r = register_chrdev(0, AUCPU_DEV_NAME, &aucpu_fops);
 	if (r <= 0) {
 		aucpu_pr(LOG_ERROR, "register aucpu device error.\n");
-		return  -1;
+		return  r;
 	}
 	s_aucpu_major = r;
 
 	r = class_register(&aucpu_class);
+	if (r < 0) {
+		aucpu_pr(LOG_ERROR, "error create multienc class.\n");
+		return r;
+	}
 	s_register_flag = 1;
 	aucpu_dev = device_create(&aucpu_class, NULL, MKDEV(s_aucpu_major, 0),
 				  NULL, AUCPU_DEV_NAME);
@@ -1161,7 +1173,7 @@ s32 init_Aucpu_device(void)
 		class_unregister(&aucpu_class);
 		return -1;
 	}
-	return 0;
+	return r;
 }
 
 s32 uninit_Aucpu_device(void)
@@ -1288,7 +1300,7 @@ static s32 aucpu_probe(struct platform_device *pdev)
 		} else {
 			pctx->aucpu_reg.phys_addr = AUCPU_REG_BASE_ADDR;
 			pctx->aucpu_reg.base =
-				(ulong)ioremap_nocache(pctx->aucpu_reg.phys_addr,
+			(ulong)ioremap_nocache(pctx->aucpu_reg.phys_addr,
 				AUCPU_REG_SIZE);
 
 			pctx->aucpu_reg.size = AUCPU_REG_SIZE;

@@ -20,7 +20,7 @@
 #include <linux/err.h>
 #include <linux/seq_file.h>
 #include <linux/debugfs.h>
-#include <linux/sched/clock.h>
+
 #include "di_data.h"
 
 #include "di_reg_tab.h"
@@ -44,7 +44,7 @@
 
 #undef TRACE_INCLUDE_PATH
 #undef TRACE_INCLUDE_FILE
-#define TRACE_INCLUDE_PATH ../../drivers/amlogic/media/di_multi
+#define TRACE_INCLUDE_PATH .
 #define TRACE_INCLUDE_FILE dim_trace
 #include <trace/define_trace.h>
 
@@ -117,22 +117,6 @@ static void trace_irq_aisr(unsigned int index)
 
 	ustime = cur_to_usecs();
 	trace_dim_irq_aisr("PRE-AISR-1", index, ustime);
-}
-
-static void trace_irq_dct(unsigned int index)
-{
-	u64 ustime;
-
-	ustime = cur_to_usecs();
-	trace_dim_irq_dct("PRE-DIRQ-1", index, ustime);
-}
-
-static void trace_dct_set(unsigned int index)
-{
-	u64 ustime;
-
-	ustime = cur_to_usecs();
-	trace_dim_dct_set("PRE-DCTS-1", index, ustime);
 }
 
 #define DI_TRACE_LIMIT		50
@@ -289,8 +273,6 @@ const struct dim_tr_ops_s dim_tr_ops = {
 	.sct_tail  = trace_msct_tail,
 	.self_trig = trace_slef_trig,
 	.irq_aisr = trace_irq_aisr,
-	.irq_dct = trace_irq_dct,
-	.dct_set = trace_dct_set,
 };
 
 /*keep same order as enum EDBG_TIMER*/
@@ -300,8 +282,6 @@ static const char * const dbg_timer_name[] = {
 	"unreg_b",
 	"unreg_e",
 	"1_peek",
-	"dct_b",
-	"dct_e",
 	"1_get",
 	"2_get",
 	"3_get",
@@ -336,7 +316,8 @@ void dbg_timer(unsigned int ch, enum EDBG_TIMER item)
 		return;
 	if (item == EDBG_TIMER_MEM_1) {
 		if (pch->dbg_data.timer_mem_alloc_cnt < 5) {
-			tmp = EDBG_TIMER_MEM_1 + pch->dbg_data.timer_mem_alloc_cnt;
+			tmp = EDBG_TIMER_MEM_1 +
+				pch->dbg_data.timer_mem_alloc_cnt;
 			pch->dbg_data.ms_dbg[tmp] = ustime;
 			pch->dbg_data.timer_mem_alloc_cnt++;
 			//PR_INF("%s:%s:%lu\n", __func__,
@@ -345,7 +326,8 @@ void dbg_timer(unsigned int ch, enum EDBG_TIMER item)
 		}
 		return;
 	}
-	//PR_INF("%s:%s:%lu\n", __func__, dbg_timer_name[item], (unsigned long)ustime);
+	//PR_INF("%s:%s:%lu\n", __func__,
+		//dbg_timer_name[item], (unsigned long)ustime);
 	pch->dbg_data.ms_dbg[item] = ustime;
 	//PR_INF("%s:%d:ms[%llu]\n", __func__, item, ustime);
 	switch (item) {
@@ -682,8 +664,8 @@ static int seq_file_vframe(struct seq_file *seq, void *v, struct vframe_s *pvfm)
 		   pvfm->flag & VFRAME_FLAG_HF);
 	seq_printf(seq, "%-15s:0x%x\n", "canvas0Addr", pvfm->canvas0Addr);
 	seq_printf(seq, "%-15s:0x%x\n", "canvas1Addr", pvfm->canvas1Addr);
-	seq_printf(seq, "%-15s:0x%lx\n", "compHeadAddr", pvfm->compHeadAddr);
-	seq_printf(seq, "%-15s:0x%lx\n", "compBodyAddr", pvfm->compBodyAddr);
+	seq_printf(seq, "%-15s:0x%x\n", "compHeadAddr", pvfm->compHeadAddr);
+	seq_printf(seq, "%-15s:0x%x\n", "compBodyAddr", pvfm->compBodyAddr);
 	seq_printf(seq, "%-15s:%d\n", "plane_num", pvfm->plane_num);
 
 	seq_printf(seq, "%-15s:%d\n", "bufWidth", pvfm->bufWidth);
@@ -832,7 +814,8 @@ static int seq_file_vframe_in_show(struct seq_file *seq, void *v)
 /***********************/
 /* debug output vframe */
 /***********************/
-void didbg_vframe_out_save(unsigned int ch, struct vframe_s *pvfm, unsigned int id)
+void didbg_vframe_out_save(unsigned int ch, struct vframe_s *pvfm,
+	unsigned int id)
 {
 	//unsigned int ch;
 	//struct vframe_s **pvfm_t;
@@ -2509,9 +2492,6 @@ DEFINE_STORE_ONLY(dbg_pip);
 DEFINE_SEQ_SHOW_ONLY(dbg_dct_mif);
 DEFINE_SEQ_SHOW_ONLY(dbg_dct_contr);
 DEFINE_SEQ_SHOW_ONLY(dbg_dct_core);
-DEFINE_SEQ_SHOW_ONLY(dct_pre_ch);
-DEFINE_SEQ_SHOW_ONLY(dct_pre_reg);
-DEFINE_SEQ_SHOW_ONLY(dct_pre);
 DEFINE_SEQ_SHOW_ONLY(dbg_q_sct);
 DEFINE_SEQ_SHOW_ONLY(dbg_sct_peek);
 DEFINE_SEQ_SHOW_ONLY(dbg_sct_used_pat);
@@ -2594,8 +2574,6 @@ static const struct di_dbgfs_files_t di_debugfs_files_top[] = {
 	{"dct_mif", S_IFREG | 0644, &dbg_dct_mif_fops},
 	{"dct_ctr", S_IFREG | 0644, &dbg_dct_contr_fops},
 	{"dct_other", S_IFREG | 0644, &dbg_dct_core_fops},
-	{"dct_preh", S_IFREG | 0644, &dct_pre_fops},
-	{"dct_pre_reg", S_IFREG | 0644, &dct_pre_reg_fops},
 #ifdef TST_NEW_INS_INTERFACE
 	{"tst_list_in", S_IFREG | 0644, &dim_dbg_tst_in_fops},
 #endif
@@ -2617,7 +2595,6 @@ static const struct di_dbgfs_files_t di_debugfs_files[] = {
 	{"vfmc", S_IFREG | 0644, &seq_file_curr_vframe_fops},
 	{"dbg_crc", S_IFREG | 0644, &dbg_crc_fops},
 	{"dbg_pip", S_IFREG | 0644, &dbg_pip_fops},
-	{"dct_pre_ch", S_IFREG | 0644, &dct_pre_ch_fops},
 	{"sct_top", S_IFREG | 0644, &dim_dbg_sct_top_fops},
 	{"list_sct", S_IFREG | 0644, &dbg_q_sct_fops},
 	{"list_sct_peek", S_IFREG | 0644, &dbg_sct_peek_fops},

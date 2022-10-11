@@ -1,10 +1,11 @@
-// SPDX-License-Identifier: GPL-2.0-only
 /*
  * This file provides /sys/class/ieee80211/<wiphy name>/
  * and some default attributes.
  *
  * Copyright 2005-2006	Jiri Benc <jbenc@suse.cz>
  * Copyright 2006	Johannes Berg <johannes@sipsolutions.net>
+ *
+ * This file is GPLv2 as found in COPYING.
  */
 
 #include <linux/device.h>
@@ -38,11 +39,9 @@ SHOW_FMT(address_mask, "%pM", wiphy.addr_mask);
 
 static ssize_t name_show(struct device *dev,
 			 struct device_attribute *attr,
-			 char *buf)
-{
+			 char *buf) {
 	struct wiphy *wiphy = &dev_to_rdev(dev)->wiphy;
-
-	return sprintf(buf, "%s\n", wiphy_name(wiphy));
+	return sprintf(buf, "%s\n", dev_name(&wiphy->dev));
 }
 static DEVICE_ATTR_RO(name);
 
@@ -101,13 +100,18 @@ static int wiphy_suspend(struct device *dev)
 	struct cfg80211_registered_device *rdev = dev_to_rdev(dev);
 	int ret = 0;
 
-	rdev->suspend_at = ktime_get_boottime_seconds();
+	rdev->suspend_at = get_seconds();
 
 	rtnl_lock();
 	if (rdev->wiphy.registered) {
 		if (!rdev->wiphy.wowlan_config) {
+#ifdef CONFIG_AMLOGIC_WIFI
+			printk_ratelimited(KERN_INFO
+				"force to skip cfg80211_leave_all due to wifi suspend/resume issue\n");
+#else
 			cfg80211_leave_all(rdev);
 			cfg80211_process_rdev_events(rdev);
+#endif
 		}
 		if (rdev->ops->suspend)
 			ret = rdev_suspend(rdev, rdev->wiphy.wowlan_config);
@@ -129,7 +133,7 @@ static int wiphy_resume(struct device *dev)
 	int ret = 0;
 
 	/* Age scan results with time spent in suspend */
-	cfg80211_bss_age(rdev, ktime_get_boottime_seconds() - rdev->suspend_at);
+	cfg80211_bss_age(rdev, get_seconds() - rdev->suspend_at);
 
 	rtnl_lock();
 	if (rdev->wiphy.registered && rdev->ops->resume)

@@ -1,19 +1,25 @@
-// SPDX-License-Identifier: GPL-2.0
 /*
- * Copyright (C) 2019 Amlogic, Inc. All rights reserved.
+ * sound/soc/amlogic/auge/card_utils.c
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
  *
  */
 
 #include <linux/clk.h>
-#include <linux/gpio.h>
-#include <linux/gpio/consumer.h>
 #include <linux/module.h>
 #include <linux/of.h>
-#include <linux/of_gpio.h>
-#include <linux/of_graph.h>
-#include <sound/jack.h>
+#include <linux/kernel.h>
 
-#include "audio_utils.h"
 #include "card_utils.h"
 
 int aml_card_parse_daifmt(struct device *dev,
@@ -265,15 +271,13 @@ int aml_card_init_dai(struct snd_soc_dai *dai,
 
 int aml_card_canonicalize_dailink(struct snd_soc_dai_link *dai_link)
 {
-	if (!dai_link->cpus ||
-	    !dai_link->cpus->dai_name ||
-	    !dai_link->codecs ||
-	    !dai_link->codecs->dai_name)
+	if (!dai_link->cpu_dai_name ||
+			(!dai_link->codec_dai_name && !dai_link->codecs))
 		return -EINVAL;
 
 	/* Assumes platform == cpu */
-	if (!dai_link->platforms->of_node)
-		dai_link->platforms->of_node = dai_link->cpus->of_node;
+	if (!dai_link->platform_of_node)
+		dai_link->platform_of_node = dai_link->cpu_of_node;
 
 	return 0;
 }
@@ -291,7 +295,7 @@ void aml_card_canonicalize_cpu(struct snd_soc_dai_link *dai_link,
 	 *	fmt_multiple_name()
 	 */
 	if (is_single_links)
-		dai_link->cpus->dai_name = NULL;
+		dai_link->cpu_dai_name = NULL;
 }
 
 int aml_card_clean_reference(struct snd_soc_card *card)
@@ -300,23 +304,17 @@ int aml_card_clean_reference(struct snd_soc_card *card)
 	struct snd_soc_codec_conf *codec_conf;
 	int num_links, num_confs;
 
-	if (!card || !card->dai_link || !card->codec_conf)
-		return -EINVAL;
-
 	for (num_links = 0, dai_link = card->dai_link;
 	     num_links < card->num_links;
 	     num_links++, dai_link++) {
-		if (dai_link->cpus && dai_link->cpus->of_node)
-			of_node_put(dai_link->cpus->of_node);
-		if (dai_link->codecs && dai_link->codecs->of_node)
-			of_node_put(dai_link->codecs->of_node);
+		of_node_put(dai_link->cpu_of_node);
+		of_node_put(dai_link->codec_of_node);
 	}
 
 	for (num_confs = 0, codec_conf = card->codec_conf;
 		num_confs < card->num_configs;
 		num_confs++, codec_conf++) {
-		if (codec_conf->of_node)
-			of_node_put(codec_conf->of_node);
+		of_node_put(codec_conf->of_node);
 	}
 
 	return 0;
@@ -334,8 +332,3 @@ int aml_card_add_controls(struct snd_soc_card *card)
 
 	return 0;
 }
-
-/* Module information */
-MODULE_AUTHOR("Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>");
-MODULE_DESCRIPTION("ALSA SoC Simple Card Utils");
-MODULE_LICENSE("GPL v2");

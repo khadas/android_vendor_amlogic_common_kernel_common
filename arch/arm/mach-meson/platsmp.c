@@ -1,430 +1,338 @@
-// SPDX-License-Identifier: GPL-2.0-or-later
 /*
- * Copyright (C) 2015 Carlo Caione <carlo@endlessm.com>
- * Copyright (C) 2017 Martin Blumenstingl <martin.blumenstingl@googlemail.com>
+ * arch/arm/mach-meson/platsmp.c
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
-#include <linux/delay.h>
 #include <linux/init.h>
-#include <linux/io.h>
-#include <linux/of.h>
-#include <linux/of_address.h>
-#include <linux/regmap.h>
-#include <linux/reset.h>
+#include <linux/errno.h>
+#include <linux/delay.h>
+#include <linux/device.h>
+#include <linux/jiffies.h>
 #include <linux/smp.h>
-#include <linux/mfd/syscon.h>
-
-#include <asm/cacheflush.h>
-#include <asm/cp15.h>
+#include <linux/io.h>
+#include <linux/of_address.h>
 #include <asm/smp_scu.h>
 #include <asm/smp_plat.h>
+#include <asm/smp_scu.h>
+#include <asm/cacheflush.h>
+#include <asm/mach-types.h>
+#include <linux/percpu.h>
+#include "platsmp.h"
+#include <asm/cache.h>
+#include <asm/cacheflush.h>
+#include <asm/cp15.h>
+#include <linux/amlogic/meson-secure.h>
 
-#define MESON_SMP_SRAM_CPU_CTRL_REG		(0x00)
-#define MESON_SMP_SRAM_CPU_CTRL_ADDR_REG(c)	(0x04 + ((c - 1) << 2))
+static DEFINE_SPINLOCK(boot_lock);
+static DEFINE_SPINLOCK(clockfw_lock);
+static void __iomem *periph_membase;
+static void __iomem *sram_membase;
+static void __iomem *reg_map[3];
+static unsigned int io_cbus_base;
+static unsigned int io_aobus_base;
 
-#define MESON_CPU_AO_RTI_PWR_A9_CNTL0		(0x00)
-#define MESON_CPU_AO_RTI_PWR_A9_CNTL1		(0x04)
-#define MESON_CPU_AO_RTI_PWR_A9_MEM_PD0		(0x14)
 
-#define MESON_CPU_PWR_A9_CNTL0_M(c)		(0x03 << ((c * 2) + 16))
-#define MESON_CPU_PWR_A9_CNTL1_M(c)		(0x03 << ((c + 1) << 1))
-#define MESON_CPU_PWR_A9_MEM_PD0_M(c)		(0x0f << (32 - (c * 4)))
-#define MESON_CPU_PWR_A9_CNTL1_ST(c)		(0x01 << (c + 16))
-
-static void __iomem *sram_base;
-static void __iomem *scu_base;
-static struct regmap *pmu;
-
-static struct reset_control *meson_smp_get_core_reset(int cpu)
+void meson_set_cpu_ctrl_addr(uint32_t cpu, const uint32_t addr)
 {
-	struct device_node *np = of_get_cpu_node(cpu, 0);
+	spin_lock(&clockfw_lock);
 
-	return of_reset_control_get_exclusive(np, NULL);
-}
-
-static void meson_smp_set_cpu_ctrl(int cpu, bool on_off)
-{
-	u32 val = readl(sram_base + MESON_SMP_SRAM_CPU_CTRL_REG);
-
-	if (on_off)
-		val |= BIT(cpu);
+	if (meson_secure_enabled())
+		meson_auxcoreboot_addr(cpu, addr);
 	else
-		val &= ~BIT(cpu);
+		writel(addr, (void *)(CPU1_CONTROL_ADDR_REG + ((cpu-1) << 2)));
 
-	/* keep bit 0 always enabled */
-	val |= BIT(0);
-
-	writel(val, sram_base + MESON_SMP_SRAM_CPU_CTRL_REG);
+	spin_unlock(&clockfw_lock);
 }
 
-static void __init meson_smp_prepare_cpus(const char *scu_compatible,
-					  const char *pmu_compatible,
-					  const char *sram_compatible)
+void meson_set_cpu_ctrl_reg(int cpu, int is_on)
 {
-	static struct device_node *node;
+	uint32_t value = 0;
 
-	/* SMP SRAM */
-	node = of_find_compatible_node(NULL, NULL, sram_compatible);
-	if (!node) {
-		pr_err("Missing SRAM node\n");
-		return;
+	spin_lock(&clockfw_lock);
+
+	if (meson_secure_enabled()) {
+		value = meson_read_corectrl();
+		value = (value & ~(1U << cpu)) | (is_on << cpu);
+		value |= 1;
+		meson_modify_corectrl(value);
+	} else {
+		aml_set_reg32_bits(CPU_CONTROL_REG, is_on, cpu, 1);
+		aml_set_reg32_bits(CPU_CONTROL_REG, 1, 0, 1);
 	}
 
-	sram_base = of_iomap(node, 0);
-	if (!sram_base) {
-		pr_err("Couldn't map SRAM registers\n");
-		return;
-	}
-
-	/* PMU */
-	pmu = syscon_regmap_lookup_by_compatible(pmu_compatible);
-	if (IS_ERR(pmu)) {
-		pr_err("Couldn't map PMU registers\n");
-		return;
-	}
-
-	/* SCU */
-	node = of_find_compatible_node(NULL, NULL, scu_compatible);
-	if (!node) {
-		pr_err("Missing SCU node\n");
-		return;
-	}
-
-	scu_base = of_iomap(node, 0);
-	if (!scu_base) {
-		pr_err("Couldn't map SCU registers\n");
-		return;
-	}
-
-	scu_enable(scu_base);
+	spin_unlock(&clockfw_lock);
 }
 
-static void __init meson8b_smp_prepare_cpus(unsigned int max_cpus)
+int meson_get_cpu_ctrl_addr(int cpu)
 {
-	meson_smp_prepare_cpus("arm,cortex-a5-scu", "amlogic,meson8b-pmu",
-			       "amlogic,meson8b-smp-sram");
+	if (meson_secure_enabled())
+		return 0;
+	else
+		return readl((void *)(CPU1_CONTROL_ADDR_REG + ((cpu-1) << 2)));
 }
 
-static void __init meson8_smp_prepare_cpus(unsigned int max_cpus)
+void meson_set_cpu_power_ctrl(uint32_t cpu, int is_power_on)
 {
-	meson_smp_prepare_cpus("arm,cortex-a9-scu", "amlogic,meson8-pmu",
-			       "amlogic,meson8-smp-sram");
+	WARN_ON(cpu == 0);
+
+	if (is_power_on) {
+		/* SCU Power on CPU & CPU PWR_A9_CNTL0 CTRL_MODE bit.
+		 * CTRL_MODE bit may write forward to SCU when cpu reset.
+		 * So, we need clean it here to avoid the forward write happen.
+		 */
+		aml_set_reg32_bits(CPU_POWER_CTRL_REG,
+			0x0, (cpu << 3), 2);
+		aml_set_reg32_bits(P_AO_RTI_PWR_A9_CNTL0, 0x0, 2*cpu + 16, 2);
+		udelay(5);
+
+#ifndef CONFIG_MESON_CPU_EMULATOR
+		/* Reset enable*/
+		aml_set_reg32_bits(P_HHI_SYS_CPU_CLK_CNTL, 1, (cpu + 24), 1);
+		/* Power on*/
+		aml_set_reg32_bits(P_AO_RTI_PWR_A9_MEM_PD0,
+			0, (32 - cpu * 4), 4);
+		aml_set_reg32_bits(P_AO_RTI_PWR_A9_CNTL1,
+			0x0, ((cpu + 1) << 1), 2);
+
+		udelay(10);
+		while (!(readl((void *)(P_AO_RTI_PWR_A9_CNTL1)) &
+			(1<<(cpu+16)))) {
+			pr_err("wait power...0x%08x 0x%08x\n",
+				readl((void *)(P_AO_RTI_PWR_A9_CNTL0)),
+				readl((void *)(P_AO_RTI_PWR_A9_CNTL1)));
+			udelay(10);
+		};
+		/* Isolation disable */
+		aml_set_reg32_bits(P_AO_RTI_PWR_A9_CNTL0, 0x0, cpu, 1);
+		/* Reset disable */
+		aml_set_reg32_bits(P_HHI_SYS_CPU_CLK_CNTL, 0, (cpu + 24), 1);
+		aml_set_reg32_bits(CPU_POWER_CTRL_REG,
+			0x0, (cpu << 3), 2);
+#endif
+	} else{
+		aml_set_reg32_bits(CPU_POWER_CTRL_REG,
+			0x3, (cpu << 3), 2);
+		aml_set_reg32_bits(P_AO_RTI_PWR_A9_CNTL0, 0x3, 2*cpu + 16, 2);
+
+#ifndef CONFIG_MESON_CPU_EMULATOR
+		/* Isolation enable */
+		aml_set_reg32_bits(P_AO_RTI_PWR_A9_CNTL0, 0x1, cpu, 1);
+		udelay(10);
+		/* Power off */
+		aml_set_reg32_bits(P_AO_RTI_PWR_A9_CNTL1,
+			0x3, ((cpu + 1) << 1), 2);
+		aml_set_reg32_bits(P_AO_RTI_PWR_A9_MEM_PD0,
+			0xf, (32 - cpu * 4), 4);
+#endif
+	}
+	dsb();
+	dmb();
+
+	pr_debug("----CPU %d\n", cpu);
+	pr_debug("----CPU_POWER_CTRL_REG(%08x) = %08x\n",
+		CPU_POWER_CTRL_REG,
+		readl((void *)(CPU_POWER_CTRL_REG)));
+	pr_debug("----P_AO_RTI_PWR_A9_CNTL0(%08x)    = %08x\n",
+		P_AO_RTI_PWR_A9_CNTL0, readl((void *)(P_AO_RTI_PWR_A9_CNTL0)));
+	pr_debug("----P_AO_RTI_PWR_A9_CNTL1(%08x)    = %08x\n",
+		P_AO_RTI_PWR_A9_CNTL1, readl((void *)(P_AO_RTI_PWR_A9_CNTL1)));
+
 }
 
-static void meson_smp_begin_secondary_boot(unsigned int cpu)
+static void write_pen_release(int val)
+{
+	pen_release = val;
+	/*memory barrier*/
+	smp_wmb();
+	__cpuc_flush_dcache_area((void *)&pen_release, sizeof(pen_release));
+	outer_clean_range(__pa(&pen_release), __pa(&pen_release + 1));
+}
+
+static void meson_secondary_set(unsigned int cpu)
+{
+	meson_set_cpu_ctrl_addr(cpu,
+		(const uint32_t)virt_to_phys(meson_secondary_startup));
+	meson_set_cpu_ctrl_reg(cpu, 1);
+	/*memory barrier*/
+	smp_wmb();
+	/*memory barrier*/
+	mb();
+}
+
+static void meson_secondary_init(unsigned int cpu)
 {
 	/*
-	 * Set the entry point before powering on the CPU through the SCU. This
-	 * is needed if the CPU is in "warm" state (= after rebooting the
-	 * system without power-cycling, or when taking the CPU offline and
-	 * then taking it online again.
+	 * let the primary processor know we're out of the
+	 * pen, then head off into the C entry point
 	 */
-	writel(__pa_symbol(secondary_startup),
-	       sram_base + MESON_SMP_SRAM_CPU_CTRL_ADDR_REG(cpu));
-
-	/*
-	 * SCU Power on CPU (needs to be done before starting the CPU,
-	 * otherwise the secondary CPU will not start).
-	 */
-	scu_cpu_power_enable(scu_base, cpu);
+	write_pen_release(-1);
+	/*memory barrier*/
+	smp_wmb();
 }
 
-static int meson_smp_finalize_secondary_boot(unsigned int cpu)
+static int meson_boot_secondary(unsigned int cpu, struct task_struct *idle)
 {
 	unsigned long timeout;
+	/*
+	 * Set synchronisation state between this boot processor
+	 * and the secondary one
+	 */
+	spin_lock(&boot_lock);
 
+	/*
+	 * The secondary processor is waiting to be released from
+	 * the holding pen - release it, then wait for it to flag
+	 * that it has been released by resetting pen_release.
+	 */
+	write_pen_release(cpu_logical_map(cpu));
+
+	if (!meson_secure_enabled()) {
+		meson_set_cpu_ctrl_addr(cpu,
+			(const uint32_t)virt_to_phys(meson_secondary_startup));
+		meson_set_cpu_power_ctrl(cpu, 1);
+		timeout = jiffies + (10 * HZ);
+
+		while (meson_get_cpu_ctrl_addr(cpu))
+			;
+		if (!time_before(jiffies, timeout))
+			return -EPERM;
+	}
+
+	meson_secondary_set(cpu);
+	dsb_sev();
+
+/* smp_send_reschedule(cpu); */
 	timeout = jiffies + (10 * HZ);
-	while (readl(sram_base + MESON_SMP_SRAM_CPU_CTRL_ADDR_REG(cpu))) {
-		if (!time_before(jiffies, timeout)) {
-			pr_err("Timeout while waiting for CPU%d status\n",
-			       cpu);
-			return -ETIMEDOUT;
+	while (time_before(jiffies, timeout)) {
+		/*memory barrier*/
+		smp_rmb();
+		if (pen_release == -1)
+			break;
+		udelay(10);
+	}
+
+	/*
+	 * now the secondary core is starting up let it run its
+	 * calibrations, then wait for it to finish
+	 */
+	spin_unlock(&boot_lock);
+	return pen_release != -1 ? -ETIME : 0;
+}
+
+
+static void __init meson_smp_prepare_cpus(unsigned int max_cpus)
+{
+	int i = 0;
+	struct device_node *node;
+	struct resource res;
+	struct device_node *child;
+
+	node = of_find_compatible_node(NULL, NULL, "amlogic,meson8b-cpuconfig");
+	if (!node) {
+		pr_err("Missing A5 CPU config node in the device tree\n");
+		return;
+	}
+
+	periph_membase = of_iomap(node, 0);
+	if (!periph_membase)
+		pr_err("Couldn't map A5 CPU config registers\n");
+
+	sram_membase = of_iomap(node, 1);
+	if (!periph_membase)
+		pr_err("Couldn't map A5 sram registers\n");
+
+	node = of_find_compatible_node(NULL, NULL, "amlogic, iomap");
+	if (!node) {
+		pr_err("Missing A5 iomap node in the device tree\n");
+		return;
+	}
+
+	for_each_child_of_node(node, child) {
+		if (of_address_to_resource(child, 0, &res)) {
+			pr_err("Missing iomap child node reg\n");
+			return;
 		}
+
+		reg_map[i] = ioremap(res.start, resource_size(&res));
+		i++;
 	}
+	io_cbus_base = (unsigned int)reg_map[0];
+	io_aobus_base = (unsigned int)reg_map[2];
 
-	writel(__pa_symbol(secondary_startup),
-	       sram_base + MESON_SMP_SRAM_CPU_CTRL_ADDR_REG(cpu));
 
-	meson_smp_set_cpu_ctrl(cpu, true);
-
-	return 0;
+	/*
+	 * Initialise the SCU and wake up the secondary core using
+	 * wakeup_secondary().
+	 */
+	scu_enable((void __iomem *) periph_membase);
 }
 
-static int meson8_smp_boot_secondary(unsigned int cpu,
-				     struct task_struct *idle)
-{
-	struct reset_control *rstc;
-	int ret;
-
-	rstc = meson_smp_get_core_reset(cpu);
-	if (IS_ERR(rstc)) {
-		pr_err("Couldn't get the reset controller for CPU%d\n", cpu);
-		return PTR_ERR(rstc);
-	}
-
-	meson_smp_begin_secondary_boot(cpu);
-
-	/* Reset enable */
-	ret = reset_control_assert(rstc);
-	if (ret) {
-		pr_err("Failed to assert CPU%d reset\n", cpu);
-		goto out;
-	}
-
-	/* CPU power ON */
-	ret = regmap_update_bits(pmu, MESON_CPU_AO_RTI_PWR_A9_CNTL1,
-				 MESON_CPU_PWR_A9_CNTL1_M(cpu), 0);
-	if (ret < 0) {
-		pr_err("Couldn't wake up CPU%d\n", cpu);
-		goto out;
-	}
-
-	udelay(10);
-
-	/* Isolation disable */
-	ret = regmap_update_bits(pmu, MESON_CPU_AO_RTI_PWR_A9_CNTL0, BIT(cpu),
-				 0);
-	if (ret < 0) {
-		pr_err("Error when disabling isolation of CPU%d\n", cpu);
-		goto out;
-	}
-
-	/* Reset disable */
-	ret = reset_control_deassert(rstc);
-	if (ret) {
-		pr_err("Failed to de-assert CPU%d reset\n", cpu);
-		goto out;
-	}
-
-	ret = meson_smp_finalize_secondary_boot(cpu);
-	if (ret)
-		goto out;
-
-out:
-	reset_control_put(rstc);
-
-	return 0;
-}
-
-static int meson8b_smp_boot_secondary(unsigned int cpu,
-				     struct task_struct *idle)
-{
-	struct reset_control *rstc;
-	int ret;
-	u32 val;
-
-	rstc = meson_smp_get_core_reset(cpu);
-	if (IS_ERR(rstc)) {
-		pr_err("Couldn't get the reset controller for CPU%d\n", cpu);
-		return PTR_ERR(rstc);
-	}
-
-	meson_smp_begin_secondary_boot(cpu);
-
-	/* CPU power UP */
-	ret = regmap_update_bits(pmu, MESON_CPU_AO_RTI_PWR_A9_CNTL0,
-				 MESON_CPU_PWR_A9_CNTL0_M(cpu), 0);
-	if (ret < 0) {
-		pr_err("Couldn't power up CPU%d\n", cpu);
-		goto out;
-	}
-
-	udelay(5);
-
-	/* Reset enable */
-	ret = reset_control_assert(rstc);
-	if (ret) {
-		pr_err("Failed to assert CPU%d reset\n", cpu);
-		goto out;
-	}
-
-	/* Memory power UP */
-	ret = regmap_update_bits(pmu, MESON_CPU_AO_RTI_PWR_A9_MEM_PD0,
-				 MESON_CPU_PWR_A9_MEM_PD0_M(cpu), 0);
-	if (ret < 0) {
-		pr_err("Couldn't power up the memory for CPU%d\n", cpu);
-		goto out;
-	}
-
-	/* Wake up CPU */
-	ret = regmap_update_bits(pmu, MESON_CPU_AO_RTI_PWR_A9_CNTL1,
-				 MESON_CPU_PWR_A9_CNTL1_M(cpu), 0);
-	if (ret < 0) {
-		pr_err("Couldn't wake up CPU%d\n", cpu);
-		goto out;
-	}
-
-	udelay(10);
-
-	ret = regmap_read_poll_timeout(pmu, MESON_CPU_AO_RTI_PWR_A9_CNTL1, val,
-				       val & MESON_CPU_PWR_A9_CNTL1_ST(cpu),
-				       10, 10000);
-	if (ret) {
-		pr_err("Timeout while polling PMU for CPU%d status\n", cpu);
-		goto out;
-	}
-
-	/* Isolation disable */
-	ret = regmap_update_bits(pmu, MESON_CPU_AO_RTI_PWR_A9_CNTL0, BIT(cpu),
-				 0);
-	if (ret < 0) {
-		pr_err("Error when disabling isolation of CPU%d\n", cpu);
-		goto out;
-	}
-
-	/* Reset disable */
-	ret = reset_control_deassert(rstc);
-	if (ret) {
-		pr_err("Failed to de-assert CPU%d reset\n", cpu);
-		goto out;
-	}
-
-	ret = meson_smp_finalize_secondary_boot(cpu);
-	if (ret)
-		goto out;
-
-out:
-	reset_control_put(rstc);
-
-	return 0;
-}
 
 #ifdef CONFIG_HOTPLUG_CPU
-static void meson8_smp_cpu_die(unsigned int cpu)
+int meson_cpu_kill(unsigned int cpu)
 {
-	meson_smp_set_cpu_ctrl(cpu, false);
+	unsigned int value;
+	unsigned int offset = (cpu<<3);
+	unsigned int cnt = 0;
 
+	do {
+		udelay(10);
+		value = readl((void *)(CPU_POWER_CTRL_REG));
+		cnt++;
+		WARN_ON(cnt > 5000);
+	} while ((value&(3<<offset)) != (3<<offset));
+
+	udelay(10);
+	meson_set_cpu_power_ctrl(cpu, 0);
+	return 1;
+}
+
+void meson_cpu_die(unsigned int cpu)
+{
+	meson_set_cpu_ctrl_reg(cpu, 0);
+
+	meson_cleanup();
 	v7_exit_coherency_flush(louis);
 
-	scu_power_mode(scu_base, SCU_PM_POWEROFF);
-
-	dsb();
-	wfi();
-
-	/* we should never get here */
+	aml_set_reg32_bits(CPU_POWER_CTRL_REG, 0x3, (cpu << 3), 2);
+	asm volatile(
+		"dsb\n"
+		"wfi\n"
+	);
 	WARN_ON(1);
 }
 
-static int meson8_smp_cpu_kill(unsigned int cpu)
+int meson_cpu_disable(unsigned int cpu)
 {
-	int ret, power_mode;
-	unsigned long timeout;
-
-	timeout = jiffies + (50 * HZ);
-	do {
-		power_mode = scu_get_cpu_power_mode(scu_base, cpu);
-
-		if (power_mode == SCU_PM_POWEROFF)
-			break;
-
-		usleep_range(10000, 15000);
-	} while (time_before(jiffies, timeout));
-
-	if (power_mode != SCU_PM_POWEROFF) {
-		pr_err("Error while waiting for SCU power-off on CPU%d\n",
-		       cpu);
-		return -ETIMEDOUT;
-	}
-
-	msleep(30);
-
-	/* Isolation enable */
-	ret = regmap_update_bits(pmu, MESON_CPU_AO_RTI_PWR_A9_CNTL0, BIT(cpu),
-				 0x3);
-	if (ret < 0) {
-		pr_err("Error when enabling isolation for CPU%d\n", cpu);
-		return ret;
-	}
-
-	udelay(10);
-
-	/* CPU power OFF */
-	ret = regmap_update_bits(pmu, MESON_CPU_AO_RTI_PWR_A9_CNTL1,
-				 MESON_CPU_PWR_A9_CNTL1_M(cpu), 0x3);
-	if (ret < 0) {
-		pr_err("Couldn't change sleep status of CPU%d\n", cpu);
-		return ret;
-	}
-
-	return 1;
-}
-
-static int meson8b_smp_cpu_kill(unsigned int cpu)
-{
-	int ret, power_mode, count = 5000;
-
-	do {
-		power_mode = scu_get_cpu_power_mode(scu_base, cpu);
-
-		if (power_mode == SCU_PM_POWEROFF)
-			break;
-
-		udelay(10);
-	} while (++count);
-
-	if (power_mode != SCU_PM_POWEROFF) {
-		pr_err("Error while waiting for SCU power-off on CPU%d\n",
-		       cpu);
-		return -ETIMEDOUT;
-	}
-
-	udelay(10);
-
-	/* CPU power DOWN */
-	ret = regmap_update_bits(pmu, MESON_CPU_AO_RTI_PWR_A9_CNTL0,
-				 MESON_CPU_PWR_A9_CNTL0_M(cpu), 0x3);
-	if (ret < 0) {
-		pr_err("Couldn't power down CPU%d\n", cpu);
-		return ret;
-	}
-
-	/* Isolation enable */
-	ret = regmap_update_bits(pmu, MESON_CPU_AO_RTI_PWR_A9_CNTL0, BIT(cpu),
-				 0x3);
-	if (ret < 0) {
-		pr_err("Error when enabling isolation for CPU%d\n", cpu);
-		return ret;
-	}
-
-	udelay(10);
-
-	/* Sleep status */
-	ret = regmap_update_bits(pmu, MESON_CPU_AO_RTI_PWR_A9_CNTL1,
-				 MESON_CPU_PWR_A9_CNTL1_M(cpu), 0x3);
-	if (ret < 0) {
-		pr_err("Couldn't change sleep status of CPU%d\n", cpu);
-		return ret;
-	}
-
-	/* Memory power DOWN */
-	ret = regmap_update_bits(pmu, MESON_CPU_AO_RTI_PWR_A9_MEM_PD0,
-				 MESON_CPU_PWR_A9_MEM_PD0_M(cpu), 0xf);
-	if (ret < 0) {
-		pr_err("Couldn't power down the memory of CPU%d\n", cpu);
-		return ret;
-	}
-
-	return 1;
+	/*
+	 * we don't allow CPU 0 to be shutdown (it is still too special
+	 * e.g. clock tick interrupts)
+	 */
+	return cpu == 0 ? -EPERM : 0;
 }
 #endif
 
-static struct smp_operations meson8_smp_ops __initdata = {
-	.smp_prepare_cpus	= meson8_smp_prepare_cpus,
-	.smp_boot_secondary	= meson8_smp_boot_secondary,
+const struct smp_operations meson_smp_ops __initconst = {
+	.smp_prepare_cpus	= meson_smp_prepare_cpus,
+	.smp_secondary_init	= meson_secondary_init,
+	.smp_boot_secondary	= meson_boot_secondary,
 #ifdef CONFIG_HOTPLUG_CPU
-	.cpu_die		= meson8_smp_cpu_die,
-	.cpu_kill		= meson8_smp_cpu_kill,
+	.cpu_die		= meson_cpu_die,
+	.cpu_kill = meson_cpu_kill,
+	.cpu_disable = meson_cpu_disable,
 #endif
 };
 
-static struct smp_operations meson8b_smp_ops __initdata = {
-	.smp_prepare_cpus	= meson8b_smp_prepare_cpus,
-	.smp_boot_secondary	= meson8b_smp_boot_secondary,
-#ifdef CONFIG_HOTPLUG_CPU
-	.cpu_die		= meson8_smp_cpu_die,
-	.cpu_kill		= meson8b_smp_cpu_kill,
-#endif
-};
-
-CPU_METHOD_OF_DECLARE(meson8_smp, "amlogic,meson8-smp", &meson8_smp_ops);
-CPU_METHOD_OF_DECLARE(meson8b_smp, "amlogic,meson8b-smp", &meson8b_smp_ops);
+CPU_METHOD_OF_DECLARE(meson8b_smp, "amlogic,meson8b-smp", &meson_smp_ops);

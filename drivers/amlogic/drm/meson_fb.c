@@ -1,6 +1,18 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/amlogic/drm/meson_fb.c
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
 #include <drm/drm_atomic_helper.h>
@@ -11,12 +23,13 @@
 void am_meson_fb_destroy(struct drm_framebuffer *fb)
 {
 	struct am_meson_fb *meson_fb = to_am_meson_fb(fb);
+	struct meson_drm *private = fb->dev->dev_private;
 	int i;
 
 	for (i = 0; i < AM_MESON_GEM_OBJECT_NUM && meson_fb->bufp[i]; i++)
-		drm_gem_object_put_unlocked(&meson_fb->bufp[i]->base);
+		drm_gem_object_unreference_unlocked(&meson_fb->bufp[i]->base);
 	drm_framebuffer_cleanup(fb);
-	if (meson_fb->logo && meson_fb->logo->alloc_flag)
+	if (private->logo && private->logo->alloc_flag)
 		am_meson_free_logo_memory();
 	DRM_DEBUG("meson_fb=0x%p,\n", meson_fb);
 	kfree(meson_fb);
@@ -28,11 +41,8 @@ int am_meson_fb_create_handle(struct drm_framebuffer *fb,
 {
 	struct am_meson_fb *meson_fb = to_am_meson_fb(fb);
 
-	if (meson_fb->bufp[0])
-		return drm_gem_handle_create(file_priv,
+	return drm_gem_handle_create(file_priv,
 				     &meson_fb->bufp[0]->base, handle);
-	else
-		return -EFAULT;
 }
 
 struct drm_framebuffer_funcs am_meson_fb_funcs = {
@@ -59,7 +69,7 @@ am_meson_fb_alloc(struct drm_device *dev,
 	} else {
 		meson_fb->bufp[0] = NULL;
 	}
-	drm_helper_mode_fill_fb_struct(dev, &meson_fb->base, mode_cmd);
+	drm_helper_mode_fill_fb_struct(&meson_fb->base, mode_cmd);
 
 	ret = drm_framebuffer_init(dev, &meson_fb->base,
 				   &am_meson_fb_funcs);
@@ -70,7 +80,7 @@ am_meson_fb_alloc(struct drm_device *dev,
 	}
 	DRM_INFO("meson_fb[id:%d,ref:%d]=0x%p,meson_fb->bufp[0]=0x%p\n",
 		 meson_fb->base.base.id,
-		 kref_read(&meson_fb->base.base.refcount),
+		 atomic_read(&meson_fb->base.base.refcount.refcount),
 		 meson_fb, meson_fb->bufp[0]);
 
 	return &meson_fb->base;
@@ -105,20 +115,20 @@ struct drm_framebuffer *am_meson_fb_create(struct drm_device *dev,
 		meson_fb->bufp[i] = meson_gem;
 	}
 
-	drm_helper_mode_fill_fb_struct(dev, &meson_fb->base, mode_cmd);
+	drm_helper_mode_fill_fb_struct(&meson_fb->base, mode_cmd);
 
 	ret = drm_framebuffer_init(dev, &meson_fb->base, &am_meson_fb_funcs);
 	if (ret) {
 		dev_err(dev->dev,
 			"Failed to initialize framebuffer: %d\n",
 			ret);
-		drm_gem_object_put(obj);
+		drm_gem_object_unreference(obj);
 		kfree(meson_fb);
 		return ERR_PTR(ret);
 	}
 	DRM_DEBUG("meson_fb[id:%d,ref:%d]=0x%px,meson_fb->bufp[%d-0]=0x%p\n",
 		  meson_fb->base.base.id,
-		  kref_read(&meson_fb->base.base.refcount),
+		  atomic_read(&meson_fb->base.base.refcount.refcount),
 		  meson_fb, i, meson_fb->bufp[0]);
 
 	return &meson_fb->base;

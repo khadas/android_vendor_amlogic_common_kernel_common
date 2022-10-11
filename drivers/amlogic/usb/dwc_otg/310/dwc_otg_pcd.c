@@ -1163,24 +1163,12 @@ static void sof_timeout(void *ptr)
 	dwc_otg_core_if_t *core_if = (dwc_otg_core_if_t *) ptr;
 	dwc_timer_t *timer = core_if->device_connect_timer;
 	static uint64_t sof_cnt_pre;
-	static u32 sofstop_flag;
-	dsts_data_t dsts;
-
-	dsts.d32 = DWC_READ_REG32(&core_if->dev_if->dev_global_regs->dsts);
 
 	if (core_if->phy_interface == 0) {
-		if (sof_cnt_pre == dsts.b.soffn) {
-			sofstop_flag++;
-			if (sofstop_flag == 2) {
-				set_usb_phy_device_tuning(1, 1);
-				sofstop_flag = 0;
-			} else {
-				DWC_TIMER_SCHEDULE(timer, 100);
-			}
-
+		if (sof_cnt_pre == core_if->sof_counter) {
+			set_usb_phy_device_tuning(1, 1);
 		} else {
-			sof_cnt_pre = dsts.b.soffn;
-			sofstop_flag = 0;
+			sof_cnt_pre = core_if->sof_counter;
 			DWC_TIMER_SCHEDULE(timer, 1000);
 		}
 	}

@@ -1,6 +1,18 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/amlogic/media/di_multi/di_mem_scatter.c
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
 #include <linux/version.h>
@@ -156,10 +168,11 @@ static void sct_alloc(struct di_ch_s *pch,
 
 	cur_mmu_4k_number = ((buffer_size + (1 << 12) - 1) >> 12);
 
-	ret = di_mmu_box_alloc_idx(psct->box,
-				   idx,
-				   cur_mmu_4k_number,
-				   psct->tab_vaddr);
+	ret = di_mmu_box_alloc_idx(
+			psct->box,
+			idx,
+			cur_mmu_4k_number,
+			psct->tab_vaddr);
 	if (ret == 0) {
 		psct->flg_act.b.tab = 1;
 		psct->flg_act.b.tab_resize = 0;
@@ -184,9 +197,10 @@ static void sct_free_tail(struct di_ch_s *pch,
 	u64 timer_st, timer_end, diff;
 
 	timer_st = cur_to_usecs();
-	ret = di_mmu_box_free_idx_tail(psct->box,
-				       idx,
-				       buffer_used);
+	ret = di_mmu_box_free_idx_tail(
+		psct->box,
+		idx,
+		buffer_used);
 	if (ret == 0) {
 		psct->flg_act.b.tab_resize = 1;
 	} else {
@@ -331,7 +345,7 @@ void tst_resize(struct di_ch_s *pch, unsigned int used_size)
 		return;
 	}
 
-	if (!psct->flg_act.b.tab || psct->flg_act.b.tab_resize)
+	if ((!psct->flg_act.b.tab) || (psct->flg_act.b.tab_resize))
 		return;
 	sct_free_tail(pch, used_size, 0);
 }
@@ -527,7 +541,7 @@ unsigned int sct_cnt_crc(struct device *dev,
 	for (i = 0; i < cnt; i++) {
 		crc_tmp += *(p + i);
 		/*debug*/
-		if ((dbg_sct_cfg & DI_BIT8) && i < 5)
+		if ((dbg_sct_cfg & DI_BIT8) && (i < 5))
 			PR_INF("\t:0x%x\n", *(p + i));
 	}
 	//PR_INF("%s:3\n", __func__);
@@ -557,11 +571,11 @@ static void sct_alloc_l(struct di_ch_s *pch,
 	cur_mmu_4k_number = psct->buffer_size_nub;
 	//((psct->buffer_size + (1 << 12) - 1) >> 12);
 
-	ret = di_mmu_box_alloc_idx
-			(psct->box,
-			 sct->header.index,
-			 cur_mmu_4k_number,
-			 sct->pat_buf->vaddr);
+	ret = di_mmu_box_alloc_idx(
+			psct->box,
+			sct->header.index,
+			cur_mmu_4k_number,
+			sct->pat_buf->vaddr);
 	if (ret == 0) {
 		sct->flg_act.b.tab = 1;
 		sct->tail_cnt = cur_mmu_4k_number;
@@ -606,7 +620,7 @@ void sct_free_tail_l(struct di_ch_s *pch,
 	u64 timer_st, timer_end, diff;
 	struct dim_msc_sum_s *psum;
 
-	if (!sct || !pch) {
+	if ((!sct) || (!pch)) {
 		PR_ERR("%s:no sct\n", __func__);
 		return;
 	}
@@ -622,9 +636,10 @@ void sct_free_tail_l(struct di_ch_s *pch,
 		PR_ERR("%s:overflow:0x%x\n", __func__, buffer_used);
 		return;
 	}
-	ret = di_mmu_box_free_idx_tail(psct->box,
-				       sct->header.index,
-				       buffer_used);
+	ret = di_mmu_box_free_idx_tail(
+		psct->box,
+		sct->header.index,
+		buffer_used);
 	if (ret == 0) {
 		sct->flg_act.b.tab_resize = 1;
 		/*sum*/
@@ -640,7 +655,8 @@ void sct_free_tail_l(struct di_ch_s *pch,
 	timer_end = cur_to_usecs();
 	diff = timer_end - timer_st;
 	dim_tr_ops.sct_tail(sct->header.index, buffer_used);
-	//dbg_sct("%s:use %uus 0x%x\n", __func__, (unsigned int)diff, buffer_used);
+	//dbg_sct("%s:use %uus 0x%x\n", __func__,
+		//  (unsigned int)diff, buffer_used);
 }
 
 void sct_free_l(struct di_ch_s *pch, struct dim_sct_s *sct)
@@ -650,7 +666,7 @@ void sct_free_l(struct di_ch_s *pch, struct dim_sct_s *sct)
 	//u64 timer_st, timer_end, diff;
 	struct dim_msc_sum_s *psum;
 
-	if (!pch || !sct)
+	if ((!pch) || (!sct))
 		return;
 	psct = &pch->msct_top;
 	psum = &psct->sum;
@@ -688,19 +704,19 @@ unsigned int sct_keep(struct di_ch_s *pch, struct dim_sct_s *sct)
 	void *mem_handle;
 	int ret;
 
-	if (!pch || !sct)
+	if ((!pch) || (!sct))
 		return 0xff;
 	psct = &pch->msct_top;
 
 	mem_handle =
-		di_mmu_box_get_mem_handle
-			(psct->box, sct->header.index);
+		di_mmu_box_get_mem_handle(
+			psct->box, sct->header.index);
 	ret = codec_mm_keeper_mask_keep_mem(mem_handle,
 		MEM_TYPE_CODEC_MM_SCATTER);
 	#ifdef HIS_CODE
 	vf->mem_head_handle =
-		decoder_bmmu_box_get_mem_handle
-			(hevc->bmmu_box, VF_BUFFER_IDX(pic->BUF_index));
+		decoder_bmmu_box_get_mem_handle(
+			hevc->bmmu_box, VF_BUFFER_IDX(pic->BUF_index));
 	#endif
 	if (ret >= 0)
 		return ret;
@@ -829,8 +845,8 @@ void sct_mng_working_recycle(struct di_ch_s *pch)
 
 	cnt_idle	= qbufp_count(pbufq, QBF_SCT_Q_IDLE);
 
-	if (cnt_idle == DIM_SCT_NUB &&
-	    pmsct->box) {
+	if ((cnt_idle == DIM_SCT_NUB) &&
+	    (pmsct->box)) {
 		di_mmu_box_free(pmsct->box);
 		pmsct->box = NULL;
 		pmsct->flg_act_box = 0;
@@ -918,7 +934,7 @@ void sct_mng_working(struct di_ch_s *pch)
 	cnt_display = qbufp_count(pbufq_dis, QBF_NDIS_Q_DISPLAY);
 
 	ready_set = cnt_sct_ready;
-	if (cnt_sct_ready && cnt_wait < cnt_sct_ready) {
+	if (cnt_sct_ready && (cnt_wait < cnt_sct_ready)) {
 		//PR_INF("cnt_wait:%d->%d\n", cnt_wait, cnt_sct_ready);
 		//cnt_sct_ready = cnt_wait;
 		ready_set = cnt_wait;
@@ -957,8 +973,8 @@ void sct_mng_working(struct di_ch_s *pch)
 		//cnt_sct_ready = 0;
 	}
 
-	if (cnt_pst_free >= DIM_SCT_KEEP_READY ||
-	    (dbg_limit_ready() && cnt_pst_ready >= 3)) {
+	if ((cnt_pst_free >= DIM_SCT_KEEP_READY) ||
+	    (dbg_limit_ready() && (cnt_pst_ready >= 3))) {
 		if (pmsct->flg_no_buf) {
 			pmsct->flg_no_buf = 0;
 			pch->rsc_bypass.b.no_buf = 0;/*tmp*/
@@ -969,7 +985,8 @@ void sct_mng_working(struct di_ch_s *pch)
 	if ((cnt_pst_free + cnt_sct_req + cnt_sct_ready) >= DIM_SCT_KEEP_READY)
 		return;
 
-	need_req = DIM_SCT_KEEP_READY - cnt_pst_free - cnt_sct_req - cnt_sct_ready;
+	need_req =
+		DIM_SCT_KEEP_READY - cnt_pst_free - cnt_sct_req - cnt_sct_ready;
 
 	if (cnt_idle >= need_req) {
 		f_req = true;
@@ -989,7 +1006,8 @@ void sct_mng_working(struct di_ch_s *pch)
 					      mm->cfg.pst_afbct_size);
 				//#if 1
 				/* cash */
-				if ((dbg_sct_clear_first() && !pat_buf->flg_mode) ||
+				if ((dbg_sct_clear_first() &&
+				     (!pat_buf->flg_mode)) ||
 				    dbg_sct_clear_by_frame()) {
 					pat_clear_mem(&devp->pdev->dev,
 						pch,
@@ -1025,7 +1043,8 @@ void sct_mng_working(struct di_ch_s *pch)
 	} else {
 		/* no resource */
 		if (f_no_wbuf)
-			PR_WARN("no_buf:0:cnt_wait:%d[%d]\n", cnt_sct_ready, frame_nub);
+			PR_WARN("no_buf:0:cnt_wait:%d[%d]\n", cnt_sct_ready,
+				frame_nub);
 
 		if (pch->rsc_bypass.b.no_buf) {
 			if (time_after_eq(jiffies,
@@ -1085,8 +1104,8 @@ void sct_mng_idle(struct di_ch_s *pch)
 
 	cnt_idle	= qbufp_count(pbufq, QBF_SCT_Q_IDLE);
 
-	if (cnt_idle == DIM_SCT_NUB &&
-	    pmsct->box) {
+	if ((cnt_idle == DIM_SCT_NUB) &&
+	    (pmsct->box)) {
 		di_mmu_box_free(pmsct->box);
 		pmsct->box = NULL;
 		pmsct->flg_act_box = 0;
@@ -1124,7 +1143,8 @@ void sct_sw_off_rebuild(struct di_ch_s *pch)
 		for (i = 0; i < len; i++) {
 			ret = qsct_req_to_idle(pch, &sct);
 			if (!ret) {
-				PR_ERR("%s:clear req[%d][%d]\n", __func__, len, i);
+				PR_ERR("%s:clear req[%d][%d]\n", __func__,
+				       len, i);
 				break;
 			}
 			/*pat*/

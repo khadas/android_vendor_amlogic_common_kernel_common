@@ -15,7 +15,4 @@
 
 extern u32 num_scp_chans;
 extern u32 send_listen_chans;
-
-int __init aml_mhu_init(void);
-void aml_mhu_exit(void);
 #endif

@@ -1,6 +1,18 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/amlogic/irblaster/irblaster-meson.c
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
 #include <linux/of_device.h>
@@ -15,8 +27,7 @@
 #include <linux/of_irq.h>
 #include <linux/amlogic/irblaster.h>
 #include <linux/amlogic/irblaster_consumer.h>
-#include <linux/pm_runtime.h>
-#include <linux/pm_domain.h>
+#include <linux/amlogic/irblaster_encoder.h>
 
 /* Amlogic AO_IR_BLASTER_ADDR0 bits */
 #define BLASTER_BUSY				BIT(26)
@@ -52,6 +63,11 @@
 
 #define DEFAULT_CARRIER_FREQ			(38000)
 #define DEFAULT_DUTY_CYCLE			(50)
+
+#ifdef CONFIG_AMLOGIC_IRBLASTER_PROTOCOL
+#define DEFAULT_IRBLASTER_PROTOCOL		IRBLASTER_PROTOCOL_NEC
+#endif
+
 #define LIMIT_DUTY				(25)
 #define MAX_DUTY				(75)
 #define LIMIT_FREQ				(25000)
@@ -88,7 +104,11 @@ struct meson_irblaster_dev {
 	void __iomem	*reset_base;
 };
 
-#define IROUTDebug(fmt, x...)
+#define IROUTDebug(fmt, x...)	\
+do {				\
+	if (irblaster_debug)	\
+		pr_err("%sDebug: %s: "fmt, "[irblaster]", __func__,  ##x);\
+} while (0)	\
 
 static void meson_irblaster_tasklet(unsigned long data);
 DECLARE_TASKLET_DISABLED(irblaster_tasklet, meson_irblaster_tasklet, 0);
@@ -177,7 +197,7 @@ static int write_to_fifo(struct meson_irblaster_dev *dev,
 			BLASTER_TIMEBASE_MODULATION_CLOCK | (count_delay << 0));
 	} else {
 		count_delay = (((hightime + 100 / 2) / 100) - 1)
-			       & COUNT_DELAY_MASK;
+			       &COUNT_DELAY_MASK;
 		val = (BLASTER_WRITE_FIFO | BLASTER_MODULATION_ENABLE |
 			BLASTER_TIMEBASE_100US | (count_delay << 0));
 	}
@@ -278,7 +298,6 @@ int meson_irblaster_send(struct irblaster_chip *chip,
 	unsigned int high_ct, low_ct, cycle, long_len = 0;
 	struct meson_irblaster_dev *irblaster_dev = to_meson_irblaster(chip);
 
-	pm_runtime_get_sync(chip->dev);
 	init_completion(&irblaster_dev->blaster_completion);
 
 	/*
@@ -322,7 +341,6 @@ int meson_irblaster_send(struct irblaster_chip *chip,
 		return -ETIMEDOUT;
 	}
 	IROUTDebug("send finish!\n");
-	pm_runtime_put_sync(chip->dev);
 
 	return 0;
 }
@@ -410,19 +428,18 @@ static int  meson_irblaster_probe(struct platform_device *pdev)
 		pr_err("Failed to request irq.\n");
 		return ret;
 	}
-	/* init irblaster sysfs */
-	ret = irblaster_sysfs_init();
-	if (ret) {
-		pr_err("Failed to init irblaster sysfs.\n");
-		return ret;
-	}
+
 	irblaster_dev->reg_base = reg_base;
 	irblaster_dev->chip.dev = &pdev->dev;
 	irblaster_dev->chip.ops = &meson_irblaster_ops;
 	irblaster_dev->chip.of_irblaster_n_cells = 2;
 	irblaster_dev->chip.state.freq = DEFAULT_CARRIER_FREQ;
 	irblaster_dev->chip.state.duty = DEFAULT_DUTY_CYCLE;
-
+#ifdef CONFIG_AMLOGIC_IRBLASTER_PROTOCOL
+	irblaster_dev->chip.state.protocol = DEFAULT_IRBLASTER_PROTOCOL;
+	irblaster_set_protocol(&irblaster_dev->chip,
+			       DEFAULT_IRBLASTER_PROTOCOL);
+#endif
 	err = irblasterchip_add(&irblaster_dev->chip);
 	if (err < 0) {
 		dev_err(&pdev->dev, "failed to register irblaster chip: %d\n",
@@ -432,9 +449,9 @@ static int  meson_irblaster_probe(struct platform_device *pdev)
 
 	irblaster_tasklet.data = (unsigned long)irblaster_dev;
 	tasklet_enable(&irblaster_tasklet);
+
 	/*initial blaster*/
 	blaster_initialize(irblaster_dev);
-	pm_runtime_enable(&pdev->dev);
 
 	return 0;
 }
@@ -450,20 +467,6 @@ static int meson_irblaster_remove(struct platform_device *pdev)
 	return 0;
 }
 
-static int meson_irblaster_runtime_suspend(struct device *dev)
-{
-	return 0;
-}
-
-static int meson_irblaster_runtime_resume(struct device *dev)
-{
-	struct meson_irblaster_dev *irblaster_dev = dev_get_drvdata(dev);
-
-	/*initial blaster*/
-	blaster_initialize(irblaster_dev);
-	return 0;
-}
-
 static const struct of_device_id irblaster_dt_match[] = {
 	{
 		.compatible = "amlogic, meson_irblaster",
@@ -472,11 +475,6 @@ static const struct of_device_id irblaster_dt_match[] = {
 };
 MODULE_DEVICE_TABLE(of, irblaster_dt_match);
 
-static const struct dev_pm_ops meson_irblaster_pm_ops = {
-	SET_RUNTIME_PM_OPS(meson_irblaster_runtime_suspend,
-			   meson_irblaster_runtime_resume, NULL)
-};
-
 static struct platform_driver meson_irblaster_driver = {
 	.probe = meson_irblaster_probe,
 	.remove = meson_irblaster_remove,
@@ -484,7 +482,6 @@ static struct platform_driver meson_irblaster_driver = {
 		.name = "meson_irblaster",
 		.owner  = THIS_MODULE,
 		.of_match_table = irblaster_dt_match,
-		.pm = &meson_irblaster_pm_ops,
 	},
 };
 

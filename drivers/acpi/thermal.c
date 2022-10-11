@@ -1,9 +1,22 @@
-// SPDX-License-Identifier: GPL-2.0-or-later
 /*
  *  acpi_thermal.c - ACPI Thermal Zone Driver ($Revision: 41 $)
  *
  *  Copyright (C) 2001, 2002 Andy Grover <andrew.grover@intel.com>
  *  Copyright (C) 2001, 2002 Paul Diefenbaugh <paul.s.diefenbaugh@intel.com>
+ *
+ * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ *
+ *  This program is free software; you can redistribute it and/or modify
+ *  it under the terms of the GNU General Public License as published by
+ *  the Free Software Foundation; either version 2 of the License, or (at
+ *  your option) any later version.
+ *
+ *  This program is distributed in the hope that it will be useful, but
+ *  WITHOUT ANY WARRANTY; without even the implied warranty of
+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ *  General Public License for more details.
+ *
+ * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
  *
  *  This driver fully implements the ACPI thermal policy as described in the
  *  ACPI 2.0 Specification.
@@ -11,6 +24,7 @@
  *  TBD: 1. Implement passive cooling hysteresis.
  *       2. Enhance passive cooling (CPU) states/limit interface to support
  *          concepts of 'multiple limiters', upper/lower limits, etc.
+ *
  */
 
 #include <linux/kernel.h>
@@ -26,7 +40,7 @@
 #include <linux/thermal.h>
 #include <linux/acpi.h>
 #include <linux/workqueue.h>
-#include <linux/uaccess.h>
+#include <asm/uaccess.h>
 
 #define PREFIX "ACPI: "
 
@@ -175,7 +189,7 @@ struct acpi_thermal {
 	int kelvin_offset;
 	struct work_struct thermal_check_work;
 	struct mutex thermal_check_lock;
-	refcount_t thermal_check_count;
+	atomic_t thermal_check_count;
 };
 
 /* --------------------------------------------------------------------------
@@ -227,9 +241,13 @@ static int acpi_thermal_set_cooling_mode(struct acpi_thermal *tz, int mode)
 	if (!tz)
 		return -EINVAL;
 
-	if (ACPI_FAILURE(acpi_execute_simple_method(tz->device->handle,
-						    "_SCP", mode)))
+	if (!acpi_has_method(tz->device->handle, "_SCP")) {
+		ACPI_DEBUG_PRINT((ACPI_DB_INFO, "_SCP not present\n"));
 		return -ENODEV;
+	} else if (ACPI_FAILURE(acpi_execute_simple_method(tz->device->handle,
+							   "_SCP", mode))) {
+		return -ENODEV;
+	}
 
 	return 0;
 }
@@ -461,7 +479,8 @@ static int acpi_thermal_trips_update(struct acpi_thermal *tz, int flag)
 			break;
 	}
 
-	if (flag & ACPI_TRIPS_DEVICES) {
+	if ((flag & ACPI_TRIPS_DEVICES)
+	    && acpi_has_method(tz->device->handle, "_TZD")) {
 		memset(&devices, 0, sizeof(devices));
 		status = acpi_evaluate_reference(tz->device->handle, "_TZD",
 						NULL, &devices);
@@ -1062,14 +1081,14 @@ static void acpi_thermal_check_fn(struct work_struct *work)
 	 * check some time ago, so allow at least one of them to block on the
 	 * mutex while another one is running the update.
 	 */
-	if (!refcount_dec_not_one(&tz->thermal_check_count))
+	if (!atomic_add_unless(&tz->thermal_check_count, -1, 1))
 		return;
 
 	mutex_lock(&tz->thermal_check_lock);
 
 	thermal_zone_device_update(tz->thermal_zone, THERMAL_EVENT_UNSPECIFIED);
 
-	refcount_inc(&tz->thermal_check_count);
+	atomic_inc(&tz->thermal_check_count);
 
 	mutex_unlock(&tz->thermal_check_lock);
 }
@@ -1103,7 +1122,7 @@ static int acpi_thermal_add(struct acpi_device *device)
 	if (result)
 		goto free_memory;
 
-	refcount_set(&tz->thermal_check_count, 3);
+	atomic_set(&tz->thermal_check_count, 3);
 	mutex_init(&tz->thermal_check_lock);
 	INIT_WORK(&tz->thermal_check_work, acpi_thermal_check_fn);
 
@@ -1211,7 +1230,7 @@ static int thermal_psv(const struct dmi_system_id *d) {
 	return 0;
 }
 
-static const struct dmi_system_id thermal_dmi_table[] __initconst = {
+static struct dmi_system_id thermal_dmi_table[] __initdata = {
 	/*
 	 * Award BIOS on this AOpen makes thermal control almost worthless.
 	 * http://bugzilla.kernel.org/show_bug.cgi?id=8842

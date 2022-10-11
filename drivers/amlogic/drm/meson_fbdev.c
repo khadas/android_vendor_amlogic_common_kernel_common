@@ -1,6 +1,18 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/amlogic/drm/meson_fbdev.c
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
 #include <drm/drm.h>
@@ -8,38 +20,38 @@
 #include <drm/drm_fb_helper.h>
 #include <drm/drm_crtc_helper.h>
 #include <drm/drm_atomic.h>
-#include <drm/drm_atomic_uapi.h>
 #include <drm/drm_atomic_helper.h>
-#include <linux/ion.h>
 
 #include "meson_drv.h"
 #include "meson_gem.h"
 #include "meson_fb.h"
 #include "meson_fbdev.h"
-#include "meson_plane.h"
 
 #define PREFERRED_BPP		32
-#define PREFERRED_DEPTH	32
 #define MESON_DRM_MAX_CONNECTOR	2
 
-static int am_meson_fbdev_alloc_fb_gem(struct fb_info *info)
+static int am_meson_fbdev_alloc_fb(struct fb_info *info)
 {
-	struct am_meson_fb *meson_fb;
 	struct drm_fb_helper *helper = info->par;
-	struct meson_drm_fbdev *fbdev = container_of(helper, struct meson_drm_fbdev, base);
-	struct drm_framebuffer *fb = helper->fb;
-	struct drm_device *dev = helper->dev;
-	size_t size = info->fix.smem_len;
+	struct meson_drm *private;
 	struct am_meson_gem_object *meson_gem;
-	void *vaddr;
+	struct ion_client *client;
+	struct drm_device *dev;
+	struct am_meson_fb *meson_fb;
+	struct drm_framebuffer *fb;
+	size_t size;
 
-	if (!fbdev->fb_gem) {
-		meson_gem = am_meson_gem_object_create(dev, 0, size);
+	private = helper->dev->dev_private;
+	client = (struct ion_client *)private->gem_client;
+	dev = helper->dev;
+	size = info->fix.smem_len;
+	if (!private->fbdev_bo) {
+		meson_gem = am_meson_gem_object_create(dev, 0, size, client);
 		if (IS_ERR(meson_gem)) {
 			DRM_ERROR("alloc memory %d fail\n", (u32)size);
 			return -ENOMEM;
 		}
-		fbdev->fb_gem = &meson_gem->base;
+		private->fbdev_bo = &meson_gem->base;
 		fb = helper->fb;
 		meson_fb = container_of(fb, struct am_meson_fb, base);
 		if (!meson_fb) {
@@ -47,10 +59,6 @@ static int am_meson_fbdev_alloc_fb_gem(struct fb_info *info)
 			return -EINVAL;
 		}
 		meson_fb->bufp[0] = meson_gem;
-		vaddr = ion_heap_map_kernel(meson_gem->ionbuffer->heap,
-					meson_gem->ionbuffer);
-		info->screen_base = (char __iomem *)vaddr;
-
 		DRM_DEBUG("alloc memory %d done\n", (u32)size);
 	} else {
 		DRM_DEBUG("no need repeate alloc memory %d\n", (u32)size);
@@ -58,57 +66,46 @@ static int am_meson_fbdev_alloc_fb_gem(struct fb_info *info)
 	return 0;
 }
 
-static void am_meson_fbdev_free_fb_gem(struct fb_info *info)
+static void am_meson_fbdev_free_fb(struct fb_info *info)
 {
 	struct drm_fb_helper *helper = info->par;
-	struct meson_drm_fbdev *fbdev;
-	struct drm_framebuffer *fb;
-	struct am_meson_fb *meson_fb;
+	struct meson_drm *private;
 
-	if (!helper) {
-		DRM_ERROR("fb helper is NULL!\n");
-		return;
-	}
-
-	fbdev = container_of(helper, struct meson_drm_fbdev, base);
-	if (fbdev && fbdev->fb_gem) {
-		struct drm_gem_object *gem_obj = fbdev->fb_gem;
-		struct am_meson_gem_object *meson_gem = container_of(gem_obj,
-					struct am_meson_gem_object, base);
-
-		ion_heap_unmap_kernel(meson_gem->ionbuffer->heap,
-				meson_gem->ionbuffer);
-		info->screen_base = NULL;
-
-		am_meson_gem_object_free(fbdev->fb_gem);
-		fbdev->fb_gem = NULL;
-
-		fb = helper->fb;
-		if (fb) {
-			meson_fb = container_of(fb, struct am_meson_fb, base);
-			if (meson_fb)
-				meson_fb->bufp[0] = NULL;
-			else
-				DRM_ERROR("meson_fb is NULL!\n");
-		} else {
-			DRM_ERROR("drm framebuffer is NULL!\n");
-		}
-
+	private = helper->dev->dev_private;
+	if (private->fbdev_bo) {
+		am_meson_gem_object_free(private->fbdev_bo);
+		private->fbdev_bo = NULL;
 		DRM_DEBUG("free memory done\n");
 	} else {
 		DRM_DEBUG("memory already free before\n");
 	}
 }
 
+static void am_meson_fbdev_update_fb(struct fb_info *info,
+				     struct fb_var_screeninfo *var)
+{
+	struct drm_fb_helper *helper = info->par;
+	struct drm_framebuffer *fb = helper->fb;
+	int bytes_per_pixel, depth;
+
+	fb->width = var->xres_virtual;
+	fb->height = var->yres_virtual;
+	bytes_per_pixel = DIV_ROUND_UP(var->bits_per_pixel, 8);
+	fb->pitches[0] = ALIGN(var->xres_virtual * bytes_per_pixel, 64);
+	if (var->bits_per_pixel == 32)
+		depth = (var->transp.length > 0) ? 32 : 24;
+	else
+		depth = var->bits_per_pixel;
+	fb->pixel_format = drm_mode_legacy_fb_format(var->bits_per_pixel,
+						     depth);
+}
+
 static int am_meson_fbdev_open(struct fb_info *info, int arg)
 {
 	int ret = 0;
-	struct drm_fb_helper *helper = info->par;
-	struct meson_drm_fbdev *fbdev = container_of(helper, struct meson_drm_fbdev, base);
-	struct am_osd_plane *osdplane = container_of(fbdev->plane, struct am_osd_plane, base);
 
-	DRM_DEBUG("%s - %d\n", __func__, osdplane->plane_index);
-	ret = am_meson_fbdev_alloc_fb_gem(info);
+	DRM_DEBUG("%s\n", __func__);
+	ret = am_meson_fbdev_alloc_fb(info);
 	return ret;
 }
 
@@ -122,10 +119,11 @@ static int am_meson_fbdev_mmap(struct fb_info *info,
 			       struct vm_area_struct *vma)
 {
 	struct drm_fb_helper *helper = info->par;
-	struct meson_drm_fbdev *fbdev = container_of(helper, struct meson_drm_fbdev, base);
+	struct meson_drm *private;
 	struct am_meson_gem_object *meson_gem;
 
-	meson_gem = container_of(fbdev->fb_gem,
+	private = helper->dev->dev_private;
+	meson_gem = container_of(private->fbdev_bo,
 				 struct am_meson_gem_object, base);
 
 	return am_meson_gem_object_mmap(meson_gem, vma);
@@ -139,31 +137,140 @@ static int am_meson_drm_fbdev_sync(struct fb_info *info)
 static int am_meson_drm_fbdev_ioctl(struct fb_info *info,
 				    unsigned int cmd, unsigned long arg)
 {
-	int ret = 0;
-	void __user *argp = (void __user *)arg;
-	struct fb_dmabuf_export fbdma;
-	struct drm_fb_helper *helper = info->par;
-	struct meson_drm_fbdev *fbdev = container_of(helper, struct meson_drm_fbdev, base);
-	struct drm_plane *plane = fbdev->plane;
-	struct am_meson_fb *meson_fb;
+	return 0;
+}
 
-	memset(&fbdma, 0, sizeof(fbdma));
-	DRM_DEBUG("am_meson_drm_fbdev_ioctl CMD   [%x] - [%d] IN\n", cmd, plane->index);
+/*sync from pan_display_atomic to adatp to the case of
+ *input and output size is different
+ */
+static int am_meson_pan_display_atomic(struct fb_var_screeninfo *var,
+				       struct fb_info *info)
+{
+	struct drm_fb_helper *fb_helper = info->par;
+	struct drm_device *dev = fb_helper->dev;
+	struct drm_atomic_state *state;
+	struct drm_plane *plane;
+	int i, ret;
+	unsigned int plane_mask;
 
-	/*amlogic fbdev ioctl, used by gpu fbdev backend.*/
-	if (cmd == FBIOGET_OSD_DMABUF) {
-		meson_fb = container_of(helper->fb, struct am_meson_fb, base);
-		fbdma.fd = dma_buf_fd(meson_fb->bufp[0]->dmabuf, O_CLOEXEC);
-		fbdma.flags = O_CLOEXEC;
-		ret = copy_to_user(argp, &fbdma, sizeof(fbdma)) ? -EFAULT : 0;
-	} else if (cmd == FBIO_WAITFORVSYNC) {
-		if (plane->crtc)
-			drm_wait_one_vblank(helper->dev, plane->crtc->index);
-		else
-			DRM_ERROR("crtc is not set for plane [%d]\n", plane->index);
+	state = drm_atomic_state_alloc(dev);
+	if (!state)
+		return -ENOMEM;
+
+	state->acquire_ctx = dev->mode_config.acquire_ctx;
+retry:
+	plane_mask = 0;
+	for (i = 0; i < fb_helper->crtc_count; i++) {
+		struct drm_mode_set *mode_set;
+
+		mode_set = &fb_helper->crtc_info[i].mode_set;
+
+		mode_set->x = var->xoffset;
+		mode_set->y = var->yoffset;
+
+		ret = __am_meson_drm_set_config(mode_set, state);
+		if (ret != 0)
+			goto fail;
+
+		plane = mode_set->crtc->primary;
+		plane_mask |= (1 << drm_plane_index(plane));
+		plane->old_fb = plane->fb;
 	}
 
-	DRM_DEBUG("am_meson_drm_fbdev_ioctl CMD   [%x] - [%d] OUT\n", cmd, plane->index);
+	ret = drm_atomic_commit(state);
+	if (ret != 0)
+		goto fail;
+
+	info->var.xoffset = var->xoffset;
+	info->var.yoffset = var->yoffset;
+
+fail:
+	drm_atomic_clean_old_fb(dev, plane_mask, ret);
+
+	if (ret == -EDEADLK)
+		goto backoff;
+
+	if (ret != 0)
+		drm_atomic_state_free(state);
+
+	return ret;
+
+backoff:
+	drm_atomic_state_clear(state);
+	drm_atomic_legacy_backoff(state);
+
+	goto retry;
+}
+
+static bool am_meson_drm_fb_helper_is_bound(struct drm_fb_helper *fb_helper)
+{
+	struct drm_device *dev = fb_helper->dev;
+	struct drm_crtc *crtc;
+	int bound = 0, crtcs_bound = 0;
+
+	/* Sometimes user space wants everything disabled, so don't steal the
+	 * display if there's a master.
+	 */
+	if (READ_ONCE(dev->master))
+		return false;
+
+	drm_for_each_crtc(crtc, dev) {
+		if (crtc->primary->fb)
+			crtcs_bound++;
+		if (crtc->primary->fb == fb_helper->fb)
+			bound++;
+	}
+
+	if (bound < crtcs_bound)
+		return false;
+
+	return true;
+}
+
+/*sync from drm_fb_helper_pan_display to adatp to the case of
+ *input and output size is different
+ */
+static int am_meson_drm_fb_pan_display(struct fb_var_screeninfo *var,
+				       struct fb_info *info)
+{
+	struct drm_fb_helper *fb_helper = info->par;
+	struct drm_device *dev = fb_helper->dev;
+	struct drm_mode_set *modeset;
+	int ret = 0;
+	int i;
+
+	DRM_DEBUG("%s in\n", __func__);
+	if (oops_in_progress)
+		return -EBUSY;
+
+	drm_modeset_lock_all(dev);
+	if (!am_meson_drm_fb_helper_is_bound(fb_helper)) {
+		drm_modeset_unlock_all(dev);
+		return -EBUSY;
+	}
+
+	if (dev->mode_config.funcs->atomic_commit) {
+		ret = am_meson_pan_display_atomic(var, info);
+		goto unlock;
+	}
+
+	for (i = 0; i < fb_helper->crtc_count; i++) {
+		modeset = &fb_helper->crtc_info[i].mode_set;
+
+		modeset->x = var->xoffset;
+		modeset->y = var->yoffset;
+
+		if (modeset->num_connectors) {
+			ret = drm_mode_set_config_internal(modeset);
+			if (!ret) {
+				info->var.xoffset = var->xoffset;
+				info->var.yoffset = var->yoffset;
+			}
+		}
+	}
+unlock:
+	drm_modeset_unlock_all(dev);
+	DRM_DEBUG("%s out\n", __func__);
 	return ret;
 }
 
@@ -179,10 +286,8 @@ static int am_meson_drm_fb_helper_check_var(struct fb_var_screeninfo *var,
 	struct drm_framebuffer *fb = fb_helper->fb;
 	int depth;
 
-	if (var->pixclock != 0 || in_dbg_master()) {
-		DRM_ERROR("%s FAILED.\n", __func__);
+	if (var->pixclock != 0 || in_dbg_master())
 		return -EINVAL;
-	}
 
 	/*
 	 * Changes struct fb_var_screeninfo are currently not pushed back
@@ -192,8 +297,8 @@ static int am_meson_drm_fb_helper_check_var(struct fb_var_screeninfo *var,
 		  var->xres, var->yres, var->bits_per_pixel,
 		  var->xres_virtual, var->yres_virtual);
 	DRM_DEBUG("current fb w/h/bpp %dx%d-%d\n",
-		  fb->width, fb->height, fb->format->depth);
-	if (var->bits_per_pixel != fb->format->depth ||
+		  fb->width, fb->height, fb->bits_per_pixel);
+	if (var->bits_per_pixel != fb->bits_per_pixel ||
 	    var->xres_virtual != fb->width ||
 	    var->yres_virtual != fb->height)
 		DRM_DEBUG("%s need realloc buffer\n", __func__);
@@ -280,10 +385,6 @@ int am_meson_drm_fb_helper_set_par(struct fb_info *info)
 	struct drm_fb_helper *fb_helper = info->par;
 	struct fb_var_screeninfo *var = &info->var;
 	struct drm_framebuffer *fb = fb_helper->fb;
-	struct meson_drm_fbdev *fbdev = container_of(fb_helper, struct meson_drm_fbdev, base);
-	struct drm_gem_object *fb_gem = fbdev->fb_gem;
-	struct drm_fb_helper_surface_size sizes;
-	unsigned int bytes_per_pixel;
 
 	if (oops_in_progress)
 		return -EBUSY;
@@ -293,184 +394,21 @@ int am_meson_drm_fb_helper_set_par(struct fb_info *info)
 		return -EINVAL;
 	}
 
-	DRM_INFO("%s IN\n", __func__);
-	if (var->bits_per_pixel != fb->format->depth ||
+	drm_fb_helper_restore_fbdev_mode_unlocked(fb_helper);
+	if (var->bits_per_pixel != fb->bits_per_pixel ||
 	    var->xres_virtual != fb->width ||
 	    var->yres_virtual != fb->height) {
 		/*realloc framebuffer, free old then alloc new gem*/
-		sizes.fb_height = var->yres_virtual;
-		sizes.fb_width = var->xres_virtual;
-		sizes.surface_width = sizes.fb_width;
-		sizes.surface_height = sizes.fb_height;
-		sizes.surface_bpp = var->bits_per_pixel;
-		sizes.surface_depth = PREFERRED_DEPTH;
-
-		fb->width = sizes.fb_width;
-		fb->height = sizes.fb_height;
-		bytes_per_pixel = DIV_ROUND_UP(sizes.surface_bpp, 8);
-		fb->pitches[0] =  ALIGN(fb->width * bytes_per_pixel, 64);
-
-		info->screen_size = fb->pitches[0] * fb->height;
-		info->fix.smem_len = info->screen_size;
-
-		drm_fb_helper_fill_info(info, fb_helper, &sizes);
-
-		if (fb_gem && fb_gem->size < info->fix.smem_len) {
-			DRM_DEBUG("GEM SIZE is not enough, no re-allocate.\n");
-			am_meson_fbdev_free_fb_gem(info);
-			fb_gem = NULL;
+		am_meson_fbdev_free_fb(info);
+		am_meson_fbdev_update_fb(info, var);
+		if (am_meson_fbdev_alloc_fb(info)) {
+			DRM_DEBUG("%s realloc fb fail\n", __func__);
+			return -ENOMEM;
 		}
-
-		if (!fb_gem) {
-			if (am_meson_fbdev_alloc_fb_gem(info)) {
-				DRM_ERROR("%s realloc fb fail\n", __func__);
-				return -ENOMEM;
-			}
-			DRM_DEBUG("%s reallocate success.\n", __func__);
-		}
+		DRM_DEBUG("%s realloc fb done\n", __func__);
 	}
-
-	DRM_INFO("%s OUT\n", __func__);
 
 	return 0;
-}
-
-/* sync of drm_client_modeset_commit_atomic(),
- * 1. add fbdev for non-primary plane.
- * 2. remove crtc set.
- */
-static int am_meson_drm_fb_pan_display(struct fb_var_screeninfo *var,
-				       struct fb_info *info)
-{
-	struct drm_fb_helper *fb_helper = info->par;
-	struct meson_drm_fbdev *fbdev = container_of(fb_helper, struct meson_drm_fbdev, base);
-	struct drm_device *dev = fb_helper->dev;
-	struct drm_atomic_state *state;
-	struct drm_plane_state *plane_state;
-	struct drm_plane *plane = fbdev->plane;
-	struct drm_mode_set *mode_set;
-	int hdisplay, vdisplay;
-	int ret;
-
-	if (fbdev->blank) {
-		DRM_DEBUG("%s skip blank.\n", __func__);
-		return 0;
-	}
-
-	drm_modeset_lock_all(dev);
-	DRM_DEBUG("%s IN [%d]\n", __func__, plane->index);
-
-	state = drm_atomic_state_alloc(dev);
-	if (!state) {
-		ret = -ENOMEM;
-		goto unlock_exit;
-	}
-
-	state->acquire_ctx = dev->mode_config.acquire_ctx;
-retry:
-	DRM_DEBUG("%s for plane [%d-%p]\n", __func__, plane->type, fb_helper->fb);
-
-	mode_set = &fbdev->modeset;
-
-	/*update plane state, refer to drm_atomic_plane_set_property()*/
-	plane_state = drm_atomic_get_plane_state(state, plane);
-	if (IS_ERR(plane_state)) {
-		ret = PTR_ERR(plane_state);
-		goto fail;
-	}
-
-	ret = drm_atomic_set_crtc_for_plane(plane_state, mode_set->crtc);
-	if (ret != 0) {
-		DRM_ERROR("set crtc for plane failed.\n");
-		goto fail;
-	}
-
-	drm_mode_get_hv_timing(&mode_set->crtc->mode, &hdisplay, &vdisplay);
-	plane_state->crtc_x = 0;
-	plane_state->crtc_y = 0;
-	plane_state->crtc_w = hdisplay;
-	plane_state->crtc_h = vdisplay;
-
-	drm_atomic_set_fb_for_plane(plane_state, fb_helper->fb);
-	if (fb_helper->fb) {
-		plane_state->src_x = var->xoffset << 16;
-		plane_state->src_y = var->yoffset << 16;
-		plane_state->src_w = var->xres << 16;
-		plane_state->src_h = var->yres << 16;
-		plane_state->zpos = fbdev->zorder;
-	} else {
-		plane_state->src_x = 0;
-		plane_state->src_y = 0;
-		plane_state->src_w = 0;
-		plane_state->src_h = 0;
-		plane_state->zpos = fbdev->zorder;
-	}
-	/* fix alpha */
-	plane_state->pixel_blend_mode = DRM_MODE_BLEND_COVERAGE;
-
-	DRM_DEBUG("update fb [%x-%x, %x-%x]-%d->[%d-%d]",
-		plane_state->src_x, plane_state->src_y,
-		plane_state->src_w, plane_state->src_h,
-		plane_state->zpos, plane_state->crtc_w,
-		plane_state->crtc_h);
-
-	ret = drm_atomic_commit(state);
-	if (ret != 0)
-		goto fail;
-
-	info->var.xoffset = var->xoffset;
-	info->var.yoffset = var->yoffset;
-
-fail:
-	if (ret == -EDEADLK)
-		goto backoff;
-
-	if (ret != 0)
-		drm_atomic_state_put(state);
-
-unlock_exit:
-	drm_modeset_unlock_all(dev);
-
-	if (ret)
-		DRM_ERROR("%s failed .\n", __func__);
-	else
-		DRM_DEBUG("%s OUT [%d]\n", __func__, plane->index);
-
-	return ret;
-
-backoff:
-	drm_atomic_state_clear(state);
-	drm_modeset_backoff(state->acquire_ctx);
-
-	goto retry;
-}
-
-/**
- * the implment if different from drm_fb_helper.
- * for plane based fbdev, we only disable corresponding plane
- * but not the whole crtc.
- */
-int am_meson_drm_fb_blank(int blank, struct fb_info *info)
-{
-	struct drm_fb_helper *helper = info->par;
-	struct meson_drm_fbdev *fbdev = container_of(helper, struct meson_drm_fbdev, base);
-	struct drm_device *dev = helper->dev;
-	int ret = 0;
-
-	if (blank == 0) {
-		DRM_DEBUG("meson_fbdev[%s] goto UNBLANK.\n", fbdev->plane->name);
-		fbdev->blank = false;
-		ret = am_meson_drm_fb_pan_display(&info->var, info);
-	} else {
-		DRM_DEBUG("meson_fbdev[%s-%p] goto blank.\n", fbdev->plane->name, fbdev->plane->fb);
-		drm_modeset_lock_all(dev);
-		drm_atomic_helper_disable_plane(fbdev->plane, dev->mode_config.acquire_ctx);
-		drm_modeset_unlock_all(dev);
-
-		fbdev->blank = true;
-	}
-
-	return ret;
 }
 
 static struct fb_ops meson_drm_fbdev_ops = {
@@ -483,7 +421,7 @@ static struct fb_ops meson_drm_fbdev_ops = {
 	.fb_imageblit	= drm_fb_helper_cfb_imageblit,
 	.fb_check_var	= am_meson_drm_fb_helper_check_var,
 	.fb_set_par	= am_meson_drm_fb_helper_set_par,
-	.fb_blank	= am_meson_drm_fb_blank,
+	.fb_blank	= drm_fb_helper_blank,
 	.fb_pan_display	= am_meson_drm_fb_pan_display,
 	.fb_setcmap	= drm_fb_helper_setcmap,
 	.fb_sync	= am_meson_drm_fbdev_sync,
@@ -493,143 +431,154 @@ static struct fb_ops meson_drm_fbdev_ops = {
 #endif
 };
 
-static int am_meson_drm_fbdev_modeset_create(struct drm_fb_helper *helper)
+static int am_meson_drm_fbdev_create(struct drm_fb_helper *helper,
+				     struct drm_fb_helper_surface_size *sizes)
 {
-	struct drm_device *dev = helper->dev;
-	struct meson_drm_fbdev *fbdev = container_of(helper, struct meson_drm_fbdev, base);
-
-	fbdev->modeset.crtc = drm_crtc_from_index(dev, 0);
-	return 0;
-}
-
-static int am_meson_drm_fbdev_probe(struct drm_fb_helper *helper,
-				     struct drm_fb_helper_surface_size *sizesxx)
-{
-	struct drm_device *dev = helper->dev;
-	struct meson_drm *private = dev->dev_private;
-	struct meson_drm_fbdev *fbdev = container_of(helper, struct meson_drm_fbdev, base);
+	struct meson_drm *private = helper->dev->dev_private;
 	struct drm_mode_fb_cmd2 mode_cmd = { 0 };
-	struct drm_fb_helper_surface_size sizes;
+	struct drm_device *dev = helper->dev;
 	struct drm_framebuffer *fb;
-	struct fb_info *fbi;
 	unsigned int bytes_per_pixel;
+	unsigned long offset;
+	struct fb_info *fbi;
+	size_t size;
 	int ret;
 
-	sizes.fb_width = private->ui_config.ui_w;
-	sizes.fb_height = private->ui_config.ui_h;
-	sizes.surface_width = private->ui_config.fb_w;
-	sizes.surface_height = private->ui_config.fb_h;
-	sizes.surface_bpp = private->ui_config.fb_bpp;
-	sizes.surface_depth = PREFERRED_DEPTH;
+	bytes_per_pixel = DIV_ROUND_UP(sizes->surface_bpp, 8);
 
-	bytes_per_pixel = DIV_ROUND_UP(sizes.surface_bpp, 8);
-	mode_cmd.width = sizes.surface_width;
-	mode_cmd.height = sizes.surface_height;
-	mode_cmd.pixel_format = drm_mode_legacy_fb_format(sizes.surface_bpp, PREFERRED_DEPTH);
-	mode_cmd.pitches[0] = ALIGN(mode_cmd.width * bytes_per_pixel, 64);
-
+	if (private->ui_config.fb_w)
+		mode_cmd.width = private->ui_config.fb_w;
+	else if (logo.width)
+		mode_cmd.width = logo.width;
+	else
+		mode_cmd.width = sizes->surface_width;
+	if (private->ui_config.fb_h)
+		mode_cmd.height = private->ui_config.fb_h;
+	else  if (logo.height)
+		mode_cmd.height = logo.height;
+	else
+		mode_cmd.height = sizes->surface_height;
 	DRM_INFO("mode_cmd.width = %d\n", mode_cmd.width);
 	DRM_INFO("mode_cmd.height = %d\n", mode_cmd.height);
-	DRM_INFO("mode_cmd.pixel_format = %d-%d\n", mode_cmd.pixel_format, DRM_FORMAT_ARGB8888);
+
+	mode_cmd.pitches[0] = ALIGN(sizes->surface_width * bytes_per_pixel, 64);
+	mode_cmd.pixel_format = drm_mode_legacy_fb_format(sizes->surface_bpp,
+		sizes->surface_depth);
+
+	size = mode_cmd.pitches[0] * mode_cmd.height;
 
 	fbi = drm_fb_helper_alloc_fbi(helper);
 	if (IS_ERR(fbi)) {
-		DRM_ERROR("Failed to create framebuffer info.\n");
+		dev_err(dev->dev, "Failed to create framebuffer info.\n");
 		ret = PTR_ERR(fbi);
 		return ret;
 	}
 
 	helper->fb = am_meson_drm_framebuffer_init(dev, &mode_cmd,
-						   fbdev->fb_gem);
+						   private->fbdev_bo);
 	if (IS_ERR(helper->fb)) {
 		dev_err(dev->dev, "Failed to allocate DRM framebuffer.\n");
 		ret = PTR_ERR(helper->fb);
 		goto err_release_fbi;
 	}
-	fb = helper->fb;
 
 	fbi->par = helper;
 	fbi->flags = FBINFO_FLAG_DEFAULT;
 	fbi->fbops = &meson_drm_fbdev_ops;
-	fbi->skip_vt_switch = true;
-	fbi->screen_size = fb->pitches[0] * fb->height;
-	fbi->fix.smem_len = fbi->screen_size;
 
-	drm_fb_helper_fill_info(fbi, helper, &sizes);
-	am_meson_drm_fbdev_modeset_create(helper);
+	fb = helper->fb;
+	fb->bits_per_pixel = sizes->surface_bpp;
+	fb->depth = sizes->surface_depth;
+	drm_fb_helper_fill_fix(fbi, fb->pitches[0], fb->depth);
+	if (private->ui_config.ui_w)
+		sizes->fb_width = private->ui_config.ui_w;
+	if (private->ui_config.ui_h)
+		sizes->fb_height = private->ui_config.ui_h;
+	drm_fb_helper_fill_var(fbi, helper, sizes->fb_width, sizes->fb_height);
+
+	offset = fbi->var.xoffset * bytes_per_pixel;
+	offset += fbi->var.yoffset * fb->pitches[0];
+
+	dev->mode_config.fb_base = 0;
+	fbi->screen_size = size;
+	fbi->fix.smem_len = size;
+
+	DRM_DEBUG_KMS("FB [%dx%d]-%d offset=%ld size=%zu\n",
+		      fb->width, fb->height, fb->depth, offset, size);
+
+	fbi->skip_vt_switch = true;
 
 	return 0;
 
 err_release_fbi:
-	drm_fb_helper_fini(helper);
+	drm_fb_helper_release_fbi(helper);
 	return ret;
 }
 
 static const struct drm_fb_helper_funcs meson_drm_fb_helper_funcs = {
-	.fb_probe = am_meson_drm_fbdev_probe,
+	.fb_probe = am_meson_drm_fbdev_create,
 };
 
-static int am_meson_fbdev_parse_config(struct drm_device *dev)
+static void am_meson_fbdev_parse_param(struct drm_device *dev)
+{
+	int ret;
+	struct meson_drm *private = dev->dev_private;
+
+	ret = of_property_read_u32(dev->dev->of_node,
+				   "fbdev_ui_w", &private->ui_config.ui_w);
+	if (ret) {
+		DRM_INFO("don't find  match fbdev_ui_w\n");
+		private->ui_config.ui_w = 0;
+	}
+	ret = of_property_read_u32(dev->dev->of_node,
+				   "fbdev_ui_h", &private->ui_config.ui_h);
+	if (ret) {
+		DRM_INFO("don't find  match fbdev_ui_h\n");
+		private->ui_config.ui_h = 0;
+	}
+	ret = of_property_read_u32(dev->dev->of_node,
+				   "fbdev_fb_w", &private->ui_config.fb_w);
+	if (ret) {
+		DRM_INFO("don't find  match fbdev_fb_w\n");
+		private->ui_config.fb_w = 0;
+	}
+	ret = of_property_read_u32(dev->dev->of_node,
+				   "fbdev_fb_h", &private->ui_config.fb_h);
+	if (ret) {
+		DRM_INFO("don't find  match fbdev_fb_h\n");
+		private->ui_config.fb_h = 0;
+	}
+	ret = of_property_read_u32(dev->dev->of_node,
+				   "fbdev_fb_bpp",
+				   &private->ui_config.fb_bpp);
+	if (ret) {
+		DRM_INFO("don't find  match fbdev_fb_bpp\n");
+		private->ui_config.fb_bpp = 0;
+	}
+}
+
+int am_meson_drm_fbdev_init(struct drm_device *dev)
 {
 	struct meson_drm *private = dev->dev_private;
-	u32 sizes[5];
-	int ret;
-
-	ret = of_property_read_u32_array(dev->dev->of_node,
-				   "fbdev_sizes", sizes, 5);
-	if (!ret) {
-		private->ui_config.ui_w = sizes[0];
-		private->ui_config.ui_h = sizes[1];
-		private->ui_config.fb_w = sizes[2];
-		private->ui_config.fb_h = sizes[3];
-		private->ui_config.fb_bpp = sizes[4];
-	}
-
-	return ret;
-}
-
-static ssize_t show_force_free_mem(struct device *device,
-		struct device_attribute *attr, char *buf)
-{
-	return snprintf(buf, PAGE_SIZE, "Usage: echo 1 > force_free mem\n");
-}
-
-static ssize_t store_force_free_mem(struct device *device,
-		struct device_attribute *attr,
-		const char *buf, size_t count)
-{
-	struct fb_info *fb_info = dev_get_drvdata(device);
-
-	if (strncmp("1", buf, 1) == 0) {
-		am_meson_fbdev_free_fb_gem(fb_info);
-		DRM_INFO("fb mem is freed !\n");
-	}
-	return count;
-}
-
-static struct device_attribute fbdev_device_attrs[] = {
-	__ATTR(force_free_mem, 0644, show_force_free_mem, store_force_free_mem),
-};
-
-struct meson_drm_fbdev *am_meson_create_drm_fbdev(struct drm_device *dev)
-{
-	struct meson_drm *drmdev = dev->dev_private;
-	struct meson_drm_fbdev *fbdev;
 	struct drm_fb_helper *helper;
+	unsigned int num_crtc;
 	int ret, bpp;
-	struct fb_info *fbinfo;
-	int i = 0;
 
-	bpp = drmdev->ui_config.fb_bpp;
-	fbdev = devm_kzalloc(dev->dev, sizeof(struct meson_drm_fbdev), GFP_KERNEL);
-	if (!fbdev)
-		return NULL;
+	DRM_INFO("%s in\n", __func__);
+	am_meson_fbdev_parse_param(dev);
+	if (!dev->mode_config.num_crtc || !dev->mode_config.num_connector)
+		return -EINVAL;
 
-	helper = &fbdev->base;
+	num_crtc = dev->mode_config.num_crtc;
+
+	helper = devm_kzalloc(dev->dev, sizeof(*helper), GFP_KERNEL);
+	if (!helper)
+		return -ENOMEM;
 
 	drm_fb_helper_prepare(dev, helper, &meson_drm_fb_helper_funcs);
 
-	ret = drm_fb_helper_init(dev, helper, MESON_DRM_MAX_CONNECTOR);
+	ret = drm_fb_helper_init(dev, helper, num_crtc,
+				 MESON_DRM_MAX_CONNECTOR);
 	if (ret < 0) {
 		dev_err(dev->dev, "Failed to initialize drm fb helper - %d.\n",
 			ret);
@@ -642,6 +591,10 @@ struct meson_drm_fbdev *am_meson_create_drm_fbdev(struct drm_device *dev)
 		goto err_drm_fb_helper_fini;
 	}
 
+	if (private->ui_config.fb_bpp)
+		bpp = private->ui_config.fb_bpp;
+	else
+		bpp = PREFERRED_BPP;
 	ret = drm_fb_helper_initial_config(helper, bpp);
 	if (ret < 0) {
 		dev_err(dev->dev, "Failed to set initial hw config - %d.\n",
@@ -649,111 +602,31 @@ struct meson_drm_fbdev *am_meson_create_drm_fbdev(struct drm_device *dev)
 		goto err_drm_fb_helper_fini;
 	}
 
-	fbinfo = helper->fbdev;
-	if (fbinfo && fbinfo->dev) {
-		for (i = 0; i < ARRAY_SIZE(fbdev_device_attrs); i++) {
-			ret = device_create_file(fbinfo->dev,
-						&fbdev_device_attrs[i]);
-			if (ret) {
-				DRM_ERROR("Failed to create file - %d.\n", ret);
-				continue;
-			}
-		}
-	}
+	private->fbdev_helper = helper;
+	DRM_INFO("%s out\n", __func__);
 
-	fbdev->blank = false;
-
-	DRM_INFO("create fbdev success.\n");
-	return fbdev;
+	return 0;
 
 err_drm_fb_helper_fini:
 	drm_fb_helper_fini(helper);
 err_free:
-	kfree(fbdev);
-	fbdev = NULL;
-	DRM_INFO("create drm fbdev failed[%d]\n", ret);
-	return NULL;
-}
-
-int am_meson_drm_fbdev_init(struct drm_device *dev)
-{
-	struct meson_drm *drmdev = dev->dev_private;
-	struct meson_drm_fbdev *fbdev;
-	struct am_osd_plane *osd_plane;
-	int i, fbdev_cnt = 0;
-	int ret = 0;
-
-	DRM_INFO("%s in\n", __func__);
-
-	ret = am_meson_fbdev_parse_config(dev);
-	if (ret) {
-		DRM_ERROR("don't find fbdev_sizes, please config it\n");
-		return ret;
-	}
-
-	if (drmdev->primary_plane) {
-		fbdev = am_meson_create_drm_fbdev(dev);
-		fbdev->plane = drmdev->primary_plane;
-		fbdev->zorder = OSD_PLANE_BEGIN_ZORDER;
-		DRM_INFO("create fbdev for primary plane [%p]\n", fbdev);
-	}
-
-	/*only create fbdev for viu1*/
-	for (i = 0; i < MESON_MAX_OSD; i++) {
-		osd_plane = drmdev->osd_planes[i];
-		if (!osd_plane)
-			break;
-
-		if (osd_plane->base.type == DRM_PLANE_TYPE_PRIMARY)
-			continue;
-
-		fbdev = am_meson_create_drm_fbdev(dev);
-		fbdev->plane = &osd_plane->base;
-		fbdev->zorder = OSD_PLANE_BEGIN_ZORDER + fbdev_cnt;
-		fbdev_cnt++;
-		DRM_INFO("create fbdev for plane [%d]-[%p]\n", osd_plane->plane_index, fbdev);
-	}
-
-	DRM_INFO("%s create %d out\n", __func__, fbdev_cnt);
-	return 0;
+	kfree(helper);
+	return ret;
 }
 
 void am_meson_drm_fbdev_fini(struct drm_device *dev)
 {
 	struct meson_drm *private = dev->dev_private;
-	struct meson_drm_fbdev *fbdev;
-	struct drm_fb_helper *helper;
-	struct fb_info *fbinfo;
-	int i;
+	struct drm_fb_helper *helper = private->fbdev_helper;
 
-	for (i = 0; i < MESON_MAX_OSD; i++) {
-		fbdev = private->osd_fbdevs[i];
-		if (!fbdev) {
-			dev_err(dev->dev, "fbdev is NULL.\n");
-			continue;
-		}
+	if (!helper)
+		return;
 
-		helper = &fbdev->base;
-		if (!helper || !helper->fbdev) {
-			kfree(fbdev);
-			dev_err(dev->dev, "helper or fbinfo is NULL.\n");
-			continue;
-		}
+	drm_fb_helper_unregister_fbi(helper);
+	drm_fb_helper_release_fbi(helper);
 
-		fbinfo = helper->fbdev;
-		if (fbinfo && fbinfo->dev) {
-			for (i = 0; i < ARRAY_SIZE(fbdev_device_attrs); i++) {
-				device_remove_file(fbinfo->dev,
-						&fbdev_device_attrs[i]);
-			}
-		}
+	if (helper->fb)
+		drm_framebuffer_unreference(helper->fb);
 
-		drm_fb_helper_unregister_fbi(helper);
-		drm_fb_helper_fini(helper);
-		if (helper->fb)
-			drm_framebuffer_put(helper->fb);
-		fbdev->fb_gem = NULL;
-		drm_fb_helper_fini(helper);
-		kfree(fbdev);
-	}
+	drm_fb_helper_fini(helper);
 }

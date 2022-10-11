@@ -1,8 +1,6 @@
 # AML AUDIO control drivers
-#
+
 menu "Audio Interface"
-# amaudio drivers
-#
 config	AMLOGIC_AMAUDIO
 	bool "Amlogic Audio Interface"
     default n
@@ -13,7 +11,6 @@ config	AMLOGIC_AMAUDIO
     #depends on SND_AMLOGIC_SOC
     #depends on SWITCH
 	help
-		Amlogic Audio Interface
-		for audio
+		"Amlogic Audio Interface"
 
 endmenu

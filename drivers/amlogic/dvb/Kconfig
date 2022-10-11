@@ -1,7 +1,7 @@
 menu "AMLOGIC DVB EXTERN support"
 
 config AMLOGIC_DVB_EXTERN
-	tristate "Amlogic dvb extern drivers"
+	bool "Amlogic dvb extern drivers"
 	default N
 	help
 		select it to support amlogic dvb extern driver.
@@ -25,14 +25,4 @@ config AMLOGIC_DVB_DMX
    default (DVB_CORE && DVB_PLATFORM_DRIVER && AMLOGIC_DVB && AMLOGIC_DVB_COMPAT)
    help
      support dmx/dsc driver.
-
-config AMLOGIC_DVB_DSM
-	tristate "AMLOGIC DVB DSM"
-	default N
-	help
-		Amlogic DVB Descrambler Session Manager
-		Y: enable
-		N: disable
-		M: build as module
-
 endmenu

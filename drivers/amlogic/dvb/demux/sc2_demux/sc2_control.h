@@ -1,6 +1,18 @@
-/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/amlogic/dvb/demux/sc2_demux/sc2_control.h
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
 #ifndef _SC2_CONTROL_H_
@@ -77,7 +89,6 @@ void tsout_config_es_table(u32 es_entry, int pid,
 			   u32 sid, u32 reset, u32 dup_ok, u8 fmt);
 void tsout_config_pcr_table(u32 pcr_entry, u32 pcr_pid, u32 sid);
 int tsout_config_get_pcr(u32 pcr_entry, u64 *pcr);
-void tsout_config_remap_table(u32 pid_entry, u32 sid, int pid, int pid_new);
 
 /*****************************************************/
 /*****************************************************/
@@ -130,7 +141,7 @@ unsigned int wdma_get_cfg_fast_mode(void);
 void wdma_clean_batch(u8 chan_id);
 void wdma_irq(u8 chan_id, int enable);
 unsigned int wdma_get_wr_len(u8 chan_id, int *overflow);
-void tso_set(int path);
+
 /*****************************************************/
 /*****************************************************/
 /*****************************************************/

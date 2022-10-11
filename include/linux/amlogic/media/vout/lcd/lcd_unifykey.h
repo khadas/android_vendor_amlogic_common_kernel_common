@@ -1,7 +1,17 @@
-/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
+ * include/linux/amlogic/media/vout/lcd/lcd_unifykey.h
  *
- * Copyright (C) 2019 Amlogic, Inc. All rights reserved.
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
  *
  */
 
@@ -12,17 +22,15 @@
 #define LCD_UNIFYKEY_WAIT_TIMEOUT      2000
 #define LCD_UNIFYKEY_RETRY_INTERVAL    20   /* ms */
 
-unsigned int cal_crc32(unsigned int crc, const unsigned char *buf,
-		       int buf_len);
-
 /* declare external unifykey function */
-void *get_ukdev(void);
-int key_unify_read(void *ukdev, char *keyname, unsigned char *keydata,
-		   unsigned int datalen, unsigned int *reallen);
-int key_unify_size(void *ukdev, char *keyname, unsigned int *reallen);
-int key_unify_query(void *ukdev, char *keyname,
-		    unsigned int *keystate, unsigned int *keypermit);
-int key_unify_get_init_flag(void);
+extern void *get_ukdev(void);
+extern int key_unify_read(void *ukdev, char *keyname, unsigned char *keydata,
+	unsigned int datalen, unsigned int *reallen);
+extern int key_unify_size(void *ukdev, char *keyname, unsigned int *reallen);
+extern int key_unify_query(void *ukdev, char *keyname,
+	unsigned int *keystate, unsigned int *keypermit);
+extern int key_unify_get_init_flag(void);
+
 
 #define LCD_UKEY_RETRY_CNT_MAX   5
 /*
@@ -241,14 +249,16 @@ struct aml_lcd_unifykey_header_s {
  * API
  * *********************************
  */
-int lcd_unifykey_len_check(int key_len, int len);
-int lcd_unifykey_check(char *key_name);
-int lcd_unifykey_header_check(unsigned char *buf,
-			      struct aml_lcd_unifykey_header_s *header);
-int lcd_unifykey_get(char *key_name, unsigned char *buf, int *len);
+extern int lcd_unifykey_len_check(int key_len, int len);
+extern int lcd_unifykey_check(char *key_name);
+extern int lcd_unifykey_header_check(unsigned char *buf,
+		struct aml_lcd_unifykey_header_s *header);
+extern int lcd_unifykey_get(char *key_name,
+		unsigned char *buf, int *len);
 int lcd_unifykey_get_tcon(char *key_name, unsigned char *buf, int *len);
-int lcd_unifykey_check_no_header(char *key_name);
-int lcd_unifykey_get_no_header(char *key_name, unsigned char *buf, int *len);
-void lcd_unifykey_print(void);
+extern int lcd_unifykey_check_no_header(char *key_name);
+extern int lcd_unifykey_get_no_header(char *key_name,
+		unsigned char *buf, int *len);
+extern void lcd_unifykey_print(void);
 
 #endif

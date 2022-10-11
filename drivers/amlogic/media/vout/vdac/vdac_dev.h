@@ -1,4 +1,3 @@
-/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
  * drivers/amlogic/media/vout/vdac/vdac_dev.h
  *
@@ -18,6 +17,7 @@
 
 #ifndef _VDAC_DEV_H_
 #define _VDAC_DEV_H_
+#include <linux/platform_device.h>
 
 #define HHI_VDAC_CNTL0        0xbd
 #define HHI_VDAC_CNTL1        0xbe
@@ -26,6 +26,7 @@
 
 #define ANACTRL_VDAC_CTRL0    0xb0
 #define ANACTRL_VDAC_CTRL1    0xb1
+
 #define HHI_VIID_CLK_DIV      0x4a
 #define HHI_VIID_CLK_CNTL     0x4b
 #define HHI_VIID_DIVIDER_CNTL 0x4c
@@ -34,21 +35,23 @@
 
 #define CLKCTRL_VID_CLK_CTRL2 0x31
 #define CLKCTRL_VIID_CLK_DIV  0x33
+
 #define VENC_VDAC_DACSEL0     0x1b78
 
 #define VDAC_CTRL_MAX         10
 
 enum vdac_cpu_type {
-	VDAC_CPU_G12AB = 0,
-	VDAC_CPU_TL1 = 1,
-	VDAC_CPU_SM1 = 2,
-	VDAC_CPU_TM2 = 3,
-	VDAC_CPU_SC2 = 4,
-	VDAC_CPU_T5  = 5,
-	VDAC_CPU_T5D  = 6,
-	VDAC_CPU_S4   = 7,
-	VDAC_CPU_T3   = 8,
-	VDAC_CPU_S4D   = 9,
+	VDAC_CPU_GX_L_M = 0,
+	VDAC_CPU_TXL  = 1,
+	VDAC_CPU_TXLX  = 2,
+	VDAC_CPU_GXLX  = 3,
+	VDAC_CPU_G12AB = 4,
+	VDAC_CPU_TL1 = 5,
+	VDAC_CPU_SM1 = 6,
+	VDAC_CPU_TM2 = 7,
+	VDAC_CPU_SC2 = 8,
+	VDAC_CPU_T5  = 9,
+	VDAC_CPU_T5D = 10,
 	VDAC_CPU_MAX,
 };
 
@@ -58,6 +61,7 @@ enum vdac_cpu_type {
 struct meson_vdac_data {
 	enum vdac_cpu_type cpu_id;
 	const char *name;
+	unsigned char iomap_flag;
 
 	unsigned int reg_cntl0;
 	unsigned int reg_cntl1;
@@ -75,5 +79,4 @@ struct meson_vdac_ctrl_s {
 
 extern const struct of_device_id meson_vdac_dt_match[];
 struct meson_vdac_data *aml_vdac_config_probe(struct platform_device *pdev);
-
 #endif

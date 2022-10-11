@@ -1,6 +1,21 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/amlogic/media/vin/tvin/hdmirx/hdcp_main.c
+ *
+ *              (C) COPYRIGHT 2014 - 2015 SYNOPSYS, INC.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2
+ * as published by the Free Software Foundation.
+ *
+ * is program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ *
  */
 
 #include <linux/kernel.h>
@@ -37,18 +52,18 @@ struct esm_device {
 
 	int code_is_phys_mem;
 	dma_addr_t code_base;
-	u32 code_size;
-	u8 *code;
+	uint32_t code_size;
+	uint8_t *code;
 
 	int data_is_phys_mem;
 	dma_addr_t data_base;
-	u32 data_size;
-	u8 *data;
+	uint32_t data_size;
+	uint8_t *data;
 
 	struct debugfs_blob_wrapper blob;
 
 	struct resource *hpi_resource;
-	u8 __iomem *hpi;
+	uint8_t __iomem *hpi;
 };
 
 static struct esm_device esm_devices[MAX_ESM_DEVICES];
@@ -73,7 +88,7 @@ static long get_meminfo(struct esm_device *esm, void __user *arg)
 
 /* load_code - ESM_IOC_LOAD_CODE implementation */
 static long load_code(struct esm_device *esm,
-		      struct esm_ioc_code __user *arg)
+	struct esm_ioc_code __user *arg)
 {
 	struct esm_ioc_code head;
 
@@ -95,7 +110,7 @@ static long load_code(struct esm_device *esm,
 
 /* write_data - ESM_IOC_WRITE_DATA implementation */
 static long write_data(struct esm_device *esm,
-		       struct esm_ioc_data __user *arg)
+	struct esm_ioc_data __user *arg)
 {
 	struct esm_ioc_data head;
 
@@ -114,7 +129,8 @@ static long write_data(struct esm_device *esm,
 }
 
 /* read_data - ESM_IOC_READ_DATA implementation */
-static long read_data(struct esm_device *esm, struct esm_ioc_data __user *arg)
+static long read_data(struct esm_device *esm,
+	struct esm_ioc_data __user *arg)
 {
 	struct esm_ioc_data head;
 
@@ -187,7 +203,8 @@ static long hpi_write(struct esm_device *esm, void __user *arg)
 }
 
 /* alloc_esm_slot - alloc_esm_slot*/
-static struct esm_device *alloc_esm_slot(const struct esm_ioc_meminfo *info)
+static struct esm_device *alloc_esm_slot(
+	const struct esm_ioc_meminfo *info)
 {
 	int i;
 
@@ -224,13 +241,13 @@ static void free_dma_areas(struct esm_device *esm)
 {
 	if (!esm->code_is_phys_mem && esm->code) {
 		dma_free_coherent(hdmirx_dev, esm->code_size,
-				  esm->code, esm->code_base);
+			esm->code, esm->code_base);
 		esm->code = NULL;
 	}
 
 	if (!esm->data_is_phys_mem && esm->data) {
 		dma_free_coherent(hdmirx_dev, esm->data_size,
-				  esm->data, esm->data_base);
+			esm->data, esm->data_base);
 		esm->data = NULL;
 	}
 }
@@ -239,7 +256,7 @@ static struct dentry *esm_rx_debugfs;
 struct dentry *esm_rx_blob;
 
 static int alloc_dma_areas(struct esm_device *esm,
-			   const struct esm_ioc_meminfo *info)
+	const struct esm_ioc_meminfo *info)
 {
 	esm->code_size = info->code_size;
 	esm->code_is_phys_mem = (info->code_base != 0);
@@ -250,7 +267,7 @@ static int alloc_dma_areas(struct esm_device *esm,
 		esm->code = phys_to_virt(esm->code_base);
 	} else {
 		esm->code = dma_alloc_coherent(hdmirx_dev, esm->code_size,
-					       &esm->code_base, GFP_KERNEL);
+					  &esm->code_base, GFP_KERNEL);
 		if (!esm->code)
 			return -ENOMEM;
 	}
@@ -263,7 +280,7 @@ static int alloc_dma_areas(struct esm_device *esm,
 		esm->data = phys_to_virt(esm->data_base);
 	} else {
 		esm->data = dma_alloc_coherent(hdmirx_dev, esm->data_size,
-					       &esm->data_base, GFP_KERNEL);
+				&esm->data_base, GFP_KERNEL);
 		if (!esm->data) {
 			free_dma_areas(esm);
 			return -ENOMEM;
@@ -277,16 +294,14 @@ static int alloc_dma_areas(struct esm_device *esm,
 	esm->blob.data = (void *)esm->data;
 	esm->blob.size = esm->data_size;
 	esm_rx_blob = debugfs_create_blob("blob",
-					  0644,
-					  esm_rx_debugfs,
-					  &esm->blob);
+		0644, esm_rx_debugfs, &esm->blob);
 
 	if (randomize_mem) {
 		prandom_bytes(esm->code, esm->code_size);
 		prandom_bytes(esm->data, esm->data_size);
 	}
 	if (!is_esmmem_created) {
-		if (esm->data_base && esm->code_base) {
+		if ((esm->data_base) && (esm->code_base)) {
 			is_esmmem_created = 1;
 			pr_info("create /dev/esmmem\n");
 		}
@@ -317,7 +332,7 @@ static long init(struct file *f, void __user *arg)
 		if (rc < 0)
 			goto err_free;
 		info.hpi_base =
-			rx_reg_maps[MAP_ADDR_MODULE_HDMIRX_CAPB3].phy_addr;
+			reg_maps[MAP_ADDR_MODULE_HDMIRX_CAPB3].phy_addr;
 		hpi_mem = request_mem_region(info.hpi_base, 128, "esm-hpi");
 		if (!hpi_mem) {
 			rc = -EADDRNOTAVAIL;
@@ -325,7 +340,7 @@ static long init(struct file *f, void __user *arg)
 		}
 
 		esm->hpi = ioremap_nocache(hpi_mem->start,
-					   resource_size(hpi_mem));
+			resource_size(hpi_mem));
 		if (!esm->hpi) {
 			rc = -ENOMEM;
 			goto err_release_region;
@@ -352,7 +367,7 @@ err_free:
  * amlogic added
  */
 static long set_param(struct esm_device *esm,
-		      struct esm_ioc_param __user *arg)
+	struct esm_ioc_param __user *arg)
 {
 	struct esm_ioc_param head;
 
@@ -371,7 +386,7 @@ static long set_param(struct esm_device *esm,
  * amlogic added
  */
 static long get_param(struct esm_device *esm,
-		      struct esm_ioc_param __user *arg)
+	struct esm_ioc_param __user *arg)
 {
 	struct esm_ioc_param head;
 
@@ -411,8 +426,7 @@ static void free_esm_slot(struct esm_device *slot)
 
 /* hld_ioctl - hld_ioctl*/
 static long hld_ioctl(struct file *f,
-		      unsigned int cmd,
-		      unsigned long arg)
+	unsigned int cmd, unsigned long arg)
 {
 	struct esm_device *esm = f->private_data;
 	void __user *data = (void __user *)arg;
@@ -447,7 +461,6 @@ static long hld_ioctl(struct file *f,
 
 	return -ENOTTY;
 }
-
 static const struct file_operations hld_file_operations = {
 	.unlocked_ioctl = hld_ioctl,
 	#ifdef CONFIG_COMPAT
@@ -462,13 +475,14 @@ static struct miscdevice hld_device = {
 	.fops = &hld_file_operations,
 };
 
-int __init hld_init(void)
+static int __init hld_init(void)
 {
 	pr_info("%sInitializing...\n", MY_TAG);
 	return misc_register(&hld_device);
 }
+module_init(hld_init);
 
-void __exit hld_exit(void)
+static void __exit hld_exit(void)
 {
 	int i;
 
@@ -477,6 +491,7 @@ void __exit hld_exit(void)
 	for (i = 0; i < MAX_ESM_DEVICES; i++)
 		free_esm_slot(&esm_devices[i]);
 }
+module_exit(hld_exit);
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Synopsys, Inc.");

@@ -1,7 +1,17 @@
-/* SPDX-License-Identifier: GPL-2.0+ */
 /*
+ * include/linux/amlogic/media/vout/lcd/aml_bl_extern.h
  *
- * Copyright (C) 2019 Amlogic, Inc. All rights reserved.
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
  *
  */
 
@@ -54,11 +64,13 @@ struct aml_bl_extern_driver_s {
 	struct device *dev;
 };
 
-struct aml_bl_extern_driver_s *aml_bl_extern_get_driver(void);
-int aml_bl_extern_device_load(int index);
+extern struct aml_bl_extern_driver_s *aml_bl_extern_get_driver(void);
+extern int aml_bl_extern_device_load(int index);
 
 #ifdef CONFIG_AMLOGIC_LCD_TABLET
-int dsi_write_cmd(unsigned char *payload);
+extern int dsi_write_cmd(unsigned char *payload);
 #endif
 
+
 #endif
+

@@ -1,5 +1,5 @@
 #
-# Amlogic video_composer device configuration
+# Amlogic video_composer device configuation
 #
 
 menu "Amlogic video_composer support"
@@ -9,7 +9,7 @@ config AMLOGIC_VIDEO_COMPOSER
 	select VIDEO_DEV
 	default n
 
-	help
+	---help---
 		Select to enable "Amlogic video_composer device support.
 
 endmenu

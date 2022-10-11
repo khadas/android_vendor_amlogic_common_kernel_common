@@ -1,6 +1,18 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/amlogic/drm/meson_gem.c
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
 #include <drm/drmP.h>
@@ -10,8 +22,8 @@
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/dma-buf.h>
-#include <linux/ion.h>
 #include <linux/meson_ion.h>
+#include <ion/ion.h>
 #include <linux/amlogic/meson_uvm_core.h>
 #include <linux/amlogic/media/codec_mm/codec_mm.h>
 #include "meson_gem.h"
@@ -20,93 +32,87 @@
 #define uvm_to_gem_obj(x) container_of(x, struct am_meson_gem_object, ubo)
 #define MESON_GEM_NAME "meson_gem"
 
-static int am_meson_gem_alloc_ion_buff(struct am_meson_gem_object *
-				       meson_gem_obj, int flags)
+static int am_meson_gem_alloc_ion_buff(
+	struct ion_client *client,
+	struct am_meson_gem_object *meson_gem_obj,
+	int flags)
 {
+	struct ion_handle *handle;
+	phys_addr_t addr;
 	size_t len;
-	u32 bscatter = 0;
-	struct dma_buf *dmabuf = NULL;
-	struct ion_buffer *buffer;
-	unsigned int id;
+	bool bscatter = false;
+
+	if (!client)
+		return -EINVAL;
 
 	if (!meson_gem_obj)
 		return -EINVAL;
 
-	id = meson_ion_cma_heap_id_get();
-	DRM_DEBUG("ion heap id=%d,size=0x%x,flags=0x%x\n",
-		  id, (u32)meson_gem_obj->base.size, flags);
-	/*
-	 *check flags to set different ion heap type.
-	 *if flags is set to 0, need to use ion dma buffer.
-	 */
-	if (((flags & (MESON_USE_SCANOUT | MESON_USE_CURSOR)) != 0) || flags == 0) {
-		id = meson_ion_cma_heap_id_get();
-		if (id)
-			dmabuf = ion_alloc(meson_gem_obj->base.size, (1 << id),
-						   ION_FLAG_EXTEND_MESON_HEAP);
-		if (IS_ERR_OR_NULL(dmabuf) && meson_ion_fb_heap_id_get()) {
-			id = meson_ion_fb_heap_id_get();
-			dmabuf = ion_alloc(meson_gem_obj->base.size, (1 << id),
-						   ION_FLAG_EXTEND_MESON_HEAP);
-		}
+	//check flags to set different ion heap type.
+	//if flags is set to 0, need to use ion dma buffer.
+	if (((flags & (MESON_USE_SCANOUT | MESON_USE_CURSOR)) != 0)) {
+		handle = ion_alloc(client, meson_gem_obj->base.size,
+				   0, (1 << ION_HEAP_TYPE_DMA), 0);
 	} else if (flags & MESON_USE_VIDEO_PLANE) {
 		meson_gem_obj->is_uvm = true;
-		id = meson_ion_codecmm_heap_id_get();
-		if (id)
-			dmabuf = ion_alloc(meson_gem_obj->base.size, (1 << id),
-						   ION_FLAG_EXTEND_MESON_HEAP);
+		handle = ion_alloc(client, meson_gem_obj->base.size,
+				   0, (1 << ION_HEAP_TYPE_CUSTOM), 0);
 	} else if (flags & MESON_USE_VIDEO_AFBC) {
 		meson_gem_obj->is_uvm = true;
 		meson_gem_obj->is_afbc = true;
-		id = meson_ion_codecmm_heap_id_get();
-		if (id)
-			dmabuf = ion_alloc(meson_gem_obj->base.size, (1 << id),
-						   ION_FLAG_EXTEND_MESON_HEAP);
+		handle = ion_alloc(client, UVM_FAKE_SIZE,
+				   0, (1 << ION_HEAP_TYPE_SYSTEM), 0);
+	} else if (flags == 0) {
+		// allocate from cma heap first
+		handle = ion_alloc(client, meson_gem_obj->base.size,
+				   0, (1 << ION_HEAP_TYPE_DMA), 0);
+		if (IS_ERR_OR_NULL(handle)) {
+			DRM_ERROR("CMA heap fail, try system heap.\n");
+			handle = ion_alloc(client, meson_gem_obj->base.size,
+					   0, (1 << ION_HEAP_TYPE_SYSTEM), 0);
+			bscatter = true;
+		}
 	} else {
-		dmabuf = ion_alloc(meson_gem_obj->base.size,
-				   ION_HEAP_SYSTEM, 0);
-		bscatter = 1;
+		handle = ion_alloc(client, meson_gem_obj->base.size,
+				   0, (1 << ION_HEAP_TYPE_SYSTEM), 0);
+		bscatter = true;
 	}
 
-	if (IS_ERR_OR_NULL(dmabuf))
-		return PTR_ERR(dmabuf);
-	meson_gem_obj->dmabuf = dmabuf;
-	buffer = (struct ion_buffer *)dmabuf->priv;
-	meson_gem_obj->ionbuffer = buffer;
-	sg_dma_address(buffer->sg_table->sgl) = sg_phys(buffer->sg_table->sgl);
-	dma_sync_sg_for_device(meson_gem_obj->base.dev->dev,
-			       buffer->sg_table->sgl,
-			       buffer->sg_table->nents,
-			       DMA_TO_DEVICE);
-	meson_ion_buffer_to_phys(buffer,
-				 (phys_addr_t *)&meson_gem_obj->addr,
-				 (size_t *)&len);
+	if (IS_ERR_OR_NULL(handle)) {
+		DRM_ERROR("%s: FAILED, flags:0x%x.\n",
+			  __func__, flags);
+		return -ENOMEM;
+	}
+
+	ion_phys(client, handle, (ion_phys_addr_t *)&addr, &len);
+
+	meson_gem_obj->handle = handle;
 	meson_gem_obj->bscatter = bscatter;
-	DRM_DEBUG("sg_table:nents=%d,dma_addr=0x%x,length=%d,offset=%d\n",
-		  buffer->sg_table->nents,
-		  (u32)buffer->sg_table->sgl->dma_address,
-		  buffer->sg_table->sgl->length,
-		  buffer->sg_table->sgl->offset);
-	DRM_DEBUG("allocate size (%d) addr=0x%x.\n",
-		  (u32)meson_gem_obj->base.size, (u32)meson_gem_obj->addr);
+	meson_gem_obj->addr = addr;
+	DRM_DEBUG("%s: allocate handle (%p).\n",
+		  __func__, meson_gem_obj->handle);
 	return 0;
 }
 
-static void am_meson_gem_free_ion_buf(struct drm_device *dev,
-				      struct am_meson_gem_object *meson_gem_obj)
+static void am_meson_gem_free_ion_buf(
+	struct drm_device *dev,
+	struct am_meson_gem_object *meson_gem_obj)
 {
-	if (meson_gem_obj->ionbuffer) {
-		DRM_DEBUG("%s free buffer  (0x%p).\n", __func__,
-			  meson_gem_obj->ionbuffer);
-		dma_buf_put(meson_gem_obj->dmabuf);
-		meson_gem_obj->ionbuffer = NULL;
-		meson_gem_obj->dmabuf = NULL;
+	struct ion_client *client = NULL;
+
+	if (meson_gem_obj->handle) {
+		DRM_DEBUG("am_meson_gem_free_ion_buf free handle  (%p).\n",
+			  meson_gem_obj->handle);
+		client = meson_gem_obj->handle->client;
+		ion_free(client, meson_gem_obj->handle);
+		meson_gem_obj->handle = NULL;
 	} else {
-		DRM_ERROR("meson_gem_obj buffer is null\n");
+		DRM_ERROR("meson_gem_obj handle is null\n");
 	}
 }
 
-static int am_meson_gem_alloc_video_secure_buff(struct am_meson_gem_object *meson_gem_obj)
+static int am_meson_gem_alloc_video_secure_buff(
+	struct am_meson_gem_object *meson_gem_obj)
 {
 	unsigned long addr;
 
@@ -127,7 +133,8 @@ static int am_meson_gem_alloc_video_secure_buff(struct am_meson_gem_object *meso
 	return 0;
 }
 
-static void am_meson_gem_free_video_secure_buf(struct am_meson_gem_object *meson_gem_obj)
+static void am_meson_gem_free_video_secure_buf(
+	struct am_meson_gem_object *meson_gem_obj)
 {
 	if (!meson_gem_obj || !meson_gem_obj->addr) {
 		DRM_ERROR("meson_gem_obj or addr is null.\n");
@@ -137,9 +144,11 @@ static void am_meson_gem_free_video_secure_buf(struct am_meson_gem_object *meson
 	DRM_DEBUG("free secure addr (%p).\n", &meson_gem_obj->addr);
 }
 
-struct am_meson_gem_object *am_meson_gem_object_create(struct drm_device *dev,
+struct am_meson_gem_object *am_meson_gem_object_create(
+	struct drm_device *dev,
 	unsigned int flags,
-	unsigned long size)
+	unsigned long size,
+	struct ion_client *client)
 {
 	struct am_meson_gem_object *meson_gem_obj = NULL;
 	int ret;
@@ -163,7 +172,7 @@ struct am_meson_gem_object *am_meson_gem_object_create(struct drm_device *dev,
 	if ((flags & MESON_USE_VIDEO_PLANE) && (flags & MESON_USE_PROTECTED))
 		ret = am_meson_gem_alloc_video_secure_buff(meson_gem_obj);
 	else
-		ret = am_meson_gem_alloc_ion_buff(meson_gem_obj, flags);
+		ret = am_meson_gem_alloc_ion_buff(client, meson_gem_obj, flags);
 	if (ret < 0) {
 		drm_gem_object_release(&meson_gem_obj->base);
 		goto error;
@@ -187,8 +196,8 @@ void am_meson_gem_object_free(struct drm_gem_object *obj)
 {
 	struct am_meson_gem_object *meson_gem_obj = to_am_meson_gem_obj(obj);
 
-	DRM_DEBUG("%s %p handle count = %d\n", __func__, meson_gem_obj,
-		  obj->handle_count);
+	DRM_DEBUG("am_meson_gem_object_free %p handle count = %d\n",
+		  meson_gem_obj, obj->handle_count);
 
 	if ((meson_gem_obj->flags & MESON_USE_VIDEO_PLANE) &&
 	    (meson_gem_obj->flags & MESON_USE_PROTECTED))
@@ -207,12 +216,12 @@ void am_meson_gem_object_free(struct drm_gem_object *obj)
 	meson_gem_obj = NULL;
 }
 
-int am_meson_gem_object_mmap(struct am_meson_gem_object *obj,
-			     struct vm_area_struct *vma)
+int am_meson_gem_object_mmap(
+	struct am_meson_gem_object *obj,
+	struct vm_area_struct *vma)
 {
 	int ret = 0;
-	struct ion_buffer *buffer = obj->ionbuffer;
-	struct ion_heap *heap = buffer->heap;
+	struct ion_buffer *buffer;
 
 	/*
 	 * Clear the VM_PFNMAP flag that was set by drm_gem_mmap(), and set the
@@ -225,18 +234,37 @@ int am_meson_gem_object_mmap(struct am_meson_gem_object *obj,
 	if (obj->base.import_attach) {
 		DRM_ERROR("Not support import buffer from other driver.\n");
 	} else {
-		ret = ion_heap_map_user(heap, buffer, vma);
+		buffer = obj->handle->buffer;
+
+		if (!buffer->heap->ops->map_user) {
+			DRM_ERROR("%s:heap does not define map to userspace\n",
+				  __func__);
+			ret = -EINVAL;
+		} else {
+			if (!(buffer->flags & ION_FLAG_CACHED))
+				vma->vm_page_prot =
+					pgprot_writecombine(vma->vm_page_prot);
+
+			mutex_lock(&buffer->lock);
+			/* now map it to userspace */
+			ret = buffer->heap->ops->map_user(
+						buffer->heap, buffer, vma);
+			mutex_unlock(&buffer->lock);
+		}
 	}
 
 	if (ret) {
-		DRM_ERROR("failure mapping buffer to userspace (%d)\n", ret);
+		DRM_ERROR("%s: failure mapping buffer to userspace (%d)\n",
+			  __func__, ret);
 		drm_gem_vm_close(vma);
 	}
 
 	return ret;
 }
 
-int am_meson_gem_mmap(struct file *filp, struct vm_area_struct *vma)
+int am_meson_gem_mmap(
+	struct file *filp,
+	struct vm_area_struct *vma)
 {
 	struct drm_gem_object *obj;
 	struct am_meson_gem_object *meson_gem_obj;
@@ -248,28 +276,33 @@ int am_meson_gem_mmap(struct file *filp, struct vm_area_struct *vma)
 
 	obj = vma->vm_private_data;
 	meson_gem_obj = to_am_meson_gem_obj(obj);
-	DRM_DEBUG("%s %p.\n", __func__, meson_gem_obj);
+	DRM_DEBUG("am_meson_gem_mmap %p.\n", meson_gem_obj);
 
 	ret = am_meson_gem_object_mmap(meson_gem_obj, vma);
 
 	return ret;
 }
 
-phys_addr_t am_meson_gem_object_get_phyaddr(struct meson_drm *drm,
+phys_addr_t am_meson_gem_object_get_phyaddr(
+	struct meson_drm *drm,
 	struct am_meson_gem_object *meson_gem,
 	size_t *len)
 {
-	*len = meson_gem->base.size;
+	if (len)
+		*len = meson_gem->base.size;
 	return meson_gem->addr;
 }
 EXPORT_SYMBOL(am_meson_gem_object_get_phyaddr);
 
-int am_meson_gem_dumb_create(struct drm_file *file_priv,
-			     struct drm_device *dev,
-			     struct drm_mode_create_dumb *args)
+int am_meson_gem_dumb_create(
+	struct drm_file *file_priv,
+	struct drm_device *dev,
+	struct drm_mode_create_dumb *args)
 {
 	int ret = 0;
 	struct am_meson_gem_object *meson_gem_obj;
+	struct meson_drm *drmdrv = dev->dev_private;
+	struct ion_client *client = (struct ion_client *)drmdrv->gem_client;
 	int min_pitch = DIV_ROUND_UP(args->width * args->bpp, 8);
 
 	args->pitch = ALIGN(min_pitch, 64);
@@ -277,8 +310,9 @@ int am_meson_gem_dumb_create(struct drm_file *file_priv,
 		args->size = args->pitch * args->height;
 
 	args->size = round_up(args->size, PAGE_SIZE);
-	meson_gem_obj = am_meson_gem_object_create(dev,
-						   args->flags, args->size);
+
+	meson_gem_obj = am_meson_gem_object_create(
+					dev, args->flags, args->size, client);
 	if (IS_ERR(meson_gem_obj))
 		return PTR_ERR(meson_gem_obj);
 
@@ -289,7 +323,7 @@ int am_meson_gem_dumb_create(struct drm_file *file_priv,
 	ret = drm_gem_handle_create(file_priv,
 				    &meson_gem_obj->base, &args->handle);
 	/* drop reference from allocate - handle holds it now. */
-	drm_gem_object_put_unlocked(&meson_gem_obj->base);
+	drm_gem_object_unreference_unlocked(&meson_gem_obj->base);
 	if (ret) {
 		DRM_ERROR("%s: create dumb handle failed %d\n",
 			  __func__, ret);
@@ -301,17 +335,21 @@ int am_meson_gem_dumb_create(struct drm_file *file_priv,
 	return 0;
 }
 
-int am_meson_gem_dumb_destroy(struct drm_file *file,
-			      struct drm_device *dev, uint32_t handle)
+int am_meson_gem_dumb_destroy(
+	struct drm_file *file,
+	struct drm_device *dev,
+	uint32_t handle)
 {
 	DRM_DEBUG("%s: destroy dumb with handle (0x%x)\n", __func__, handle);
 	drm_gem_handle_delete(file, handle);
 	return 0;
 }
 
-int am_meson_gem_dumb_map_offset(struct drm_file *file_priv,
-				 struct drm_device *dev,
-				 u32 handle, uint64_t *offset)
+int am_meson_gem_dumb_map_offset(
+	struct drm_file *file_priv,
+	struct drm_device *dev,
+	u32 handle,
+	uint64_t *offset)
 {
 	struct drm_gem_object *obj;
 	int ret = 0;
@@ -338,21 +376,25 @@ int am_meson_gem_dumb_map_offset(struct drm_file *file_priv,
 	DRM_DEBUG("offset = 0x%lx\n", (unsigned long)*offset);
 
 out:
-	drm_gem_object_put(obj);
+	drm_gem_object_unreference(obj);
 unlock:
 	mutex_unlock(&dev->struct_mutex);
 	return ret;
 }
 
-int am_meson_gem_create_ioctl(struct drm_device *dev, void *data,
-			      struct drm_file *file_priv)
+int am_meson_gem_create_ioctl(
+	struct drm_device *dev,
+	void *data,
+	struct drm_file *file_priv)
 {
 	struct am_meson_gem_object *meson_gem_obj;
+	struct meson_drm *drmdrv = dev->dev_private;
+	struct ion_client *client = (struct ion_client *)drmdrv->gem_client;
 	struct drm_meson_gem_create *args = data;
 	int ret = 0;
 
-	meson_gem_obj = am_meson_gem_object_create(dev, args->flags,
-						   args->size);
+	meson_gem_obj = am_meson_gem_object_create(
+					dev, args->flags, args->size, client);
 	if (IS_ERR(meson_gem_obj))
 		return PTR_ERR(meson_gem_obj);
 
@@ -363,7 +405,7 @@ int am_meson_gem_create_ioctl(struct drm_device *dev, void *data,
 	ret = drm_gem_handle_create(file_priv,
 				    &meson_gem_obj->base, &args->handle);
 	/* drop reference from allocate - handle holds it now. */
-	drm_gem_object_put_unlocked(&meson_gem_obj->base);
+	drm_gem_object_unreference_unlocked(&meson_gem_obj->base);
 	if (ret) {
 		DRM_ERROR("%s: create dumb handle failed %d\n",
 			  __func__, ret);
@@ -377,16 +419,28 @@ int am_meson_gem_create_ioctl(struct drm_device *dev, void *data,
 
 int am_meson_gem_create(struct meson_drm  *drmdrv)
 {
-	/*TODO??*/
+	drmdrv->gem_client = meson_ion_client_create(-1, "meson-gem");
+	if (!drmdrv->gem_client) {
+		DRM_ERROR("open ion client error\n");
+		return -EFAULT;
+	}
+
+	DRM_DEBUG("open ion client: %p\n", drmdrv->gem_client);
 	return 0;
 }
 
 void am_meson_gem_cleanup(struct meson_drm  *drmdrv)
 {
-	/*TODO??s*/
+	struct ion_client *gem_ion_client = drmdrv->gem_client;
+
+	if (gem_ion_client) {
+		DRM_DEBUG(" destroy ion client: %p\n", gem_ion_client);
+		ion_client_destroy(gem_ion_client);
+	}
 }
 
-struct sg_table *am_meson_gem_prime_get_sg_table(struct drm_gem_object *obj)
+struct sg_table *am_meson_gem_prime_get_sg_table(
+	struct drm_gem_object *obj)
 {
 	struct am_meson_gem_object *meson_gem_obj;
 	struct sg_table *dst_table = NULL;
@@ -396,11 +450,11 @@ struct sg_table *am_meson_gem_prime_get_sg_table(struct drm_gem_object *obj)
 	int ret, i;
 
 	meson_gem_obj = to_am_meson_gem_obj(obj);
-	DRM_DEBUG("%s %p.\n", __func__, meson_gem_obj);
+	DRM_DEBUG("am_meson_gem_prime_get_sg_table %p.\n", meson_gem_obj);
 
-	if (!meson_gem_obj->base.import_attach) {
-		src_table = meson_gem_obj->ionbuffer->sg_table;
-		dst_table = kmalloc(sizeof(*dst_table), GFP_KERNEL);
+	if (meson_gem_obj->base.import_attach == false) {
+		src_table = meson_gem_obj->handle->buffer->sg_table;
+		dst_table = kmalloc(sizeof(struct sg_table), GFP_KERNEL);
 		if (!dst_table) {
 			ret = -ENOMEM;
 			return ERR_PTR(ret);
@@ -421,16 +475,17 @@ struct sg_table *am_meson_gem_prime_get_sg_table(struct drm_gem_object *obj)
 			dst_sg = sg_next(dst_sg);
 			src_sg = sg_next(src_sg);
 		}
+
 		return dst_table;
 	}
 	DRM_ERROR("Not support import buffer from other driver.\n");
 	return NULL;
 }
 
-struct drm_gem_object *
-am_meson_gem_prime_import_sg_table(struct drm_device *dev,
-				   struct dma_buf_attachment *attach,
-				   struct sg_table *sgt)
+struct drm_gem_object *am_meson_gem_prime_import_sg_table(
+	struct drm_device *dev,
+	struct dma_buf_attachment *attach,
+	struct sg_table *sgt)
 {
 	struct am_meson_gem_object *meson_gem_obj;
 	int ret;
@@ -456,24 +511,21 @@ am_meson_gem_prime_import_sg_table(struct drm_device *dev,
 
 void *am_meson_gem_prime_vmap(struct drm_gem_object *obj)
 {
-	struct am_meson_gem_object *meson_gem_obj = to_am_meson_gem_obj(obj);
-
-	if (meson_gem_obj->is_uvm) {
-		DRM_ERROR("UVM cannot call vmap.\n");
-		return NULL;
-	}
-	DRM_DEBUG("%s %p.\n", __func__, obj);
+	DRM_DEBUG("am_meson_gem_prime_vmap %p.\n", obj);
 
 	return NULL;
 }
 
-void am_meson_gem_prime_vunmap(struct drm_gem_object *obj, void *vaddr)
+void am_meson_gem_prime_vunmap(
+	struct drm_gem_object *obj,
+	void *vaddr)
 {
-	DRM_DEBUG("%s nothing to do.\n", __func__);
+	DRM_DEBUG("am_meson_gem_prime_vunmap nothing to do.\n");
 }
 
-int am_meson_gem_prime_mmap(struct drm_gem_object *obj,
-			    struct vm_area_struct *vma)
+int am_meson_gem_prime_mmap(
+	struct drm_gem_object *obj,
+	struct vm_area_struct *vma)
 {
 	struct am_meson_gem_object *meson_gem_obj;
 	int ret;
@@ -483,7 +535,7 @@ int am_meson_gem_prime_mmap(struct drm_gem_object *obj,
 		return ret;
 
 	meson_gem_obj = to_am_meson_gem_obj(obj);
-	DRM_DEBUG("%s %p.\n", __func__, meson_gem_obj);
+	DRM_DEBUG("am_meson_gem_prime_mmap %p.\n", meson_gem_obj);
 
 	return am_meson_gem_object_mmap(meson_gem_obj, vma);
 }
@@ -494,7 +546,7 @@ static void am_meson_drm_gem_unref_uvm(struct uvm_buf_obj *ubo)
 
 	meson_gem_obj = uvm_to_gem_obj(ubo);
 
-	drm_gem_object_put_unlocked(&meson_gem_obj->base);
+	drm_gem_object_unreference_unlocked(&meson_gem_obj->base);
 }
 
 static struct sg_table *am_meson_gem_create_sg_table(struct drm_gem_object *obj)
@@ -529,7 +581,7 @@ static struct sg_table *am_meson_gem_create_sg_table(struct drm_gem_object *obj)
 
 		return dst_table;
 	} else if (meson_gem_obj->is_afbc) {
-		src_table = meson_gem_obj->ionbuffer->sg_table;
+		src_table = meson_gem_obj->handle->buffer->sg_table;
 		dst_table = kmalloc(sizeof(*dst_table), GFP_KERNEL);
 		if (!dst_table) {
 			ret = -ENOMEM;
@@ -555,7 +607,8 @@ static struct sg_table *am_meson_gem_create_sg_table(struct drm_gem_object *obj)
 	return NULL;
 }
 
-struct dma_buf *am_meson_drm_gem_prime_export(struct drm_gem_object *obj,
+struct dma_buf *am_meson_drm_gem_prime_export(struct drm_device *dev,
+					      struct drm_gem_object *obj,
 					      int flags)
 {
 	struct dma_buf *dmabuf;
@@ -573,7 +626,7 @@ struct dma_buf *am_meson_drm_gem_prime_export(struct drm_gem_object *obj,
 				am_meson_gem_create_sg_table(obj);
 			else
 				info.sgt =
-				meson_gem_obj->ionbuffer->sg_table;
+				meson_gem_obj->handle->buffer->sg_table;
 
 			if (meson_gem_obj->is_afbc)
 				info.flags |= BIT(UVM_FAKE_ALLOC);
@@ -584,7 +637,6 @@ struct dma_buf *am_meson_drm_gem_prime_export(struct drm_gem_object *obj,
 			info.obj = &meson_gem_obj->ubo;
 			info.free = am_meson_drm_gem_unref_uvm;
 			dmabuf_bind_uvm_alloc(dmabuf, &info);
-			drm_gem_object_get(obj);
 
 			if (meson_gem_obj->is_afbc ||
 			    meson_gem_obj->is_secure) {
@@ -596,7 +648,7 @@ struct dma_buf *am_meson_drm_gem_prime_export(struct drm_gem_object *obj,
 		return dmabuf;
 	}
 
-	return drm_gem_prime_export(obj, flags);
+	return drm_gem_prime_export(dev, obj, flags);
 }
 
 struct drm_gem_object *am_meson_drm_gem_prime_import(struct drm_device *dev,
@@ -612,7 +664,7 @@ struct drm_gem_object *am_meson_drm_gem_prime_import(struct drm_device *dev,
 		meson_gem_obj = uvm_to_gem_obj(ubo);
 
 		if (ubo->dev == dev->dev) {
-			drm_gem_object_get(&meson_gem_obj->base);
+			drm_gem_object_reference(&meson_gem_obj->base);
 			return &meson_gem_obj->base;
 		}
 	}

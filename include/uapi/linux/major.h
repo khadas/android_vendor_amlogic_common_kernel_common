@@ -1,10 +1,9 @@
-/* SPDX-License-Identifier: GPL-2.0 WITH Linux-syscall-note */
 #ifndef _LINUX_MAJOR_H
 #define _LINUX_MAJOR_H
 
 /*
  * This file has definitions for major device numbers.
- * For the device number assignments, see Documentation/admin-guide/devices.rst.
+ * For the device number assignments, see Documentation/devices.txt.
  */
 
 #define UNNAMED_MAJOR		0
@@ -176,29 +175,5 @@
 
 #define BLOCK_EXT_MAJOR		259
 #define SCSI_OSD_MAJOR		260	/* open-osd's OSD scsi device */
-
-/* Amlogic extension */
-#define AML_BASE	        (270)
-#define AMSTREAM_MAJOR      (0 + (AML_BASE))
-#define AUDIODSP_MAJOR      (2 + (AML_BASE))
-#ifdef CONFIG_AMLOGIC_MODIFY
-#define FIRMWARE_MAJOR      (3 + (AML_BASE))
-#endif
-#define AMVIDEO_MAJOR       (9 + (AML_BASE))
-#define AMAUDIO_MAJOR       (11 + (AML_BASE))
-#define AMVIDEO2_MAJOR      (12 + (AML_BASE))
-#define AMAUDIO2_MAJOR      (13 + (AML_BASE))
-#define VFM_MAJOR           (14 + (AML_BASE))
-#define IONVIDEO_MAJOR      (15 + (AML_BASE))
-#define VAD_MAJOR           (16 + (AML_BASE))
-#define VIDEOSYNC_MAJOR     (17 + (AML_BASE))
-#define V4LVIDEO_MAJOR      (18 + (AML_BASE))
-#define VIDEO_COMPOSER_MAJOR    (19 + (AML_BASE))
-#define TSYNC_MAJOR         (20 + (AML_BASE))
-#define VIDEOFRAME_MAJOR    (21 + (AML_BASE))
-#define MEDIASYNC_MAJOR     (22 + (AML_BASE))
-#define AMSYNC_MAJOR		(24 + (AML_BASE))
-#define AMSYNC_SESSION_MAJOR	(25 + (AML_BASE))
-#define DI_V4L_MAJOR            (27 + (AML_BASE))
 
 #endif

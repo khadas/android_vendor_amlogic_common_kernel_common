@@ -1,8 +1,19 @@
-/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * sound/soc/codecs/amlogic/aml_codec_t9015.h
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
-
 #ifndef AML_T9015_H_
 #define AML_T9015_H_
 
@@ -31,6 +42,7 @@
 #define ADC_VOL_CTR_PGA_IN_CONFIG       ACODEC_TOP_ADDR(0x04)
 #define DAC_GAIN_SEL_H              0x1F
 #define DAC_GAIN_SEL_L              0x17
+
 
 #define DAC_VOL_CTR_DAC_SOFT_MUTE       ACODEC_TOP_ADDR(0x08)
 #define DACL_VC                     0x18

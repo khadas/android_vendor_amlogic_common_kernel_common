@@ -1,4 +1,3 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
  * drivers/amlogic/media/deinterlace/detect3d.c
  *
@@ -22,8 +21,7 @@
 
 #include <linux/amlogic/media/frame_provider/tvin/tvin.h>
 #include <linux/amlogic/iomap.h>
-/* media module used media/registers/cpu_version.h since kernel 5.4 */
-#include <linux/amlogic/media/registers/cpu_version.h>
+#include <linux/amlogic/cpu_version.h>
 #include "register.h"
 #include "register_nr4.h"
 #include "detect3d.h"
@@ -226,6 +224,7 @@ det3d_info.tscore_3d_tb_accum + (tb_score <= 0) -
 		 */
 		det3d_info.chs_valid_his[0] = chessbd_score;
 		det3d_info.int_valid_his[0] = int_score;
+
 
 		for (m = 0; m < 8; m++) {
 			tmp1 = tmp1 + (det3d_info.chs_valid_his[m]);

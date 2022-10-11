@@ -1,4 +1,3 @@
-/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
  * drivers/amlogic/media/vout/cvbs/enc_clk_config.h
  *
@@ -21,8 +20,6 @@
 
 extern unsigned int cvbs_clk_path;
 void set_vmode_clk(void);
-void disable_vmode_clk(void);
-void cvbs_out_vid_pll_set(unsigned int _reg, unsigned int _value,
-			  unsigned int _start, unsigned int _len);
-unsigned int cvbs_out_vid_pll_read(unsigned int _reg);
+extern void disable_vmode_clk(void);
+
 #endif

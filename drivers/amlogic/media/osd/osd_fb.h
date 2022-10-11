@@ -1,6 +1,18 @@
-/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/amlogic/media/osd/osd_fb.h
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
 #ifndef _OSD_FB_H_
@@ -11,6 +23,7 @@
 #include <linux/fb.h>
 #include <linux/types.h>
 
+
 /* Local Headers */
 #include "osd.h"
 
@@ -20,15 +33,15 @@
 #define FBIO_WAITFORVSYNC_64       _IOW('F', 0x21, __u32)
 
 struct osd_fb_dev_s {
-	struct mutex lock;/*osd dev mutex*/
+	struct mutex lock;
 	struct fb_info *fb_info;
 	struct platform_device *dev;
 	phys_addr_t fb_mem_paddr;
 	void __iomem *fb_mem_vaddr;
-	ulong fb_len;
+	u32 fb_len;
 	phys_addr_t fb_mem_afbc_paddr[OSD_MAX_BUF_NUM];
 	void __iomem *fb_mem_afbc_vaddr[OSD_MAX_BUF_NUM];
-	ulong fb_afbc_len[OSD_MAX_BUF_NUM];
+	u32 fb_afbc_len[OSD_MAX_BUF_NUM];
 	const struct color_bit_define_s *color;
 	enum vmode_e vmode;
 	struct osd_ctl_s osd_ctl;
@@ -54,12 +67,13 @@ struct fb_dmabuf_export {
 #define OSD_SECOND_GROUP_START 4
 #define OSD_END 7
 
-phys_addr_t get_fb_rmem_paddr(int index);
-void __iomem *get_fb_rmem_vaddr(int index);
-size_t get_fb_rmem_size(int index);
-int osd_blank(int blank_mode, struct fb_info *info);
 const struct color_bit_define_s *
-	_find_color_format(struct fb_var_screeninfo *var);
+_find_color_format(struct fb_var_screeninfo *var);
+
+extern phys_addr_t get_fb_rmem_paddr(int index);
+extern void __iomem *get_fb_rmem_vaddr(int index);
+extern size_t get_fb_rmem_size(int index);
+extern int osd_blank(int blank_mode, struct fb_info *info);
 extern struct osd_fb_dev_s *gp_fbdev_list[];
 extern const struct color_bit_define_s default_color_format_array[];
 #endif

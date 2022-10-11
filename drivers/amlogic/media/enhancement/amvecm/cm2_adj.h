@@ -1,4 +1,3 @@
-/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
  * drivers/amlogic/media/enhancement/amvecm/cm2_adj.h
  *
@@ -18,6 +17,7 @@
 
 #ifndef __CM2_ADJ__
 #define __CM2_ADJ__
+
 
 enum ecm2colormd {
 	ecm2colormd_purple = 0,

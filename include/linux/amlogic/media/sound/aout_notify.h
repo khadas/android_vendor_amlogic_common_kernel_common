@@ -1,6 +1,17 @@
-/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * include/linux/amlogic/media/sound/aout_notify.h
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
  *
  */
 
@@ -23,7 +34,7 @@
 #define AOUT_EVENT_RAWDATA_MAT_MLP              0xC
 #define AOUT_EVENT_RAWDATA_DST                  0xD
 #define AOUT_EVENT_RAWDATA_WMA_PRO              0xE
-#define AOUT_EVENT_RAWDATA_DTS_HD_MA (AOUT_EVENT_RAWDATA_DTS_HD | (1 << 8))
+#define AOUT_EVENT_RAWDATA_DTS_HD_MA (AOUT_EVENT_RAWDATA_DTS_HD|(1<<8))
 
 int aout_notifier_call_chain(unsigned long val, void *v);
 int aout_unregister_client(struct notifier_block *p);

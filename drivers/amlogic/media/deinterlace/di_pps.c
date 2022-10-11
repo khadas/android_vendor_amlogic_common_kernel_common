@@ -1,4 +1,3 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
  * drivers/amlogic/media/deinterlace/di_pps.c
  *
@@ -38,6 +37,7 @@
 #define TOTAL_FILTERS        10
 
 #define MAX_NONLINEAR_FACTOR    0x40
+
 
 const u32 vpp_filter_coefs_bicubic_sharp[] = {
 	3,
@@ -211,19 +211,22 @@ static int chroma_filter_table[] = {
 	COEF_3D_FILTER		  /* can not change */
 };
 
+
 static unsigned int vert_scaler_filter = 0xff;
-module_param_named(di_vert_scaler_filter, vert_scaler_filter, uint, 0664);
+module_param(vert_scaler_filter, uint, 0664);
+MODULE_PARM_DESC(vert_scaler_filter, "vert_scaler_filter");
 
 static unsigned int vert_chroma_scaler_filter = 0xff;
-module_param_named(di_vert_chroma_scaler_filter, vert_chroma_scaler_filter,
-		   uint, 0664);
+module_param(vert_chroma_scaler_filter, uint, 0664);
+MODULE_PARM_DESC(vert_chroma_scaler_filter, "vert_chroma_scaler_filter");
 
 static unsigned int horz_scaler_filter = 0xff;
 module_param(horz_scaler_filter, uint, 0664);
 MODULE_PARM_DESC(horz_scaler_filter, "horz_scaler_filter");
 
 bool pre_scaler_en = true;
-module_param_named(di_pre_scaler_en, pre_scaler_en, bool, 0664);
+module_param(pre_scaler_en, bool, 0664);
+MODULE_PARM_DESC(pre_scaler_en, "pre_scaler_en");
 #endif
 unsigned int di_filt_coef0[] =   //bicubic
 {
@@ -335,6 +338,7 @@ unsigned int di_filt_coef2[] =  //2 point bilinear, bank_length == 2
 	 0x423e0000,
 	 0x40400000
 };
+
 
 #define ZOOM_BITS       20
 #define PHASE_BITS      16
@@ -1379,4 +1383,5 @@ void dump_hdownscler_reg(unsigned int base_addr)
 	}
 	pr_info("-----dump hdownscler end-----\n");
 }
+
 

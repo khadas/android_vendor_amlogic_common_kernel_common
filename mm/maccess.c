@@ -1,4 +1,3 @@
-// SPDX-License-Identifier: GPL-2.0-only
 /*
  * Access kernel memory without faulting.
  */
@@ -80,7 +79,7 @@ long __probe_user_read(void *dst, const void __user *src, size_t size)
 	mm_segment_t old_fs = get_fs();
 
 	set_fs(USER_DS);
-	if (access_ok(src, size))
+	if (access_ok(VERIFY_READ, src, size))
 		ret = probe_read_common(dst, src, size);
 	set_fs(old_fs);
 
@@ -133,7 +132,7 @@ long __probe_user_write(void __user *dst, const void *src, size_t size)
 	mm_segment_t old_fs = get_fs();
 
 	set_fs(USER_DS);
-	if (access_ok(dst, size))
+	if (access_ok(VERIFY_WRITE, dst, size))
 		ret = probe_write_common(dst, src, size);
 	set_fs(old_fs);
 
@@ -145,7 +144,7 @@ EXPORT_SYMBOL_GPL(probe_user_write);
  * strncpy_from_unsafe: - Copy a NUL terminated string from unsafe address.
  * @dst:   Destination address, in kernel space.  This buffer must be at
  *         least @count bytes long.
- * @unsafe_addr: Unsafe address.
+ * @src:   Unsafe address.
  * @count: Maximum number of bytes to copy, including the trailing NUL.
  *
  * Copies a NUL-terminated string from unsafe address to kernel buffer.

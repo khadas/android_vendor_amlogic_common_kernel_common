@@ -1,14 +1,15 @@
-// SPDX-License-Identifier: GPL-2.0
-#include "cache.h"
 #include "debug.h"
-#include "strbuf.h"
+#include "util.h"
 #include <linux/kernel.h>
-#include <linux/string.h>
-#include <linux/zalloc.h>
-#include <errno.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <unistd.h>
+
+int prefixcmp(const char *str, const char *prefix)
+{
+	for (; ; str++, prefix++)
+		if (!*prefix)
+			return 0;
+		else if (*str != *prefix)
+			return (unsigned char)*prefix - (unsigned char)*str;
+}
 
 /*
  * Used as the default ->buf value, so that people can always assume

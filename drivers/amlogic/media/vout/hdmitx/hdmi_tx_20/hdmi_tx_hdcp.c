@@ -1,6 +1,18 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/amlogic/media/vout/hdmitx/hdmi_tx_20/hdmi_tx_hdcp.c
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
 #include <linux/version.h>
@@ -28,16 +40,19 @@
 #include <linux/list.h>
 #include <linux/spinlock.h>
 #include <linux/spinlock_types.h>
-#include <linux/extcon-provider.h>
+#include <linux/extcon.h>
+#include <linux/uaccess.h>
+/* #include <mach/am_regs.h> */
 #include <linux/amlogic/media/vout/hdmi_tx/hdmi_info_global.h>
 #include <linux/amlogic/media/vout/hdmi_tx/hdmi_tx_module.h>
-#include <linux/uaccess.h>
 #include "hw/common.h"
 #include "hdmi_tx_hdcp.h"
 /*
  * hdmi_tx_hdcp.c
  * version 1.1
  */
+
+#define DEVICE_NAME "amhdmitx"
 
 static int hdmi_authenticated;
 
@@ -188,15 +203,23 @@ static int hdmitx_hdcp_task(void *data)
 {
 	static int auth_trigger;
 	struct hdmitx_dev *hdev = (struct hdmitx_dev *)data;
+	unsigned int hdcp_mode;
 
 	INIT_DELAYED_WORK(&hdev->work_do_hdcp, _hdcp_do_work);
 	while (hdev->hpd_event != 0xff) {
-		hdmi_authenticated = hdev->hwop.cntlddc(hdev,
-			DDC_HDCP_GET_AUTH, 0);
+		if (hdev->drm_feature) {
+			if (hdev->hwop.am_hdmitx_hdcp_result)
+				hdev->hwop.am_hdmitx_hdcp_result(&hdcp_mode,
+				&hdmi_authenticated);
+		} else {
+			hdmi_authenticated = hdev->hwop.cntlddc(hdev,
+				DDC_HDCP_GET_AUTH, 0);
+			hdcp_mode = hdev->hdcp_mode;
+		}
 		hdmitx_hdcp_status(hdmi_authenticated);
 		if (auth_trigger != hdmi_authenticated) {
 			auth_trigger = hdmi_authenticated;
-			pr_info("hdcptx: %d  auth: %d\n", hdev->hdcp_mode,
+			pr_info("hdcptx: %d  auth: %d\n", hdcp_mode,
 				auth_trigger);
 		}
 		msleep_interruptible(200);
@@ -252,7 +275,8 @@ static ssize_t hdcplog_read(struct file *file, char __user *buf,
 	int i = 0;
 	char c;
 
-	if ((file->f_flags & O_NONBLOCK) && (hdcplog_buf.rd_pos == hdcplog_buf.wr_pos))
+	if ((file->f_flags & O_NONBLOCK) &&
+	    (hdcplog_buf.rd_pos == hdcplog_buf.wr_pos))
 		return  -EAGAIN;
 
 	if (!buf || !count)
@@ -281,13 +305,13 @@ const struct file_operations hdcplog_ops = {
 
 static struct dentry *hdmitx_dbgfs;
 
-int hdmitx_hdcp_init(void)
+static int __init hdmitx_hdcp_init(void)
 {
 	struct hdmitx_dev *hdev = get_hdmitx_device();
 	struct dentry *entry;
 
-	pr_info(HDCP "%s\n", __func__);
-	if (!hdev->hdtx_dev) {
+	pr_info(HDCP "hdmitx_hdcp_init\n");
+	if (hdev->hdtx_dev == NULL) {
 		pr_info(HDCP "exit for null device of hdmitx!\n");
 		return -ENODEV;
 	}
@@ -296,7 +320,7 @@ int hdmitx_hdcp_init(void)
 	init_waitqueue_head(&hdcplog_buf.wait);
 
 	hdev->task_hdcp = kthread_run(hdmitx_hdcp_task,	(void *)hdev,
-				      "kthread_hdcp");
+		"kthread_hdcp");
 
 	hdmitx_dbgfs = hdmitx_get_dbgfsdentry();
 	if (!hdmitx_dbgfs)
@@ -313,7 +337,7 @@ int hdmitx_hdcp_init(void)
 	return 0;
 }
 
-void __exit hdmitx_hdcp_exit(void)
+static void __exit hdmitx_hdcp_exit(void)
 {
 	struct hdmitx_dev *hdev = get_hdmitx_device();
 
@@ -321,5 +345,12 @@ void __exit hdmitx_hdcp_exit(void)
 		cancel_delayed_work_sync(&hdev->work_do_hdcp);
 }
 
+
 MODULE_PARM_DESC(hdmi_authenticated, "\n hdmi_authenticated\n");
 module_param(hdmi_authenticated, int, 0444);
+
+module_init(hdmitx_hdcp_init);
+module_exit(hdmitx_hdcp_exit);
+MODULE_DESCRIPTION("AMLOGIC HDMI TX HDCP driver");
+MODULE_LICENSE("GPL");
+

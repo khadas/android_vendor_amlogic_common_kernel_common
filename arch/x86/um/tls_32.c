@@ -6,7 +6,7 @@
 #include <linux/percpu.h>
 #include <linux/sched.h>
 #include <linux/syscalls.h>
-#include <linux/uaccess.h>
+#include <asm/uaccess.h>
 #include <asm/ptrace-abi.h>
 #include <os.h>
 #include <skas.h>
@@ -215,12 +215,14 @@ static int set_tls_entry(struct task_struct* task, struct user_desc *info,
 	return 0;
 }
 
-int arch_set_tls(struct task_struct *new, unsigned long tls)
+int arch_copy_tls(struct task_struct *new)
 {
 	struct user_desc info;
 	int idx, ret = -EFAULT;
 
-	if (copy_from_user(&info, (void __user *) tls, sizeof(info)))
+	if (copy_from_user(&info,
+			   (void __user *) UPT_SI(&new->thread.regs.regs),
+			   sizeof(info)))
 		goto out;
 
 	ret = -EINVAL;

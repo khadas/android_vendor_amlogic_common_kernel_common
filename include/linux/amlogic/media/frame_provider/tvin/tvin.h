@@ -1,6 +1,18 @@
-/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * include/linux/amlogic/media/frame_provider/tvin/tvin.h
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
 #ifndef __TVIN_H
@@ -25,6 +37,14 @@ enum adc_sel {
 	ADC_DTV_DEMOD = 4,
 	ADC_DTV_DEMODPLL = 8,
 	ADC_MAX,
+};
+
+enum filter_sel {
+	FILTER_ATV_DEMOD = 1,
+	FILTER_TVAFE = 2,
+	FILTER_DTV_DEMOD = 4,
+	FILTER_DTV_DEMODT2 = 8,
+	FILTER_MAX,
 };
 
 /* *********************************************************************** */
@@ -62,7 +82,6 @@ enum tvin_port_e {
 	TVIN_PORT_VIU1_WB0_OSD1,
 	TVIN_PORT_VIU1_WB0_OSD2,
 	TVIN_PORT_VIU1_WB0_VPP,
-	TVIN_PORT_VIU1_WB0_VDIN_BIST,
 	TVIN_PORT_VIU1_WB0_POST_BLEND,
 	TVIN_PORT_VIU1_WB1_VD1,
 	TVIN_PORT_VIU1_WB1_VD2,
@@ -77,28 +96,6 @@ enum tvin_port_e {
 	TVIN_PORT_MIPI = 0x00010000,
 	TVIN_PORT_ISP = 0x00020000,
 	TVIN_PORT_MAX = 0x80000000,
-};
-
-enum viu_mux_port {
-	VIU_MUX_SEL_ENCI = 1,
-	VIU_MUX_SEL_ENCP = 2,
-	VIU_MUX_SEL_ENCL = 4,
-	VIU_MUX_SEL_WB0 = 8,
-	VIU_MUX_SEL_WB1 = 16,
-	VIU_MUX_SEL_WB2 = 32,/*t7*/
-	VIU_MUX_SEL_WB3 = 64,/*t7*/
-};
-
-enum wb_chan_sel {
-	WB_CHAN_DISABLE = 0,
-	WB_CHAN_SEL_POST_BLD_VD1 = 1,
-	WB_CHAN_SEL_POST_BLD_VD2 = 2,
-	WB_CHAN_SEL_POST_OSD1 = 3,
-	WB_CHAN_SEL_POST_OSD2 = 4,
-	WB_CHAN_SEL_POST_DOUT = 5,
-	WB_CHAN_SEL_VPP_DOUT = 6,
-	WB_CHAN_SEL_PRE_BLD_VD1 = 7,/*t7*/
-	WB_CHAN_SEL_POST_VD3 = 8,/*t7*/
 };
 
 const char *tvin_port_str(enum tvin_port_e port);
@@ -322,9 +319,8 @@ enum tvin_aspect_ratio_e {
 	TVIN_ASPECT_MAX,
 };
 
-const char *tvin_trans_color_range_str(enum
-						tvin_color_fmt_range_e
-						color_range);
+const char *tvin_trans_color_range_str(
+	enum tvin_color_fmt_range_e color_range);
 
 enum tvin_force_color_range_e {
 	COLOR_RANGE_AUTO = 0,
@@ -333,8 +329,9 @@ enum tvin_force_color_range_e {
 	COLOR_RANGE_NULL,
 };
 
-const char *tvin_trans_force_range_str(enum tvin_force_color_range_e
-				       force_range);
+const char *tvin_trans_force_range_str(
+	enum tvin_force_color_range_e force_range);
+
 const char *tvin_color_fmt_str(enum tvin_color_fmt_e color_fmt);
 enum tvin_scan_mode_e {
 	TVIN_SCAN_MODE_NULL = 0,
@@ -417,7 +414,7 @@ struct tvin_parm_s {
 	unsigned short dest_height;	/* for vdin vertical scale down */
 	bool h_reverse;		/* for vdin horizontal reverse */
 	bool v_reverse;		/* for vdin vertical reverse */
-	unsigned int reserved;
+	unsigned int reserved;	/* enum param_flag */
 };
 
 /* ************************************************************************* */
@@ -492,6 +489,8 @@ bool IS_TVAFE_AVIN_SRC(enum tvin_port_e port);
 #define TVIN_IOC_G_BUF_INFO         _IOR(_TM_T, 0x08, struct tvin_buf_info_s)
 #define TVIN_IOC_START_GET_BUF      _IO(_TM_T, 0x09)
 #define TVIN_IOC_G_EVENT_INFO	_IOW(_TM_T, 0x0a, struct vdin_event_info)
+#define TVIN_IOC_G_BUF		_IOR(_TM_T, 0x0b, struct vdin_para_to_enc_s)
+#define TVIN_IOC_P_BUF		_IOW(_TM_T, 0x0c, struct vdin_para_to_enc_s)
 
 #define TVIN_IOC_GET_BUF            _IOR(_TM_T, 0x10, struct tvin_video_buf_s)
 #define TVIN_IOC_PAUSE_DEC          _IO(_TM_T, 0x41)
@@ -516,7 +515,6 @@ bool IS_TVAFE_AVIN_SRC(enum tvin_port_e port);
 #define TVIN_IOC_S_PC_MODE		_IOW(_TM_T, 0x50, unsigned int)
 #define TVIN_IOC_S_FRAME_WR_EN		_IOW(_TM_T, 0x51, unsigned int)
 #define TVIN_IOC_G_INPUT_TIMING		_IOW(_TM_T, 0x52, struct tvin_format_s)
-
 
 #define TVIN_IOC_S_CANVAS_RECOVERY  _IO(_TM_T, 0x0a)
 /* TVAFE */
@@ -583,7 +581,6 @@ struct rx_audio_stat_s {
 	 * all others [all of 8ch]
 	 */
 	int aud_alloc;
-	u8 ch_sts[7];
 };
 
 #ifdef CONFIG_AMLOGIC_MEDIA_ADC
@@ -595,7 +592,10 @@ int adc_get_pll_flag(void);
 /*ADC_EN_DTV_DEMOD	0x4*/
 /*ADC_EN_DTV_DEMODPLL	0x8*/
 int adc_set_pll_cntl(bool on, enum adc_sel module_sel, void *p_para_);
-void adc_set_ddemod_default(enum fe_delivery_system delsys);/* add for dtv demod */
+/* add for dtv demod */
+void adc_set_ddemod_default(enum fe_delivery_system delsys);
+int adc_set_filter_ctrl(bool on, enum filter_sel module_sel, void *data);
+void tvafe_set_ddemod_default(void);
 #else
 static inline void adc_pll_down(void)
 {
@@ -610,13 +610,20 @@ static inline int adc_get_pll_flag(void)
 	return 0;
 }
 
-static inline int adc_set_pll_cntl(bool on, enum adc_sel module_sel, void *p_para_)
+static inline int adc_set_pll_cntl(bool on, enum adc_sel module_sel,
+				   void *p_para_)
 {
 	return 0;
 }
 
 static inline void adc_set_ddemod_default(enum fe_delivery_system delsys)
 {
+}
+
+static inline int adc_set_filter_ctrl(bool on, enum filter_sel module_sel,
+				      void *data)
+{
+	return 0;
 }
 #endif
 
@@ -626,4 +633,5 @@ bool rx_get_atmos_flag(void);
 u_char rx_edid_get_aud_sad(u_char *sad_data);
 bool rx_edid_set_aud_sad(u_char *sad, u_char len);
 int rx_set_audio_param(uint32_t param);
+
 #endif

@@ -1,4 +1,3 @@
-/* SPDX-License-Identifier: LGPL-2.1+ WITH Linux-syscall-note */
 /*
  * include/linux/amlogic/aml_key.h
  *
@@ -30,7 +29,6 @@ enum user_id {
 	CRYPTO_T3 = 0x103,
 	CRYPTO_T4 = 0x104,
 	CRYPTO_T5 = 0x105,
-	CRYPTO_ANY = 0x106,
 };
 
 enum key_algo {

@@ -1,5 +1,5 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
-/*
+/* SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+ *
  * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
  */
 
@@ -77,6 +77,14 @@ u32 isr_m4;
 #define PAYLOAD_OFFSET		0x400
 #define RX_PAYLOAD(chan)	((chan) * PAYLOAD_OFFSET)
 #define TX_PAYLOAD(chan)	((chan) * PAYLOAD_OFFSET + PAYLOAD_MAX_SIZE)
+
+struct mhu_ctlr {
+	struct device *dev;
+	void __iomem *mbox_base;
+	void __iomem *payload_base;
+	struct mbox_controller mbox_con;
+	struct mhu_chan *channels;
+};
 
 void bl40_rx_callback(struct mbox_client *cl, void *msg)
 {
@@ -258,7 +266,6 @@ static int mhu_probe(struct platform_device *pdev)
 	if (IS_ERR(ctlr->payload_base))
 		return PTR_ERR(ctlr->payload_base);
 
-	mutex_init(&ctlr->mutex);
 	ctlr->dev = dev;
 	platform_set_drvdata(pdev, ctlr);
 
@@ -377,13 +384,18 @@ static struct platform_driver mhu_driver = {
 	},
 };
 
-int __init aml_mhu_init(void)
+static int __init mhu_init(void)
 {
 	return platform_driver_register(&mhu_driver);
 }
+core_initcall(mhu_init);
 
-void __exit aml_mhu_exit(void)
+static void __exit mhu_exit(void)
 {
 	platform_driver_unregister(&mhu_driver);
 }
+module_exit(mhu_exit);
 
+MODULE_AUTHOR("yan wang <yan.wang@amlogic.com>");
+MODULE_DESCRIPTION("MESON MHU mailbox driver");
+MODULE_LICENSE("GPL");

@@ -1,3 +1,3 @@
-include drivers/amlogic/media/enhancement/amdolby_vision/Makefile
-
-include drivers/amlogic/media/enhancement/amvecm/Makefile
+obj-$(CONFIG_AMLOGIC_MEDIA_ENHANCEMENT_VECM)		+= amvecm/
+obj-$(CONFIG_AMLOGIC_MEDIA_ENHANCEMENT_DOLBYVISION)	+= amdolby_vision/
+obj-$(CONFIG_AMLOGIC_MEDIA_ENHANCEMENT_PRIME_SL)	+= amprime_sl/

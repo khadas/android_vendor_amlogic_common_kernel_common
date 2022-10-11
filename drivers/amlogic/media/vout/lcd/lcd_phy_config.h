@@ -1,23 +1,29 @@
-/* SPDX-License-Identifier: GPL-2.0+ */
 /*
+ * drivers/amlogic/media/vout/lcd/lcd_phy_config.h
  *
- * Copyright (C) 2019 Amlogic, Inc. All rights reserved.
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
  *
  */
 
 #ifndef __AML_LCD_PHY_CONFIG_H__
 #define __AML_LCD_PHY_CONFIG_H__
-#include <linux/amlogic/media/vout/lcd/lcd_vout.h>
 
 struct lcd_phy_ctrl_s {
-	unsigned int lane_lock;
-	unsigned int ctrl_bit_on;
-	void (*phy_set_lvds)(struct aml_lcd_drv_s *pdrv, int status);
-	void (*phy_set_vx1)(struct aml_lcd_drv_s *pdrv, int status);
-	void (*phy_set_mlvds)(struct aml_lcd_drv_s *pdrv, int status);
-	void (*phy_set_p2p)(struct aml_lcd_drv_s *pdrv, int status);
-	void (*phy_set_mipi)(struct aml_lcd_drv_s *pdrv, int status);
-	void (*phy_set_edp)(struct aml_lcd_drv_s *pdrv, int status);
+	void (*phy_set_lvds)(struct lcd_config_s *pconf, int status);
+	void (*phy_set_vx1)(struct lcd_config_s *pconf, int status);
+	void (*phy_set_mlvds)(struct lcd_config_s *pconf, int status);
+	void (*phy_set_p2p)(struct lcd_config_s *pconf, int status);
+	void (*phy_set_mipi)(struct lcd_config_s *pconf, int status);
 };
 
 /* -------------------------- */
@@ -55,11 +61,11 @@ struct lcd_phy_ctrl_s {
 #define MIPI_PHY_LANE_WIDTH      5
 
 /* MIPI-DSI */
-#define DSI_LANE_0              BIT(4)
-#define DSI_LANE_1              BIT(3)
-#define DSI_LANE_CLK            BIT(2)
-#define DSI_LANE_2              BIT(1)
-#define DSI_LANE_3              BIT(0)
+#define DSI_LANE_0              (1 << 4)
+#define DSI_LANE_1              (1 << 3)
+#define DSI_LANE_CLK            (1 << 2)
+#define DSI_LANE_2              (1 << 1)
+#define DSI_LANE_3              (1 << 0)
 #define DSI_LANE_COUNT_1        (DSI_LANE_CLK | DSI_LANE_0)
 #define DSI_LANE_COUNT_2        (DSI_LANE_CLK | DSI_LANE_0 | DSI_LANE_1)
 #define DSI_LANE_COUNT_3        (DSI_LANE_CLK | DSI_LANE_0 |\

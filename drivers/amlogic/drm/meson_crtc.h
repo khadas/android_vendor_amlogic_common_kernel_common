@@ -1,6 +1,18 @@
-/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/amlogic/drm/meson_crtc.h
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
 #ifndef __MESON_CRTC_H
@@ -31,12 +43,10 @@ struct am_meson_crtc_state {
 	u32 hdr_policy;
 	u32 dv_policy;
 	struct video_out_fence_state fence_state;
-
-	int uboot_mode_init;
 };
 
 struct am_meson_video_out_fence {
-	struct dma_fence *fence;
+	struct fence *fence;
 	atomic_t refcount;
 };
 
@@ -80,4 +90,5 @@ int get_dolby_vision_policy(void);
 void set_hdr_policy(int policy);
 int get_hdr_policy(void);
 #endif
+struct fence *drm_crtc_create_fence(struct drm_crtc *crtc);
 #endif

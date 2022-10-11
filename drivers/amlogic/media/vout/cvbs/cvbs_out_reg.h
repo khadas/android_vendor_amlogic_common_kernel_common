@@ -1,4 +1,3 @@
-/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
  * drivers/amlogic/media/vout/cvbs/cvbs_out_reg.h
  *
@@ -18,6 +17,7 @@
 
 #ifndef __CVBS_OUT_REG_H__
 #define __CVBS_OUT_REG_H__
+#include <linux/platform_device.h>
 #include <linux/amlogic/iomap.h>
 
 #define CVBS_REG_OFFSET(reg)          ((reg) << 2)
@@ -28,9 +28,9 @@
 #define CVBS_OUT_REG_BASE_CBUS                       (0xc1100000L)
 #define CVBS_OUT_REG_BASE_HIU                        (0xc883c000L)
 #define CVBS_OUT_REG_BASE_VCBUS                      (0xd0100000L)
-#define CVBS_OUT_REG_OFFSET_CBUS(reg)                (((reg) << 2))
-#define CVBS_OUT_REG_OFFSET_HIU(reg)                 (((reg) << 2))
-#define CVBS_OUT_REG_OFFSET_VCBUS(reg)               (((reg) << 2))
+#define CVBS_OUT_REG_OFFSET_CBUS(reg)                ((reg << 2))
+#define CVBS_OUT_REG_OFFSET_HIU(reg)                 ((reg << 2))
+#define CVBS_OUT_REG_OFFSET_VCBUS(reg)               ((reg << 2))
 
 /*********************************
  * HIU:  HHI_CBUS_BASE = 0x10
@@ -188,7 +188,49 @@
 /*********************************
  * HIU:  GXBB
  **********************************/
-#define CVBS_OUT_HIU_REG_GX(addr)                    ((addr) & 0xff)
+#if 0
+#define HHI_VIID_CLK_DIV                           0x4a
+#define HHI_VIID_CLK_CNTL                          0x4b
+#define HHI_VIID_DIVIDER_CNTL                      0x4c
+#define HHI_VID_CLK_DIV                            0x59
+#define HHI_VID_CLK_CNTL                           0x5f
+#define HHI_VID_CLK_CNTL2                          0x65
+#define HHI_VID_DIVIDER_CNTL                       0x66
+#define HHI_VID_PLL_CLK_DIV                        0x68
+#define HHI_EDP_APB_CLK_CNTL                       0x82
+#define HHI_EDP_TX_PHY_CNTL0                       0x9c
+#define HHI_EDP_TX_PHY_CNTL1                       0x9d
+
+#define HHI_HDMI_PLL_CNTL                          0xc8
+#define HHI_HDMI_PLL_CNTL2                         0xc9
+#define HHI_HDMI_PLL_CNTL3                         0xca
+#define HHI_HDMI_PLL_CNTL4                         0xcb
+#define HHI_HDMI_PLL_CNTL5                         0xcc
+#define HHI_HDMI_PLL_CNTL6                         0xcd
+#define HHI_HDMI_PLL_CNTL_I                        0xce
+#define HHI_HDMI_PLL_CNTL7                         0xcf
+
+#define HHI_DSI_LVDS_EDP_CNTL0                     0xd1
+#define HHI_DSI_LVDS_EDP_CNTL1                     0xd2
+#define HHI_DIF_CSI_PHY_CNTL0                      0xd8
+#define HHI_DIF_CSI_PHY_CNTL1                      0xd9
+#define HHI_DIF_CSI_PHY_CNTL2                      0xda
+#define HHI_DIF_CSI_PHY_CNTL3                      0xdb
+#define HHI_DIF_CSI_PHY_CNTL4                      0xdc
+#define HHI_DIF_CSI_PHY_CNTL5                      0xdd
+#define HHI_LVDS_TX_PHY_CNTL0                      0xde
+#define HHI_LVDS_TX_PHY_CNTL1                      0xdf
+
+#define HHI_VID2_PLL_CNTL                          0xe0
+#define HHI_VID2_PLL_CNTL2                         0xe1
+#define HHI_VID2_PLL_CNTL3                         0xe2
+#define HHI_VID2_PLL_CNTL4                         0xe3
+#define HHI_VID2_PLL_CNTL5                         0xe4
+#define HHI_VID2_PLL_CNTL_I                        0xe5
+#define HHI_VID_LOCK_CLK_CNTL                      0xf2
+#else
+#define CVBS_OUT_HIU_REG_GX(addr)                    (addr & 0xff)
+#endif
 
 /*********************************
  * Global control:  RESET_CBUS_BASE = 0x11
@@ -416,6 +458,7 @@
 
 #define VENC_VDAC_DAC3_FILT_CTRL1                  0x1c5f
 
+
 #define ENCP_VFIFO2VD_CTL                          0x1b58
 
 #define ENCP_VFIFO2VD_PIXEL_START                  0x1b59
@@ -638,15 +681,6 @@
  */
 #define VPU_VIU_VENC_MUX_CTRL                      0x271a
 
-/* ********************************
- * [ 31 : 29 ] R,Current ENCI field status;
- * [ 28 : 25 ] R,Reserved;
- * [ 24 : 16 ] R,Current ENCI line counter status;
- * [ 15 : 11 ] R,Reserved;
- * [ 10 : 0 ] R,Current ENCI pixel counter status
- */
-#define ENCI_INFO_READ                           0x271c
-
 /*Bit  6 RW, gclk_mpeg_vpu_misc
  *Bit  5 RW, gclk_mpeg_venc_l_top
  *Bit  4 RW, gclk_mpeg_vencl_int
@@ -662,23 +696,25 @@
 #define VPU_VLOCK_GCLK_EN                          0x301e
 /* ******************************** */
 
-unsigned int cvbs_out_reg_read(unsigned int _reg);
-void cvbs_out_reg_write(unsigned int _reg, unsigned int _value);
-void cvbs_out_reg_setb(unsigned int reg, unsigned int value,
-		       unsigned int _start, unsigned int _len);
-unsigned int cvbs_out_reg_getb(unsigned int reg,
-			       unsigned int _start, unsigned int _len);
-void cvbs_out_reg_set_mask(unsigned int reg, unsigned int _mask);
-void cvbs_out_reg_clr_mask(unsigned int reg, unsigned int _mask);
+int cvbs_ioremap(struct platform_device *pdev);
 
-unsigned int cvbs_out_hiu_read(unsigned int _reg);
-void cvbs_out_hiu_write(unsigned int _reg, unsigned int _value);
-void cvbs_out_hiu_setb(unsigned int _reg, unsigned int _value,
-		       unsigned int _start, unsigned int _len);
-unsigned int cvbs_out_hiu_getb(unsigned int _reg,
-			       unsigned int _start, unsigned int _len);
-void cvbs_out_hiu_set_mask(unsigned int _reg, unsigned int _mask);
-void cvbs_out_hiu_clr_mask(unsigned int _reg, unsigned int _mask);
+extern unsigned int cvbs_out_reg_read(unsigned int _reg);
+extern void cvbs_out_reg_write(unsigned int _reg, unsigned int _value);
+extern void cvbs_out_reg_setb(unsigned int reg, unsigned int value,
+		unsigned int _start, unsigned int _len);
+extern unsigned int cvbs_out_reg_getb(unsigned int reg,
+		unsigned int _start, unsigned int _len);
+extern void cvbs_out_reg_set_mask(unsigned int reg, unsigned int _mask);
+extern void cvbs_out_reg_clr_mask(unsigned int reg, unsigned int _mask);
+
+extern unsigned int cvbs_out_hiu_read(unsigned int _reg);
+extern void cvbs_out_hiu_write(unsigned int _reg, unsigned int _value);
+extern void cvbs_out_hiu_setb(unsigned int _reg, unsigned int _value,
+		unsigned int _start, unsigned int _len);
+extern unsigned int cvbs_out_hiu_getb(unsigned int _reg,
+		unsigned int _start, unsigned int _len);
+extern void cvbs_out_hiu_set_mask(unsigned int _reg, unsigned int _mask);
+extern void cvbs_out_hiu_clr_mask(unsigned int _reg, unsigned int _mask);
 
 unsigned int cvbs_out_ana_read(unsigned int _reg);
 void cvbs_out_ana_write(unsigned int _reg, unsigned int _value);

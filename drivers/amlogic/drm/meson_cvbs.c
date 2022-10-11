@@ -1,13 +1,24 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/amlogic/drm/meson_cvbs.c
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
 #include <drm/drm_modeset_helper.h>
 #include <drm/drmP.h>
 #include <drm/drm_crtc_helper.h>
 #include <drm/drm_atomic_helper.h>
-#include <drm/drm_probe_helper.h>
 #include <drm/drm_connector.h>
 
 #include <linux/component.h>
@@ -18,9 +29,8 @@
 #include <linux/amlogic/media/vout/vout_notify.h>
 #include <linux/amlogic/media/vout/vinfo.h>
 
-#include "meson_crtc.h"
 #include "meson_cvbs.h"
-#include <vout/cvbs/cvbs_out.h>
+#include <linux/amlogic/media/vout/cvbs_out.h>
 
 static struct drm_display_mode cvbs_mode[] = {
 	{ /* MODE_480CVBS */
@@ -35,7 +45,7 @@ static struct drm_display_mode cvbs_mode[] = {
 		.vdisplay = 480,
 		.vsync_start = 725,
 		.vsync_end = 730,
-		.vtotal = 750,
+		.vtotal = 525,
 		.vscan = 0,
 		.vrefresh = 60,
 		.flags = DRM_MODE_FLAG_INTERLACE,
@@ -54,7 +64,7 @@ static struct drm_display_mode cvbs_mode[] = {
 		.vsync_end = 730,
 		.vtotal = 750,
 		.vscan = 0,
-		.vrefresh = 50,
+		.vrefresh = 60,
 		.flags = DRM_MODE_FLAG_INTERLACE,
 	},
 };
@@ -76,7 +86,7 @@ char *am_cvbs_get_voutmode(struct drm_display_mode *mode)
 
 static inline struct am_drm_cvbs_s *con_to_cvbs(struct drm_connector *con)
 {
-	return container_of(connector_to_meson_connector(con), struct am_drm_cvbs_s, base);
+	return container_of(con, struct am_drm_cvbs_s, connector);
 }
 
 static inline struct am_drm_cvbs_s *encoder_to_cvbs(struct drm_encoder *encoder)
@@ -86,23 +96,21 @@ static inline struct am_drm_cvbs_s *encoder_to_cvbs(struct drm_encoder *encoder)
 
 int am_cvbs_tx_get_modes(struct drm_connector *connector)
 {
-	int i, count;
+	int i;
 	struct drm_display_mode *mode;
 
-	count = 0;
 	for (i = 0; i < ARRAY_SIZE(cvbs_mode); i++) {
 		mode = drm_mode_duplicate(connector->dev, &cvbs_mode[i]);
 		if (!mode) {
 			DRM_INFO("[%s:%d]duplicate failed\n", __func__,
 				 __LINE__);
-			continue;
+			return 0;
 		}
 
 		drm_mode_probed_add(connector, mode);
-		count++;
 	}
 
-	return count;
+	return 1;
 }
 
 enum drm_mode_status am_cvbs_tx_check_mode(struct drm_connector *connector,
@@ -115,8 +123,8 @@ enum drm_mode_status am_cvbs_tx_check_mode(struct drm_connector *connector,
 		    cvbs_mode[i].vdisplay == mode->vdisplay &&
 		    cvbs_mode[i].vrefresh == mode->vrefresh)
 			return MODE_OK;
-		else
-			DRM_INFO("hdisplay = %d\nvdisplay = %d\n"
+
+		DRM_INFO("hdisplay = %d\nvdisplay = %d\n"
 			 "vrefresh = %d\n", mode->hdisplay,
 			 mode->vdisplay, mode->vrefresh);
 	}
@@ -145,6 +153,43 @@ static enum drm_connector_status am_cvbs_connector_detect
 	return connector_status_connected;
 }
 
+static int am_cvbs_connector_set_property(struct drm_connector *connector,
+					  struct drm_property *property,
+					  uint64_t val)
+{
+	struct am_drm_cvbs_s *am_drm_cvbs = con_to_cvbs(connector);
+	struct drm_connector_state *state = am_drm_cvbs->connector.state;
+
+	if (property == connector->content_protection_property) {
+		DRM_INFO("property:%s       val: %lld\n", property->name, val);
+		/* For none atomic commit */
+		/* atomic will be filter on drm_moder_object.c */
+		if (val == DRM_MODE_CONTENT_PROTECTION_ENABLED) {
+			DRM_DEBUG_KMS("only drivers can set CP Enabled\n");
+			return -EINVAL;
+		}
+		state->content_protection = val;
+	}
+	/*other parperty todo*/
+	return 0;
+}
+
+static int am_cvbs_connector_atomic_get_property
+	(struct drm_connector *connector,
+	const struct drm_connector_state *state,
+	struct drm_property *property, uint64_t *val)
+{
+	if (property == connector->content_protection_property) {
+		DRM_INFO("get content_protection val: %d\n",
+			 state->content_protection);
+		*val = state->content_protection;
+	} else {
+		DRM_DEBUG_ATOMIC("Unknown property %s\n", property->name);
+		return -EINVAL;
+	}
+	return 0;
+}
+
 static void am_cvbs_connector_destroy(struct drm_connector *connector)
 {
 	drm_connector_unregister(connector);
@@ -152,8 +197,11 @@ static void am_cvbs_connector_destroy(struct drm_connector *connector)
 }
 
 static const struct drm_connector_funcs am_cvbs_connector_funcs = {
+	.dpms			= drm_atomic_helper_connector_dpms,
 	.detect			= am_cvbs_connector_detect,
 	.fill_modes		= drm_helper_probe_single_connector_modes,
+	.set_property		= am_cvbs_connector_set_property,
+	.atomic_get_property	= am_cvbs_connector_atomic_get_property,
 	.destroy		= am_cvbs_connector_destroy,
 	.reset			= drm_atomic_helper_connector_reset,
 	.atomic_duplicate_state	= drm_atomic_helper_connector_duplicate_state,
@@ -161,34 +209,38 @@ static const struct drm_connector_funcs am_cvbs_connector_funcs = {
 };
 
 void am_cvbs_encoder_mode_set(struct drm_encoder *encoder,
-	struct drm_crtc_state *crtc_state,
-	struct drm_connector_state *conn_state)
+			      struct drm_display_mode *mode,
+				   struct drm_display_mode *adjusted_mode)
 {
+	DRM_INFO("mode : %s, adjusted_mode : %s\n",
+		 mode->name,  adjusted_mode->name);
+
+	get_valid_vinfo(adjusted_mode->name);
 }
 
-void am_cvbs_encoder_enable(struct drm_encoder *encoder,
-	struct drm_atomic_state *state)
+void am_cvbs_encoder_enable(struct drm_encoder *encoder)
 {
 	enum vmode_e vmode = get_current_vmode();
-	struct am_meson_crtc_state *meson_crtc_state = to_am_meson_crtc_state(encoder->crtc->state);
 
-	if (meson_crtc_state->uboot_mode_init == 1)
-		vmode |= VMODE_INIT_BIT_MASK;
-
-	set_vout_mode_pre_process(vmode);
-	cvbs_set_current_vmode(vmode, NULL);
-	set_vout_mode_post_process(vmode);
+	vout_notifier_call_chain(VOUT_EVENT_MODE_CHANGE_PRE, &vmode);
+	cvbs_set_current_vmode(VMODE_CVBS);
+	vout_notifier_call_chain(VOUT_EVENT_MODE_CHANGE, &vmode);
 }
 
-void am_cvbs_encoder_disable(struct drm_encoder *encoder,
-	struct drm_atomic_state *state)
+void am_cvbs_encoder_disable(struct drm_encoder *encoder)
 {
+	struct am_drm_cvbs_s *am_drm_cvbs = encoder_to_cvbs(encoder);
+	struct drm_connector_state *state = am_drm_cvbs->connector.state;
+
+	state->content_protection = DRM_MODE_CONTENT_PROTECTION_UNDESIRED;
 }
 
-static const struct drm_encoder_helper_funcs am_cvbs_encoder_helper_funcs = {
-	.atomic_mode_set = am_cvbs_encoder_mode_set,
-	.atomic_enable = am_cvbs_encoder_enable,
-	.atomic_disable = am_cvbs_encoder_disable,
+static const struct drm_encoder_helper_funcs
+	am_cvbs_encoder_helper_funcs = {
+	.mode_set	= am_cvbs_encoder_mode_set,
+	.enable		= am_cvbs_encoder_enable,
+	.disable	= am_cvbs_encoder_disable,
+
 };
 
 static const struct drm_encoder_funcs am_cvbs_encoder_funcs = {
@@ -196,7 +248,7 @@ static const struct drm_encoder_funcs am_cvbs_encoder_funcs = {
 };
 
 static const struct of_device_id am_meson_cvbs_dt_ids[] = {
-	{ .compatible = "amlogic, drm-cvbsout", },
+	{ .compatible = "amlogic,drm-cvbsout", },
 	{}
 };
 MODULE_DEVICE_TABLE(of, am_meson_cvbs_dt_ids);
@@ -217,8 +269,9 @@ static int am_meson_cvbs_bind(struct device *dev,
 		return -ENOMEM;
 	}
 
+	am_drm_cvbs->drm = drm;
 	encoder = &am_drm_cvbs->encoder;
-	connector = &am_drm_cvbs->base.connector;
+	connector = &am_drm_cvbs->connector;
 
 	/* Encoder */
 	drm_encoder_helper_add(encoder, &am_cvbs_encoder_helper_funcs);
@@ -245,7 +298,7 @@ static int am_meson_cvbs_bind(struct device *dev,
 
 	connector->interlace_allowed = 1;
 
-	ret = drm_connector_attach_encoder(connector, encoder);
+	ret = drm_mode_connector_attach_encoder(connector, encoder);
 	if (ret) {
 		DRM_ERROR("Failed to init cvbs attach\n");
 		goto cvbs_err;
@@ -263,7 +316,7 @@ cvbs_err:
 static void am_meson_cvbs_unbind(struct device *dev,
 				 struct device *master, void *data)
 {
-	am_drm_cvbs->base.connector.funcs->destroy(&am_drm_cvbs->base.connector);
+	am_drm_cvbs->connector.funcs->destroy(&am_drm_cvbs->connector);
 	am_drm_cvbs->encoder.funcs->destroy(&am_drm_cvbs->encoder);
 	kfree(am_drm_cvbs);
 }
@@ -294,20 +347,7 @@ static struct platform_driver am_meson_cvbs_pltfm_driver = {
 	},
 };
 
-int __init am_meson_cvbs_init(void)
-{
-	return platform_driver_register(&am_meson_cvbs_pltfm_driver);
-}
-
-void __exit am_meson_cvbs_exit(void)
-{
-	platform_driver_unregister(&am_meson_cvbs_pltfm_driver);
-}
-
-#ifndef MODULE
-module_init(am_meson_cvbs_init);
-module_exit(am_meson_cvbs_exit);
-#endif
+module_platform_driver(am_meson_cvbs_pltfm_driver);
 
 MODULE_AUTHOR("MultiMedia Amlogic <multimedia-sh@amlogic.com>");
 MODULE_DESCRIPTION("Amlogic Meson Drm CVBS driver");

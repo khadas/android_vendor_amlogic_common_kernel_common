@@ -1,6 +1,18 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/amlogic/media/vout/hdmitx/hdmi_tx_20/hw/hw_sc2.c
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
 #include <linux/printk.h>
@@ -48,11 +60,11 @@ static bool set_hpll_hclk_v1(unsigned int m, unsigned int frac_val)
 	hd_write_reg(P_ANACTRL_HDMIPLL_CTRL2, 0x00000000);
 
 	if (frac_val == 0x8148) {
-		if ((hdev->para->vic == HDMI_3840x2160p50_16x9 ||
-		     hdev->para->vic == HDMI_3840x2160p60_16x9 ||
-		     hdev->para->vic == HDMI_3840x2160p50_64x27 ||
-		     hdev->para->vic == HDMI_3840x2160p60_64x27) &&
-		     hdev->para->cs != COLORSPACE_YUV420) {
+		if (((hdev->para->vic == HDMI_3840x2160p50_16x9) ||
+		     (hdev->para->vic == HDMI_3840x2160p60_16x9) ||
+		     (hdev->para->vic == HDMI_3840x2160p50_64x27) ||
+		     (hdev->para->vic == HDMI_3840x2160p60_64x27)) &&
+		     (hdev->para->cs != COLORSPACE_YUV420)) {
 			hd_write_reg(P_ANACTRL_HDMIPLL_CTRL3, 0x6a685c00);
 			hd_write_reg(P_ANACTRL_HDMIPLL_CTRL4, 0x11551293);
 		} else {
@@ -61,13 +73,13 @@ static bool set_hpll_hclk_v1(unsigned int m, unsigned int frac_val)
 		}
 	} else {
 		if (hdmitx_find_vendor_6g(hdev) &&
-		    (hdev->para->vic == HDMI_3840x2160p50_16x9 ||
-		    hdev->para->vic == HDMI_3840x2160p60_16x9 ||
-		    hdev->para->vic == HDMI_3840x2160p50_64x27 ||
-		    hdev->para->vic == HDMI_3840x2160p60_64x27 ||
-		    hdev->para->vic == HDMI_4096x2160p50_256x135 ||
-		    hdev->para->vic == HDMI_4096x2160p60_256x135) &&
-		    hdev->para->cs != COLORSPACE_YUV420) {
+		    ((hdev->para->vic == HDMI_3840x2160p50_16x9) ||
+		    (hdev->para->vic == HDMI_3840x2160p60_16x9) ||
+		    (hdev->para->vic == HDMI_3840x2160p50_64x27) ||
+		    (hdev->para->vic == HDMI_3840x2160p60_64x27) ||
+		    (hdev->para->vic == HDMI_4096x2160p50_256x135) ||
+		    (hdev->para->vic == HDMI_4096x2160p60_256x135)) &&
+		    (hdev->para->cs != COLORSPACE_YUV420)) {
 			hd_write_reg(P_ANACTRL_HDMIPLL_CTRL3, 0x6a685c00);
 			hd_write_reg(P_ANACTRL_HDMIPLL_CTRL4, 0x11551293);
 		} else {
@@ -94,7 +106,7 @@ static bool set_hpll_hclk_v2(unsigned int m, unsigned int frac_val)
 	hd_write_reg(P_ANACTRL_HDMIPLL_CTRL2, 0x00000000);
 	hd_write_reg(P_ANACTRL_HDMIPLL_CTRL3, 0xea68dc00);
 	hd_write_reg(P_ANACTRL_HDMIPLL_CTRL4, 0x65771290);
-	hd_write_reg(P_ANACTRL_HDMIPLL_CTRL5, 0x39272008);
+	hd_write_reg(P_ANACTRL_HDMIPLL_CTRL5, 0x39272004);
 	hd_write_reg(P_ANACTRL_HDMIPLL_CTRL6, 0x56540000);
 	hd_set_reg_bits(P_ANACTRL_HDMIPLL_CTRL0, 0x0, 29, 1);
 	WAIT_FOR_PLL_LOCKED(P_ANACTRL_HDMIPLL_CTRL0);
@@ -351,8 +363,6 @@ void hdmitx_phy_bandgap_en_sc2(void)
 
 void set_phy_by_mode_sc2(unsigned int mode)
 {
-	struct hdmitx_dev *hdev = get_hdmitx_device();
-
 	switch (mode) {
 	case HDMI_PHYPARA_6G: /* 5.94/4.5/3.7Gbps */
 	case HDMI_PHYPARA_4p5G:
@@ -360,9 +370,6 @@ void set_phy_by_mode_sc2(unsigned int mode)
 		hd_write_reg(P_ANACTRL_HDMIPHY_CTRL0, 0x37eb65c4);
 		hd_write_reg(P_ANACTRL_HDMIPHY_CTRL3, 0x2ab0ff3b);
 		hd_write_reg(P_ANACTRL_HDMIPHY_CTRL5, 0x0000080b);
-		/* for hdmi_rext use the 1.3k resistor */
-		if (mode == HDMI_PHYPARA_6G && hdev->hdmi_rext == 1300)
-			hd_write_reg(P_ANACTRL_HDMIPHY_CTRL0, 0x37eb6584);
 		break;
 	case HDMI_PHYPARA_3G: /* 2.97Gbps */
 		hd_write_reg(P_ANACTRL_HDMIPHY_CTRL0, 0x33eb42a2);

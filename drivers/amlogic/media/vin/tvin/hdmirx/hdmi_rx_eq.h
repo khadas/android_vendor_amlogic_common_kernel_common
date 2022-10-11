@@ -1,34 +1,46 @@
-/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/amlogic/media/vin/tvin/hdmirx/hdmi_rx_eq.h
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
 #ifndef _HDMI_RX_EQ_H
 #define _HDMI_RX_EQ_H
 /* time mS */
-#define WAITTIMESTARTCONDITIONS	3
+#define WaitTimeStartConditions	3
 /* WAIT FOR, CDR LOCK and TMDSVALID */
-#define SLEEP_TIME_CDR	10
+#define sleep_time_CDR	10
 /* Maximum slope  accumulator to consider the cable as a short cable */
-#define ACCLIMIT	360
+#define AccLimit	360
 /* Minimum slope accumulator to consider the following setting */
-#define ACCMINLIMIT	0
+#define AccMinLimit	0
 /* suitable for a long cable */
 /* Maximum allowable setting, HW as the maximum = 15, should */
-#define MAXSETTING	14
+#define maxsetting	14
 /* only be need for ultra long cables at high rates, */
 /* condition never detected on LAB */
 /* Default setting for short cables, */
 /* if system cannot find any one better than this. */
-#define SHORTCABLESETTING	4
+#define shortcableSetting	4
 /* Default setting when system cannot detect the cable type */
-#define ERRORCABLESETTING	4
+#define ErrorcableSetting	4
 /* Minimum current slope needed to consider the cable */
 /* as "very long" and therefore */
-#define MINSLOPE	50
+#define minSlope	50
 /* max setting is suitable for equalization */
 /* Maximum number of early-counter measures to average each setting */
-#define AVGACQ	4
+#define avgAcq	4
 /* Threshold Value for the statistics counter */
 /* 3'd0: Selects counter threshold 1K */
 /* 3'd1: Selects counter threshold 2K */
@@ -38,13 +50,13 @@
 /* Number of retries in case of algorithm ending with errors */
 #define NTRYS	1
 /* theoretical threshold for an equalized system */
-#define EQUALIZEDCOUNTERVALUE	512
+#define equalizedCounterValue	512
 /* theoretical threshold for an equalized system */
-#define EQUALIZEDCOUNTERVALUE_HDMI20	512
+#define equalizedCounterValue_HDMI20	512
 /* Maximum  difference between pairs */
-#define MINMAX_MAXDIFF	4
+#define MINMAX_maxDiff	4
 /* Maximum  difference between pairs  under HDMI2.0 MODE */
-#define MINMAX_MAXDIFF_HDMI20	2
+#define MINMAX_maxDiff_HDMI20	2
 /* FATBIT MASK FOR hdmi-1.4 xxxx_001 or xxxx_110 */
 #define EQ_FATBIT_MASK	0x0000
 /* hdmi 1.4 ( pll rate = 00) xx00_001 or xx11_110 */
@@ -93,8 +105,8 @@ enum e_eq_freq {
 };
 
 struct eq_cfg_coef_s {
-	u16 fat_bit_sts;
-	u8 min_max_diff;
+	uint16_t fat_bit_sts;
+	uint8_t min_max_diff;
 };
 
 enum eq_cable_type_e {
@@ -107,24 +119,24 @@ enum eq_cable_type_e {
 
 struct st_eq_data {
 	/* Best long cable setting */
-	u16 bestlongsetting;
+	uint16_t bestLongSetting;
 	/* long cable setting detected and valid */
-	u8 validlongsetting;
+	uint8_t validLongSetting;
 	/* best short cable setting */
-	u16 bestshortsetting;
+	uint16_t bestShortSetting;
 	/* best short cable setting detected and valid */
-	u8 validshortsetting;
+	uint8_t validShortSetting;
 	/* TMDS Valid for channel */
-	u8 tmdsvalid;
+	uint8_t tmdsvalid;
 	/* best setting to be programed */
-	u16 bestsetting;
+	uint16_t bestsetting;
 	/* Accumulator register */
-	u16 acc;
+	uint16_t acc;
 	/* Acquisition register */
-	u16 acq;
-	u16 acq_n[15];
-	u16 lastacq;
-	u8 eq_ref[3];
+	uint16_t acq;
+	uint16_t acq_n[15];
+	uint16_t lastacq;
+	uint8_t eq_ref[3];
 };
 
 /*struct define end*/
@@ -142,20 +154,19 @@ extern enum eq_sts_e eq_sts;
 /*--------------------------function declare------------------*/
 int rx_eq_algorithm(void);
 int hdmirx_phy_start_eq(void);
-u8 settingfinder(void);
-bool eq_maxvsmin(int ch0setting, int ch1setting, int ch2setting);
+uint8_t SettingFinder(void);
+bool eq_maxvsmin(int ch0Setting, int ch1Setting, int ch2Setting);
+
 /* int hdmirx_phy_suspend_eq(void); */
 bool hdmirx_phy_check_tmds_valid(void);
 void hdmirx_phy_conf_eq_setting(int rx_port_sel,
-				int ch0setting,
-				int ch1setting,
-				int ch2setting);
+	int ch0Setting,	int ch1Setting, int ch2Setting);
 void eq_cfg(void);
 void eq_run(void);
 void rx_set_eq_run_state(enum eq_sts_e state);
 enum eq_sts_e rx_get_eq_run_state(void);
-void dump_eq_data(void);
-void eq_dwork_handler(struct work_struct *work);
+extern void dump_eq_data(void);
+extern void eq_dwork_handler(struct work_struct *work);
 
 /*function declare end*/
 

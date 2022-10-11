@@ -1,6 +1,18 @@
-/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * include/linux/amlogic/aml_crypto.h
+ *
+ * Copyright (C) 2021 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
 #ifndef _AML_CRYPTO_H_
@@ -36,11 +48,9 @@ struct crypt_op {
 	__u8   dst_phys;     /* set if dst is in physical addr */
 	__u8   ivlen;        /* length of IV */
 	__u8   __user *iv;   /* Notice: iv returned from physical is invalid */
-	__u8   __user *param;   /* extra parameters for algorithm */
-	__u16  param_len;
 	__u8   num_src_bufs;
 	__u8   num_dst_bufs;
-	__u32  reserved;
+	__u16  reserved;     /* reserved */
 	struct crypt_mem src[MAX_CRYPTO_BUFFERS];   /* source data */
 	struct crypt_mem dst[MAX_CRYPTO_BUFFERS];   /* output data */
 };
@@ -54,9 +64,7 @@ enum aml_crypto_op_t {
 	CRYPTO_OP_AES_ECB =  5,
 	CRYPTO_OP_AES_CBC =  6,
 	CRYPTO_OP_AES_CTR =  7,
-	CRYPTO_OP_S17_ECB = 8,
-	CRYPTO_OP_S17_CBC = 9,
-	CRYPTO_OP_S17_CTR = 10,
+
 	CRYPTO_OP_MAX
 };
 

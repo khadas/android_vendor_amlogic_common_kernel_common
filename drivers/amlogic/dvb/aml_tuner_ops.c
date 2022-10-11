@@ -1,6 +1,18 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/amlogic/dvb/aml_tuner_ops.c
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
 #include <linux/amlogic/aml_tuner.h>
@@ -318,12 +330,14 @@ static struct tuner_ops *tuner_fe_type_match(struct dvb_frontend *fe)
 }
 
 /* In general, this interface must be called when it is no longer used. */
-static void tuner_release(struct dvb_frontend *fe)
+static int tuner_release(struct dvb_frontend *fe)
 {
 	struct tuner_ops *match = tuner_fe_type_match(fe);
 
 	if (match && match->fe.ops.tuner_ops.release)
-		match->fe.ops.tuner_ops.release(fe);
+		return match->fe.ops.tuner_ops.release(fe);
+
+	return 0;
 }
 
 static int tuner_init(struct dvb_frontend *fe)
@@ -521,13 +535,13 @@ static int tuner_set_bandwidth(struct dvb_frontend *fe, u32 bandwidth)
  */
 static struct dvb_tuner_ops tuner_ops = {
 	.info = {
-		.name              = "tuner-useless",
-		.frequency_min_hz  = 0,
-		.frequency_max_hz  = 0,
-		.frequency_step_hz = 0,
-		.bandwidth_min     = 0,
-		.bandwidth_max     = 0,
-		.bandwidth_step    = 0,
+		.name           = "tuner-useless",
+		.frequency_min  = 0,
+		.frequency_max  = 0,
+		.frequency_step = 0,
+		.bandwidth_min  = 0,
+		.bandwidth_max  = 0,
+		.bandwidth_step = 0,
 	},
 	.release = tuner_release,
 	.init = tuner_init,

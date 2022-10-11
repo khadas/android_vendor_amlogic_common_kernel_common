@@ -65,7 +65,6 @@ struct verbs_txreq {
 	struct sdma_engine     *sde;
 	struct send_context     *psc;
 	u16                     hdr_dwords;
-	u16			s_cur_size;
 };
 
 struct hfi1_ibdev;
@@ -93,9 +92,6 @@ static inline struct verbs_txreq *get_txreq(struct hfi1_ibdev *dev,
 	tx->psc = priv->s_sendcontext;
 	/* so that we can test if the sdma decriptors are there */
 	tx->txreq.num_desc = 0;
-	/* Set the header type */
-	tx->phdr.hdr.hdr_type = priv->hdr_type;
-	tx->txreq.flags = 0;
 	return tx;
 }
 
@@ -104,19 +100,15 @@ static inline struct sdma_txreq *get_sdma_txreq(struct verbs_txreq *tx)
 	return &tx->txreq;
 }
 
-static inline struct verbs_txreq *get_waiting_verbs_txreq(struct iowait_work *w)
+static inline struct verbs_txreq *get_waiting_verbs_txreq(struct rvt_qp *qp)
 {
 	struct sdma_txreq *stx;
+	struct hfi1_qp_priv *priv = qp->priv;
 
-	stx = iowait_get_txhead(w);
+	stx = iowait_get_txhead(&priv->s_iowait);
 	if (stx)
 		return container_of(stx, struct verbs_txreq, txreq);
 	return NULL;
-}
-
-static inline bool verbs_txreq_queued(struct iowait_work *w)
-{
-	return iowait_packet_queued(w);
 }
 
 void hfi1_put_txreq(struct verbs_txreq *tx);

@@ -1,6 +1,18 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/amlogic/media/dtv_demod/dvbs.c
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
 #include "demod_func.h"
@@ -455,7 +467,7 @@ static struct stchip_register_t l2a_def_val_local[] = {
 	{0x920,    0x00},/* REG_RL2A_DVBSX_DEMOD_DEMOD */
 	/* REG_RL2A_DVBSX_DEMOD_DMDCFGMD, important dvbs/s2/s2x auto search */
 	/* value changed from 0xcc to 0xdc, enable auto sr */
-	{0x922,    0xcc}, /*0xdc to enable auto sr ,0xcc to disable autosr*/
+	{0x922,    0xdc},
 	{0x923,    0x3b},/* REG_RL2A_DVBSX_DEMOD_DMDCFG2 */
 	{0x924,    0x15},/* REG_RL2A_DVBSX_DEMOD_DMDISTATE */
 	{0x925,    0x40},/* REG_RL2A_DVBSX_DEMOD_DMDT0M */
@@ -516,7 +528,7 @@ static struct stchip_register_t l2a_def_val_local[] = {
 	{0x987,    0x02},/* REG_RL2A_DVBSX_DEMOD_PLHMODCOD */
 	{0x988,    0x01},/* REG_RL2A_DVBSX_DEMOD_DMDREG */
 	{0x990,    0x5b},/* REG_RL2A_DVBSX_DEMOD_AGC2O */
-	{0x991,    0x40},/* REG_RL2A_DVBSX_DEMOD_AGC2REF */
+	{0x991,    0x38},/* REG_RL2A_DVBSX_DEMOD_AGC2REF */
 	{0x992,    0x00},/* REG_RL2A_DVBSX_DEMOD_AGCNADJ */
 	{0x993,    0x00},/* REG_RL2A_DVBSX_DEMOD_AGCKS */
 	{0x994,    0x38},/* REG_RL2A_DVBSX_DEMOD_AGCRSADJ */
@@ -600,7 +612,7 @@ static struct stchip_register_t l2a_def_val_local[] = {
 	{0x9ea,    0x40},/* REG_RL2A_DVBSX_DEMOD_TMGCFG2 */
 	{0x9eb,    0x50},/* REG_RL2A_DVBSX_DEMOD_KREFTMG2 */
 	/* value changed from 0x6 to 0,enable auto sr upper and low */
-	{0x9ec,    0x06},/* REG_RL2A_DVBSX_DEMOD_TMGCFG3 */
+	{0x9ec,    0x00},/* REG_RL2A_DVBSX_DEMOD_TMGCFG3 */
 	{0x9ed,    0x91},/* REG_RL2A_DVBSX_DEMOD_TMGMTHRES */
 	//{0x9f0,    0x19},/* REG_RL2A_DVBSX_DEMOD_SFRINIT2 */
 	//{0x9f1,    0x98},/* REG_RL2A_DVBSX_DEMOD_SFRINIT1 */
@@ -618,7 +630,7 @@ static struct stchip_register_t l2a_def_val_local[] = {
 	{0x9f8,    0x73},/* REG_RL2A_DVBSX_DEMOD_SFRLOW0 */
 	/* auto sr low end */
 
-	//{0x9fc,    0x19},/* REG_RL2A_DVBSX_DEMOD_SFR3 */
+	{0x9fc,    0x19},/* REG_RL2A_DVBSX_DEMOD_SFR3 */
 	//{0x9fd,    0x98},/* REG_RL2A_DVBSX_DEMOD_SFR2 */
 	//{0x9fe,    0x8d},/* REG_RL2A_DVBSX_DEMOD_SFR1 */
 	//{0x9ff,    0x00},/* REG_RL2A_DVBSX_DEMOD_SFR0 */
@@ -716,7 +728,7 @@ static struct stchip_register_t l2a_def_val_local[] = {
 	{0xa89,    0x00},/* REG_RL2A_DVBSX_DEMOD_CFR2AVRGE0 */
 	{0xa8a,    0x00},/* REG_RL2A_DVBSX_DEMOD_DPILOTMAX1 */
 	{0xa8b,    0x00},/* REG_RL2A_DVBSX_DEMOD_DPILOTMAX0 */
-	{0xa98,    0x3f},/* REG_RL2A_DVBSX_DEMOD_NOSCFG */
+	{0xa98,    0x2c},/* REG_RL2A_DVBSX_DEMOD_NOSCFG */
 	{0xa99,    0x00},/* REG_RL2A_DVBSX_DEMOD_NOSCFGF1 */
 	{0xa9a,    0x00},/* REG_RL2A_DVBSX_DEMOD_NOSCFGF2 */
 	{0xaa0,    0x25},/* REG_RL2A_DVBSX_DEMOD_NNOSDATAT1 */
@@ -932,7 +944,7 @@ static struct stchip_register_t l2a_def_val_local[] = {
 	{0xe02,    0x00},/* REG_RL2A_DVBSX_HWARE_TSCFG2 */
 	{0xe03,    0x04},/* REG_RL2A_DVBSX_HWARE_TSCFG1 */
 	/* change value from 0x20 to 0xa0 to support CI+ card */
-	{0xe04,    0x20},/* REG_RL2A_DVBSX_HWARE_TSCFG0 */
+	{0xe04,    0xa0},/* REG_RL2A_DVBSX_HWARE_TSCFG0 */
 	{0xe05,    0x00},/* REG_RL2A_DVBSX_HWARE_TSSYNC */
 	{0xe06,    0x03},/* REG_RL2A_DVBSX_HWARE_TSDIVN */
 	{0xe07,    0x00},/* REG_RL2A_DVBSX_HWARE_TSCFG4 */
@@ -1185,7 +1197,7 @@ static struct fe_lla_lookup_t fe_l2a_s2_cn_lookup = {
 		{ -5, 11498 }, { 0, 11034 }, { 5, 10660 },
 		{ 10, 10330 }, {  15, 9828 }, { 20, 9515 },
 		{ 25, 9052 }, {  30, 8613 }, { 33, 8487 },
-		{ 36, 8162 }, {  39, 7956 }, { 42,  7753 },
+		{ 36, 8162 }, {  39, 7956 }, { 42,	7753 },
 		{ 45, 7547 }, {  48, 7328 }, { 51, 7081 },
 		{ 54, 6934 }, {  57, 6702 }, { 60, 6544 },
 		{ 63, 6362 }, {  66, 6141 }, { 69, 5949 },
@@ -1208,34 +1220,31 @@ static struct fe_lla_lookup_t fe_l2a_s2_cn_lookup = {
 		{ 370, 430 }, { 380, 420 }, { 390, 434 },
 		{ 400, 404 }, { 410, 408 }, { 420, 398 },
 		{ 430, 401 }, { 440, 395 }, { 450, 400 },
-		{ 460,  388 }, { 470, 419 }, { 480, 418 },
-		{ 490,  403 }, { 500, 394 }, { 510, 396 },
+		{ 460,	388 }, { 470, 419 }, { 480, 418 },
+		{ 490,	403 }, { 500, 394 }, { 510, 396 },
 	}
 };
 
-void demod_init_local(unsigned int is_blind_scan)
+void demod_init_local(void)
 {
 	unsigned int reg = 0;
 
 	do {
 		if (l2a_def_val_local[reg].addr == 0xffff)
 			break;
-		//while blind scan,set autosr on,0 means blind scan
-		if (is_blind_scan == 0 && l2a_def_val_local[reg].addr == AUTOSR_REG)
-			dvbs_wr_byte(AUTOSR_REG, AUTOSR_ON);
-		else
-			dvbs_wr_byte(l2a_def_val_local[reg].addr,
-				     l2a_def_val_local[reg].value);
+
+		dvbs_wr_byte(l2a_def_val_local[reg].addr,
+			     l2a_def_val_local[reg].value);
 		reg++;
 	} while (1);
 }
 
-void dvbs2_reg_initial(unsigned int symb_rate, unsigned int is_blind_scan)
+void dvbs2_reg_initial(unsigned int symkb_rate)
 {
 	unsigned int tmp = 0;
 
 	/* BW/(1+ROLLOFF)=SYMBOLRATE */
-	tmp = symb_rate * ((16777216 + 67500) / 135000);
+	tmp = symkb_rate * ((16777216 + 67500) / 135000);
 
 	dvbs_wr_byte(0x9fc, (tmp >> 16) & 0xff);
 	dvbs_wr_byte(0x9fd, (tmp >> 8) & 0xff);
@@ -1245,8 +1254,7 @@ void dvbs2_reg_initial(unsigned int symb_rate, unsigned int is_blind_scan)
 	dvbs_wr_byte(0x9f1, (tmp >> 8) & 0xff);
 	dvbs_wr_byte(0x9f2, tmp & 0xff);
 
-	PR_DVBS("reg initial is_blind_scan:%d\n", is_blind_scan);
-	demod_init_local(is_blind_scan);
+	demod_init_local();
 
 	dvbs_wr_byte(0x110, 0x00);
 	dvbs_wr_byte(0x111, 0x00);
@@ -1493,57 +1501,3 @@ unsigned int dvbs_get_quality(void)
 	return c_n;
 }
 
-unsigned int dvbs_get_freq_offset(unsigned int *polarity)
-{
-	unsigned int carrier_offset, freq_offset;
-
-	carrier_offset = dvbs_rd_byte(CFR12) << 16;
-	carrier_offset |= dvbs_rd_byte(CFR11) << 8;
-	carrier_offset |= dvbs_rd_byte(CFR10);
-	PR_DVBS("%s carrier offset = 0x%x\n", __func__, carrier_offset);
-
-	*polarity = carrier_offset >> 23 & 0x1;
-	/* negative val, convert to original code */
-	if (*polarity) {
-		carrier_offset ^= 0xffffff;
-		carrier_offset += 1;
-		PR_DVBS("%s convert : 0x%x\n", __func__, carrier_offset);
-	}
-
-	/* fre offset = carrier_offset * Fs(adc) / 2^24 */
-	freq_offset = carrier_offset * 135;//ADC_CLK_135M
-	freq_offset /= 16777216;/* 2^24 */
-	PR_DVBS("%s, fre offset = %dM\n", __func__, freq_offset);
-
-	return freq_offset;
-}
-
-#define SIGNAL_STRENGTH_READ_TIMES 50
-static unsigned char s_aStrengthVal[] = {
-	0xd3,
-	0xd5, 0xd2, 0xd0, 0xce, 0xcb,
-	0xc8, 0xc5, 0xc2, 0xbe, 0xb9,
-	0xb4, 0xad, 0xa7, 0xa3, 0xa1,
-	0x9e, 0x9c, 0x99, 0x97, 0x94,
-	0x91, 0x8b, 0x8e, 0x87, 0x83,
-	0x7e, 0x79, 0x73, 0x68
-};
-
-int dvbs_get_signal_strength_off(void)
-{
-	int i;
-	unsigned int val = 0;
-
-	for (i = 0; i < SIGNAL_STRENGTH_READ_TIMES; i++)
-		val += dvbs_rd_byte(0x91a);
-	val /= SIGNAL_STRENGTH_READ_TIMES;
-
-	for (i = 1; i < sizeof(s_aStrengthVal); i++) {
-		if (val >= s_aStrengthVal[i])
-			break;
-	}
-
-	PR_DVBS("average value level val=0x%x\n", val);
-
-	return -i;
-}

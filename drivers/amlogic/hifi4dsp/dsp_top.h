@@ -18,7 +18,6 @@
 
 void soc_dsp_bootup(int dsp_id, u32 reset_addr, int freq_sel);
 void soc_dsp_regs_iomem_init(void);
-void soc_dsp_hw_init(int dsp_id, int freq_sel);
 void soc_dsp_top_regs_dump(int dsp_id);
 void soc_dsp_poweroff(int dsp_id);
 

@@ -1,4 +1,3 @@
-/* SPDX-License-Identifier: GPL-2.0 */
 #ifndef __PSTORE_INTERNAL_H__
 #define __PSTORE_INTERNAL_H__
 
@@ -6,8 +5,56 @@
 #include <linux/time.h>
 #include <linux/pstore.h>
 
-#define PSTORE_DEFAULT_KMSG_BYTES 10240
-extern unsigned long kmsg_bytes;
+#if NR_CPUS <= 2 && defined(CONFIG_ARM_THUMB)
+#define PSTORE_CPU_IN_IP 0x1
+#elif NR_CPUS <= 4 && defined(CONFIG_ARM)
+#define PSTORE_CPU_IN_IP 0x3
+#endif
+
+struct pstore_ftrace_record {
+	unsigned long ip;
+	unsigned long parent_ip;
+#ifndef PSTORE_CPU_IN_IP
+	unsigned int cpu;
+#endif
+#ifdef CONFIG_AMLOGIC_DEBUG_FTRACE_PSTORE
+	int pid;
+	unsigned long val1;
+	unsigned long val2;
+	unsigned long long time;
+	unsigned char comm[8];
+	struct {
+		unsigned int flag:31;
+		unsigned int in_irq:1;
+	};
+#endif
+};
+
+#ifdef CONFIG_AMLOGIC_DEBUG_FTRACE_PSTORE
+void notrace pstore_ftrace_save(struct pstore_ftrace_record *rec);
+void notrace pstore_ftrace_dump(struct pstore_ftrace_record *rec,
+				struct seq_file *s);
+#endif
+
+static inline void
+pstore_ftrace_encode_cpu(struct pstore_ftrace_record *rec, unsigned int cpu)
+{
+#ifndef PSTORE_CPU_IN_IP
+	rec->cpu = cpu;
+#else
+	rec->ip |= cpu;
+#endif
+}
+
+static inline unsigned int
+pstore_ftrace_decode_cpu(struct pstore_ftrace_record *rec)
+{
+#ifndef PSTORE_CPU_IN_IP
+	return rec->cpu;
+#else
+	return rec->ip & PSTORE_CPU_IN_IP;
+#endif
+}
 
 #ifdef CONFIG_PSTORE_FTRACE
 extern void pstore_register_ftrace(void);
@@ -25,27 +72,14 @@ static inline void pstore_register_pmsg(void) {}
 static inline void pstore_unregister_pmsg(void) {}
 #endif
 
-#ifdef CONFIG_AMLOGIC_MODIFY
-extern bool console_enable;
-extern bool bconsole_enable;
-extern u32 bconsole_size;
-extern void dump_log_to_bconsole(void);
-#endif
-
 extern struct pstore_info *psinfo;
 
 extern void	pstore_set_kmsg_bytes(int);
 extern void	pstore_get_records(int);
-extern void	pstore_get_backend_records(struct pstore_info *psi,
-					   struct dentry *root, int quiet);
-extern int	pstore_mkfile(struct dentry *root,
-			      struct pstore_record *record);
+extern int	pstore_mkfile(enum pstore_type_id, char *psname, u64 id,
+			      int count, char *data, bool compressed,
+			      size_t size, struct timespec time,
+			      struct pstore_info *psi);
 extern bool	pstore_is_mounted(void);
-extern void	pstore_record_init(struct pstore_record *record,
-				   struct pstore_info *psi);
-
-/* Called during pstore init/exit. */
-int __init	pstore_init_fs(void);
-void __exit	pstore_exit_fs(void);
 
 #endif

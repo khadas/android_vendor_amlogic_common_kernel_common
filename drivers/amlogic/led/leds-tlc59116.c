@@ -1,4 +1,3 @@
-// SPDX-License-Identifier: GPL-2.0+
 /*
  * This file is provided under a dual BSD/GPLv2 license.  When using or
  * redistributing this file, you may do so under either license.
@@ -172,11 +171,11 @@ static int meson_tlc59116_i2c_writes(struct i2c_client *client,
 
 	data[0] = sreg_addr;
 	for (i = 1; i <= length; i++)
-		data[i] = bufs[i - 1];
+		data[i] = bufs[i-1];
 
 	msg.addr = client->addr;
 	msg.flags = !I2C_M_RD;
-	msg.len = length + 1;
+	msg.len = length+1;
 	msg.buf = data;
 
 	ret = i2c_transfer(client->adapter, &msg, 1);
@@ -253,12 +252,12 @@ static int meson_tlc59116_set_colors(struct meson_tlc59116 *tlc59116)
 	for (i = 0; i < tlc59116->led_counts; i++) {
 		io = &tlc59116->io[i];
 		color = &tlc59116->colors[i];
-		color->blue = tlc59116->colors_buf[i] & 0xff;
-		color_data[io->b_io] = color->blue;
-		color->green = (tlc59116->colors_buf[i] >> 8) & 0xff;
-		color_data[io->g_io] = color->green;
-		color->red = (tlc59116->colors_buf[i] >> 16) & 0xff;
-		color_data[io->r_io] = color->red;
+		color_data[io->b_io] = color->blue
+			   = tlc59116->colors_buf[i] & 0xff;
+		color_data[io->g_io] = color->green
+			   = (tlc59116->colors_buf[i] >> 8) & 0xff;
+		color_data[io->r_io] = color->red
+			   = (tlc59116->colors_buf[i] >> 16) & 0xff;
 	}
 
 	return meson_tlc59116_i2c_writes(tlc59116->i2c,
@@ -267,7 +266,7 @@ static int meson_tlc59116_set_colors(struct meson_tlc59116 *tlc59116)
 					 color_data);
 }
 
-static ssize_t colors_store(struct device *dev,
+static ssize_t meson_tlc59116_colors_store(struct device *dev,
 					   struct device_attribute *attr,
 					   const char *buf, size_t count)
 {
@@ -291,7 +290,7 @@ static ssize_t colors_store(struct device *dev,
 	return count;
 }
 
-static ssize_t colors_show(struct device *dev,
+static ssize_t meson_tlc59116_colors_show(struct device *dev,
 					  struct device_attribute *attr,
 					  char *buf)
 {
@@ -312,7 +311,7 @@ static ssize_t colors_show(struct device *dev,
 		       tlc59116->colors_buf[3]);
 }
 
-static ssize_t reg_store(struct device *dev,
+static ssize_t meson_tlc59116_reg_store(struct device *dev,
 					struct device_attribute *attr,
 					const char *buf, size_t count)
 {
@@ -343,7 +342,7 @@ static ssize_t reg_store(struct device *dev,
 	return count;
 }
 
-static ssize_t reg_show(struct device *dev,
+static ssize_t meson_tlc59116_reg_show(struct device *dev,
 				       struct device_attribute *attr,
 				       char *buf)
 {
@@ -361,14 +360,14 @@ static ssize_t reg_show(struct device *dev,
 			continue;
 
 		meson_tlc59116_i2c_read(tlc59116, i, &reg_val);
-		len += snprintf(buf + len, PAGE_SIZE - len,
+		len += snprintf(buf+len, PAGE_SIZE-len,
 				"reg:0x%02x=0x%02x\n", i, reg_val);
 	}
 
 	return len;
 }
 
-static ssize_t debug_store(struct device *dev,
+static ssize_t meson_tlc59116_debug_store(struct device *dev,
 					  struct device_attribute *attr,
 					  const char *buf, size_t count)
 {
@@ -383,7 +382,7 @@ static ssize_t debug_store(struct device *dev,
 	return count;
 }
 
-static ssize_t debug_show(struct device *dev,
+static ssize_t meson_tlc59116_debug_show(struct device *dev,
 					 struct device_attribute *attr,
 					 char *buf)
 {
@@ -410,129 +409,19 @@ static ssize_t meson_tlc59116_io_show(struct device *dev,
 	return len;
 }
 
-static int meson_tlc59116_set_singlecolors(u32 ledid, struct meson_tlc59116 *tlc59116)
-{
-	struct meson_tlc59116_colors *color;
-	struct meson_tlc59116_io *io;
-	u8 color_data[MESON_TLC59116_MAX_IO];
-
-	if (ledid > 3) {
-		pr_info(" Exceed the maximum number of leds!\n");
-		return 0;
-	}
-
-	if (meson_tlc59116_debug) {
-		pr_info("tlc59116 set colors: 0x%x\n",
-				tlc59116->colors_buf[0]);
-	}
-
-	memset(color_data, 0, sizeof(color_data));
-
-	switch (ledid) {
-	case LED_NUM0:
-		io = &tlc59116->io[0];
-		color = &tlc59116->colors[0];
-		color->blue = tlc59116->colors_buf[0] & 0xff;
-		color_data[io->b_io] = color->blue;
-		color->green = (tlc59116->colors_buf[0] >> 8) & 0xff;
-		color_data[io->g_io] = color->green;
-		color->red = (tlc59116->colors_buf[0] >> 16) & 0xff;
-		color_data[io->r_io] = color->red;
-		meson_tlc59116_i2c_write(tlc59116, tlc59116->io[0].b_io + REGISTER_OFFSET,
-				color_data[io->b_io]);
-		meson_tlc59116_i2c_write(tlc59116, tlc59116->io[0].g_io + REGISTER_OFFSET,
-				color_data[io->g_io]);
-		meson_tlc59116_i2c_write(tlc59116, tlc59116->io[0].r_io + REGISTER_OFFSET,
-				color_data[io->r_io]);
-		break;
-
-	case LED_NUM1:
-		io = &tlc59116->io[1];
-		color = &tlc59116->colors[1];
-		color->blue = tlc59116->colors_buf[0] & 0xff;
-		color_data[io->b_io] = color->blue;
-		color->green = (tlc59116->colors_buf[0] >> 8) & 0xff;
-		color_data[io->g_io] = color->green;
-		color->red = (tlc59116->colors_buf[0] >> 16) & 0xff;
-		color_data[io->r_io] = color->red;
-		meson_tlc59116_i2c_write(tlc59116, tlc59116->io[1].b_io + REGISTER_OFFSET,
-				color_data[io->b_io]);
-		meson_tlc59116_i2c_write(tlc59116, tlc59116->io[1].g_io + REGISTER_OFFSET,
-				color_data[io->g_io]);
-		meson_tlc59116_i2c_write(tlc59116, tlc59116->io[1].r_io + REGISTER_OFFSET,
-				color_data[io->r_io]);
-		break;
-
-	case LED_NUM2:
-		io = &tlc59116->io[2];
-		color = &tlc59116->colors[2];
-		color->blue = tlc59116->colors_buf[0] & 0xff;
-		color_data[io->b_io] = color->blue;
-		color->green = (tlc59116->colors_buf[0] >> 8) & 0xff;
-		color_data[io->g_io] = color->green;
-		color->red = (tlc59116->colors_buf[0] >> 16) & 0xff;
-		color_data[io->r_io] = color->red;
-		meson_tlc59116_i2c_write(tlc59116, tlc59116->io[2].b_io + REGISTER_OFFSET,
-				color_data[io->b_io]);
-		meson_tlc59116_i2c_write(tlc59116, tlc59116->io[2].g_io + REGISTER_OFFSET,
-				color_data[io->g_io]);
-		meson_tlc59116_i2c_write(tlc59116, tlc59116->io[2].r_io + REGISTER_OFFSET,
-				color_data[io->r_io]);
-		break;
-
-	case LED_NUM3:
-		io = &tlc59116->io[3];
-		color = &tlc59116->colors[3];
-		color->blue = tlc59116->colors_buf[0] & 0xff;
-		color_data[io->b_io] = color->blue;
-		color->green = (tlc59116->colors_buf[0] >> 8) & 0xff;
-		color_data[io->g_io] = color->green;
-		color->red = (tlc59116->colors_buf[0] >> 16) & 0xff;
-		color_data[io->r_io] = color->red;
-		meson_tlc59116_i2c_write(tlc59116, tlc59116->io[3].b_io + REGISTER_OFFSET,
-				color_data[io->b_io]);
-		meson_tlc59116_i2c_write(tlc59116, tlc59116->io[3].g_io + REGISTER_OFFSET,
-				color_data[io->g_io]);
-		meson_tlc59116_i2c_write(tlc59116, tlc59116->io[3].r_io + REGISTER_OFFSET,
-				color_data[io->r_io]);
-		break;
-	}
-	return 0;
-}
-
-static ssize_t single_colors_store(struct device *dev,
-					   struct device_attribute *attr,
-					   const char *buf, size_t count)
-{
-	u32 ledid;
-	struct led_classdev *led_cdev = dev_get_drvdata(dev);
-	struct meson_tlc59116 *tlc59116 = container_of(led_cdev, struct meson_tlc59116, cdev);
-	int ret;
-
-	mutex_lock(&meson_tlc59116_lock);
-
-	ret = sscanf(buf, "%d %x", &ledid, &tlc59116->colors_buf[0]);
-		if (ret != 2) {
-			pr_info(" enter,Line:...set led colors fail!\n");
-			return count;
-		}
-	meson_tlc59116_set_singlecolors(ledid, tlc59116);
-	mutex_unlock(&meson_tlc59116_lock);
-	return count;
-}
-
-static DEVICE_ATTR_RW(colors);
-static DEVICE_ATTR_RW(reg);
-static DEVICE_ATTR_RW(debug);
+static DEVICE_ATTR(colors, 0644, meson_tlc59116_colors_show,
+		   meson_tlc59116_colors_store);
+static DEVICE_ATTR(reg, 0644, meson_tlc59116_reg_show,
+		   meson_tlc59116_reg_store);
+static DEVICE_ATTR(debug, 0644, meson_tlc59116_debug_show,
+		   meson_tlc59116_debug_store);
 static DEVICE_ATTR_RO(meson_tlc59116_io);
-static DEVICE_ATTR_WO(single_colors);
 
 static struct attribute *tlc59116_attributes[] = {
 	&dev_attr_colors.attr,
 	&dev_attr_reg.attr,
 	&dev_attr_debug.attr,
 	&dev_attr_meson_tlc59116_io.attr,
-	&dev_attr_single_colors.attr,
 	NULL
 };
 
@@ -565,12 +454,12 @@ static int meson_tlc59116_check(struct meson_tlc59116 *tlc59116)
 	int i;
 
 	for (i = 0; i < tlc59116->led_counts; i++)
-		if (tlc59116->io[i].r_io >= MESON_TLC59116_MAX_IO ||
-		    tlc59116->io[i].g_io >= MESON_TLC59116_MAX_IO ||
-		    tlc59116->io[i].b_io >= MESON_TLC59116_MAX_IO ||
-		    tlc59116->colors[i].red > MESON_TLC59116_BRI_MAX ||
-		    tlc59116->colors[i].green > MESON_TLC59116_BRI_MAX ||
-		    tlc59116->colors[i].blue > MESON_TLC59116_BRI_MAX)
+		if ((tlc59116->io[i].r_io >= MESON_TLC59116_MAX_IO) ||
+		    (tlc59116->io[i].g_io >= MESON_TLC59116_MAX_IO) ||
+		    (tlc59116->io[i].b_io >= MESON_TLC59116_MAX_IO) ||
+		    (tlc59116->colors[i].red > MESON_TLC59116_BRI_MAX) ||
+		    (tlc59116->colors[i].green > MESON_TLC59116_BRI_MAX) ||
+		    (tlc59116->colors[i].blue > MESON_TLC59116_BRI_MAX))
 			return -EINVAL;
 
 	return 0;
@@ -606,9 +495,6 @@ static int meson_tlc59116_parse_led_dt(struct meson_tlc59116 *tlc59116,
 	struct device_node *temp;
 	int ret = -1;
 	int i = 0;
-
-	if (of_property_read_bool(np, "ignore-led-suspend"))
-		tlc59116->ignore_led_suspend = 1;
 
 	for_each_child_of_node(np, temp) {
 		ret = of_property_read_u32_array(temp, "default_colors",
@@ -746,69 +632,22 @@ static int meson_tlc59116_i2c_remove(struct i2c_client *i2c)
 	return 0;
 }
 
-static int meson_tlc59116_suspend(struct device *dev)
-{
-	struct i2c_client *client = container_of(dev, struct i2c_client, dev);
-	struct meson_tlc59116 *tlc59116 = i2c_get_clientdata(client);
-
-	if (!tlc59116) {
-		dev_err(tlc59116->dev, "tlc59116 is NULL!\n");
-		return -ENXIO;
-	}
-
-	if (tlc59116->ignore_led_suspend)
-		return 0;
-
-	meson_tlc59116_i2c_write(tlc59116, MESON_TLC59116_REG_LEDOUT0, 0x0);
-	meson_tlc59116_i2c_write(tlc59116, MESON_TLC59116_REG_LEDOUT1, 0x0);
-	meson_tlc59116_i2c_write(tlc59116, MESON_TLC59116_REG_LEDOUT2, 0x0);
-	meson_tlc59116_i2c_write(tlc59116, MESON_TLC59116_REG_LEDOUT3, 0x0);
-	meson_tlc59116_i2c_write(tlc59116, MESON_TLC59116_REG_MODE_1, 0x10);
-
-	return 0;
-}
-
-static int meson_tlc59116_resume(struct device *dev)
-{
-	struct i2c_client *client = container_of(dev, struct i2c_client, dev);
-	struct meson_tlc59116 *tlc59116 = i2c_get_clientdata(client);
-
-	if (!tlc59116) {
-		dev_err(tlc59116->dev, "tlc59116 is NULL!\n");
-		return -ENXIO;
-	}
-
-	if (tlc59116->ignore_led_suspend)
-		return 0;
-
-	meson_tlc59116_i2c_write(tlc59116, MESON_TLC59116_REG_LEDOUT0, 0xaa);
-	meson_tlc59116_i2c_write(tlc59116, MESON_TLC59116_REG_LEDOUT1, 0xaa);
-	meson_tlc59116_i2c_write(tlc59116, MESON_TLC59116_REG_LEDOUT2, 0xaa);
-	meson_tlc59116_i2c_write(tlc59116, MESON_TLC59116_REG_LEDOUT3, 0xaa);
-	meson_tlc59116_i2c_write(tlc59116, MESON_TLC59116_REG_MODE_1, 0x00);
-
-	return 0;
-}
-
 static const struct i2c_device_id meson_tlc59116_i2c_id[] = {
 	{ MESON_TLC59116_I2C_NAME, 0 },
 	{ }
 };
-MODULE_DEVICE_TABLE(i2c, meson_tlc59116_i2c_id);
+MODULE_DEVICE_TABLE(i2c, tlc59116_i2c_id);
 
 static const struct of_device_id meson_tlc59116_dt_match[] = {
 	{ .compatible = "amlogic,tlc59116_led" },
 	{ }
 };
 
-static SIMPLE_DEV_PM_OPS(meson_tlc59116_pm, meson_tlc59116_suspend, meson_tlc59116_resume);
-
 static struct i2c_driver meson_tlc59116_driver = {
 	.driver = {
 		.name = MESON_TLC59116_I2C_NAME,
 		.owner = THIS_MODULE,
 		.of_match_table = of_match_ptr(meson_tlc59116_dt_match),
-		.pm = &meson_tlc59116_pm,
 	},
 	.probe = meson_tlc59116_i2c_probe,
 	.remove = meson_tlc59116_i2c_remove,

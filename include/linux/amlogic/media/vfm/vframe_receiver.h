@@ -1,4 +1,3 @@
-/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
  * include/linux/amlogic/media/vfm/vframe_receiver.h
  *
@@ -14,7 +13,7 @@
  * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
  * more details.
  *
- */
+*/
 
 #ifndef VFRAME_RECEIVER_H
 #define VFRAME_RECEIVER_H
@@ -60,20 +59,21 @@ struct vframe_receiver_s {
 	struct list_head list;
 } /*vframe_receiver_t */;
 
-struct vframe_receiver_s *vf_receiver_alloc(void);
-void vf_receiver_init(struct vframe_receiver_s *recv,
-		      const char *name,
-		      const struct vframe_receiver_op_s *ops,
-		      void *op_arg);
-void vf_receiver_free(struct vframe_receiver_s *recv);
-int vf_reg_receiver(struct vframe_receiver_s *recv);
-void vf_unreg_receiver(struct vframe_receiver_s *recv);
+extern struct vframe_receiver_s *vf_receiver_alloc(void);
+extern void vf_receiver_init(struct vframe_receiver_s *recv,
+			     const char *name,
+			     const struct vframe_receiver_op_s *ops,
+			     void *op_arg);
+extern void vf_receiver_free(struct vframe_receiver_s *recv);
+
+extern int vf_reg_receiver(struct vframe_receiver_s *recv);
+extern void vf_unreg_receiver(struct vframe_receiver_s *recv);
 
 struct vframe_receiver_s *vf_get_receiver(const char *provider_name);
 
 int vf_notify_receiver(const char *provider_name, int event_type, void *data);
 
 int vf_notify_receiver_by_name(const char *receiver_name, int event_type,
-			       void *data);
+	void *data);
 
 #endif /* VFRAME_RECEIVER_H */

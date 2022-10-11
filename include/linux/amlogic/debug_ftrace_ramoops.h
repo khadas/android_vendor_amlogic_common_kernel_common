@@ -1,4 +1,3 @@
-/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
  * include/linux/amlogic/debug_ftrace_ramoops.h
  *
@@ -39,8 +38,6 @@ void notrace pstore_io_save(unsigned long reg, unsigned long val,
 			    unsigned long parant, unsigned int flag,
 			    unsigned long *irq_flag);
 
-void pstore_ftrace_dump_old(struct persistent_ram_zone *prz);
-
 //#define SKIP_IO_TRACE
 #if (defined CONFIG_AMLOGIC_DEBUG_FTRACE_PSTORE) && (!defined SKIP_IO_TRACE)
 #define pstore_ftrace_io_wr(reg, val)	\
@@ -59,7 +56,7 @@ pstore_io_save(reg, 0, CALLER_ADDR0, PSTORE_FLAG_IO_R_END, &irqflg)
 #define need_dump_iomap()		(ramoops_io_en | dump_iomap)
 
 #define pstore_ftrace_io_tag(reg, val)	\
-	pstore_io_save(reg, val, CALLER_ADDR0, PSTORE_FLAG_IO_TAG, NULL)
+pstore_io_save(reg, val, CALLER_ADDR0, PSTORE_FLAG_IO_TAG, NULL)
 
 #else
 #define pstore_ftrace_io_wr(reg, val)		do {	} while (0)
@@ -70,5 +67,7 @@ pstore_io_save(reg, 0, CALLER_ADDR0, PSTORE_FLAG_IO_R_END, &irqflg)
 #define pstore_ftrace_io_tag(reg, val)		do {    } while (0)
 
 #endif
+
+void pstore_ftrace_dump_old(struct persistent_ram_zone *prz);
 
 #endif

@@ -1,7 +1,9 @@
-// SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2013, 2014
  * Phillip Lougher <phillip@squashfs.org.uk>
+ *
+ * This work is licensed under the terms of the GNU GPL, version 2. See
+ * the COPYING file in the top-level directory.
  */
 
 #include <linux/buffer_head.h>
@@ -95,6 +97,7 @@ static int lz4_uncompress(struct squashfs_sb_info *msblk, void *strm,
 	struct squashfs_lz4 *stream = strm;
 	void *buff = stream->input, *data;
 	int avail, i, bytes = length, res;
+	size_t dest_len = output->length;
 
 	for (i = 0; i < b; i++) {
 		avail = min(bytes, msblk->devblksize - offset);
@@ -105,13 +108,12 @@ static int lz4_uncompress(struct squashfs_sb_info *msblk, void *strm,
 		put_bh(bh[i]);
 	}
 
-	res = LZ4_decompress_safe(stream->input, stream->output,
-		length, output->length);
-
-	if (res < 0)
+	res = lz4_decompress_unknownoutputsize(stream->input, length,
+					stream->output, &dest_len);
+	if (res)
 		return -EIO;
 
-	bytes = res;
+	bytes = dest_len;
 	data = squashfs_first_page(output);
 	buff = stream->output;
 	while (data) {
@@ -126,7 +128,7 @@ static int lz4_uncompress(struct squashfs_sb_info *msblk, void *strm,
 	}
 	squashfs_finish_page(output);
 
-	return res;
+	return dest_len;
 }
 
 const struct squashfs_decompressor squashfs_lz4_comp_ops = {

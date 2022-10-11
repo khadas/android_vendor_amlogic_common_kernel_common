@@ -1,6 +1,18 @@
-/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/amlogic/media/vout/hdmitx/hdmi_tx_20/hw/common.h
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
 #ifndef __HDMITX_HW_COMMON_H__
@@ -52,15 +64,14 @@ void set_g12a_hpll_clk_out(unsigned int frac_rate, unsigned int clk);
 void set_hpll_od1_g12a(unsigned int div);
 void set_hpll_od2_g12a(unsigned int div);
 void set_hpll_od3_g12a(unsigned int div);
-int hdmitx_hpd_hw_op_g12a(enum hpd_op cmd);
-int hdmitx_ddc_hw_op_g12a(enum ddc_op cmd);
 
-int read_hpd_gpio_txlx(void);
 int hdmitx_hpd_hw_op_txlx(enum hpd_op cmd);
+int hdmitx_hpd_hw_op_g12a(enum hpd_op cmd);
+int read_hpd_gpio_txlx(void);
 int hdmitx_ddc_hw_op_txlx(enum ddc_op cmd);
-unsigned int hdmitx_get_format_txlx(void);
+extern unsigned int hdmitx_get_format_txlx(void);
 void hdmitx_set_format_txlx(unsigned int val);
-void hdmitx_sys_reset_txlx(void);
+extern void hdmitx_sys_reset_txlx(void);
 
 void hdmitx_phy_bandgap_en_tm2(void);
 void hdmitx_phy_bandgap_en_g12(void);
@@ -82,9 +93,11 @@ void set_hpll_od3_sc2(unsigned int div);
 
 void set_hpll_sspll_sc2(enum hdmi_vic vic);
 
-int hdmitx_uboot_audio_en(void);
 void hdmitx_debugfs_init(void);
 
 struct dentry *hdmitx_get_dbgfsdentry(void);
 
+int hdmitx_uboot_audio_en(void);
+
 #endif
+

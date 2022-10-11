@@ -1,6 +1,18 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * arch/arm64/boot/dts/amlogic/mesong12a-bifrost.dtsi
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
 / {
@@ -21,6 +33,9 @@
 
 		num_of_pp = <2>;
 		sc_mpp = <1>; /* number of shader cores used most of time. */
+		clocks = <&clkc CLKID_GPU_MUX &clkc CLKID_GP0_PLL>;
+		clock-names = "gpu_mux","gp0_pll";
+
 
 		tbl =  <&dvfs285_cfg
 			&dvfs400_cfg
@@ -46,7 +61,7 @@
 			clk_reg = <0xA01>;
 			voltage = <1150>;
 			keep_count = <5>;
-			threshold = <0 76>;
+			threshold = <80 170>;
 		};
 
 		dvfs285_cfg:dvfs285_cfg {
@@ -66,7 +81,7 @@
 			clk_reg = <0xC00>;
 			voltage = <1150>;
 			keep_count = <5>;
-			threshold = <80 120>;
+			threshold = <152 207>;
 		};
 
 		dvfs500_cfg:dvfs500_cfg {
@@ -76,7 +91,7 @@
 			clk_reg = <0xA00>;
 			voltage = <1150>;
 			keep_count = <5>;
-			threshold = <80 120>;
+			threshold = <38 194>;
 		};
 
 		dvfs666_cfg:dvfs666_cfg {
@@ -86,7 +101,7 @@
 			clk_reg = <0x800>;
 			voltage = <1150>;
 			keep_count = <5>;
-			threshold = <80 120>;
+			threshold = <150 203>;
 		};
 
 		dvfs800_cfg:dvfs800_cfg {
@@ -96,7 +111,7 @@
 			clk_reg = <0x600>;
 			voltage = <1150>;
 			keep_count = <5>;
-			threshold = <80 255>;
+			threshold = <230 255>;
 		};
 
 		dvfs850_cfg:dvfs850_cfg {
@@ -106,7 +121,7 @@
 			clk_reg = <0x200>;
 			voltage = <1150>;
 			keep_count = <5>;
-			threshold = <80 255>;
+			threshold = <156 255>;
 		};
 	};
 

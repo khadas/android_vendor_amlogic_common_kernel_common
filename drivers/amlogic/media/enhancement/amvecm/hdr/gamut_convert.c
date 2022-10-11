@@ -1,6 +1,5 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
- * drivers/amlogic/media/enhancement/amvecm/hdr/gamut_convet.c
+ * drivers/amlogic/media/enhancement/amvecm/hdr/gamut_convert.c
  *
  * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
  *
@@ -42,18 +41,22 @@ static unsigned int scale_factor =
 
 #define NORM 50000
 #define BL		16
+
 static s64 ma[3][3] = {
 	{0.8951 * NORM, 0.2664 * NORM, -0.1614 * NORM},
 	{-0.7502 * NORM, 1.7135 * NORM, 0.0367 * NORM},
 	{0.0389 * NORM, -0.0685 * NORM, 1.0296 * NORM}
 };
+
 static s64 ma_inv[3][3] = {
 	{0.9869929 * NORM, -0.1470543 * NORM, 0.1599627 * NORM},
 	{0.4323053 * NORM, 0.5183603 * NORM, 0.0492912 * NORM},
 	{-0.0085287 * NORM, 0.0400428 * NORM, 0.9684867 * NORM}
 };
-static void mtx_inv(s64 (*in)[3], s64 (*out)[3],
-		    s32 norm, s32 obl)
+
+static void mtx_inv(
+	s64 (*in)[3], s64 (*out)[3],
+	s32 norm, s32 obl)
 {
 	int i, j;
 	s64 determinant = 0;
@@ -89,7 +92,8 @@ static void mtx_inv(s64 (*in)[3], s64 (*out)[3],
 	pr_gmt("%s: done\n", __func__);
 }
 
-static void rgb_xyz(s64 (*prmy)[2], s64 (*tout)[3],
+static void rgb_xyz(
+	s64 (*prmy)[2], s64 (*tout)[3],
 	s32 norm, s32 obl, s64 *cone)
 {
 	int i, j;
@@ -156,9 +160,11 @@ static void rgb_xyz(s64 (*prmy)[2], s64 (*tout)[3],
 		tmp = m_s[i] + (norm >> 1);
 		m_s[i] = div64_s64(tmp, norm);
 	}
+
 	for (i = 0; i < 3; i++) {
 		for (j = 0; j < 3; j++)
 			cone[i] += ma[i][j] * m_w[j];
+
 		tmp = cone[i] + (norm >> 1);
 		cone[i] = div64_s64(tmp, norm);
 		pr_gmt("cone[%d] = %lld\n", i, cone[i]);
@@ -180,13 +186,17 @@ static void rgb_xyz(s64 (*prmy)[2], s64 (*tout)[3],
 
 static void xyzs_xyzd_conv(s64 *cone_s, s64 *cone_d, s64 (*m_xyz)[3], s32 norm, s32 obl)
 {
-	s64 a[3][3] = {0};
+	s64 a[3][3];
 	s64 b[3][3];
 	int i, j, k;
 	s64 tmp;
+
+	memset(a, 0, sizeof(s64) * 9);
+
 	a[0][0] = div64_s64(cone_d[0] * (1 << obl), cone_s[0]);
 	a[1][1] = div64_s64(cone_d[1] * (1 << obl), cone_s[1]);
 	a[2][2] = div64_s64(cone_d[2] * (1 << obl), cone_s[2]);
+
 	for (i = 0; i < 3; i++) {
 		for (j = 0; j < 3; j++) {
 			b[i][j] = 0;
@@ -197,6 +207,7 @@ static void xyzs_xyzd_conv(s64 *cone_s, s64 *cone_d, s64 (*m_xyz)[3], s32 norm, 
 			pr_gmt("b[%d][%d] = %lld\n", i, j, b[i][j]);
 		}
 	}
+
 	for (i = 0; i < 3; i++) {
 		for (j = 0; j < 3; j++) {
 			m_xyz[i][j] = 0;
@@ -209,7 +220,9 @@ static void xyzs_xyzd_conv(s64 *cone_s, s64 *cone_d, s64 (*m_xyz)[3], s32 norm, 
 	}
 	pr_gmt("%s: done\n", __func__);
 }
-static void cal_mtx_out(s64 (*m_xyz)[3],
+
+static void cal_mtx_out(
+	s64 (*m_xyz)[3],
 	s64 (*mtx_src)[3],
 	s64 (*mtx_dest_inv)[3],
 	s64 (*out)[3],
@@ -220,6 +233,7 @@ static void cal_mtx_out(s64 (*m_xyz)[3],
 	s64 mtx_tmp[3][3];
 
 	pr_gmt("%s\n", __func__);
+
 	for (i = 0; i < 3; i++) {
 		for (j = 0; j < 3; j++) {
 			mtx_tmp[i][j] = 0;
@@ -230,6 +244,7 @@ static void cal_mtx_out(s64 (*m_xyz)[3],
 			pr_gmt("mtx_tmp[%d][%d] = %lld\n", i, j, mtx_tmp[i][j]);
 		}
 	}
+
 	for (i = 0; i < 3; i++)
 		for (j = 0; j < 3; j++) {
 			out[i][j] = 0;
@@ -243,11 +258,12 @@ static void cal_mtx_out(s64 (*m_xyz)[3],
 	pr_gmt("%s: done\n", __func__);
 }
 
-static void gamut_proc(s64 (*src_prmy)[2], s64 (*dst_prmy)[2],
-		       s64 (*tout)[3], s32 norm, s32 obl)
+static void gamut_proc(
+	s64 (*src_prmy)[2], s64 (*dst_prmy)[2],
+	s64 (*tout)[3], s32 norm, s32 obl)
 {
-	s64 tsrc[3][3];
-	s64 tdst[3][3];
+	s64 Tsrc[3][3];
+	s64 Tdst[3][3];
 	s64 out[3][3];
 	s64 cone_s[3] = {0};
 	s64 cone_d[3] = {0};
@@ -260,11 +276,12 @@ static void gamut_proc(s64 (*src_prmy)[2], s64 (*dst_prmy)[2],
 	pr_gmt("dst_primary: %lld, %lld, %lld, %lld, %lld, %lld, %lld, %lld\n",
 		dst_prmy[0][0], dst_prmy[0][1], dst_prmy[1][0], dst_prmy[1][1],
 		dst_prmy[2][0], dst_prmy[2][1], dst_prmy[3][0], dst_prmy[3][1]);
-	rgb_xyz(src_prmy, tsrc, norm, obl, cone_s);
-	rgb_xyz(dst_prmy, tdst, norm, obl, cone_d);
+
+	rgb_xyz(src_prmy, Tsrc, norm, obl, cone_s);
+	rgb_xyz(dst_prmy, Tdst, norm, obl, cone_d);
 	xyzs_xyzd_conv(cone_s, cone_d, m_xyz, norm, obl);
-	mtx_inv(tdst, out, 1 << obl, obl);
-	cal_mtx_out(m_xyz, tsrc, out, tout, 1 << obl);
+	mtx_inv(Tdst, out, 1 << obl, obl);
+	cal_mtx_out(m_xyz, Tsrc, out, tout, 1 << obl);
 }
 
 static void apply_scale_factor(s64 (*in)[3], s32 *rs)
@@ -298,10 +315,11 @@ static void apply_scale_factor(s64 (*in)[3], s32 *rs)
 	}
 }
 
-static void N2C(s64 (*in)[3],
-		s32 ibl,
-		s32 obl,
-		int mtx_depth)
+static void N2C(
+	s64 (*in)[3],
+	s32 ibl,
+	s32 obl,
+	int mtx_depth)
 {
 	int i, j;
 
@@ -315,10 +333,11 @@ static void N2C(s64 (*in)[3],
 		}
 }
 
-static void cal_mtx_seting(s64 (*in)[3],
-			   s32 ibl, s32 obl,
-			   struct matrix_s *m,
-			   int mtx_depth)
+static void cal_mtx_seting(
+	s64 (*in)[3],
+	s32 ibl, s32 obl,
+	struct matrix_s *m,
+	int mtx_depth)
 {
 	int i, j;
 	s32 right_shift = 0;
@@ -332,10 +351,11 @@ static void cal_mtx_seting(s64 (*in)[3],
 		for (j = 0; j < 3; j++)
 			m->matrix[i][j] = in[i][j];
 		m->offset[i] = 0;
-		pr_gmt("\t\t%04x %04x %04x\n",
-		       (int)(m->matrix[i][0] & 0xffff),
-		       (int)(m->matrix[i][1] & 0xffff),
-		       (int)(m->matrix[i][2] & 0xffff));
+		pr_gmt(
+			"\t\t%04x %04x %04x\n",
+			(int)(m->matrix[i][0] & 0xffff),
+			(int)(m->matrix[i][1] & 0xffff),
+			(int)(m->matrix[i][2] & 0xffff));
 	}
 }
 
@@ -382,6 +402,7 @@ static u32 force_src_primary[8] = {
 };
 module_param_array(force_src_primary, uint, &num_force_primary, 0664);
 MODULE_PARM_DESC(force_src_primary, "\n force_src_primary\n");
+
 static u32 force_dst_primary[8] = {
 	0.64 * NORM + 0.5, 0.33 * NORM + 0.5,	/* R */
 	0.30 * NORM + 0.5, 0.60 * NORM + 0.5,	/* G */
@@ -390,11 +411,13 @@ static u32 force_dst_primary[8] = {
 };
 module_param_array(force_dst_primary, uint, &num_force_primary, 0664);
 MODULE_PARM_DESC(force_dst_primary, "\n force_src_primary\n");
-int gamut_convert_process(struct vinfo_s *vinfo,
-			  enum hdr_type_e *source_type,
-			  enum vd_path_e vd_path,
-			  struct matrix_s *mtx,
-			  int mtx_depth)
+
+int gamut_convert_process(
+	struct vinfo_s *vinfo,
+	enum hdr_type_e *source_type,
+	enum vd_path_e vd_path,
+	struct matrix_s *mtx,
+	int mtx_depth)
 {
 	int i, j;
 	s64 out[3][3];
@@ -414,24 +437,22 @@ int gamut_convert_process(struct vinfo_s *vinfo,
 			}
 	} else if ((source_type[vd_path] == HDRTYPE_HDR10) ||
 		(source_type[vd_path] == HDRTYPE_HLG) ||
-		(source_type[vd_path] == HDRTYPE_HDR10PLUS)) {
+		(source_type[vd_path] == HDRTYPE_HDR10PLUS) ||
+		(source_type[vd_path] == CUVA_HDR_SOURCE) ||
+		(source_type[vd_path] == CUVA_HLG_SOURCE)) {
 		if (get_primary_policy() == PRIMARIES_AUTO) {
 			for (i = 0; i < 3; i++)
 				for (j = 0; j < 2; j++) {
 					src_prmy[i][j] =
-						std_p3_primaries
-						[(i + 2) % 3][j];
-					src_prmy[3][j] =
-						std_p3_white_point
-						[j];
+						std_p3_primaries[(i + 2) % 3][j];
+					src_prmy[3][j] = std_p3_white_point[j];
 				}
 		} else {
 			for (i = 0; i < 3; i++)
 				for (j = 0; j < 2; j++) {
 					src_prmy[i][j] =
 						std_bt2020_prmy[(i + 2) % 3][j];
-					src_prmy[3][j] =
-						std_bt2020_white_point[j];
+					src_prmy[3][j] = std_bt2020_white_point[j];
 				}
 		}
 	}
@@ -459,6 +480,7 @@ int gamut_convert_process(struct vinfo_s *vinfo,
 				src_prmy[i][j] =
 					force_src_primary[i * 2 + j];
 			}
+
 		for (i = 0; i < 4; i++)
 			for (j = 0; j < 2; j++) {
 				dest_prmy[i][j] =

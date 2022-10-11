@@ -1,4 +1,3 @@
-/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
  * drivers/amlogic/media/enhancement/amvecm/arch/hdr_curve.h
  *
@@ -881,7 +880,6 @@ unsigned int oetf_289_gamma22_table[][289] = {
 	1023
 	}
 };
-
 /*Mbox: iptv/ott hdr curve select*/
 /*600nit alpha_low = 0.12; */
 static unsigned int eotf_33_2084_mapping_box[33] = {

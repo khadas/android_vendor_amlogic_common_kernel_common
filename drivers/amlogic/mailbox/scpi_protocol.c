@@ -1,8 +1,19 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/amlogic/mailbox/scpi_protocol.c
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
-
 #include <linux/err.h>
 #include <linux/export.h>
 #include <linux/kernel.h>
@@ -10,8 +21,6 @@
 #include <linux/printk.h>
 #include <linux/mailbox_client.h>
 #include <linux/slab.h>
-#include <linux/platform_device.h>
-#include <linux/of_device.h>
 #include <linux/amlogic/scpi_protocol.h>
 
 #include "meson_mhu.h"
@@ -32,6 +41,7 @@
 struct device *mhu_device;
 struct device *mhu_fifo_device;
 struct device *mhu_pl_device;
+struct device *mhu_sec_device;
 u32 mhu_f;
 
 #define CMD_ID_SHIFT		0
@@ -242,8 +252,8 @@ static void scpi_rx_callback(struct mbox_client *cl, void *msg)
 	complete(&scpi_buf->complete);
 }
 
-int send_scpi_cmd(struct scpi_data_buf *scpi_buf,
-		  bool high_priority, int c_chan)
+static int send_scpi_cmd(struct scpi_data_buf *scpi_buf,
+			 bool high_priority, int c_chan)
 {
 	struct mbox_chan *chan;
 	struct mbox_client cl = {0};
@@ -256,8 +266,6 @@ int send_scpi_cmd(struct scpi_data_buf *scpi_buf,
 	unsigned long wait;
 	int ret;
 	int plhead_len = 0;
-	struct mhu_ctlr *mhu_ctlr;
-	struct platform_device *mhu_pdev;
 
 	switch (c_chan) {
 	case C_DSPA_FIFO:
@@ -301,7 +309,6 @@ int send_scpi_cmd(struct scpi_data_buf *scpi_buf,
 	case C_DSPA_PL:
 	case C_DSPB_PL:
 	case C_SECPU_PL:
-	case C_AOCPU_PL:
 		if (!mhu_pl_device)
 			return -ENOENT;
 
@@ -312,7 +319,7 @@ int send_scpi_cmd(struct scpi_data_buf *scpi_buf,
 			return -ENOENT;
 		}
 
-		if (c_chan == C_SECPU_PL || c_chan == C_AOCPU_PL)
+		if (c_chan == C_SECPU_PL)
 			plhead_len = MBOX_PL_HEAD_SIZE;
 		else
 			plhead_len = MBOX_RESERVE_LEN;
@@ -366,15 +373,9 @@ int send_scpi_cmd(struct scpi_data_buf *scpi_buf,
 	}
 
 	cl.rx_callback = scpi_rx_callback;
-
-	mhu_pdev = container_of(cl.dev, struct platform_device, dev);
-	mhu_ctlr = platform_get_drvdata(mhu_pdev);
-	mutex_lock(&mhu_ctlr->mutex);
-
 	chan = mbox_request_channel(&cl, chan_idx);
 	if (IS_ERR(chan)) {
 		status = -SCPI_ERR_NOMEM;
-		mutex_unlock(&mhu_ctlr->mutex);
 		goto free_buf;
 	}
 
@@ -387,7 +388,8 @@ int send_scpi_cmd(struct scpi_data_buf *scpi_buf,
 	wait = msecs_to_jiffies(MBOX_TIME_OUT);
 	ret = wait_for_completion_timeout(&scpi_buf->complete, wait);
 	if (ret == 0) {
-		pr_err("Warning: scpi wait ack time out %d\n", ret);
+		pr_err("Warning: scpi wait ack time out %d\n",
+		       ret);
 		status = SCPI_ERR_TIMEOUT;
 		goto free_channel;
 	}
@@ -397,31 +399,27 @@ int send_scpi_cmd(struct scpi_data_buf *scpi_buf,
 	case C_DSPB_FIFO:
 		status = *(u32 *)(data->rx_buf);
 		if (status == ACK_OK) {
-			if (rx_buf)
-				memcpy(rx_buf, (data->rx_buf) + MBOX_HEAD_SIZE,
-					(data->rx_size - MBOX_HEAD_SIZE));
+			memcpy(rx_buf, (data->rx_buf) + MBOX_HEAD_SIZE,
+			       (data->rx_size - MBOX_HEAD_SIZE));
+
+			data->rx_buf = rx_buf;
 		}
+
 		data->rx_buf = rx_buf;
 
 		status = SCPI_SUCCESS;
 	break;
 	case C_AOCPU_FIFO:
-	case C_AOCPU_PL:
 		status = *(u32 *)(data->rx_buf);
 		if (status == ACK_OK) {
 			*(u32 *)(rx_buf) = SCPI_SUCCESS;
-			if (c_chan == C_AOCPU_PL)
-				plhead_len = MBOX_PL_HEAD_SIZE;
-			else
-				plhead_len = MBOX_HEAD_SIZE;
-
-			memcpy(rx_buf + sizeof(status),
-			       (data->rx_buf) + plhead_len,
-			       (data->rx_size - plhead_len
-			       - sizeof(status)));
+		memcpy(rx_buf + sizeof(status),
+		       (data->rx_buf) + MBOX_HEAD_SIZE,
+		       (data->rx_size - MBOX_HEAD_SIZE - sizeof(status)));
 		} else {
 			*(u32 *)(rx_buf) = SCPI_ERR_SUPPORT;
 		}
+
 		data->rx_buf = rx_buf;
 		status = *(u32 *)(data->rx_buf);
 	break;
@@ -442,11 +440,12 @@ int send_scpi_cmd(struct scpi_data_buf *scpi_buf,
 			memcpy(rx_buf, (data->rx_buf) + plhead_len,
 			       (data->rx_size - plhead_len));
 
-			status = SCPI_SUCCESS;
-		} else {
-			status = SCPI_ERR_SUPPORT;
+			data->rx_buf = rx_buf;
 		}
+
 		data->rx_buf = rx_buf;
+
+		status = SCPI_SUCCESS;
 	break;
 	case C_AOCPU_OLD:
 		status = *(u32 *)(data->rx_buf); /* read first word */
@@ -455,7 +454,7 @@ int send_scpi_cmd(struct scpi_data_buf *scpi_buf,
 
 free_channel:
 	mbox_free_channel(chan);
-	mutex_unlock(&mhu_ctlr->mutex);
+
 free_buf:
 	kfree(rxbuf);
 	kfree(txbuf);
@@ -463,7 +462,6 @@ free_buf:
 free_end:
 	return scpi_to_linux_errno(status);
 }
-EXPORT_SYMBOL_GPL(send_scpi_cmd);
 
 #define SCPI_SETUP_DBUF(scpi_buf, mhu_buf, _client_id,\
 			_cmd, _tx_buf, _rx_buf) \
@@ -578,21 +576,13 @@ static int scpi_execute_cmd(struct scpi_data_buf *scpi_buf)
 			else
 				return -EINVAL;
 		} else {
-			if (mhu_f & MASK_MHU_FIFO || mhu_f & MASK_MHU_PL) {
+			if (mhu_f & MASK_MHU_FIFO) {
 				if (data->tx_size > MBOX_DATA_SIZE)
 					return -EINVAL;
 
-				if (mhu_f & MASK_MHU_FIFO) {
-					c_chan = C_AOCPU_FIFO;
-					txsize = data->tx_size + MBOX_HEAD_SIZE;
-				}
-
-				if (mhu_f & MASK_MHU_PL) {
-					c_chan = C_AOCPU_PL;
-					txsize = data->tx_size + MBOX_PL_HEAD_SIZE;
-				}
-
+				c_chan = C_AOCPU_FIFO;
 				scpi_buf->channel = SCPI_AOCPU;
+				txsize = data->tx_size + MBOX_HEAD_SIZE;
 				if (scpi_buf->async != ASYNC_CMD_TAG &&
 				    scpi_buf->async != SYNC_CMD_TAG)
 					scpi_buf->async = SCPI_DEF_SYNC;
@@ -645,7 +635,7 @@ unsigned long scpi_clk_get_val(u16 clk_id)
 
 	return buf.clk_rate;
 }
-EXPORT_SYMBOL(scpi_clk_get_val);
+EXPORT_SYMBOL_GPL(scpi_clk_get_val);
 
 int scpi_clk_set_val(u16 clk_id, unsigned long rate)
 {
@@ -664,7 +654,7 @@ int scpi_clk_set_val(u16 clk_id, unsigned long rate)
 			SCPI_CMD_SET_CLOCK_VALUE, buf, stat);
 	return scpi_execute_cmd(&sdata);
 }
-EXPORT_SYMBOL(scpi_clk_set_val);
+EXPORT_SYMBOL_GPL(scpi_clk_set_val);
 
 struct scpi_dvfs_info *scpi_dvfs_get_opps(u8 domain)
 {
@@ -711,7 +701,7 @@ struct scpi_dvfs_info *scpi_dvfs_get_opps(u8 domain)
 
 	return opps;
 }
-EXPORT_SYMBOL(scpi_dvfs_get_opps);
+EXPORT_SYMBOL_GPL(scpi_dvfs_get_opps);
 
 int scpi_dvfs_get_idx(u8 domain)
 {
@@ -734,7 +724,7 @@ int scpi_dvfs_get_idx(u8 domain)
 		ret = buf.dvfs_idx;
 	return ret;
 }
-EXPORT_SYMBOL(scpi_dvfs_get_idx);
+EXPORT_SYMBOL_GPL(scpi_dvfs_get_idx);
 
 int scpi_dvfs_set_idx(u8 domain, u8 idx)
 {
@@ -756,7 +746,7 @@ int scpi_dvfs_set_idx(u8 domain, u8 idx)
 			SCPI_CMD_SET_DVFS, buf, stat);
 	return scpi_execute_cmd(&sdata);
 }
-EXPORT_SYMBOL(scpi_dvfs_set_idx);
+EXPORT_SYMBOL_GPL(scpi_dvfs_set_idx);
 
 int scpi_get_sensor(char *name)
 {
@@ -808,7 +798,7 @@ int scpi_get_sensor(char *name)
 out:
 	return ret;
 }
-EXPORT_SYMBOL(scpi_get_sensor);
+EXPORT_SYMBOL_GPL(scpi_get_sensor);
 
 int scpi_get_sensor_value(u16 sensor, u32 *val)
 {
@@ -828,7 +818,7 @@ int scpi_get_sensor_value(u16 sensor, u32 *val)
 
 	return ret;
 }
-EXPORT_SYMBOL(scpi_get_sensor_value);
+EXPORT_SYMBOL_GPL(scpi_get_sensor_value);
 
 /****Send fail when data size > 0x1fd.      ***
  * Because of USER_LOW_TASK_SHARE_MEM_BASE ***
@@ -837,7 +827,7 @@ EXPORT_SYMBOL(scpi_get_sensor_value);
  * multi-times when your data is bigger
  * than 0x1fe
  */
-int scpi_send_usr_data(u32 client_id, u32 *val, u32 size)
+int scpi_send_usr_data(u32 client_id, void *val, u32 size)
 {
 	struct scpi_data_buf sdata;
 	struct mhu_data_buf mdata;
@@ -866,7 +856,7 @@ int scpi_send_usr_data(u32 client_id, u32 *val, u32 size)
 
 	return ret;
 }
-EXPORT_SYMBOL(scpi_send_usr_data);
+EXPORT_SYMBOL_GPL(scpi_send_usr_data);
 
 int scpi_get_vrtc(u32 *p_vrtc)
 {
@@ -887,7 +877,7 @@ int scpi_get_vrtc(u32 *p_vrtc)
 
 	return 0;
 }
-EXPORT_SYMBOL(scpi_get_vrtc);
+EXPORT_SYMBOL_GPL(scpi_get_vrtc);
 
 int scpi_set_vrtc(u32 vrtc_val)
 {
@@ -902,7 +892,7 @@ int scpi_set_vrtc(u32 vrtc_val)
 
 	return 0;
 }
-EXPORT_SYMBOL(scpi_set_vrtc);
+EXPORT_SYMBOL_GPL(scpi_set_vrtc);
 
 int scpi_get_ring_value(unsigned char *val)
 {
@@ -922,7 +912,7 @@ int scpi_get_ring_value(unsigned char *val)
 		memcpy(val, &buf.ringinfo, sizeof(buf.ringinfo));
 	return ret;
 }
-EXPORT_SYMBOL(scpi_get_ring_value);
+EXPORT_SYMBOL_GPL(scpi_get_ring_value);
 
 int scpi_get_wakeup_reason(u32 *wakeup_reason)
 {
@@ -943,7 +933,7 @@ int scpi_get_wakeup_reason(u32 *wakeup_reason)
 
 	return 0;
 }
-EXPORT_SYMBOL(scpi_get_wakeup_reason);
+EXPORT_SYMBOL_GPL(scpi_get_wakeup_reason);
 
 int scpi_clr_wakeup_reason(void)
 {
@@ -958,7 +948,7 @@ int scpi_clr_wakeup_reason(void)
 
 	return 0;
 }
-EXPORT_SYMBOL(scpi_clr_wakeup_reason);
+EXPORT_SYMBOL_GPL(scpi_clr_wakeup_reason);
 
 int scpi_init_dsp_cfg0(u32 id, u32 addr, u32 cfg0)
 {
@@ -1026,7 +1016,7 @@ EXPORT_SYMBOL_GPL(scpi_get_cec_val);
  * multi-times when your data is bigger
  * than 0x20
  */
-int scpi_send_cec_data(u32 cmd_id, u32 *val, u32 size)
+int scpi_send_cec_data(u32 cmd_id, void *val, u32 size)
 {
 	struct scpi_data_buf sdata;
 	struct mhu_data_buf mdata;
@@ -1090,7 +1080,7 @@ u8 scpi_get_ethernet_calc(void)
 		return 0;
 	return buf.eth_calc;
 }
-EXPORT_SYMBOL(scpi_get_ethernet_calc);
+EXPORT_SYMBOL_GPL(scpi_get_ethernet_calc);
 
 int scpi_get_cpuinfo(enum scpi_get_pfm_type type, u32 *freq, u32 *vol)
 {
@@ -1142,7 +1132,7 @@ int scpi_get_cpuinfo(enum scpi_get_pfm_type type, u32 *freq, u32 *vol)
 	};
 	return ret;
 }
-EXPORT_SYMBOL(scpi_get_cpuinfo);
+EXPORT_SYMBOL_GPL(scpi_get_cpuinfo);
 
 int scpi_unlock_bl40(void)
 {
@@ -1160,7 +1150,7 @@ int scpi_unlock_bl40(void)
 		return -1;
 	return 0;
 }
-EXPORT_SYMBOL(scpi_unlock_bl40);
+EXPORT_SYMBOL_GPL(scpi_unlock_bl40);
 
 int scpi_send_bl40(unsigned int cmd, struct bl40_msg_buf *bl40_buf)
 {
@@ -1202,7 +1192,7 @@ int scpi_send_data(void *data, int size, int channel,
 	break;
 	case SCPI_AOCPU:
 	{
-		if (mhu_f & MASK_MHU_FIFO || mhu_f & MASK_MHU_PL) {
+		if (mhu_f & MASK_MHU_FIFO) {
 			if (size > MBOX_DATA_SIZE ||
 			    revsize > MBOX_DATA_SIZE) {
 				pr_err("[scpi]: size: %d %d over max: %d\n",
@@ -1274,141 +1264,3 @@ int scpi_send_data(void *data, int size, int channel,
 	return ret;
 }
 EXPORT_SYMBOL_GPL(scpi_send_data);
-
-static int  mbox_message_send_common(struct mbox_client *cl,
-			struct mhu_data_buf *data_buf, void *sdata, int idx)
-{
-	struct mbox_chan *chan;
-	struct scpi_data_buf scpi_buf;
-	int ret = -1;
-
-	cl->rx_callback = scpi_rx_callback;
-	init_completion(&scpi_buf.complete);
-	data_buf->cl_data = &scpi_buf;
-	data_buf->rx_buf = kmalloc(data_buf->rx_size, GFP_KERNEL);
-	if (!data_buf->rx_buf)
-		return -SCPI_ERR_NOMEM;
-
-	data_buf->tx_buf = kmalloc(data_buf->tx_size, GFP_KERNEL);
-	if (!data_buf->tx_buf) {
-		kfree(data_buf->rx_buf);
-		return -SCPI_ERR_NOMEM;
-	}
-	memset(data_buf->tx_buf, 0, data_buf->tx_size);
-	memset(data_buf->rx_buf, 0, data_buf->rx_size);
-	memcpy(data_buf->tx_buf + data_buf->head_off, sdata,
-		data_buf->tx_size - data_buf->head_off);
-	chan = mbox_request_channel(cl, idx);
-	if (IS_ERR(chan)) {
-		ret = -SCPI_ERR_DEVICE;
-		goto freedata;
-	}
-
-	if (mbox_send_message(chan, (void *)data_buf) < 0) {
-		ret = -SCPI_ERR_TIMEOUT;
-		goto freechannel;
-	}
-
-	ret = wait_for_completion_timeout(&scpi_buf.complete,
-			msecs_to_jiffies(MBOX_TIME_OUT));
-	if (!ret) {
-		pr_err("Warning: scpi wait ack timeout\n");
-		ret = -SCPI_ERR_TIMEOUT;
-		goto freechannel;
-	}
-	mbox_free_channel(chan);
-	return 0;
-freechannel:
-	mbox_free_channel(chan);
-freedata:
-	kfree(data_buf->tx_buf);
-	kfree(data_buf->rx_buf);
-	return ret;
-}
-
-static int mbox_get_head_offset(struct mhu_data_buf *data_buf, int mhu_type)
-{
-	switch (mhu_type) {
-	case MASK_MHU_FIFO:
-		data_buf->head_off = MBOX_HEAD_SIZE;
-		break;
-	case MASK_MHU_PL:
-		data_buf->head_off = MBOX_PL_HEAD_SIZE;
-		break;
-	case MASK_MHU_SEC:
-		data_buf->head_off = 0;
-		break;
-	default:
-		data_buf->head_off = -1;
-		break;
-	};
-	return data_buf->head_off;
-}
-
-int mbox_message_send_ao_sync(struct device *dev, int cmd, void *sdata,
-			int tx_size, void *rdata, int rx_size, int idx)
-{
-	int mhu_type = mhu_f & (MASK_MHU_FIFO | MASK_MHU_PL | MASK_MHU);
-	struct mhu_data_buf data_buf;
-	struct mbox_client cl = {0};
-	int ret = 0;
-
-	ret = mbox_get_head_offset(&data_buf, mhu_type);
-	if (ret < 0 && (mhu_type & MASK_MHU)) {
-		data_buf.head_off = 0;
-		data_buf.cmd = PACK_SCPI_CMD(cmd,
-					SCPI_CL_NONE,
-					tx_size);
-	} else {
-		data_buf.cmd = (cmd & MBCMD_MASK)
-			| ((tx_size + data_buf.head_off) & MBSIZE_MASK) << MBSIZE_SHIFT
-			| SYNC_CMD_TAG;
-	}
-	cl.dev = dev;
-	data_buf.tx_size = tx_size + data_buf.head_off;
-	data_buf.rx_size = rx_size + data_buf.head_off;
-
-	ret = mbox_message_send_common(&cl, (void *)&data_buf, sdata, idx);
-	if (ret) {
-		dev_err(dev, "Failed to aosend data %d\n", ret);
-		return ret;
-	}
-
-	memcpy(rdata, data_buf.rx_buf + data_buf.head_off, rx_size);
-	kfree(data_buf.tx_buf);
-	kfree(data_buf.rx_buf);
-	ret = tx_size;
-	return ret;
-}
-EXPORT_SYMBOL(mbox_message_send_ao_sync);
-
-int mbox_message_send_sec_sync(struct device *dev, int cmd, void *sdata,
-			size_t tx_size, void *rdata, size_t *rx_size, int idx)
-{
-	int mhu_type = mhu_f & MASK_MHU_SEC;
-	struct mhu_data_buf data_buf;
-	struct mbox_client cl = {0};
-	int ret = 0;
-
-	ret = mbox_get_head_offset(&data_buf, mhu_type);
-	if (ret < 0) {
-		dev_err(dev, "not supprt sec mbox\n");
-		return ret;
-	}
-	cl.dev = dev;
-	data_buf.tx_size = tx_size + data_buf.head_off;
-	data_buf.rx_size = *rx_size + data_buf.head_off;
-
-	ret = mbox_message_send_common(&cl, (void *)&data_buf, sdata, idx);
-	if (ret) {
-		dev_err(dev, "Failed to send secdata %d\n", ret);
-		return ret;
-	}
-	*rx_size = data_buf.rx_size;
-	memcpy(rdata, data_buf.rx_buf + data_buf.head_off, *rx_size);
-	kfree(data_buf.tx_buf);
-	kfree(data_buf.rx_buf);
-	ret = tx_size;
-	return ret;
-}
-EXPORT_SYMBOL(mbox_message_send_sec_sync);

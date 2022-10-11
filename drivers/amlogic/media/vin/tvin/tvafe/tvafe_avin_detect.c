@@ -1,6 +1,18 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/amlogic/media/vin/tvin/tvafe/tvafe_avin_detect.c
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
 /* Standard Linux headers */
@@ -31,8 +43,9 @@
 #include "tvafe_debug.h"
 #include "../tvin_global.h"
 
-#define TVAFE_AVIN_CH1_MASK  BIT(0)
-#define TVAFE_AVIN_CH2_MASK  BIT(1)
+
+#define TVAFE_AVIN_CH1_MASK  (1 << 0)
+#define TVAFE_AVIN_CH2_MASK  (1 << 1)
 #define TVAFE_AVIN_MASK  (TVAFE_AVIN_CH1_MASK | TVAFE_AVIN_CH2_MASK)
 #define TVAFE_MAX_AVIN_DEVICE_NUM  2
 #define TVAFE_AVIN_NAME  "avin_detect"
@@ -41,14 +54,14 @@
 
 static unsigned int avin_detect_debug_print;
 
-#define AVIN_DETECT_INIT          BIT(0)
-#define AVIN_DETECT_OPEN          BIT(1)
-#define AVIN_DETECT_CH1_MASK      BIT(2)
-#define AVIN_DETECT_CH2_MASK      BIT(3)
-#define AVIN_DETECT_CH1_EN        BIT(4)   /* 0x2e[0] */
-#define AVIN_DETECT_CH1_SYNC_TIP  BIT(5)   /* 0x2e[3] */
-#define AVIN_DETECT_CH2_EN        BIT(6)   /* 0x2e[15] */
-#define AVIN_DETECT_CH2_SYNC_TIP  BIT(7)   /* 0x2e[18] */
+#define AVIN_DETECT_INIT          (1 << 0)
+#define AVIN_DETECT_OPEN          (1 << 1)
+#define AVIN_DETECT_CH1_MASK      (1 << 2)
+#define AVIN_DETECT_CH2_MASK      (1 << 3)
+#define AVIN_DETECT_CH1_EN        (1 << 4)   /* 0x2e[0] */
+#define AVIN_DETECT_CH1_SYNC_TIP  (1 << 5)   /* 0x2e[3] */
+#define AVIN_DETECT_CH2_EN        (1 << 6)   /* 0x2e[15] */
+#define AVIN_DETECT_CH2_SYNC_TIP  (1 << 7)   /* 0x2e[18] */
 static unsigned int avin_detect_flag;
 
 /*0:670mv; 1:727mv; 2:777mv; 3:823mv; 4:865mv; 5:904mv; 6:940mv; 7:972mv*/
@@ -86,7 +99,7 @@ static unsigned int avin_count_times = 5;
 
 static unsigned int avin_timer_time = 10;/*100ms*/
 
-#define TVAFE_AVIN_INTERVAL (HZ / 100)/*10ms*/
+#define TVAFE_AVIN_INTERVAL (HZ/100)/*10ms*/
 static struct timer_list avin_detect_timer;
 static unsigned int s_irq_counter0;
 static unsigned int s_irq_counter1;
@@ -95,7 +108,6 @@ static unsigned int s_irq_counter1_time;
 static unsigned int s_counter0_last_state;
 static unsigned int s_counter1_last_state;
 
-static struct tvafe_avin_det_s *avdev;
 static struct meson_avin_data *meson_data;
 static DECLARE_WAIT_QUEUE_HEAD(tvafe_avin_waitq);
 
@@ -311,8 +323,14 @@ void tvafe_cha2_SYNCTIP_close_config(void)
 		tvafe_pr_info("%s\n", __func__);
 
 	if (meson_data) {
-		W_HIU_BIT(HHI_CVBS_DETECT_CNTL, 0, AFE_CH2_EN_DC_BIAS_BIT,
-			AFE_CH2_EN_DC_BIAS_WIDTH);
+		if (meson_data->cpu_id >= AVIN_CPU_TYPE_T5)
+			W_HIU_BIT(HHI_CVBS_DETECT_CNTL, 0,
+				  AFE_T5_CH2_EN_DC_BIAS_BIT,
+				  AFE_T5_CH2_EN_DC_BIAS_WIDTH);
+		else
+			W_HIU_BIT(HHI_CVBS_DETECT_CNTL, 0,
+				  AFE_CH2_EN_DC_BIAS_BIT,
+				  AFE_CH2_EN_DC_BIAS_WIDTH);
 	} else {
 		W_HIU_BIT(HHI_CVBS_DETECT_CNTL, 0, AFE_CH2_EN_SYNC_TIP_BIT,
 			AFE_CH2_EN_SYNC_TIP_WIDTH);
@@ -379,8 +397,14 @@ void tvafe_cha2_detect_restart_config(void)
 		tvafe_pr_info("%s\n", __func__);
 
 	if (meson_data) {
-		W_HIU_BIT(HHI_CVBS_DETECT_CNTL, 1, AFE_CH2_EN_DC_BIAS_BIT,
-			AFE_CH2_EN_DC_BIAS_WIDTH);
+		if (meson_data->cpu_id >= AVIN_CPU_TYPE_T5)
+			W_HIU_BIT(HHI_CVBS_DETECT_CNTL, 1,
+				  AFE_T5_CH2_EN_DC_BIAS_BIT,
+				  AFE_T5_CH2_EN_DC_BIAS_WIDTH);
+		else
+			W_HIU_BIT(HHI_CVBS_DETECT_CNTL, 1,
+				  AFE_CH2_EN_DC_BIAS_BIT,
+				  AFE_CH2_EN_DC_BIAS_WIDTH);
 	} else {
 		W_HIU_BIT(HHI_CVBS_DETECT_CNTL, 1, AFE_CH2_EN_SYNC_TIP_BIT,
 			AFE_CH2_EN_SYNC_TIP_WIDTH);
@@ -446,8 +470,14 @@ static void tvafe_avin_detect_anlog_config(void)
 		AFE_CH2_COMP_LEVEL_ADJ_BIT, AFE_CH2_COMP_LEVEL_ADJ_WIDTH);
 		W_HIU_BIT(HHI_CVBS_DETECT_CNTL, 0,
 			AFE_CH2_COMP_HYS_ADJ_BIT, AFE_CH2_COMP_HYS_ADJ_WIDTH);
-		W_HIU_BIT(HHI_CVBS_DETECT_CNTL, 1, AFE_CH2_EN_DC_BIAS_BIT,
-			AFE_CH2_EN_DC_BIAS_WIDTH);
+		if (meson_data->cpu_id >= AVIN_CPU_TYPE_T5)
+			W_HIU_BIT(HHI_CVBS_DETECT_CNTL, 1,
+				  AFE_T5_CH2_EN_DC_BIAS_BIT,
+				  AFE_T5_CH2_EN_DC_BIAS_WIDTH);
+		else
+			W_HIU_BIT(HHI_CVBS_DETECT_CNTL, 1,
+				  AFE_CH2_EN_DC_BIAS_BIT,
+				  AFE_CH2_EN_DC_BIAS_WIDTH);
 	} else {
 		if (detect_mode == 0) {
 			/*for ch1*/
@@ -511,7 +541,7 @@ static int tvafe_avin_open(struct inode *inode, struct file *file)
 {
 	struct tvafe_avin_det_s *avin_data;
 
-	tvafe_pr_info("%s: avin open.\n", __func__);
+	tvafe_pr_info("tvafe_avin_open.\n");
 	avin_data = container_of(inode->i_cdev,
 		struct tvafe_avin_det_s, avin_cdev);
 	file->private_data = avin_data;
@@ -647,7 +677,7 @@ static void tvafe_avin_detect_parse_param(char *buf_orig, char **parm)
 	strcat(delim1, delim2);
 	while (1) {
 		token = strsep(&ps, delim1);
-		if (!token)
+		if (token == NULL)
 			break;
 		if (*token == '\0')
 			continue;
@@ -655,49 +685,50 @@ static void tvafe_avin_detect_parse_param(char *buf_orig, char **parm)
 	}
 }
 
-static ssize_t debug_show(struct device *dev,
+static ssize_t tvafe_avin_detect_show(struct device *dev,
 	struct device_attribute *attr, char *buf)
 {
 	ssize_t len = 0;
 
-	len += sprintf(buf + len,
+	len += sprintf(buf+len,
 		"\t*****usage:*****\n");
-	len += sprintf(buf + len,
+	len += sprintf(buf+len,
 		"echo dc_level_adj val(D) > debug\n");
-	len += sprintf(buf + len,
+	len += sprintf(buf+len,
 		"echo comp_level_adj val(D) > debug\n");
-	len += sprintf(buf + len,
+	len += sprintf(buf+len,
 		"echo detect_mode val(D) > debug\n");
-	len += sprintf(buf + len,
+	len += sprintf(buf+len,
 		"echo vdc_level val(D) > debug\n");
-	len += sprintf(buf + len,
+	len += sprintf(buf+len,
 		"echo sync_level val(D) > debug\n");
-	len += sprintf(buf + len,
+	len += sprintf(buf+len,
 		"echo sync_hys_adj val(D) > debug\n");
-	len += sprintf(buf + len,
+	len += sprintf(buf+len,
 		"echo irq_mode val(D) > debug\n");
-	len += sprintf(buf + len,
+	len += sprintf(buf+len,
 		"echo trigger_sel val(D) > debug\n");
-	len += sprintf(buf + len,
+	len += sprintf(buf+len,
 		"echo irq_edge_en val(D) > debug\n");
-	len += sprintf(buf + len,
+	len += sprintf(buf+len,
 		"echo irq_filter val(D) > debug\n");
-	len += sprintf(buf + len,
+	len += sprintf(buf+len,
 		"echo irq_pol val(D) > debug\n");
-	len += sprintf(buf + len,
+	len += sprintf(buf+len,
 		"echo ch1_enable val(D) > debug\n");
-	len += sprintf(buf + len,
+	len += sprintf(buf+len,
 		"echo ch2_enable val(D) > debug\n");
-	len += sprintf(buf + len,
+	len += sprintf(buf+len,
 		"echo enable > debug\n");
-	len += sprintf(buf + len,
+	len += sprintf(buf+len,
 		"echo disable > debug\n");
-	len += sprintf(buf + len,
+	len += sprintf(buf+len,
 		"echo status > debug\n");
 	return len;
 }
 
-static ssize_t debug_store(struct device *dev,
+
+static ssize_t tvafe_avin_detect_store(struct device *dev,
 	struct device_attribute *attr, const char *buff, size_t count)
 {
 	struct tvafe_avin_det_s *avdev;
@@ -714,7 +745,7 @@ static ssize_t debug_store(struct device *dev,
 	if (!strcmp(parm[0], "dc_level_adj")) {
 		if (parm[1]) {
 			if (kstrtouint(parm[1], 10, &dc_level_adj)) {
-				tvafe_pr_info("[%s]:invalid parameter\n",
+				tvafe_pr_info("[%s]:invaild parameter\n",
 					__func__);
 				goto tvafe_avin_detect_store_err;
 			} else {
@@ -731,7 +762,7 @@ static ssize_t debug_store(struct device *dev,
 	} else if (!strcmp(parm[0], "comp_level_adj")) {
 		if (parm[1]) {
 			if (kstrtouint(parm[1], 10, &comp_level_adj)) {
-				tvafe_pr_info("[%s]:invalid parameter\n",
+				tvafe_pr_info("[%s]:invaild parameter\n",
 					__func__);
 				goto tvafe_avin_detect_store_err;
 			} else {
@@ -748,7 +779,7 @@ static ssize_t debug_store(struct device *dev,
 	} else if (!strcmp(parm[0], "detect_mode")) {
 		if (parm[1]) {
 			if (kstrtouint(parm[1], 10, &detect_mode)) {
-				tvafe_pr_info("[%s]:invalid parameter\n",
+				tvafe_pr_info("[%s]:invaild parameter\n",
 					__func__);
 				goto tvafe_avin_detect_store_err;
 			}
@@ -758,7 +789,7 @@ static ssize_t debug_store(struct device *dev,
 	} else if (!strcmp(parm[0], "vdc_level")) {
 		if (parm[1]) {
 			if (kstrtouint(parm[1], 10, &vdc_level)) {
-				tvafe_pr_info("[%s]:invalid parameter\n",
+				tvafe_pr_info("[%s]:invaild parameter\n",
 					__func__);
 				goto tvafe_avin_detect_store_err;
 			}
@@ -768,7 +799,7 @@ static ssize_t debug_store(struct device *dev,
 	} else if (!strcmp(parm[0], "sync_level")) {
 		if (parm[1]) {
 			if (kstrtouint(parm[1], 10, &sync_level)) {
-				tvafe_pr_info("[%s]:invalid parameter\n",
+				tvafe_pr_info("[%s]:invaild parameter\n",
 					__func__);
 				goto tvafe_avin_detect_store_err;
 			}
@@ -778,7 +809,7 @@ static ssize_t debug_store(struct device *dev,
 	} else if (!strcmp(parm[0], "sync_hys_adj")) {
 		if (parm[1]) {
 			if (kstrtouint(parm[1], 10, &sync_hys_adj)) {
-				tvafe_pr_info("[%s]:invalid parameter\n",
+				tvafe_pr_info("[%s]:invaild parameter\n",
 					__func__);
 				goto tvafe_avin_detect_store_err;
 			}
@@ -788,7 +819,7 @@ static ssize_t debug_store(struct device *dev,
 	} else if (!strcmp(parm[0], "irq_mode")) {
 		if (parm[1]) {
 			if (kstrtouint(parm[1], 10, &irq_mode)) {
-				tvafe_pr_info("[%s]:invalid parameter\n",
+				tvafe_pr_info("[%s]:invaild parameter\n",
 					__func__);
 				goto tvafe_avin_detect_store_err;
 			}
@@ -798,7 +829,7 @@ static ssize_t debug_store(struct device *dev,
 	} else if (!strcmp(parm[0], "trigger_sel")) {
 		if (parm[1]) {
 			if (kstrtouint(parm[1], 10, &trigger_sel)) {
-				tvafe_pr_info("[%s]:invalid parameter\n",
+				tvafe_pr_info("[%s]:invaild parameter\n",
 					__func__);
 				goto tvafe_avin_detect_store_err;
 			}
@@ -808,7 +839,7 @@ static ssize_t debug_store(struct device *dev,
 	} else if (!strcmp(parm[0], "irq_edge_en")) {
 		if (parm[1]) {
 			if (kstrtouint(parm[1], 10, &irq_edge_en)) {
-				tvafe_pr_info("[%s]:invalid parameter\n",
+				tvafe_pr_info("[%s]:invaild parameter\n",
 					__func__);
 				goto tvafe_avin_detect_store_err;
 			}
@@ -818,7 +849,7 @@ static ssize_t debug_store(struct device *dev,
 	} else if (!strcmp(parm[0], "irq_filter")) {
 		if (parm[1]) {
 			if (kstrtouint(parm[1], 10, &irq_filter)) {
-				tvafe_pr_info("[%s]:invalid parameter\n",
+				tvafe_pr_info("[%s]:invaild parameter\n",
 					__func__);
 				goto tvafe_avin_detect_store_err;
 			}
@@ -828,7 +859,7 @@ static ssize_t debug_store(struct device *dev,
 	} else if (!strcmp(parm[0], "irq_pol")) {
 		if (parm[1]) {
 			if (kstrtouint(parm[1], 10, &irq_pol)) {
-				tvafe_pr_info("[%s]:invalid parameter\n",
+				tvafe_pr_info("[%s]:invaild parameter\n",
 					__func__);
 				goto tvafe_avin_detect_store_err;
 			}
@@ -838,7 +869,7 @@ static ssize_t debug_store(struct device *dev,
 	} else if (!strcmp(parm[0], "ch1_enable")) {
 		if (parm[1]) {
 			if (kstrtouint(parm[1], 10, &val)) {
-				tvafe_pr_info("[%s]:invalid parameter\n",
+				tvafe_pr_info("[%s]:invaild parameter\n",
 					__func__);
 				goto tvafe_avin_detect_store_err;
 			}
@@ -852,7 +883,7 @@ static ssize_t debug_store(struct device *dev,
 	} else if (!strcmp(parm[0], "ch2_enable")) {
 		if (parm[1]) {
 			if (kstrtouint(parm[1], 10, &val)) {
-				tvafe_pr_info("[%s]:invalid parameter\n",
+				tvafe_pr_info("[%s]:invaild parameter\n",
 					__func__);
 				goto tvafe_avin_detect_store_err;
 			}
@@ -876,16 +907,15 @@ static ssize_t debug_store(struct device *dev,
 	} else if (!strcmp(parm[0], "print")) {
 		if (parm[1]) {
 			if (kstrtouint(parm[1], 10, &avin_detect_debug_print)) {
-				tvafe_pr_info("[%s]:invalid parameter\n",
+				tvafe_pr_info("[%s]:invaild parameter\n",
 					__func__);
 				goto tvafe_avin_detect_store_err;
 			}
 		}
 		tvafe_pr_info("[%s]: avin_detect_debug_print: %d\n",
 			__func__, avin_detect_debug_print);
-	} else {
-		tvafe_pr_info("[%s]:invalid command.\n", __func__);
-	}
+	} else
+		tvafe_pr_info("[%s]:invaild command.\n", __func__);
 
 	kfree(buf_orig);
 	return count;
@@ -895,14 +925,10 @@ tvafe_avin_detect_store_err:
 	return -EINVAL;
 }
 
-static void tvafe_avin_detect_timer_handler(struct timer_list *avin_detect_timer)
+static void tvafe_avin_detect_timer_handler(unsigned long arg)
 {
 	unsigned int state_changed = 0;
-
-	if (!avdev) {
-		tvafe_pr_info("tvin avdev is NULL\n");
-		return;
-	}
+	struct tvafe_avin_det_s *avdev = (struct tvafe_avin_det_s *)arg;
 
 	if (avdev->dts_param.device_mask == TVAFE_AVIN_CH1_MASK) {
 		avdev->irq_counter[0] = aml_read_cbus(CVBS_IRQ0_COUNTER);
@@ -1037,15 +1063,16 @@ static void tvafe_avin_detect_timer_handler(struct timer_list *avin_detect_timer
 		wake_up_interruptible(&tvafe_avin_waitq);
 
 TIMER:
-	avin_detect_timer->expires = jiffies +
+	avin_detect_timer.expires = jiffies +
 				(TVAFE_AVIN_INTERVAL * avin_timer_time);
-	add_timer(avin_detect_timer);
+	add_timer(&avin_detect_timer);
 }
 
 static int tvafe_avin_init_resource(struct tvafe_avin_det_s *avdev)
 {
 	/* add timer for avin detect*/
-	timer_setup(&avin_detect_timer, tvafe_avin_detect_timer_handler, 0);
+	init_timer(&avin_detect_timer);
+	avin_detect_timer.data = (unsigned long)avdev;
 	avin_detect_timer.function = tvafe_avin_detect_timer_handler;
 	avin_detect_timer.expires = jiffies +
 				(TVAFE_AVIN_INTERVAL * avin_timer_time);
@@ -1054,20 +1081,22 @@ static int tvafe_avin_init_resource(struct tvafe_avin_det_s *avdev)
 	return 0;
 }
 
-static DEVICE_ATTR_RW(debug);
+static DEVICE_ATTR(debug, 0644, tvafe_avin_detect_show,
+	tvafe_avin_detect_store);
 
 static int tvafe_avin_detect_probe(struct platform_device *pdev)
 {
 	int ret;
 	int state = 0;
+	struct tvafe_avin_det_s *avdev = NULL;
 
 	meson_data = (struct meson_avin_data *)
 		of_device_get_match_data(&pdev->dev);
 	if (meson_data)
-		tvafe_pr_info("%s: cpuid:%d,%s.\n",
-			      __func__, meson_data->cpu_id, meson_data->name);
+		tvafe_pr_info("tvafe_avin_detect_probe cpuid:%d,%s.\n",
+			meson_data->cpu_id, meson_data->name);
 
-	avdev = kzalloc(sizeof(*avdev), GFP_KERNEL);
+	avdev = kzalloc(sizeof(struct tvafe_avin_det_s), GFP_KERNEL);
 	if (!avdev) {
 		state = -ENOMEM;
 		goto get_param_mem_fail;
@@ -1097,14 +1126,15 @@ static int tvafe_avin_detect_probe(struct platform_device *pdev)
 	tvafe_avin_detect_digital_config();
 
 	/* add timer for avin detect*/
-	timer_setup(&avin_detect_timer, tvafe_avin_detect_timer_handler, 0);
+	init_timer(&avin_detect_timer);
+	avin_detect_timer.data = (unsigned long)avdev;
 	avin_detect_timer.function = tvafe_avin_detect_timer_handler;
 	avin_detect_timer.expires = jiffies +
 				(TVAFE_AVIN_INTERVAL * avin_timer_time);
 	add_timer(&avin_detect_timer);
 
 	avin_detect_flag |= AVIN_DETECT_INIT;
-	tvafe_pr_info("%s: ok.\n", __func__);
+	tvafe_pr_info("tvafe_avin_detect_probe ok.\n");
 
 	return 0;
 
@@ -1112,7 +1142,7 @@ fail_create_dbg_file:
 get_dts_dat_fail:
 	kfree(avdev);
 get_param_mem_fail:
-	tvafe_pr_info("%s: kzalloc error\n", __func__);
+	tvafe_pr_info("tvafe_avin_detect: kzalloc error\n");
 	return state;
 }
 
@@ -1123,7 +1153,7 @@ static int tvafe_avin_detect_suspend(struct platform_device *pdev,
 
 	del_timer_sync(&avin_detect_timer);
 	tvafe_avin_detect_disable(avdev);
-	tvafe_pr_info("%s: tvafe suspend.\n", __func__);
+	tvafe_pr_info("tvafe_avin_detect_suspend ok.\n");
 	return 0;
 }
 
@@ -1133,7 +1163,7 @@ static int tvafe_avin_detect_resume(struct platform_device *pdev)
 
 	tvafe_avin_init_resource(avdev);
 	tvafe_avin_detect_enable(avdev);
-	tvafe_pr_info("%s: avin resume.\n", __func__);
+	tvafe_pr_info("tvafe_avin_detect_resume ok.\n");
 	return 0;
 }
 
@@ -1145,7 +1175,7 @@ static void tvafe_avin_detect_shutdown(struct platform_device *pdev)
 	del_timer_sync(&avin_detect_timer);
 	tvafe_avin_detect_disable(avdev);
 	device_remove_file(avdev->config_dev, &dev_attr_debug);
-	tvafe_pr_info("%s: avin shutdown.\n", __func__);
+	tvafe_pr_info("tvafe_avin_detect_shutdown ok.\n");
 	kfree(avdev);
 }
 
@@ -1165,12 +1195,10 @@ int tvafe_avin_detect_remove(struct platform_device *pdev)
 }
 
 #ifdef CONFIG_OF
-#ifndef CONFIG_AMLOGIC_REMOVE_OLD
 struct meson_avin_data tl1_data = {
 	.cpu_id = AVIN_CPU_TYPE_TL1,
 	.name = "meson-tl1-avin-detect",
 };
-#endif
 
 struct meson_avin_data tm2_data = {
 	.cpu_id = AVIN_CPU_TYPE_TM2,
@@ -1188,13 +1216,11 @@ struct meson_avin_data t5d_data = {
 };
 
 static const struct of_device_id tvafe_avin_dt_match[] = {
-#ifndef CONFIG_AMLOGIC_REMOVE_OLD
 	{	.compatible = "amlogic, tvafe_avin_detect",
 	},
 	{	.compatible = "amlogic, tl1_tvafe_avin_detect",
 		.data = &tl1_data,
 	},
-#endif
 	{	.compatible = "amlogic, tm2_tvafe_avin_detect",
 		.data = &tm2_data,
 	},
@@ -1222,17 +1248,22 @@ static struct platform_driver tvafe_avin_driver = {
 	},
 };
 
-int __init tvafe_avin_detect_init(void)
+static int __init tvafe_avin_detect_init(void)
 {
 	return platform_driver_register(&tvafe_avin_driver);
 }
 
-void __exit tvafe_avin_detect_exit(void)
+static void __exit tvafe_avin_detect_exit(void)
 {
 	platform_driver_unregister(&tvafe_avin_driver);
 }
 
-//MODULE_DESCRIPTION("Meson TVAFE AVIN detect Driver");
-//MODULE_LICENSE("GPL");
-//MODULE_AUTHOR("Amlogic, Inc.");
+module_init(tvafe_avin_detect_init);
+module_exit(tvafe_avin_detect_exit);
+
+MODULE_DESCRIPTION("Meson TVAFE AVIN detect Driver");
+MODULE_LICENSE("GPL");
+MODULE_AUTHOR("Amlogic, Inc.");
+
+
 

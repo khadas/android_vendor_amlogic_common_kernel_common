@@ -1,4 +1,3 @@
-/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
  * drivers/amlogic/media/video_processor/videosync/videosync.h
  *
@@ -36,11 +35,8 @@
 #include <linux/amlogic/media/vfm/vframe_provider.h>
 #include <linux/amlogic/media/vfm/vframe_receiver.h>
 #include <linux/amlogic/media/vfm/vframe.h>
-#ifdef CONFIG_AMLOGIC_MEDIA_FRAME_SYNC
 #include <linux/amlogic/media/frame_sync/timestamp.h>
-#endif
-#include "../utils/vfp.h"
-#include "../utils/vfp-queue.h"
+#include "vfp.h"
 #include <linux/spinlock.h>
 
 #define VIDEOSYNC_S_COUNT 1
@@ -58,13 +54,12 @@ struct videosync_dev {
 	struct videosync_s *video_prov;
 	struct task_struct *kthread;
 	struct completion thread_active;
-	struct mutex vp_mutex; /*vp lock*/
-	spinlock_t dev_s_num_slock; /*num lock*/
+	struct mutex vp_mutex;
+	spinlock_t dev_s_num_slock;
 	u32 active_dev_s_num;
 	wait_queue_head_t videosync_wait;
 	int wakeup;
 };
-
 extern bool omx_secret_mode;
 
 #define VIDEOSYNC_IOC_MAGIC  'P'
@@ -80,12 +75,21 @@ extern bool omx_secret_mode;
 	_IOW(VIDEOSYNC_IOC_MAGIC, 0x07, unsigned int)
 #define VIDEOSYNC_IOC_SET_FIRST_FRAME_NOSYNC \
 	_IOR(VIDEOSYNC_IOC_MAGIC, 0x08, unsigned int)
+#define VIDEOSYNC_IOC_SET_VPAUSE \
+	_IOW(VIDEOSYNC_IOC_MAGIC, 0x09, unsigned int)
+#define VIDEOSYNC_IOC_SET_VMASTER \
+	_IOW(VIDEOSYNC_IOC_MAGIC, 0x0a, unsigned int)
+#define VIDEOSYNC_IOC_GET_VPTS \
+	_IOR(VIDEOSYNC_IOC_MAGIC, 0x0b, unsigned int)
+#define VIDEOSYNC_IOC_GET_PCRSCR \
+	_IOR(VIDEOSYNC_IOC_MAGIC, 0x0c, unsigned int)
+
 
 #define VIDEOSYNC_S_VF_RECEIVER_NAME_SIZE 32
 #define VIDEOSYNC_S_POOL_SIZE 16
 #define VIDEOSYNC_VF_NAME_SIZE 32
 
-int videosync_assign_map(char **receiver_name, int *inst);
+extern int videosync_assign_map(char **receiver_name, int *inst);
 
 struct videosync_buffer_states {
 	int buf_ready_num;
@@ -96,10 +100,10 @@ struct videosync_buffer_states {
 struct videosync_operations_s {
 	struct vframe_s *(*peek)(void *op_arg);
 	struct vframe_s *(*get)(void *op_arg);
-	void (*put)(struct vframe_s *vf, void *op_arg);
+	void (*put)(struct vframe_s *, void *op_arg);
 	int (*event_cb)(int type, void *data, void *private_data);
 	int (*buffer_states)(struct videosync_buffer_states *states,
-			     void *op_arg);
+		void *op_arg);
 };
 
 struct display_area {
@@ -108,7 +112,6 @@ struct display_area {
 	u32 width;
 	u32 height;
 };
-
 struct videosync_s {
 	void *dev;
 	int index;
@@ -126,8 +129,8 @@ struct videosync_s {
 	const struct videosync_operations_s *ops;
 	struct completion inactive_done;
 	struct vframe_s *cur_dispbuf;
-	spinlock_t timestamp_lock; /*timestamp lock*/
-	struct mutex omx_mutex; /*omx lock*/
+	spinlock_t timestamp_lock;
+	struct mutex omx_mutex;
 	u32 system_time_up;
 	u32 system_time;
 	u32 system_time_scale_remainder;
@@ -140,7 +143,11 @@ struct videosync_s {
 	u32 video_frame_repeat_count;
 	u32 freerun_mode;
 	u32 first_frame_toggled;
+	u32 first_frame_vpts;
+	u32 first_frame_queued;
+	u32 video_started;
 	u32 vmaster_mode;
+	u32 get_vpts;
 	u32 get_frame_count;
 	u32 put_frame_count;
 	void *op_arg;
@@ -151,5 +158,7 @@ struct videosync_s {
 	char vf_provider_name[VIDEOSYNC_VF_NAME_SIZE];
 	long long time_update;
 };
+
+
 #endif
 

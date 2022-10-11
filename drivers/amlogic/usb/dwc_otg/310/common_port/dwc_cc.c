@@ -1,4 +1,5 @@
-/* $File: //dwh/usb_iip/dev/software/dwc_common_port_2/dwc_cc.c $
+/* =========================================================================
+ * $File: //dwh/usb_iip/dev/software/dwc_common_port_2/dwc_cc.c $
  * $Revision: #4 $
  * $Date: 2010/11/04 $
  * $Change: 1621692 $
@@ -31,11 +32,11 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE
  * USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH
  * DAMAGE.
- * ========================================================================
- */
+ * ========================================================================= */
 #ifdef DWC_CCLIB
 
 #include "dwc_cc.h"
+
 
 typedef struct dwc_cc {
 	uint32_t uid;

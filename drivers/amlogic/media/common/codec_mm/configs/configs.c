@@ -1,6 +1,18 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/amlogic/media/common/codec_mm/configs/configs.c
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
 #include <linux/amlogic/media/codec_mm/configs.h>
@@ -16,18 +28,20 @@ static struct mconfig_node *configs_get_root_node(void)
 #else
 #define config_debug(args...)
 #endif
-int configs_inc_node_ref(struct mconfig_node *node)
+int configs_inc_node_ref(
+	struct mconfig_node *node)
 {
 	return atomic_inc_return(&node->ref_cnt);
 }
 
-int configs_dec_node_ref(struct mconfig_node *node)
+int configs_dec_node_ref(
+	struct mconfig_node *node)
 {
 	return atomic_dec_return(&node->ref_cnt);
 }
 
-static int configs_put_node(struct mconfig_node *node, int del_parent_ref,
-			    struct mconfig_node *root_node)
+static int configs_put_node(struct mconfig_node *node,
+	int del_parent_ref, struct mconfig_node *root_node)
 {
 	struct mconfig_node *pnode;
 
@@ -37,15 +51,19 @@ static int configs_put_node(struct mconfig_node *node, int del_parent_ref,
 	pnode = node->parent_node;
 	if (!del_parent_ref)
 		return 0;
-	while (pnode && (pnode != root_node)) {
+	while ((pnode != NULL) && (pnode != root_node)) {
 		configs_dec_node_ref(pnode);
 		pnode = pnode->parent_node;
 	}
 	return 0;
 }
 
-static int configs_parser_first_node(const char *root_str, char *sub_str,
-				     int sub_size, int *is_end_node)
+
+static int configs_parser_first_node(
+	const char *root_str,
+	char *sub_str,
+	int sub_size,
+	int *is_end_node)
 {
 	int node_size;
 	char *str;
@@ -54,12 +72,12 @@ static int configs_parser_first_node(const char *root_str, char *sub_str,
 	if (strlen(root_str) <= 0)
 		return 0;
 	str = strchr(root_str, '.');
-	if (str) {
+	if (str != NULL) {
 		node_size = str - root_str;
 		*is_end_node = 0;
 	} else {
 		str = strchr(root_str, '=');
-		if (str)
+		if (str != NULL)
 			node_size = str - root_str;
 		else
 			node_size = strlen(root_str);
@@ -72,20 +90,20 @@ static int configs_parser_first_node(const char *root_str, char *sub_str,
 		sub_str[node_size] = '\0';
 		pstr = sub_str;
 		while (pstr[0] != '\0' &&
-		       pstr[0] != ' ' &&
-		       pstr[0] != '\r' &&
-		       pstr[0] != '\n') {
+			pstr[0] != ' ' &&
+			pstr[0] != '\r' &&
+			pstr[0] != '\n') {
 			/*not space. */
 			pstr++;
 		}
 		pstr[0] = '\0';
-	} else {
+	} else
 		sub_str[0] = '\0';
-	}
 	return node_size;
 }
 
-static inline const char *configs_parser_str_valstr(const char *root_str)
+static inline const char *configs_parser_str_valstr(
+	const char *root_str)
 {
 	char *str;
 
@@ -110,11 +128,11 @@ static int configs_parser_value_u32(const char *str, u32 *val)
 	if (pstr[0] == '-') {
 		ret = sscanf(pstr, "-%d", val);
 		*val = -((int)*val);
-	} else if (strstr(pstr, "0x")) {
+	} else if (strstr(pstr, "0x"))
 		ret = sscanf(pstr, "0x%x", val);
-	} else if (strstr(pstr, "0x")) {
+	else if (strstr(pstr, "0x"))
 		ret = sscanf(pstr, "0x%x", val);
-	} else {
+	else {
 		ret = kstrtou32(pstr, 0, val);
 		if (ret == 0)
 			ret = 1;
@@ -135,11 +153,11 @@ static int configs_parser_value_u64(const char *str, u64 *val)
 	if (pstr[0] == '-') {
 		ret = sscanf(pstr, "-%lld", val);
 		*val = -((int)*val);
-	} else if (strstr(pstr, "0x")) {
+	} else if (strstr(pstr, "0x"))
 		ret = sscanf(pstr, "0x%llx", val);
-	} else if (strstr(pstr, "0x")) {
+	else if (strstr(pstr, "0x"))
 		ret = sscanf(pstr, "0x%llx", val);
-	} else {
+	else {
 		ret = kstrtou64(pstr, 0, val);
 		if (ret == 0)
 			ret = 1;
@@ -174,8 +192,10 @@ static int configs_parser_value_bool(const char *str, bool *pbool)
 	return 1;
 }
 
-static struct mconfig_node *
-configs_get_node_with_name(struct mconfig_node *rootnode, const char *node_name)
+
+static struct mconfig_node *configs_get_node_with_name(
+	struct mconfig_node
+	*rootnode, const char *node_name)
 {
 	struct mconfig_node *snode, *need;
 	struct list_head *node_list, *next;
@@ -193,7 +213,7 @@ configs_get_node_with_name(struct mconfig_node *rootnode, const char *node_name)
 		if (!strcmp(snode->name, node_name)) {
 			need = snode;
 			if (snode->active <= 0 ||
-			    configs_inc_node_ref(need) < 0)
+				configs_inc_node_ref(need) < 0)
 				need = NULL;
 			break;
 		}
@@ -203,7 +223,7 @@ configs_get_node_with_name(struct mconfig_node *rootnode, const char *node_name)
 }
 
 int configs_init_new_node(struct mconfig_node *node,
-			  const char *name, int rw_flags)
+	const char *name, int rw_flags)
 {
 	node->configs = NULL;
 	node->configs_num = 0;
@@ -219,10 +239,10 @@ int configs_init_new_node(struct mconfig_node *node,
 	INIT_LIST_HEAD(&node->son_node_list);
 	return 0;
 }
-EXPORT_SYMBOL_GPL(configs_init_new_node);
+EXPORT_SYMBOL(configs_init_new_node);
 
 int configs_register_node(struct mconfig_node *parent,
-			  struct mconfig_node *new_node)
+	struct mconfig_node *new_node)
 {
 	if (!parent)
 		parent = configs_get_root_node();
@@ -238,9 +258,9 @@ int configs_register_node(struct mconfig_node *parent,
 		       MAX_PREFIX_NAME - 1);
 		return -2;	/*unsuport deep path */
 	}
-	if (configs_get_node_with_name(parent, new_node->name)) {
+	if (configs_get_node_with_name(parent, new_node->name) != NULL) {
 		pr_err("have register same node[%s] on %s before\n",
-		       new_node->name, parent->name);
+			new_node->name, parent->name);
 		return -3;
 	}
 	/*
@@ -271,10 +291,10 @@ int configs_register_node(struct mconfig_node *parent,
 	mutex_unlock(&parent->lock);
 	return 0;
 }
-EXPORT_SYMBOL_GPL(configs_register_node);
+EXPORT_SYMBOL(configs_register_node);
 
-static struct mconfig_node *
-configs_get_node_path_end_node(struct mconfig_node *root_node, const char *path)
+static struct mconfig_node *configs_get_node_path_end_node(
+	struct mconfig_node *root_node, const char *path)
 {
 	char sub_node_name[128];
 	struct mconfig_node *node, *start_node, *parent_node;
@@ -291,7 +311,7 @@ configs_get_node_path_end_node(struct mconfig_node *root_node, const char *path)
 	while (!end) {
 		parent_node = node;
 		i = configs_parser_first_node(next_path,
-					      sub_node_name, 128, &end);
+			sub_node_name, 128, &end);
 		if (i <= 0 || sub_node_name[0] == '\0') {
 			pr_err("can't find [%s] 's node!!\n", path);
 			return NULL;
@@ -304,23 +324,24 @@ configs_get_node_path_end_node(struct mconfig_node *root_node, const char *path)
 			}
 		}
 		config_debug("configs_parser_first_node{%s} end%d\n",
-			     sub_node_name, end);
+			sub_node_name, end);
 		node = configs_get_node_with_name(parent_node,
-						  sub_node_name);
-		if (!node) {
+			sub_node_name);
+		if (node == NULL) {
 			pr_err("can't find node:[%s], from:[%s], path=%s\n",
-			       sub_node_name, parent_node->name, path);
+				sub_node_name, parent_node->name, path);
 			return NULL;
 		}
 		next_path = next_path + i + 1;	/*media.vdec --> vdec */
 		config_debug("get snode[%s] from node[%s], end=%d\n",
-			     node->name, parent_node->name, end);
+			node->name, parent_node->name, end);
 	}
 	return node;
 }
+EXPORT_SYMBOL(configs_get_node_path_end_node);
 
 int configs_register_path_node(const char *path,
-			       struct mconfig_node *new_node)
+	struct mconfig_node *new_node)
 {
 	struct mconfig_node *parent = NULL;
 	int ret;
@@ -334,14 +355,14 @@ int configs_register_path_node(const char *path,
 	configs_put_node(parent, 1, NULL);
 	return ret;
 }
-EXPORT_SYMBOL_GPL(configs_register_path_node);
+EXPORT_SYMBOL(configs_register_path_node);
 
 int configs_register_configs(struct mconfig_node *node,
-			     struct mconfig *configs, int num)
+	struct mconfig *configs, int num)
 {
 	if (!node)
 		return -1;
-	if (node->configs || node->configs_num > 0) {
+	if (node->configs != NULL || node->configs_num > 0) {
 		pr_err("node[%s] register config before!.\n", node->name);
 		return -2;
 	}
@@ -361,10 +382,10 @@ int configs_register_configs(struct mconfig_node *node,
 	mutex_unlock(&node->lock);
 	return 0;
 }
-EXPORT_SYMBOL_GPL(configs_register_configs);
+EXPORT_SYMBOL(configs_register_configs);
 
 int configs_register_path_configs(const char *path,
-				  struct mconfig *configs, int num)
+	struct mconfig *configs, int num)
 {
 	struct mconfig_node *parent = NULL;
 	int ret;
@@ -379,10 +400,10 @@ int configs_register_path_configs(const char *path,
 	}
 	return -1;
 }
-EXPORT_SYMBOL_GPL(configs_register_path_configs);
+EXPORT_SYMBOL(configs_register_path_configs);
 
 int configs_del_endnode(struct mconfig_node *parent,
-			struct mconfig_node *node)
+	struct mconfig_node *node)
 {
 	struct mconfig_node *parent_node;
 
@@ -406,8 +427,8 @@ int configs_del_endnode(struct mconfig_node *parent,
 	return 0;
 }
 
-static struct mconfig *configs_get_node_config(struct mconfig_node *node,
-					       char *name)
+static struct mconfig *configs_get_node_config(
+	struct mconfig_node *node, char *name)
 {
 	int i;
 	struct mconfig *config = NULL;
@@ -424,12 +445,12 @@ static struct mconfig *configs_get_node_config(struct mconfig_node *node,
 	}
 	mutex_unlock(&node->lock);
 	config_debug("get config[%s] from %s-end-%p\n",
-		     name, node->name, (void *)config);
+		name, node->name, (void *)config);
 	return config;
 }
 
 static int configs_config2str(struct mconfig *config,
-			      char *buf, int size)
+	char *buf, int size)
 {
 	int ret = 0;
 
@@ -438,7 +459,7 @@ static int configs_config2str(struct mconfig *config,
 	switch (config->type) {
 	case CONFIG_TYPE_PBOOL:
 		ret = snprintf(buf, size, "%s",
-			       config->pboolval[0] ? "true" : "false");
+			config->pboolval[0] ? "true" : "false");
 		break;
 	case CONFIG_TYPE_PI32:
 		ret = snprintf(buf, size, "%u", config->pival[0]);
@@ -455,7 +476,7 @@ static int configs_config2str(struct mconfig *config,
 		break;
 	case CONFIG_TYPE_BOOL:
 		ret = snprintf(buf, size, "%s",
-			       config->pboolval ? "true" : "false");
+			config->pboolval ? "true" : "false");
 		break;
 	case CONFIG_TYPE_I32:
 		ret = snprintf(buf, size, "%d", config->ival);
@@ -488,7 +509,7 @@ static int configs_config2str(struct mconfig *config,
 }
 
 static int configs_str2config(struct mconfig *config,
-			      const char *str)
+	const char *str)
 {
 	int ret = 0;
 	u32 val;
@@ -510,12 +531,12 @@ static int configs_str2config(struct mconfig *config,
 		break;
 	case CONFIG_TYPE_PI32:
 	case CONFIG_TYPE_PU32:
-		ret = configs_parser_value_u32(str, (u32 *)&val);
+		ret = configs_parser_value_u32(str, (u32 *) &val);
 		if (ret > 0)
 			config->pu32val[0] = val;
 		break;
 	case CONFIG_TYPE_PU64:
-		ret = configs_parser_value_u64(str, (u64 *)&val64);
+		ret = configs_parser_value_u64(str, (u64 *) &val64);
 		if (ret > 0)
 			config->pu64val[0] = val64;
 		break;
@@ -525,12 +546,12 @@ static int configs_str2config(struct mconfig *config,
 		break;
 	case CONFIG_TYPE_I32:
 	case CONFIG_TYPE_U32:
-		ret = configs_parser_value_u32(str, (u32 *)&val);
+		ret = configs_parser_value_u32(str, (u32 *) &val);
 		if (ret > 0)
 			config->u32val = val;
 		break;
 	case CONFIG_TYPE_U64:
-		ret = configs_parser_value_u64(str, (u64 *)&val64);
+		ret = configs_parser_value_u64(str, (u64 *) &val64);
 		if (ret > 0)
 			config->u64val = val64;
 		break;
@@ -549,31 +570,36 @@ static int configs_str2config(struct mconfig *config,
 	return ret;
 }
 
-static char *configs_build_prefix(struct mconfig_node *node,
-				  const char *prefix,
-				  int mode,
-				  char *buf,
-				  int size)
+static char *configs_build_prefix(
+		struct mconfig_node *node,
+		const char *prefix,
+		int mode,
+		char *buf,
+		int size)
 {
 	if (!buf)
 		return "";
 	buf[0] = '\0';
 	if (mode & LIST_MODE_PATH_FULLPREFIX) {
-		if (node->prefix[0])
-			snprintf(buf, size, "%s", node->prefix);
+		if (node->prefix[0]) {
+			snprintf(buf, size, "%s",
+				node->prefix);
+		}
 	} else if (mode & LIST_MODE_PATH_PREFIX) {
-		if (prefix && prefix[0])
-			snprintf(buf, size, "%s", prefix);
+		if (prefix && prefix[0]) {
+			snprintf(buf, size, "%s",
+				prefix);
+		}
 	}
 	if (buf[0] && buf[strlen(buf) - 1] != '.')
 		strncat(buf, ".", size);
 	return buf;
 }
 
-static int configs_list_node_configs_locked(struct mconfig_node *node,
-					    char *buf, int size,
-					    const char *prefix,
-					    int mode)
+static int configs_list_node_configs_locked(
+	struct mconfig_node *node,
+	char *buf, int size, const char *prefix,
+	int mode)
 {
 	int i;
 	int ret;
@@ -588,7 +614,7 @@ static int configs_list_node_configs_locked(struct mconfig_node *node,
 	for (i = 0; i < node->configs_num && (size - pn_size) > 8; i++) {
 		config = &node->configs[i];
 		ret = snprintf(buf + pn_size,
-			       size - pn_size,
+				size - pn_size,
 				" %s%s.%s%s",
 			     cprefix,
 			     node->name,
@@ -597,11 +623,11 @@ static int configs_list_node_configs_locked(struct mconfig_node *node,
 		if (ret > 0)
 			pn_size += ret;
 		if ((mode & LIST_MODE_VAL) &&
-		    ((mode & CONFIG_FOR_T) ||
+			((mode & CONFIG_FOR_T) ||
 			!(CONFIG_FOR_T & node->rw_flags)) &&
 			(node->rw_flags & CONFIG_FOR_R)) {
-			ret = configs_config2str(config, buf + pn_size,
-						 size - pn_size);
+			ret = configs_config2str(config,
+				buf + pn_size, size - pn_size);
 			if (ret > 0) {
 				if ((pn_size + ret) < size) {
 					strcat(buf, "\n");
@@ -625,20 +651,22 @@ static int configs_list_node_configs_locked(struct mconfig_node *node,
 	return pn_size;
 }
 
-int configs_list_node_configs(struct mconfig_node *node, char *buf, int size,
-			      int mode)
+int configs_list_node_configs(struct mconfig_node *node,
+	char *buf, int size,
+	int mode)
 {
 	int ret;
 
 	mutex_lock(&node->lock);
-	ret = configs_list_node_configs_locked(node, buf, size, NULL, mode);
+	ret = configs_list_node_configs_locked(node, buf,
+		size, NULL, mode);
 	mutex_unlock(&node->lock);
 	return ret;
 }
 
 static int configs_list_nodes_in(struct mconfig_node *node,
-				 char *buf, int size, const char *prefix,
-				 int mode)
+	char *buf, int size, const char *prefix,
+	int mode)
 {
 	int ret;
 	int pn_size = 0;
@@ -651,12 +679,15 @@ static int configs_list_nodes_in(struct mconfig_node *node,
 	if (!(node->rw_flags & mode))
 		return 0;/*LIST_MODE_LIST_RD/WD flags*/
 	config_debug("start dump node %s...\n", node->name);
-	c_prefix = configs_build_prefix(node, prefix, mode, cprefix,
-					MAX_PREFIX_NAME + MAX_ITEM_NAME - 1);
+	c_prefix = configs_build_prefix(node,
+				prefix,
+				mode,
+				cprefix,
+				MAX_PREFIX_NAME + MAX_ITEM_NAME);
 	mutex_lock(&node->lock);
 	if (mode & LIST_MODE_NODE_INFO) {
 		ret = snprintf(buf + pn_size, size - pn_size,
-			       "[NODE]%s%s:[%s/%d/%d/%d]\n",
+				"[NODE]%s%s:[%s/%d/%d/%d]\n",
 			     c_prefix,
 			     node->name,
 			     rw[(node->rw_flags & 3)],
@@ -668,8 +699,7 @@ static int configs_list_nodes_in(struct mconfig_node *node,
 	}
 	if (mode & LIST_MODE_CONFIGS_VAL) {
 		ret = configs_list_node_configs_locked(node, buf + pn_size,
-						       size - pn_size,
-						       c_prefix, mode);
+			size - pn_size, c_prefix, mode);
 		if (ret > 0)
 			pn_size += ret;
 	}
@@ -684,13 +714,12 @@ static int configs_list_nodes_in(struct mconfig_node *node,
 			}
 		}
 		list_for_each_safe(node_list, next, &node->son_node_list) {
-			snode = list_entry(node_list, struct mconfig_node,
-					   list);
+			snode = list_entry(node_list,
+					struct mconfig_node, list);
 			if (snode) {
 				ret = configs_list_nodes_in(snode,
-							    buf + pn_size,
-							    size - pn_size,
-							    cprefix, mode);
+					buf + pn_size, size - pn_size,
+					cprefix, mode);
 				if (ret > 0)
 					pn_size += ret;
 			}
@@ -701,7 +730,7 @@ static int configs_list_nodes_in(struct mconfig_node *node,
 }
 
 int configs_list_nodes(struct mconfig_node *node,
-		       char *buf, int size, int mode)
+	char *buf, int size, int mode)
 {
 	if (!node)
 		node = configs_get_root_node();
@@ -711,24 +740,24 @@ int configs_list_nodes(struct mconfig_node *node,
 }
 
 int configs_list_path_nodes(const char *prefix,
-			    char *buf, int size, int mode)
+	char *buf, int size, int mode)
 {
 	struct mconfig_node *node;
 	int ret = 0;
 
 	node = configs_get_node_path_end_node(NULL, prefix);
-	if (node) {
+	if (node != NULL) {
 		ret = configs_list_nodes(node, buf, size, mode);
 		configs_put_node(node, 1, NULL);
 	}
 	return ret;
 }
 
-static int configs_get_node_path_config(struct mconfig_node *root_node,
-					struct mconfig **config_ret,
-					const char *path,
-					struct mconfig_node **hold_node,
-					int set)
+static int configs_get_node_path_config(
+	struct mconfig_node *root_node,
+	struct mconfig **config_ret,
+	const char *path,
+	struct mconfig_node **hold_node, int set)
 {
 	char sub_node_name[128];
 	struct mconfig_node *node, *parent_node;
@@ -746,17 +775,17 @@ static int configs_get_node_path_config(struct mconfig_node *root_node,
 	while (!end) {
 		parent_node = node;
 		i = configs_parser_first_node(next_path,
-					      sub_node_name, 128, &end);
+			sub_node_name, 128, &end);
 		if (i <= 0 || sub_node_name[0] == '\0') {
 			pr_err("can't find [%s] 's node!!\n", path);
 			return -1;
 		}
 		config_debug("configs_parser_first_node{%s} end%d\n",
-			     sub_node_name, end);
+			sub_node_name, end);
 		if (!end) {
 			node = configs_get_node_with_name(parent_node,
-							  sub_node_name);
-			if (!node) {
+				sub_node_name);
+			if (node == NULL) {
 				if (parent_node != root_node) {
 					node = parent_node;
 					err = -EPERM;
@@ -770,7 +799,7 @@ static int configs_get_node_path_config(struct mconfig_node *root_node,
 			}
 			next_path = next_path + i + 1;	/*media.vdec --> vdec */
 			config_debug("get snode[%s] from node[%s], end=%d\n",
-				     node->name, parent_node->name, end);
+				node->name, parent_node->name, end);
 		}
 	}
 	if (set && !(node->rw_flags & CONFIG_FOR_W)) {
@@ -785,19 +814,17 @@ static int configs_get_node_path_config(struct mconfig_node *root_node,
 	if (!config) {
 		/*release node refs. */
 		err = -EPERM;
-	} else {
+	} else
 		*hold_node = node;
-	}
  out:
-	if (!config) {
+	if (config == NULL) {
 		if (node) {
 			configs_put_node(node, 1, root_node);
 			pr_err("can't find node %s's  config:%s\n",
-			       node->name, sub_node_name);
-		} else {
+				node->name, sub_node_name);
+		} else
 			pr_err("can't find node %s from %s\n",
-			       sub_node_name, root_node->name);
-		}
+			sub_node_name, root_node->name);
 	} else {
 		*config_ret = config;
 		err = 0;
@@ -806,10 +833,7 @@ static int configs_get_node_path_config(struct mconfig_node *root_node,
 }
 
 static int configs_setget_config_value(struct mconfig *config,
-				       const void *val_set,
-				       void *val_get,
-				       int size,
-				       int set)
+	const void *val_set, void *val_get, int size, int set)
 {
 	int s;
 	int ret;
@@ -830,26 +854,26 @@ static int configs_setget_config_value(struct mconfig *config,
 	case CONFIG_TYPE_PI32:
 		if (size < sizeof(u32))
 			return -2;
-		((u32 *)dst)[0] = ((const u32 *)src)[0];
+		((u32 *) dst)[0] = ((const u32 *)src)[0];
 		ret = sizeof(u32);
 		break;
 	case CONFIG_TYPE_PU64:
 		if (size < sizeof(u64))
 			return -2;
-		((u64 *)dst)[0] = ((const u64 *)src)[0];
+		((u64 *) dst)[0] = ((const u64 *)src)[0];
 		ret = sizeof(u64);
 		break;
 	case CONFIG_TYPE_PCSTR:
-	case CONFIG_TYPE_PSTR:
-		if (set && config->type == CONFIG_TYPE_PCSTR) {
+		if (set) {
 			ret = -3;
 			break;
 		}
 		/*rd same as CONFIG_TYPE_PSTR */
+	case CONFIG_TYPE_PSTR:
 		s = min_t(int, size - 1, config->size - 1);
-		if (s > 0) {
+		if (s > 0)
 			strncpy(dst, src, s);
-		} else {
+		else {
 			ret = -3;
 			break;
 		}
@@ -862,7 +886,7 @@ static int configs_setget_config_value(struct mconfig *config,
 		if (set)
 			config->u32val = ((const u32 *)src)[0];
 		else
-			((u32 *)dst)[0] = config->u32val;
+			((u32 *) dst)[0] = config->u32val;
 		ret = sizeof(u32);
 		break;
 	case CONFIG_TYPE_U64:
@@ -871,7 +895,7 @@ static int configs_setget_config_value(struct mconfig *config,
 		if (set)
 			config->u64val = ((const u64 *)src)[0];
 		else
-			((u64 *)dst)[0] = config->u64val;
+			((u64 *) dst)[0] = config->u64val;
 		ret = sizeof(u64);
 		break;
 	default:
@@ -880,10 +904,11 @@ static int configs_setget_config_value(struct mconfig *config,
 	return ret;
 }
 
-static int configs_setget_node_path_value(struct mconfig_node *topnode,
-					  const char *path,
-					  const void *val_set, void *val_get,
-					  int size, int set)
+static int configs_setget_node_path_value(
+	struct mconfig_node *topnode,
+	const char *path,
+	const void *val_set, void *val_get,
+	int size, int set)
 {
 	struct mconfig_node *node;
 	struct mconfig *config;
@@ -894,19 +919,18 @@ static int configs_setget_node_path_value(struct mconfig_node *topnode,
 		return ret;
 	if (set)
 		pr_err("start set config val config=%s, val=%x\n",
-		       config->item_name, *(int *)val_set);
+		config->item_name, *(int *)val_set);
 	ret = configs_setget_config_value(config, val_set,
-					  val_get, size, set);
+		val_get, size, set);
 	config_debug("setget config val config=%s, ret=%x end\n",
-		     config->item_name, ret);
+		config->item_name, ret);
 	configs_put_node(node, 0, topnode);
 	configs_put_node(node, 1, topnode);
 	return ret;
 }
 
 int configs_set_node_path_str(struct mconfig_node *topnode,
-			      const char *path,
-			      const char *val)
+	const char *path, const char *val)
 {
 	struct mconfig_node *node;
 	struct mconfig *config;
@@ -918,7 +942,7 @@ int configs_set_node_path_str(struct mconfig_node *topnode,
 	if (ret != 0)
 		return ret;
 	config_debug("start set config val config=%s, %s\n",
-		     config->item_name, val);
+		config->item_name, val);
 	mutex_lock(&node->lock);
 	ret = configs_str2config(config, val);
 	mutex_unlock(&node->lock);
@@ -930,18 +954,16 @@ int configs_set_node_path_str(struct mconfig_node *topnode,
 		ret = -1;/*val not changed.*/
 	return ret;
 }
-
 int configs_set_node_nodepath_str(struct mconfig_node *topnode,
-				  const char *path,
-				  const char *val)
+	const char *path, const char *val)
 {
-	if (!topnode) {
+	if (topnode == NULL) {
 		return configs_set_node_path_str(topnode,
 			path, val);
 	}
 	if (strncmp(topnode->name, path, strlen(topnode->name))) {
 		pr_err("nodepath(%s) must start from node=%s\n",
-		       path, topnode->name);
+			path, topnode->name);
 		return -1;
 	}
 	return configs_set_node_path_str(topnode,
@@ -949,8 +971,7 @@ int configs_set_node_nodepath_str(struct mconfig_node *topnode,
 }
 
 int configs_set_prefix_path_str(const char *prefix,
-				const char *path,
-				const char *str)
+	const char *path, const char *str)
 {
 	struct mconfig_node *topnode = NULL;
 	int ret;
@@ -967,15 +988,16 @@ int configs_set_prefix_path_str(const char *prefix,
 	return ret;
 }
 
-int configs_set_node_path_valonpath(struct mconfig_node *topnode,
-				    const char *path)
+int configs_set_node_path_valonpath(
+	struct mconfig_node *topnode,
+	const char *path)
 {
 	return configs_set_node_path_str(topnode, path,
 		configs_parser_str_valstr(path));
 }
 
 int configs_set_prefix_path_valonpath(const char *prefix,
-				      const char *path)
+	const char *path)
 {
 	struct mconfig_node *topnode = NULL;
 	int ret;
@@ -988,15 +1010,13 @@ int configs_set_prefix_path_valonpath(const char *prefix,
 		}
 	}
 	ret = configs_set_node_path_str(topnode, path,
-					configs_parser_str_valstr(path));
+		configs_parser_str_valstr(path));
 	configs_put_node(topnode, 1, NULL);
 	return ret;
 }
 
 int configs_get_node_path_str(struct mconfig_node *topnode,
-			      const char *path,
-			      char *buf,
-			      int size)
+	const char *path, char *buf, int size)
 {
 	struct mconfig_node *node;
 	struct mconfig *config;
@@ -1004,76 +1024,68 @@ int configs_get_node_path_str(struct mconfig_node *topnode,
 
 	if (!path || strlen(path) <= 0)
 		return -1;
-	ret = configs_get_node_path_config(topnode, &config, path, &node, 0);
+	ret = configs_get_node_path_config(topnode,
+		&config, path, &node, 0);
 	if (ret != 0)
 		return ret;
 	config_debug("startget config val config=%s\n",
-		     config->item_name);
+		config->item_name);
 	ret = configs_config2str(config, buf, size);
 	configs_put_node(node, 0, topnode);
 	configs_put_node(node, 1, topnode);
 	return ret;
 }
-
 int configs_get_node_nodepath_str(struct mconfig_node *topnode,
-				  const char *path,
-				  char *buf,
-				  int size)
+	const char *path, char *buf, int size)
 {
-	if (!topnode)
+	if (topnode == NULL)
 		return configs_get_node_path_str(topnode, path, buf, size);
 	if (strncmp(topnode->name, path, strlen(topnode->name))) {
 		pr_err("nodepath(%s) must start from node=%s\n",
-		       path, topnode->name);
+			path, topnode->name);
 		return -1;
 	}
 	return configs_get_node_path_str(topnode,
 		path + strlen(topnode->name) + 1,
 		buf, size);
+
 }
 
-static inline int configs_set_node_path_value(struct mconfig_node *topnode,
-					      const char *path,
-					      const void *val,
-					      int size)
+static inline int configs_set_node_path_value(
+	struct mconfig_node *topnode,
+	const char *path, const void *val, int size)
 {
 	return configs_setget_node_path_value(topnode,
 		path, val, NULL, size, 1);
 }
 
 static int configs_get_node_path_value(struct mconfig_node *topnode,
-				       const char *path,
-				       void *val,
-				       int size)
+	const char *path, void *val, int size)
 {
 	return configs_setget_node_path_value(topnode,
 		path, NULL, val, size, 0);
 }
 
 int configs_get_node_path_u32(struct mconfig_node *topnode,
-			      const char *path,
-			      u32 *val)
+	const char *path, u32 *val)
 {
 	return configs_get_node_path_value(topnode, path, val, sizeof(u32));
 }
 
 int configs_get_node_path_u64(struct mconfig_node *topnode,
-			      const char *path,
-			      u64 *val)
+	const char *path, u64 *val)
 {
 	return configs_get_node_path_value(topnode, path, val, sizeof(u64));
 }
 
 int configs_set_node_path_u32(struct mconfig_node *topnode,
-			      const char *path,
-			      u32 val)
+	const char *path, u32 val)
 {
 	return configs_set_node_path_value(topnode, path, &val, sizeof(u32));
 }
 
 int configs_set_node_path_u64(struct mconfig_node *topnode,
-			      const char *path,
-			      u64 val)
+	const char *path, u64 val)
 {
 	return configs_set_node_path_value(topnode, path, &val,
 		sizeof(u64));

@@ -1,4 +1,3 @@
-// SPDX-License-Identifier: GPL-2.0-only
 /*
  *  Copyright (C) 1991, 1992  Linus Torvalds
  *  Copyright (C) 2000, 2001, 2002 Andi Kleen, SuSE Labs
@@ -14,7 +13,6 @@
 #include <linux/spinlock.h>
 #include <linux/kprobes.h>
 #include <linux/kdebug.h>
-#include <linux/sched/debug.h>
 #include <linux/nmi.h>
 #include <linux/debugfs.h>
 #include <linux/delay.h>
@@ -22,14 +20,12 @@
 #include <linux/ratelimit.h>
 #include <linux/slab.h>
 #include <linux/export.h>
-#include <linux/atomic.h>
-#include <linux/sched/clock.h>
 
 #if defined(CONFIG_EDAC)
 #include <linux/edac.h>
 #endif
 
-#include <asm/cpu_entry_area.h>
+#include <linux/atomic.h>
 #include <asm/traps.h>
 #include <asm/mach_traps.h>
 #include <asm/nmi.h>
@@ -42,26 +38,26 @@
 #include <trace/events/nmi.h>
 
 struct nmi_desc {
-	raw_spinlock_t lock;
+	spinlock_t lock;
 	struct list_head head;
 };
 
 static struct nmi_desc nmi_desc[NMI_MAX] = 
 {
 	{
-		.lock = __RAW_SPIN_LOCK_UNLOCKED(&nmi_desc[0].lock),
+		.lock = __SPIN_LOCK_UNLOCKED(&nmi_desc[0].lock),
 		.head = LIST_HEAD_INIT(nmi_desc[0].head),
 	},
 	{
-		.lock = __RAW_SPIN_LOCK_UNLOCKED(&nmi_desc[1].lock),
+		.lock = __SPIN_LOCK_UNLOCKED(&nmi_desc[1].lock),
 		.head = LIST_HEAD_INIT(nmi_desc[1].head),
 	},
 	{
-		.lock = __RAW_SPIN_LOCK_UNLOCKED(&nmi_desc[2].lock),
+		.lock = __SPIN_LOCK_UNLOCKED(&nmi_desc[2].lock),
 		.head = LIST_HEAD_INIT(nmi_desc[2].head),
 	},
 	{
-		.lock = __RAW_SPIN_LOCK_UNLOCKED(&nmi_desc[3].lock),
+		.lock = __SPIN_LOCK_UNLOCKED(&nmi_desc[3].lock),
 		.head = LIST_HEAD_INIT(nmi_desc[3].head),
 	},
 
@@ -104,21 +100,18 @@ static int __init nmi_warning_debugfs(void)
 }
 fs_initcall(nmi_warning_debugfs);
 
-static void nmi_check_duration(struct nmiaction *action, u64 duration)
+static void nmi_max_handler(struct irq_work *w)
 {
+	struct nmiaction *a = container_of(w, struct nmiaction, irq_work);
 	int remainder_ns, decimal_msecs;
+	u64 whole_msecs = ACCESS_ONCE(a->max_duration);
 
-	if (duration < nmi_longest_ns || duration < action->max_duration)
-		return;
-
-	action->max_duration = duration;
-
-	remainder_ns = do_div(duration, (1000 * 1000));
+	remainder_ns = do_div(whole_msecs, (1000 * 1000));
 	decimal_msecs = remainder_ns / 1000;
 
 	printk_ratelimited(KERN_INFO
 		"INFO: NMI handler (%ps) took too long to run: %lld.%03d msecs\n",
-		action->handler, duration, decimal_msecs);
+		a->handler, whole_msecs, decimal_msecs);
 }
 
 static int nmi_handle(unsigned int type, struct pt_regs *regs)
@@ -145,7 +138,11 @@ static int nmi_handle(unsigned int type, struct pt_regs *regs)
 		delta = sched_clock() - delta;
 		trace_nmi_handler(a->handler, (int)delta, thishandled);
 
-		nmi_check_duration(a, delta);
+		if (delta < nmi_longest_ns || delta < a->max_duration)
+			continue;
+
+		a->max_duration = delta;
+		irq_work_queue(&a->irq_work);
 	}
 
 	rcu_read_unlock();
@@ -163,12 +160,16 @@ int __register_nmi_handler(unsigned int type, struct nmiaction *action)
 	if (!action->handler)
 		return -EINVAL;
 
-	raw_spin_lock_irqsave(&desc->lock, flags);
+	init_irq_work(&action->irq_work, nmi_max_handler);
+
+	spin_lock_irqsave(&desc->lock, flags);
 
 	/*
-	 * Indicate if there are multiple registrations on the
-	 * internal NMI handler call chains (SERR and IO_CHECK).
+	 * most handlers of type NMI_UNKNOWN never return because
+	 * they just assume the NMI is theirs.  Just a sanity check
+	 * to manage expectations
 	 */
+	WARN_ON_ONCE(type == NMI_UNKNOWN && !list_empty(&desc->head));
 	WARN_ON_ONCE(type == NMI_SERR && !list_empty(&desc->head));
 	WARN_ON_ONCE(type == NMI_IO_CHECK && !list_empty(&desc->head));
 
@@ -181,7 +182,7 @@ int __register_nmi_handler(unsigned int type, struct nmiaction *action)
 	else
 		list_add_tail_rcu(&action->list, &desc->head);
 	
-	raw_spin_unlock_irqrestore(&desc->lock, flags);
+	spin_unlock_irqrestore(&desc->lock, flags);
 	return 0;
 }
 EXPORT_SYMBOL(__register_nmi_handler);
@@ -192,7 +193,7 @@ void unregister_nmi_handler(unsigned int type, const char *name)
 	struct nmiaction *n;
 	unsigned long flags;
 
-	raw_spin_lock_irqsave(&desc->lock, flags);
+	spin_lock_irqsave(&desc->lock, flags);
 
 	list_for_each_entry_rcu(n, &desc->head, list) {
 		/*
@@ -207,7 +208,7 @@ void unregister_nmi_handler(unsigned int type, const char *name)
 		}
 	}
 
-	raw_spin_unlock_irqrestore(&desc->lock, flags);
+	spin_unlock_irqrestore(&desc->lock, flags);
 	synchronize_rcu();
 }
 EXPORT_SYMBOL_GPL(unregister_nmi_handler);
@@ -221,6 +222,17 @@ pci_serr_error(unsigned char reason, struct pt_regs *regs)
 
 	pr_emerg("NMI: PCI system error (SERR) for reason %02x on CPU %d.\n",
 		 reason, smp_processor_id());
+
+	/*
+	 * On some machines, PCI SERR line is used to report memory
+	 * errors. EDAC makes use of it.
+	 */
+#if defined(CONFIG_EDAC)
+	if (edac_handler_set()) {
+		edac_atomic_assert_error();
+		return;
+	}
+#endif
 
 	if (panic_on_unrecovered_nmi)
 		nmi_panic(regs, "NMI: Not continuing");
@@ -487,31 +499,11 @@ static DEFINE_PER_CPU(unsigned long, nmi_cr2);
  * switch back to the original IDT.
  */
 static DEFINE_PER_CPU(int, update_debug_stack);
-
-static bool notrace is_debug_stack(unsigned long addr)
-{
-	struct cea_exception_stacks *cs = __this_cpu_read(cea_exception_stacks);
-	unsigned long top = CEA_ESTACK_TOP(cs, DB);
-	unsigned long bot = CEA_ESTACK_BOT(cs, DB1);
-
-	if (__this_cpu_read(debug_stack_usage))
-		return true;
-	/*
-	 * Note, this covers the guard page between DB and DB1 as well to
-	 * avoid two checks. But by all means @addr can never point into
-	 * the guard page.
-	 */
-	return addr >= bot && addr < top;
-}
-NOKPROBE_SYMBOL(is_debug_stack);
 #endif
 
 dotraplinkage notrace void
 do_nmi(struct pt_regs *regs, long error_code)
 {
-	if (IS_ENABLED(CONFIG_SMP) && cpu_is_offline(smp_processor_id()))
-		return;
-
 	if (this_cpu_read(nmi_state) != NMI_NOT_RUNNING) {
 		this_cpu_write(nmi_state, NMI_LATCHED);
 		return;

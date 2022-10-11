@@ -1,6 +1,18 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/amlogic/media/common/vfm/vfm.c
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
 /* Standard Linux headers */
@@ -15,20 +27,17 @@
 #include <linux/list.h>
 #include <linux/io.h>
 #include <linux/uaccess.h>
-#include <linux/fs.h>
-#include <linux/major.h>
 /* Amlogic headers */
 #include <linux/amlogic/media/vfm/vframe.h>
 #include <linux/amlogic/media/vfm/vframe_provider.h>
 #include <linux/amlogic/media/vfm/vframe_receiver.h>
 
+#include <linux/amlogic/major.h>
 /*for dumpinfos*/
 #include <linux/amlogic/media/canvas/canvas_mgr.h>
 #include <linux/amlogic/media/canvas/canvas.h>
-
-#ifdef CONFIG_AMLOGIC_MEDIA_CODEC_MM
 #include <linux/amlogic/media/codec_mm/configs.h>
-#endif
+
 /* Local headers */
 #include "vftrace.h"
 #include "vfm.h"
@@ -49,7 +58,6 @@ struct vfm_map_s {
 	int valid;
 	int active;
 };
-
 struct vfm_map_s *vfm_map[VFM_MAP_COUNT];
 static int vfm_map_num;
 int vfm_debug_flag;		/* 1; */
@@ -66,13 +74,13 @@ void vf_update_active_map(void)
 			for (j = 0; j < (vfm_map[i]->vfm_map_size - 1); j++) {
 				vfp = vf_get_provider_by_name(vfm_map[i]->name
 					[j]);
-				if (!vfp)
+				if (vfp == NULL)
 					vfm_map[i]->active &= (~(1 << j));
-				else
-					if ((j > 0 &&
-					     vfm_map[i]->active & 0x1) ||
-					    j == 0)
+				else {
+					if ((j > 0 && vfm_map[i]->active & 0x1)
+						|| j == 0)
 						vfm_map[i]->active |= (1 << j);
+				}
 			}
 		}
 	}
@@ -86,7 +94,7 @@ static int get_vfm_map_index(const char *id)
 	for (i = 0; i < vfm_map_num; i++) {
 		if (vfm_map[i]) {
 			if (vfm_map[i]->valid &&
-			    (!strcmp(vfm_map[i]->id, id))) {
+				(!strcmp(vfm_map[i]->id, id))) {
 				index = i;
 				break;
 			}
@@ -108,7 +116,7 @@ static int vfm_map_remove_by_index(int index)
 			vfp->ops->event_cb(VFRAME_EVENT_RECEIVER_FORCE_UNREG,
 				NULL, vfp->op_arg);
 			pr_err("%s: VFRAME_EVENT_RECEIVER_FORCE_UNREG %s\n",
-			       __func__, vfm_map[index]->name[i]);
+				__func__, vfm_map[index]->name[i]);
 		}
 	}
 	for (i = 0; i < (vfm_map[index]->vfm_map_size - 1); i++) {
@@ -118,7 +126,7 @@ static int vfm_map_remove_by_index(int index)
 	}
 	if (i < (vfm_map[index]->vfm_map_size - 1)) {
 		pr_err("failed remove vfm map %s with active provider %s.\n",
-		       vfm_map[index]->id, vfm_map[index]->name[i]);
+			vfm_map[index]->id, vfm_map[index]->name[i]);
 		ret = -1;
 	}
 	vfm_map[index]->valid = 0;
@@ -159,10 +167,12 @@ int vfm_map_add(char *id, char *name_chain)
 	int cnt = 10;
 	ulong addr;
 
-	p = kmalloc(sizeof(*p), GFP_KERNEL);
+	p = kmalloc(sizeof(struct vfm_map_s), GFP_KERNEL);
 
-	if (!p)
+	if (!p) {
+		pr_err("%s: Error, map no mem!!\n", __func__);
 		return -ENOMEM;
+	}
 	ptr = kstrdup(name_chain, GFP_KERNEL);
 	addr = (ulong)ptr;
 	if (!ptr) {
@@ -189,7 +199,7 @@ int vfm_map_add(char *id, char *name_chain)
 			break;
 		if (strlen(token) >= VFM_NAME_LEN - 1) {
 			memcpy(p->name[p->vfm_map_size], token,
-			       VFM_NAME_LEN - 1);
+				VFM_NAME_LEN - 1);
 			p->name[p->vfm_map_size][VFM_NAME_LEN - 1] = '\0';
 		} else {
 			memcpy(p->name[p->vfm_map_size], token, strlen(token));
@@ -209,7 +219,7 @@ retry:
 		} else if (pi->valid) {
 			for (j = 0; j < p->vfm_map_size; j++) {
 				if (strcmp(pi->name[j],
-					   p->name[j])){
+					p->name[j])){
 					break;
 				}
 			}
@@ -241,7 +251,7 @@ retry:
 		if (i == old_num && old_num != vfm_map_num && cnt--) {
 			spin_unlock_irqrestore(&lock, flags);
 			pr_err("%s: vfm_map changed on add, need retry!\n",
-			       __func__);
+				__func__);
 			goto retry;
 		}
 		if (i == vfm_map_num) {
@@ -249,14 +259,13 @@ retry:
 				vfm_map[i] = p;
 				vfm_map_num++;
 				add_ok = 1;
-			} else {
+			} else{
 				pr_err("%s: Error, map full\n", __func__);
 				ret = -1;
 				kfree(p);
 			}
-		} else {
+		} else
 			kfree(p);
-		}
 		spin_unlock_irqrestore(&lock, flags);
 	}
 	if (add_ok)
@@ -272,8 +281,8 @@ static char *vf_get_provider_name_inmap(int i, const char *receiver_name)
 
 	for (j = 0; j < vfm_map[i]->vfm_map_size; j++) {
 		if (!strcmp(vfm_map[i]->name[j], receiver_name)) {
-			if (j > 0 &&
-			    ((vfm_map[i]->active >> (j - 1)) & 0x1)) {
+			if ((j > 0) &&
+				((vfm_map[i]->active >> (j - 1)) & 0x1)) {
 				provider_name = vfm_map[i]->name[j - 1];
 			}
 			break;
@@ -289,10 +298,8 @@ char *vf_get_provider_name(const char *receiver_name)
 
 	for (i = 0; i < vfm_map_num; i++) {
 		if (vfm_map[i] && vfm_map[i]->active) {
-			provider_name =
-				vf_get_provider_name_inmap
-					(i,
-					 receiver_name);
+			provider_name = vf_get_provider_name_inmap(i,
+				receiver_name);
 		}
 		if (provider_name)
 			break;
@@ -312,10 +319,11 @@ static char *vf_get_receiver_name_inmap(int i, const char *provider_name)
 		namelen = strlen(vfm_map[i]->name[j]);
 		if (vfm_debug_flag & 2) {
 			pr_err("%s:vfm_map:%s\n", __func__,
-			       vfm_map[i]->name[j]);
+				vfm_map[i]->name[j]);
 		}
 		if ((!strncmp(vfm_map[i]->name[j], provider_name, namelen)) &&
-		    ((j + 1) < vfm_map[i]->vfm_map_size)) {
+			((j + 1) < vfm_map[i]->vfm_map_size)) {
+
 			if (namelen == provide_namelen) {
 				/* exact match */
 				receiver_name = vfm_map[i]->name[j + 1];
@@ -329,6 +337,7 @@ static char *vf_get_receiver_name_inmap(int i, const char *provider_name)
 				receiver_name = vfm_map[i]->name[j + 1];
 			}
 		}
+
 	}
 	return receiver_name;
 }
@@ -340,10 +349,8 @@ char *vf_get_receiver_name(const char *provider_name)
 
 	for (i = 0; i < vfm_map_num; i++) {
 		if (vfm_map[i] && vfm_map[i]->valid && vfm_map[i]->active) {
-			receiver_name =
-				vf_get_receiver_name_inmap
-					(i,
-					 provider_name);
+			receiver_name = vf_get_receiver_name_inmap(i,
+				provider_name);
 		}
 		if (receiver_name)
 			break;
@@ -400,8 +407,10 @@ static void vfm_init(void)
 	char def_dvel_id[VFM_NAME_LEN] = "dvelpath";
 	char def_dvel_chain[] = "dveldec dvel";
 #endif
+#if 1/*def CONFIG_AM_HDMIIN_DV*/
 	char def_dvhdmiin_id[VFM_NAME_LEN] = "dvhdmiin";
 	char def_dvhdmiin_chain[] = "dv_vdin amvideo";
+#endif
 	int i;
 
 	for (i = 0; i < VFM_MAP_COUNT; i++)
@@ -421,14 +430,16 @@ static void vfm_init(void)
 	vfm_map_add(def_dvbl_id, def_dvbl_chain);
 	vfm_map_add(def_dvel_id, def_dvel_chain);
 #endif
+#if 1/*def CONFIG_AM_HDMIIN_DV*/
 	vfm_map_add(def_dvhdmiin_id, def_dvhdmiin_chain);
+#endif
 }
 
 /*
  * cat /sys/class/vfm/map
  */
-static ssize_t map_show(struct class *class,
-			struct class_attribute *attr, char *buf)
+static ssize_t vfm_map_show(struct class *class,
+	struct class_attribute *attr, char *buf)
 {
 	int i, j;
 	int len = 0;
@@ -443,7 +454,7 @@ static ssize_t map_show(struct class *class,
 					len += sprintf(buf + len, "%s(%d) ",
 					   vfm_map[i]->name[j],
 					   (vfm_map[i]->active >> j) & 0x1);
-				} else {
+				} else{
 					len += sprintf(buf + len, "%s",
 						vfm_map[i]->name[j]);
 				}
@@ -457,7 +468,7 @@ static ssize_t map_show(struct class *class,
 }
 
 static int vfm_vf_get_states(struct vframe_provider_s *vfp,
-			     struct vframe_states *states)
+	struct vframe_states *states)
 {
 	int ret = -1;
 	unsigned long flags;
@@ -468,7 +479,8 @@ static int vfm_vf_get_states(struct vframe_provider_s *vfp,
 	return ret;
 }
 
-static inline struct vframe_s *vfm_vf_peek(struct vframe_provider_s *vfp)
+static inline struct vframe_s *vfm_vf_peek(
+	struct vframe_provider_s *vfp)
 {
 	if (!(vfp && vfp->ops && vfp->ops->peek))
 		return NULL;
@@ -519,9 +531,9 @@ void vfm_dump_one(const char *name)
 			pbuf += sprintf(pbuf, "vf->pts=%d\n", vf->pts);
 			pbuf += sprintf(pbuf, "vf->type=%d\n", vf->type);
 			if (vf->type & VIDTYPE_COMPRESS) {
-				pbuf += sprintf(pbuf, "vf compHeadAddr=%lx\n",
+				pbuf += sprintf(pbuf, "vf compHeadAddr=%x\n",
 						vf->compHeadAddr);
-				pbuf += sprintf(pbuf, "vf compBodyAddr =%lx\n",
+				pbuf += sprintf(pbuf, "vf compBodyAddr =%x\n",
 						vf->compBodyAddr);
 			} else {
 				pbuf += sprintf(pbuf, "vf canvas0Addr=%x\n",
@@ -529,17 +541,17 @@ void vfm_dump_one(const char *name)
 				pbuf += sprintf(pbuf, "vf canvas1Addr=%x\n",
 					vf->canvas1Addr);
 				pbuf += sprintf(pbuf,
-					"vf canvas0Addr.y.addr=%lx(%ld)\n",
-					canvas_get_addr
-					(canvasY(vf->canvas0Addr)),
-					canvas_get_addr
-					(canvasY(vf->canvas0Addr)));
+					"vf canvas0Addr.y.addr=%x(%d)\n",
+					canvas_get_addr(
+					canvasY(vf->canvas0Addr)),
+					canvas_get_addr(
+					canvasY(vf->canvas0Addr)));
 				pbuf += sprintf(pbuf,
-					"vf canvas0Adr.uv.adr=%lx(%ld)\n",
-					canvas_get_addr
-					(canvasUV(vf->canvas0Addr)),
-					canvas_get_addr
-					(canvasUV(vf->canvas0Addr)));
+					"vf canvas0Adr.uv.adr=%x(%d)\n",
+					canvas_get_addr(
+					canvasUV(vf->canvas0Addr)),
+					canvas_get_addr(
+					canvasUV(vf->canvas0Addr)));
 			}
 		}
 		spin_unlock_irqrestore(&lock, flags);
@@ -570,9 +582,8 @@ static void vfm_dump_provider(const char *name)
 
 static int dummy_receiver_event_fun(int type, void *data, void *arg)
 {
-	struct vframe_receiver_s *dummy_vf_recv;
-
-	dummy_vf_recv = (struct vframe_receiver_s *)arg;
+	struct vframe_receiver_s *dummy_vf_recv
+		= (struct vframe_receiver_s *)arg;
 	if (type == VFRAME_EVENT_PROVIDER_UNREG) {
 		char *provider_name = (char *)data;
 
@@ -585,8 +596,7 @@ static int dummy_receiver_event_fun(int type, void *data, void *arg)
 		while (vframe_tmp) {
 			vf_put(vframe_tmp, dummy_vf_recv->name);
 			vf_notify_provider(dummy_vf_recv->name,
-					   VFRAME_EVENT_RECEIVER_PUT,
-					   NULL);
+				VFRAME_EVENT_RECEIVER_PUT, NULL);
 			vframe_tmp = vf_get(dummy_vf_recv->name);
 		}
 	} else if (type == VFRAME_EVENT_PROVIDER_QUREY_STATE) {
@@ -614,8 +624,7 @@ static void add_dummy_receiver(char *vfm_name_)
 
 		snprintf(vfm_name, 16, "%s", vfm_name_);
 		vf_receiver_init(dummy_vf_recv, vfm_name,
-				 &dummy_vf_receiver,
-				 dummy_vf_recv);
+			&dummy_vf_receiver, dummy_vf_recv);
 		vf_reg_receiver(dummy_vf_recv);
 		pr_info("%s: %s\n", __func__, dummy_vf_recv->name);
 	}
@@ -632,10 +641,9 @@ static void add_dummy_receiver(char *vfm_name_)
  * <name> the name of the path.
  * <node1 node2 ...> the name of the nodes in the path.
  */
-static ssize_t map_store(struct class *class,
-			 struct class_attribute *attr,
-			 const char *buf,
-			 size_t count)
+static ssize_t vfm_map_store(struct class *class,
+		 struct class_attribute *attr,
+		 const char *buf, size_t count)
 {
 	char *buf_orig, *ps, *token;
 	int i = 0;
@@ -649,7 +657,7 @@ static ssize_t map_store(struct class *class,
 	ps = buf_orig;
 	while (1) {
 		token = strsep(&ps, "\n ");
-		if (!token)
+		if (token == NULL)
 			break;
 		if (*token == '\0')
 			continue;
@@ -686,151 +694,21 @@ static ssize_t map_store(struct class *class,
 	return count;
 }
 
-static ssize_t vfm_debug_flag_show(struct class *class,
-				   struct class_attribute *attr,
-				   char *buf)
-{
-	ssize_t size = 0;
-
-	size = sprintf(buf, "%u\n", vfm_debug_flag);
-
-	return size;
-}
-
-static ssize_t vfm_debug_flag_store(struct class *class,
-				    struct class_attribute *attr,
-				    const char *buf, size_t size)
-{
-	unsigned int val;
-	ssize_t ret;
-
-	val = -1;
-	ret = kstrtoint(buf, 0, &val);
-	if (ret != 0)
-		return -EINVAL;
-
-	vfm_debug_flag = val;
-
-	return size;
-}
-
-static ssize_t vfm_map_num_show(struct class *class,
-				struct class_attribute *attr,
-				char *buf)
-{
-	ssize_t size = 0;
-
-	size = sprintf(buf, "%u\n", vfm_map_num);
-
-	return size;
-}
-
-static ssize_t vfm_map_num_store(struct class *class,
-				 struct class_attribute *attr,
-				 const char *buf, size_t size)
-{
-	unsigned int val;
-	ssize_t ret;
-
-	val = -1;
-	ret = kstrtoint(buf, 0, &val);
-	if (ret != 0)
-		return -EINVAL;
-
-	vfm_map_num = val;
-
-	return size;
-}
-
-static ssize_t vfm_trace_enable_show(struct class *class,
-				     struct class_attribute *attr, char *buf)
-{
-	ssize_t size = 0;
-
-	size = sprintf(buf, "%u\n", vfm_trace_enable);
-
-	return size;
-}
-
-static ssize_t vfm_trace_enable_store(struct class *class,
-				      struct class_attribute *attr,
-				      const char *buf, size_t size)
-{
-	unsigned int val;
-	ssize_t ret;
-
-	val = -1;
-	ret = kstrtoint(buf, 0, &val);
-	if (ret != 0)
-		return -EINVAL;
-
-	vfm_trace_enable = val;
-
-	return size;
-}
-
-static ssize_t vfm_trace_num_show(struct class *class,
-				  struct class_attribute *attr,
-				  char *buf)
-{
-	ssize_t size = 0;
-
-	size = sprintf(buf, "%u\n", vfm_trace_num);
-
-	return size;
-}
-
-static ssize_t vfm_trace_num_store(struct class *class,
-				   struct class_attribute *attr,
-				   const char *buf, size_t size)
-{
-	unsigned int val;
-	ssize_t ret;
-
-	val = -1;
-	ret = kstrtoint(buf, 0, &val);
-	if (ret != 0)
-		return -EINVAL;
-
-	vfm_trace_num = val;
-
-	return size;
-}
-
-static CLASS_ATTR_RW(map);
-static CLASS_ATTR_RW(vfm_debug_flag);
-static CLASS_ATTR_RW(vfm_map_num);
-static CLASS_ATTR_RW(vfm_trace_enable);
-static CLASS_ATTR_RW(vfm_trace_num);
-
-static struct attribute *vfm_class_attrs[] = {
-	&class_attr_map.attr,
-	&class_attr_vfm_debug_flag.attr,
-	&class_attr_vfm_map_num.attr,
-	&class_attr_vfm_trace_enable.attr,
-	&class_attr_vfm_trace_num.attr,
-	NULL
-};
-
-ATTRIBUTE_GROUPS(vfm_class);
-
+static CLASS_ATTR(map, 0664, vfm_map_show, vfm_map_store);
 static struct class vfm_class = {
 	.name = CLS_NAME,
-	.class_groups = vfm_class_groups,
-};
-
+	};
 int vfm_map_store_fun(const char *trigger, int id, const char *buf, int size)
 {
 	int ret = size;
 
 	switch (id) {
-	case 0:	return map_store(NULL, NULL, buf, size);
+	case 0:	return vfm_map_store(NULL, NULL, buf, size);
 	default:
 		ret = -1;
 	}
 	return size;
 }
-
 int vfm_map_show_fun(const char *trigger, int id, char *sbuf, int size)
 {
 	int ret = -1;
@@ -848,25 +726,24 @@ int vfm_map_show_fun(const char *trigger, int id, char *sbuf, int size)
 
 	switch (id) {
 	case 0:
-		ret = map_show(NULL, NULL, buf);
+		ret = vfm_map_show(NULL, NULL, buf);
 		break;
 	default:
 		ret = -1;
 	}
-	if (ret > 0 && getbuf) {
+	if (ret > 0 && getbuf != NULL) {
 		ret = min_t(int, ret, size);
 		strncpy(sbuf, buf, ret);
 	}
-	if (getbuf)
+	if (getbuf != NULL)
 		free_page((unsigned long)getbuf);
 	return ret;
 }
 
-#ifdef CONFIG_AMLOGIC_MEDIA_CODEC_MM
 static struct mconfig vfm_configs[] = {
 	MC_FUN_ID("map", vfm_map_show_fun, vfm_map_store_fun, 0),
 };
-#endif
+
 /*********************************************************
  * /dev/vfm APIs
  *********************************************************/
@@ -902,14 +779,14 @@ static long vfm_ioctl(struct file *file, unsigned int cmd, ulong arg)
 		if (ret)
 			ret = -EINVAL;
 		else
-			ret = map_store(NULL, NULL, argp.val,
-					sizeof(argp.val) - 1);
+			ret = vfm_map_store(NULL, NULL, argp.val,
+					    sizeof(argp.val) - 1);
 		}
 		break;
 	case VFM_IOCTL_CMD_GET:{
 	/*
 	 *overflow bug, need fixed.
-	 *map_show(NULL, NULL, argp.val);
+	 *vfm_map_show(NULL, NULL, argp.val);
 	 *ret = copy_to_user(user_argp->val, argp.val, sizeof(argp.val));
 	 *if (ret != 0)
 	 *	return -EIO;
@@ -988,7 +865,7 @@ static const struct file_operations vfm_fops = {
 	.poll = NULL,
 };
 
-int __init vfm_class_init(void)
+static int __init vfm_class_init(void)
 {
 	int error;
 
@@ -999,10 +876,14 @@ int __init vfm_class_init(void)
 		pr_err("%s: class_register failed\n", __func__);
 		return error;
 	}
-
-#ifdef CONFIG_AMLOGIC_MEDIA_CODEC_MM
+	error = class_create_file(&vfm_class, &class_attr_map);
+	if (error) {
+		pr_err("%s: class_create_file failed\n", __func__);
+		class_unregister(&vfm_class);
+	}
 	REG_PATH_CONFIGS("media.vfm", vfm_configs);
-#endif
+
+
 	/* create vfm device */
 	error = register_chrdev(VFM_MAJOR, "vfm", &vfm_fops);
 	if (error < 0) {
@@ -1010,17 +891,28 @@ int __init vfm_class_init(void)
 		return error;
 	}
 	vfm_dev = device_create(&vfm_class, NULL,
-				MKDEV(VFM_MAJOR, 0),
-				NULL, DEV_NAME);
+		MKDEV(VFM_MAJOR, 0), NULL, DEV_NAME);
 	return error;
 }
 
-void __exit vfm_class_exit(void)
+static void __exit vfm_class_exit(void)
 {
 	class_unregister(&vfm_class);
 	unregister_chrdev(VFM_MAJOR, DEV_NAME);
 }
 
-//MODULE_DESCRIPTION("Amlogic video frame manager driver");
-//MODULE_LICENSE("GPL");
-//MODULE_AUTHOR("Bobby Yang <bo.yang@amlogic.com>");
+fs_initcall(vfm_class_init);
+module_exit(vfm_class_exit);
+MODULE_PARM_DESC(vfm_debug_flag, "\n vfm_debug_flag\n");
+module_param(vfm_debug_flag, int, 0664);
+MODULE_PARM_DESC(vfm_map_num, "\n vfm_map_num\n");
+module_param(vfm_map_num, int, 0664);
+
+module_param(vfm_trace_enable, int, 0664);
+MODULE_PARM_DESC(vfm_trace_enable, "\n vfm_trace_enable\n");
+module_param(vfm_trace_num, int, 0664);
+MODULE_PARM_DESC(vfm_trace_num, "\n vfm_trace_num\n");
+
+MODULE_DESCRIPTION("Amlogic video frame manager driver");
+MODULE_LICENSE("GPL");
+MODULE_AUTHOR("Bobby Yang <bo.yang@amlogic.com>");

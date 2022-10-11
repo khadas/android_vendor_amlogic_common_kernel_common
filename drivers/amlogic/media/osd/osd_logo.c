@@ -1,7 +1,20 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
- */
+ * drivers/amlogic/media/osd/osd_logo.c
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
+*/
+
 
 /* Linux Headers */
 #include <linux/kernel.h>
@@ -10,16 +23,15 @@
 #include <linux/delay.h>
 
 /* Amlogic Headers */
-#include <linux/amlogic/media/osd/osd_logo.h>
 #include <linux/amlogic/media/vout/vout_notify.h>
 #include <linux/amlogic/media/vout/hdmi_tx/hdmi_tx_module.h>
+
 
 /* Local Headers */
 #include "osd_hw.h"
 #include "osd_log.h"
 #include "osd.h"
 
-#include <linux/amlogic/gki_module.h>
 
 #undef pr_fmt
 #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
@@ -31,6 +43,7 @@ struct para_pair_s {
 	int value;
 };
 
+
 static struct para_pair_s logo_args[] = {
 	{"osd0", LOGO_DEV_OSD0},
 	{"osd1", LOGO_DEV_OSD1},
@@ -38,6 +51,7 @@ static struct para_pair_s logo_args[] = {
 	{"debug", LOGO_DEBUG},
 	{"loaded", LOGO_LOADED},
 };
+
 
 struct logo_info_s {
 	int index;
@@ -75,7 +89,7 @@ static int logo_info_init(char *para)
 	u32 count = 0;
 	int value = -1;
 
-	count = ARRAY_SIZE(logo_args);
+	count = sizeof(logo_args) / sizeof(logo_args[0]);
 	value = get_value_by_name(para, logo_args, count);
 	if (value >= 0) {
 		switch (value) {
@@ -112,7 +126,7 @@ static int str2lower(char *str)
 	return 0;
 }
 
-static int logo_setup(char *str)
+static int __init logo_setup(char *str)
 {
 	char *ptr = str;
 	char sep[2];
@@ -120,7 +134,7 @@ static int logo_setup(char *str)
 	int count = 5;
 	char find = 0;
 
-	if (!str)
+	if (str == NULL)
 		return -EINVAL;
 
 	do {
@@ -149,7 +163,7 @@ static int logo_setup(char *str)
 	return 0;
 }
 
-static int get_logo_width(char *str)
+static int __init get_logo_width(char *str)
 {
 	int ret;
 
@@ -158,7 +172,7 @@ static int get_logo_width(char *str)
 	return 0;
 }
 
-static int get_logo_height(char *str)
+static int __init get_logo_height(char *str)
 {
 	int ret;
 
@@ -167,38 +181,9 @@ static int get_logo_height(char *str)
 	return 0;
 }
 
-static u32 display_bpp;
-
-static int logo_display_bpp_setup(char *str)
-{
-	int ret;
-
-	ret = kstrtoint(str, 0, &display_bpp);
-	pr_info("logo_info.bpp=%d\n", display_bpp);
-	return 0;
-}
-
-u32 get_logo_fb_width(void)
-{
-	return logo_info.fb_width;
-}
-EXPORT_SYMBOL(get_logo_fb_width);
-
-u32 get_logo_fb_height(void)
-{
-	return logo_info.fb_height;
-}
-EXPORT_SYMBOL(get_logo_fb_height);
-
-u32 get_logo_display_bpp(void)
-{
-	return display_bpp;
-}
-EXPORT_SYMBOL(get_logo_display_bpp);
-
 int set_osd_logo_freescaler(void)
 {
-	const struct vinfo_s *vinfo = NULL;
+	const struct vinfo_s *vinfo;
 	u32 index = logo_info.index;
 	s32 src_x_start = 0, src_x_end = 0;
 	s32 src_y_start = 0, src_y_end = 0;
@@ -214,7 +199,7 @@ int set_osd_logo_freescaler(void)
 		return -1;
 	}
 
-	if (osd_hw.osd_meson_dev.osd_ver == OSD_SIMPLE && index >= 1)
+	if ((osd_hw.osd_meson_dev.osd_ver == OSD_SIMPLE) && (index >= 1))
 		return -1;
 
 	/* for dual logo,
@@ -225,17 +210,15 @@ int set_osd_logo_freescaler(void)
 		if (index >= LOGO_DEV_VIU2_OSD0)
 			index = LOGO_DEV_OSD0;
 
-	if (osd_get_position_from_reg
-		(index,
+	if (osd_get_position_from_reg(
+		index,
 		&src_x_start, &src_x_end,
 		&src_y_start, &src_y_end,
 		&dst_x_start, &dst_x_end,
 		&dst_y_start, &dst_y_end))
 		return -1;
 
-#ifdef CONFIG_AMLOGIC_VOUT_SERVE
 	vinfo = get_current_vinfo();
-#endif
 	if (vinfo) {
 		target_x_end = vinfo->width - 1;
 		target_y_end = vinfo->height - 1;
@@ -243,14 +226,14 @@ int set_osd_logo_freescaler(void)
 		target_x_end = 1919;
 		target_y_end = 1079;
 	}
-	if (src_x_start == 0 &&
-	    (src_x_end == (logo_info.fb_width - 1)) &&
-	    src_y_start == 0 &&
-	    (src_y_end == (logo_info.fb_height - 1)) &&
-	    dst_x_start == 0 &&
-	    dst_x_end == target_x_end &&
-	    dst_y_start == 0 &&
-	    dst_y_end == target_y_end)
+	if ((src_x_start == 0)
+		&& (src_x_end == (logo_info.fb_width - 1))
+		&& (src_y_start == 0)
+		&& (src_y_end == (logo_info.fb_height - 1))
+		&& (dst_x_start == 0)
+		&& (dst_x_end == target_x_end)
+		&& (dst_y_start == 0)
+		&& (dst_y_end == target_y_end))
 		return 0;
 
 	if (vinfo)
@@ -267,10 +250,9 @@ int set_osd_logo_freescaler(void)
 	osd_set_free_scale_mode_hw(index, 1);
 	osd_set_free_scale_enable_hw(index, 0);
 	osd_set_free_scale_axis_hw(index, 0, 0,
-				   logo_info.fb_width - 1,
-				   logo_info.fb_height - 1);
+		logo_info.fb_width - 1, logo_info.fb_height - 1);
 	osd_update_disp_axis_hw(index, 0, logo_info.fb_width - 1,
-				0, logo_info.fb_height - 1, 0, 0, 0);
+		0, logo_info.fb_height - 1, 0, 0, 0);
 	osd_set_window_axis_hw(index, 0, 0, target_x_end, target_y_end);
 	osd_set_free_scale_enable_hw(index, 0x10001);
 	osd_enable_hw(index, 1);
@@ -286,8 +268,6 @@ void set_logo_loaded(void)
 {
 	logo_info.loaded = 0;
 }
-
-__setup("display_bpp=", logo_display_bpp_setup);
 
 __setup("logo=", logo_setup);
 

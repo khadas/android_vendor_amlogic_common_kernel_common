@@ -1,4 +1,3 @@
-// SPDX-License-Identifier: GPL-2.0
 /*
  *  linux/arch/x86_64/ia32/ia32_signal.c
  *
@@ -10,7 +9,6 @@
  */
 
 #include <linux/sched.h>
-#include <linux/sched/task_stack.h>
 #include <linux/mm.h>
 #include <linux/smp.h>
 #include <linux/kernel.h>
@@ -21,9 +19,8 @@
 #include <linux/personality.h>
 #include <linux/compat.h>
 #include <linux/binfmts.h>
-#include <linux/syscalls.h>
 #include <asm/ucontext.h>
-#include <linux/uaccess.h>
+#include <asm/uaccess.h>
 #include <asm/fpu/internal.h>
 #include <asm/fpu/signal.h>
 #include <asm/ptrace.h>
@@ -34,6 +31,7 @@
 #include <asm/vdso.h>
 #include <asm/sigframe.h>
 #include <asm/sighandling.h>
+#include <asm/sys_ia32.h>
 #include <asm/smap.h>
 
 /*
@@ -119,13 +117,13 @@ static int ia32_restore_sigcontext(struct pt_regs *regs,
 	return err;
 }
 
-COMPAT_SYSCALL_DEFINE0(sigreturn)
+asmlinkage long sys32_sigreturn(void)
 {
 	struct pt_regs *regs = current_pt_regs();
 	struct sigframe_ia32 __user *frame = (struct sigframe_ia32 __user *)(regs->sp-8);
 	sigset_t set;
 
-	if (!access_ok(frame, sizeof(*frame)))
+	if (!access_ok(VERIFY_READ, frame, sizeof(*frame)))
 		goto badframe;
 	if (__get_user(set.sig[0], &frame->sc.oldmask)
 	    || (_COMPAT_NSIG_WORDS > 1
@@ -145,7 +143,7 @@ badframe:
 	return 0;
 }
 
-COMPAT_SYSCALL_DEFINE0(rt_sigreturn)
+asmlinkage long sys32_rt_sigreturn(void)
 {
 	struct pt_regs *regs = current_pt_regs();
 	struct rt_sigframe_ia32 __user *frame;
@@ -153,7 +151,7 @@ COMPAT_SYSCALL_DEFINE0(rt_sigreturn)
 
 	frame = (struct rt_sigframe_ia32 __user *)(regs->sp - 4);
 
-	if (!access_ok(frame, sizeof(*frame)))
+	if (!access_ok(VERIFY_READ, frame, sizeof(*frame)))
 		goto badframe;
 	if (__copy_from_user(&set, &frame->uc.uc_sigmask, sizeof(set)))
 		goto badframe;
@@ -222,7 +220,8 @@ static void __user *get_sigframe(struct ksignal *ksig, struct pt_regs *regs,
 				 size_t frame_size,
 				 void __user **fpstate)
 {
-	unsigned long sp, fx_aligned, math_size;
+	struct fpu *fpu = &current->thread.fpu;
+	unsigned long sp;
 
 	/* Default to using normal stack */
 	sp = regs->sp;
@@ -231,16 +230,20 @@ static void __user *get_sigframe(struct ksignal *ksig, struct pt_regs *regs,
 	if (ksig->ka.sa.sa_flags & SA_ONSTACK)
 		sp = sigsp(sp, ksig);
 	/* This is the legacy signal stack switching. */
-	else if (regs->ss != __USER32_DS &&
+	else if ((regs->ss & 0xffff) != __USER32_DS &&
 		!(ksig->ka.sa.sa_flags & SA_RESTORER) &&
 		 ksig->ka.sa.sa_restorer)
 		sp = (unsigned long) ksig->ka.sa.sa_restorer;
 
-	sp = fpu__alloc_mathframe(sp, 1, &fx_aligned, &math_size);
-	*fpstate = (struct _fpstate_32 __user *) sp;
-	if (copy_fpstate_to_sigframe(*fpstate, (void __user *)fx_aligned,
-				     math_size) < 0)
-		return (void __user *) -1L;
+	if (fpu->fpstate_active) {
+		unsigned long fx_aligned, math_size;
+
+		sp = fpu__alloc_mathframe(sp, 1, &fx_aligned, &math_size);
+		*fpstate = (struct _fpstate_32 __user *) sp;
+		if (copy_fpstate_to_sigframe(*fpstate, (void __user *)fx_aligned,
+				    math_size) < 0)
+			return (void __user *) -1L;
+	}
 
 	sp -= frame_size;
 	/* Align the stack pointer according to the i386 ABI,
@@ -270,7 +273,7 @@ int ia32_setup_frame(int sig, struct ksignal *ksig,
 
 	frame = get_sigframe(ksig, regs, sizeof(*frame), &fpstate);
 
-	if (!access_ok(frame, sizeof(*frame)))
+	if (!access_ok(VERIFY_WRITE, frame, sizeof(*frame)))
 		return -EFAULT;
 
 	if (__put_user(sig, &frame->sig))
@@ -350,7 +353,7 @@ int ia32_setup_rt_frame(int sig, struct ksignal *ksig,
 
 	frame = get_sigframe(ksig, regs, sizeof(*frame), &fpstate);
 
-	if (!access_ok(frame, sizeof(*frame)))
+	if (!access_ok(VERIFY_WRITE, frame, sizeof(*frame)))
 		return -EFAULT;
 
 	put_user_try {
@@ -359,7 +362,7 @@ int ia32_setup_rt_frame(int sig, struct ksignal *ksig,
 		put_user_ex(ptr_to_compat(&frame->uc), &frame->puc);
 
 		/* Create the ucontext.  */
-		if (static_cpu_has(X86_FEATURE_XSAVE))
+		if (boot_cpu_has(X86_FEATURE_XSAVE))
 			put_user_ex(UC_FP_XSTATE, &frame->uc.uc_flags);
 		else
 			put_user_ex(0, &frame->uc.uc_flags);

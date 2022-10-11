@@ -1,4 +1,3 @@
-/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
  * drivers/amlogic/media/enhancement/amvecm/pattern_detection.h
  *
@@ -39,7 +38,7 @@ struct setting_regs_s {
 	struct am_reg_s am_reg[setting_reg_count];
 };
 
-enum epattern {
+enum ePattern {
 	PATTERN_UNKNOWN = -1,
 	PATTERN_75COLORBAR = PATTERN_START,
 	PATTERN_SKIN_TONE_FACE,
@@ -71,16 +70,21 @@ extern uint mltcast_ratio1;
 extern uint mltcast_ratio2;
 extern int mltcast_skip_en;
 
-int pattern_detect_add_checker(int id,
-			       int (*checker)(struct vframe_s *vf));
-int pattern_detect_add_handler(int id,
-			       int (*handler)(struct vframe_s *vf, int flag));
-int pattern_detect_add_defaultloader(int id,
-				     int (*loader)(struct vframe_s *vf));
-int pattern_detect_add_cvd2_setting_table(int id,
-					  struct setting_regs_s *new_settings);
-int pattern_detect_add_vpp_setting_table(int id,
-					 struct setting_regs_s *new_settings);
+int pattern_detect_add_checker(
+	int id,
+	int (*newchecker)(struct vframe_s *vf));
+int pattern_detect_add_handler(
+	int id,
+	int (*newhandler)(struct vframe_s *vf, int flag));
+int pattern_detect_add_defaultloader(
+	int id,
+	int (*newloader)(struct vframe_s *vf));
+int pattern_detect_add_cvd2_setting_table(
+	int id,
+	struct setting_regs_s *new_settings);
+int pattern_detect_add_vpp_setting_table(
+	int id,
+	struct setting_regs_s *new_settings);
 int init_pattern_detect(void);
 int pattern_detect(struct vframe_s *vf);
 

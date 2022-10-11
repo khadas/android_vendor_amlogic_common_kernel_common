@@ -1,17 +1,18 @@
 #
-# Amlogic MTD RESERVED AREA MANAGEMENT configuration
+# Amlogic NAND device configuration
 #
 
-menu "Meson MTD RESERVED AREA MANAGEMENT Support"
+menu "Meson NAND Device Support"
 
-config MTD_RESV_MESON
-	tristate "AMLOGIC MTD reserve area management"
-	depends on MTD_NAND_MESON
+config AMLOGIC_NAND
+	bool "Meson NAND flash device"
+	default n
+	depends on MTD_BLOCK
+	depends on MTD_NAND
+	depends on MTD
 	help
-		Implements a reserve area which is used
-		to manage the bbt/key/dtd/env and so on.
-		we pre-allocate fixed blocks and list these
-		blocks base on different usage, such as bbt,
-		key. it is efficiently for power lost and
-		backups and others.
+		Amlogic mtd support config.
+		Support for MTD NAND flash on Amlogic Meson platforms
+		Need open in defconfig, set CONFIG_AMLOGIC_NAND=y
+		need check
 endmenu

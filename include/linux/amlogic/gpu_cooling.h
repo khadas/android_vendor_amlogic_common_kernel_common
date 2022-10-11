@@ -1,6 +1,18 @@
-/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * include/linux/amlogic/gpu_cooling.h
+ *
+ * Copyright (C) 2016 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
 #ifndef __gpu_COOLING_H__
@@ -8,6 +20,7 @@
 
 #include <linux/thermal.h>
 #include <linux/cpumask.h>
+#include <linux/amlogic/aml_thermal_hw.h>
 
 #ifdef CONFIG_AMLOGIC_GPU_THERMAL
 
@@ -48,9 +61,7 @@ struct gpufreq_cooling_device {
 	int max_pp;
 	struct device_node *np;
 };
-
 int gpufreq_cooling_register(struct gpufreq_cooling_device *gpufreq_dev);
-
 struct gpufreq_cooling_device *gpufreq_cooling_alloc(void);
 
 /**
@@ -58,16 +69,15 @@ struct gpufreq_cooling_device *gpufreq_cooling_alloc(void);
  * @cdev: thermal cooling device pointer.
  */
 void gpufreq_cooling_unregister(struct thermal_cooling_device *cdev);
-
 int register_gpu_freq_info(unsigned int (*fun)(void));
 
 unsigned long gpufreq_cooling_get_level(unsigned int gpu, unsigned int freq);
-
 void save_gpu_cool_para(int i, struct device_node *d, int j);
 #else
-static inline
-void save_gpu_cool_para(int i, struct device_node *n, int j)
+static inline void save_gpu_cool_para(unsigned int coef,
+	struct device_node *n, int pp)
 {
+
 }
 
 struct gpufreq_cooling_device *gpufreq_cooling_alloc(void)
@@ -79,22 +89,19 @@ int gpufreq_cooling_register(struct gpufreq_cooling_device *gpufreq_dev)
 {
 	return 0;
 }
-
 static inline
 void gpufreq_cooling_unregister(struct thermal_cooling_device *cdev)
 {
 }
-
 static inline
 unsigned long gpufreq_cooling_get_level(unsigned int gpu, unsigned int freq)
 {
 	return THERMAL_CSTATE_INVALID;
 }
-
-static inline
-int register_gpu_freq_info(unsigned int (*fun)(void))
+static inline int register_gpu_freq_info(unsigned int (*fun)(void))
 {
 	return 0;
 }
 #endif
+
 #endif /* __GPU_COOLING_H__ */

@@ -1,6 +1,18 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/amlogic/media/vin/tvin/tvafe/tvafe_debug.c
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
 /* Standard Linux Headers */
@@ -17,7 +29,6 @@
 #include <linux/amlogic/media/codec_mm/codec_mm.h>
 /* Local Headers */
 #include "../tvin_global.h"
-#include "tvafe_cvd.h"
 #include "tvafe_regs.h"
 #include "tvafe_debug.h"
 #include "tvafe.h"
@@ -161,7 +172,6 @@ static void tvafe_state(struct tvafe_dev_s *devp)
 	tvafe_pr_info("tvafe_cvd2_hw_data_s->vcrtrick:%d\n", hw->vcrtrick);
 	tvafe_pr_info("tvafe_cvd2_hw_data_s->vcrff:%d\n", hw->vcrff);
 	tvafe_pr_info("tvafe_cvd2_hw_data_s->vcrrew:%d\n", hw->vcrrew);
-	tvafe_pr_info("tvafe_cvd2_hw_data_s->noisy:%d\n", hw->noisy);
 	tvafe_pr_info("tvafe_cvd2_hw_data_s->acc4xx_cnt:%d\n",
 		hw->acc4xx_cnt);
 	tvafe_pr_info("tvafe_cvd2_hw_data_s->acc425_cnt:%d\n",
@@ -177,6 +187,9 @@ static void tvafe_state(struct tvafe_dev_s *devp)
 	tvafe_pr_info("tvafe_cvd2_hw_data_s->fsc_358:%d\n", hw->fsc_358);
 	tvafe_pr_info("tvafe_cvd2_hw_data_s->fsc_425:%d\n", hw->fsc_425);
 	tvafe_pr_info("tvafe_cvd2_hw_data_s->fsc_443:%d\n", hw->fsc_443);
+	tvafe_pr_info("tvafe_cvd2_hw_data_s->noise_level:%d\n",
+		hw->noise_level);
+	tvafe_pr_info("tvafe_cvd2_hw_data_s->low_amp:%d\n", hw->low_amp);
 
 	tvafe_pr_info("\ntvafe_cvd2_info_s->smr_cnt:%d\n",
 		cvd2_info->smr_cnt);
@@ -212,6 +225,7 @@ static void tvafe_state(struct tvafe_dev_s *devp)
 	tvafe_pr_info("nostd_stable_cnt:%d\n", user_param->nostd_stable_cnt);
 	tvafe_pr_info("nostd_dmd_clp_step:0x%x\n",
 		user_param->nostd_dmd_clp_step);
+	tvafe_pr_info("low_amp_level:%d\n", user_param->low_amp_level);
 	tvafe_pr_info("skip_vf_num:%d\n", user_param->skip_vf_num);
 	tvafe_pr_info("unlock_cnt_max:%d\n", user_param->unlock_cnt_max);
 	tvafe_pr_info("nostd_bypass_iir:%d\n", user_param->nostd_bypass_iir);
@@ -232,7 +246,7 @@ static void tvafe_parse_param(char *buf_orig, char **parm)
 	strcat(delim1, delim2);
 	while (1) {
 		token = strsep(&ps, delim1);
-		if (!token)
+		if (token == NULL)
 			break;
 		if (*token == '\0')
 			continue;
@@ -241,7 +255,7 @@ static void tvafe_parse_param(char *buf_orig, char **parm)
 }
 
 /*default only one tvafe ,echo cvdfmt pali/palm/ntsc/secam >dir*/
-static ssize_t debug_store(struct device *dev,
+static ssize_t tvafe_store(struct device *dev,
 		struct device_attribute *attr, const char *buff, size_t count)
 {
 	unsigned char fmt_index = 0;
@@ -258,33 +272,32 @@ static ssize_t debug_store(struct device *dev,
 
 	if (!strncmp(buff, "cvdfmt", strlen("cvdfmt"))) {
 		fmt_index = strlen("cvdfmt") + 1;
-		if (!strncmp(buff + fmt_index, "ntscm", strlen("ntscm"))) {
+		if (!strncmp(buff+fmt_index, "ntscm", strlen("ntscm")))
 			devp->tvafe.cvd2.manual_fmt = TVIN_SIG_FMT_CVBS_NTSC_M;
-		} else if (!strncmp(buff + fmt_index,
-					"ntsc443", strlen("ntsc443"))) {
+		else if (!strncmp(buff+fmt_index,
+					"ntsc443", strlen("ntsc443")))
 			devp->tvafe.cvd2.manual_fmt =
 					TVIN_SIG_FMT_CVBS_NTSC_443;
-		} else if (!strncmp(buff + fmt_index, "pali", strlen("pali"))) {
+		else if (!strncmp(buff+fmt_index, "pali", strlen("pali")))
 			devp->tvafe.cvd2.manual_fmt = TVIN_SIG_FMT_CVBS_PAL_I;
-		} else if (!strncmp(buff + fmt_index, "palm", strlen("plam"))) {
+		else if (!strncmp(buff+fmt_index, "palm", strlen("plam")))
 			devp->tvafe.cvd2.manual_fmt = TVIN_SIG_FMT_CVBS_PAL_M;
-		} else if (!strncmp(buff + fmt_index, "pal60", strlen("pal60"))) {
+		else if (!strncmp(buff+fmt_index, "pal60", strlen("pal60")))
 			devp->tvafe.cvd2.manual_fmt = TVIN_SIG_FMT_CVBS_PAL_60;
-		} else if (!strncmp(buff + fmt_index, "palcn", strlen("palcn"))) {
+		else if (!strncmp(buff+fmt_index, "palcn", strlen("palcn")))
 			devp->tvafe.cvd2.manual_fmt = TVIN_SIG_FMT_CVBS_PAL_CN;
-		} else if (!strncmp(buff + fmt_index, "secam", strlen("secam"))) {
+		else if (!strncmp(buff+fmt_index, "secam", strlen("secam")))
 			devp->tvafe.cvd2.manual_fmt = TVIN_SIG_FMT_CVBS_SECAM;
-		} else if (!strncmp(buff + fmt_index, "null", strlen("null"))) {
+		else if (!strncmp(buff+fmt_index, "null", strlen("null")))
 			devp->tvafe.cvd2.manual_fmt = TVIN_SIG_FMT_NULL;
-		} else {
-			tvafe_pr_info("%s:invalid command.", buff);
-		}
+		else
+			tvafe_pr_info("%s:invaild command.", buff);
 	} else if (!strncmp(buff, "disableapi", strlen("disableapi"))) {
-		if (kstrtouint(buff + strlen("disableapi") + 1, 10, &val) == 0)
+		if (kstrtouint(buff+strlen("disableapi")+1, 10, &val) == 0)
 			disableapi = val;
 
 	} else if (!strncmp(buff, "force_stable", strlen("force_stable"))) {
-		if (kstrtouint(buff + strlen("force_stable") + 1, 10, &val) == 0)
+		if (kstrtouint(buff+strlen("force_stable")+1, 10, &val) == 0)
 			force_stable = val;
 	} else if (!strncmp(buff, "tvafe_enable", strlen("tvafe_enable"))) {
 		if (kstrtouint(parm[1], 10, &val) < 0)
@@ -520,10 +533,9 @@ static ssize_t debug_store(struct device *dev,
 				pr_info("[tvafe]%s: av shift cnt = %d\n",
 					__func__, val);
 			}
-		} else {
+		} else
 			pr_info("[shift_cnt_av]miss parameter,ori val = %d\n",
 				cvd_get_shift_cnt(TVAFE_CVD2_SHIFT_CNT_AV));
-		}
 	} else if  (!strcmp(parm[0], "shift_cnt_atv")) {
 		if (parm[1]) {
 			if (kstrtouint(parm[1], 10, &val) < 0) {
@@ -535,26 +547,35 @@ static ssize_t debug_store(struct device *dev,
 				pr_info("[tvafe]%s: atv shift cnt = %d\n",
 					__func__, val);
 			}
-		} else {
+		} else
 			pr_info("[shift_cnt_atv]miss parameter,ori val = %d\n",
 				cvd_get_shift_cnt(TVAFE_CVD2_SHIFT_CNT_ATV));
-		}
-	} else if (!strncmp(parm[0], "nostd_bypass_iir", strlen("nostd_bypass_iir"))) {
+	} else if (!strncmp(parm[0], "nostd_bypass_iir",
+			    strlen("nostd_bypass_iir"))) {
 		/* bypass iir influence electric performance test */
 		if (parm[1]) {
 			if (kstrtouint(parm[1], 10, &val) == 0)
 				user_param->nostd_bypass_iir = val;
 			pr_info("[tvafe]%s nostd_bypass_iir val = %u\n",
 				__func__, user_param->nostd_bypass_iir);
-		} else {
+		} else
 			pr_info("[tvafe]%s nostd_bypass_iir, ori val = %u\n",
 				__func__, user_param->nostd_bypass_iir);
+	} else if (!strncmp(parm[0], "low_amp_level",
+			    strlen("low_amp_level"))) {
+		if (parm[1]) {
+			if (kstrtouint(parm[1], 10, &val) == 0)
+				user_param->low_amp_level = val;
+			pr_info("[tvafe]%s low_amp_level val = %u\n",
+				__func__, user_param->low_amp_level);
+		} else {
+			pr_info("[tvafe]%s low_amp_level, ori val = %u\n",
+				__func__, user_param->low_amp_level);
 		}
 	} else if (!strncmp(parm[0], "tvafe_init", strlen("tvafe_init"))) {
 		tvafe_bringup_detect_signal(devp, TVIN_PORT_CVBS1);
-	} else {
-		tvafe_pr_info("[%s]:invalid command.\n", __func__);
-	}
+	} else
+		tvafe_pr_info("[%s]:invaild command.\n", __func__);
 	kfree(buf_orig);
 	return count;
 
@@ -600,13 +621,13 @@ static const char *tvafe_debug_usage_str = {
 "    bit[12]: nostd debug info\n"
 };
 
-static ssize_t debug_show(struct device *dev,
+static ssize_t tvafe_show(struct device *dev,
 		struct device_attribute *attr, char *buf)
 {
 	return sprintf(buf, "%s\n", tvafe_debug_usage_str);
 }
 
-static DEVICE_ATTR_RW(debug);
+static DEVICE_ATTR(debug, 0644, tvafe_show, tvafe_store);
 
 static void tvafe_dumpmem_adc(struct tvafe_dev_s *devp)
 {
@@ -694,7 +715,7 @@ static int tvafe_dumpmem_save_buf(struct tvafe_dev_s *devp, const char *str)
 	return 0;
 }
 
-static ssize_t dumpmem_store(struct device *dev,
+static ssize_t tvafe_dumpmem_store(struct device *dev,
 		struct device_attribute *attr, const char *buff, size_t len)
 {
 	unsigned int n = 0;
@@ -718,7 +739,7 @@ static ssize_t dumpmem_store(struct device *dev,
 	ps = buf_orig;
 	while (1) {
 		token = strsep(&ps, delim1);
-		if (!token)
+		if (token == NULL)
 			break;
 		if (*token == '\0')
 			continue;
@@ -736,14 +757,14 @@ static ssize_t dumpmem_store(struct device *dev,
 		tvafe_dumpmem_adc(devp);
 		tvafe_dumpmem_save_buf(devp, parm[1]);
 	}
-
 	kfree(buf_orig);
 	return len;
+
 }
 
-static DEVICE_ATTR_WO(dumpmem);
+static DEVICE_ATTR(dumpmem, 0200, NULL, tvafe_dumpmem_store);
 
-static ssize_t reg_store(struct device *dev,
+static ssize_t tvafereg_store(struct device *dev,
 		struct device_attribute *attr, const char *buff, size_t count)
 {
 	struct tvafe_dev_s *devp;
@@ -762,7 +783,7 @@ static ssize_t reg_store(struct device *dev,
 
 	for (argn = 0; argn < 3; argn++) {
 		para = strsep(&p, " ");
-		if (!para)
+		if (para == NULL)
 			break;
 		argv[argn] = para;
 	}
@@ -779,12 +800,12 @@ static ssize_t reg_store(struct device *dev,
 		case 'R':
 			if (argn < 2) {
 				tvafe_pr_err("syntax error.\n");
-			} else {
+			} else{
 				if (kstrtouint(argv[1], 16, &tmp) == 0)
 					addr = tmp;
 				else
 					break;
-				value = R_APB_REG(addr << 2);
+				value = R_APB_REG(addr<<2);
 				tvafe_pr_info("APB[0x%04x]=0x%08x\n",
 					addr, value);
 			}
@@ -793,7 +814,7 @@ static ssize_t reg_store(struct device *dev,
 		case 'W':
 			if (argn < 3) {
 				tvafe_pr_err("syntax error.\n");
-			} else {
+			} else{
 				if (kstrtouint(argv[1], 16, &tmp) == 0)
 					value = tmp;
 				else
@@ -802,16 +823,16 @@ static ssize_t reg_store(struct device *dev,
 					addr = tmp;
 				else
 					break;
-				W_APB_REG(addr << 2, value);
+				W_APB_REG(addr<<2, value);
 				tvafe_pr_info("Write APB[0x%04x]=0x%08x\n",
-					addr, R_APB_REG(addr << 2));
+					addr, R_APB_REG(addr<<2));
 			}
 			break;
 		case 'd':
 		/*case 'D': */
 			if (argn < 3) {
 				tvafe_pr_err("syntax error.\n");
-			} else {
+			} else{
 				if (kstrtouint(argv[1], 16, &tmp) == 0)
 					addr = tmp;
 				else
@@ -822,7 +843,7 @@ static ssize_t reg_store(struct device *dev,
 					break;
 				for (; addr <= end; addr++)
 					tvafe_pr_info("APB[0x%04x]=0x%08x\n",
-					addr, R_APB_REG(addr << 2));
+					addr, R_APB_REG(addr<<2));
 			}
 			break;
 		case 'D':
@@ -851,35 +872,36 @@ static ssize_t reg_store(struct device *dev,
 	return count;
 }
 
-static ssize_t reg_show(struct device *dev,
+
+static ssize_t tvafe_reg_show(struct device *dev,
 		struct device_attribute *attr, char *buff)
 {
 	ssize_t len = 0;
 
-	len += sprintf(buff + len, "Usage:\n");
-	len += sprintf(buff + len,
+	len += sprintf(buff+len, "Usage:\n");
+	len += sprintf(buff+len,
 		"\techo [read|write <date>] addr > reg;Access ATV DEMON/TVAFE/HDMIRX logic address.\n");
-	len += sprintf(buff + len,
+	len += sprintf(buff+len,
 		"\techo dump <start> <end> > reg;Dump ATV DEMON/TVAFE/HDMIRX logic address.\n");
-	len += sprintf(buff + len,
+	len += sprintf(buff+len,
 		"Address format:\n");
-	len += sprintf(buff + len,
+	len += sprintf(buff+len,
 		"\taddr    : 0xXXXX, 16 bits register address\n");
 	return len;
 }
 
-static DEVICE_ATTR_RW(reg);
+static DEVICE_ATTR(reg, 0644, tvafe_reg_show, tvafereg_store);
 
-static ssize_t cutwin_show(struct device *dev,
+static ssize_t tvafe_cutwindow_show(struct device *dev,
 		struct device_attribute *attr, char *buf)
 {
 	ssize_t len = 0;
 
-	len += sprintf(buf + len,
+	len += sprintf(buf+len,
 		"echo h index(d) val(d) > /sys/class/tvafe/tvafe0/cutwin;conifg cutwindow_h value\n");
-	len += sprintf(buf + len,
+	len += sprintf(buf+len,
 		"echo v index(d) val(d) > /sys/class/tvafe/tvafe0/cutwin;conifg cutwindow_v value\n");
-	len += sprintf(buf + len,
+	len += sprintf(buf+len,
 		"echo r > /sys/class/tvafe/tvafe0/cutwin;read cutwindow value\n");
 	return len;
 }
@@ -909,7 +931,7 @@ static void tvafe_cutwindow_info_print(void)
 	kfree(pr_buf);
 }
 
-static ssize_t cutwin_store(struct device *dev,
+static ssize_t tvafe_cutwindow_store(struct device *dev,
 		struct device_attribute *attr, const char *buff, size_t count)
 {
 	struct tvafe_user_param_s *user_param = tvafe_get_user_param();
@@ -994,7 +1016,7 @@ static ssize_t cutwin_store(struct device *dev,
 			pr_info("set cutwin_test_vcut = %d\n",
 				user_param->cutwin_test_vcut);
 		} else {
-			pr_info("error: invalid command\n");
+			pr_info("error: invaild command\n");
 		}
 	} else if (!strcmp(parm[0], "cdto")) {
 		if (!parm[2]) {
@@ -1037,10 +1059,10 @@ static ssize_t cutwin_store(struct device *dev,
 			pr_info("set cdto_adj_offset_n = 0x%x\n",
 				user_param->cdto_adj_offset_n);
 		} else {
-			pr_info("error: invalid command\n");
+			pr_info("error: invaild command\n");
 		}
 	} else {
-		pr_info("error: invalid command\n");
+		pr_info("error: invaild command\n");
 	}
 
 	kfree(buf_orig);
@@ -1051,36 +1073,8 @@ tvafe_cutwindow_store_err:
 	return -EINVAL;
 }
 
-static DEVICE_ATTR_RW(cutwin);
-
-static ssize_t cvd_store(struct device *dev,
-		struct device_attribute *attr, const char *buff, size_t count)
-{
-	struct tvafe_dev_s *devp;
-	char *buf_orig, *parm[47] = {NULL};
-	int ret;
-
-	devp = dev_get_drvdata(dev);
-	if (!buff)
-		return count;
-	buf_orig = kstrdup(buff, GFP_KERNEL);
-	tvafe_parse_param(buf_orig, (char **)&parm);
-
-	ret = cvd_set_debug_parm(buff, parm);
-	if (ret) {
-		tvafe_pr_info("pls input:echo cmd val >/sys/class/..");
-		goto tvafe_store_err;
-	}
-
-	kfree(buf_orig);
-	return count;
-
-tvafe_store_err:
-	kfree(buf_orig);
-	return -EINVAL;
-}
-
-static DEVICE_ATTR_WO(cvd);
+static DEVICE_ATTR(cutwin, 0644,
+		tvafe_cutwindow_show, tvafe_cutwindow_store);
 
 int tvafe_device_create_file(struct device *dev)
 {
@@ -1090,17 +1084,18 @@ int tvafe_device_create_file(struct device *dev)
 	ret |= device_create_file(dev, &dev_attr_dumpmem);
 	ret |= device_create_file(dev, &dev_attr_reg);
 	ret |= device_create_file(dev, &dev_attr_cutwin);
-	ret |= device_create_file(dev, &dev_attr_cvd);
 
 	return ret;
 }
 
 void tvafe_remove_device_files(struct device *dev)
 {
-	device_remove_file(dev, &dev_attr_cvd);
 	device_remove_file(dev, &dev_attr_cutwin);
-	device_remove_file(dev, &dev_attr_reg);
+	device_remove_file(dev, &dev_attr_debug);
 	device_remove_file(dev, &dev_attr_dumpmem);
 	device_remove_file(dev, &dev_attr_debug);
 }
+
+
+
 

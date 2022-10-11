@@ -1,9 +1,12 @@
-// SPDX-License-Identifier: GPL-2.0-only
 /*
  *  linux/drivers/mmc/core/bus.c
  *
  *  Copyright (C) 2003 Russell King, All Rights Reserved.
  *  Copyright (C) 2007 Pierre Ossman
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
  *
  *  MMC card bus driver model
  */
@@ -20,8 +23,6 @@
 #include <linux/mmc/host.h>
 
 #include "core.h"
-#include "card.h"
-#include "host.h"
 #include "sdio_cis.h"
 #include "bus.h"
 
@@ -286,7 +287,7 @@ int mmc_add_card(struct mmc_card *card)
 	int ret;
 	const char *type;
 	const char *uhs_bus_speed_mode = "";
-#ifdef CONFIG_AMLOGIC_MODIFY
+#ifdef CONFIG_AMLOGIC_MMC
 	int width;
 	struct mmc_host *mmc = card->host;
 #endif
@@ -338,22 +339,23 @@ int mmc_add_card(struct mmc_card *card)
 			mmc_card_ddr52(card) ? "DDR " : "",
 			type);
 	} else {
-#ifdef CONFIG_AMLOGIC_MODIFY
+#ifdef CONFIG_AMLOGIC_MMC
 		switch (mmc->ios.bus_width) {
 		case MMC_BUS_WIDTH_1:
-			width = 1;
-			break;
+				width = 1;
+				break;
 		case MMC_BUS_WIDTH_4:
-			width = 4;
-			break;
+				width = 4;
+				break;
 		case MMC_BUS_WIDTH_8:
-			width = 8;
-			break;
+				width = 8;
+				break;
 		default:
-			width = -1;
-			break;
+				width = -1;
+				break;
 		}
 #endif
+
 		pr_info("%s: new %s%s%s%s%s%s card at address %04x\n",
 			mmc_hostname(card->host),
 			mmc_card_uhs(card) ? "ultra high speed " :
@@ -364,7 +366,7 @@ int mmc_add_card(struct mmc_card *card)
 			mmc_card_ddr52(card) ? "DDR " : "",
 			uhs_bus_speed_mode, type, card->rca);
 
-#ifdef CONFIG_AMLOGIC_MODIFY
+#ifdef CONFIG_AMLOGIC_MMC
 		pr_info("%s: clock %d, %u-bit-bus-width\n ",
 				mmc_hostname(card->host),
 				mmc->actual_clock, width);
@@ -374,6 +376,8 @@ int mmc_add_card(struct mmc_card *card)
 #ifdef CONFIG_DEBUG_FS
 	mmc_add_card_debugfs(card);
 #endif
+	mmc_init_context_info(card->host);
+
 	card->dev.of_node = mmc_of_find_child_device(card->host, 0);
 
 	device_enable_async_suspend(&card->dev);
@@ -393,8 +397,6 @@ int mmc_add_card(struct mmc_card *card)
  */
 void mmc_remove_card(struct mmc_card *card)
 {
-	struct mmc_host *host = card->host;
-
 #ifdef CONFIG_DEBUG_FS
 	mmc_remove_card_debugfs(card);
 #endif
@@ -411,10 +413,6 @@ void mmc_remove_card(struct mmc_card *card)
 		of_node_put(card->dev.of_node);
 	}
 
-	if (host->cqe_enabled) {
-		host->cqe_ops->cqe_disable(host);
-		host->cqe_enabled = false;
-	}
-
 	put_device(&card->dev);
 }
+

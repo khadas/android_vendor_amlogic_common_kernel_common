@@ -1,6 +1,18 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/amlogic/media/common/v4l_util/videobuf-res.c
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
 #include <linux/init.h>
@@ -40,7 +52,7 @@ module_param(debug, int, 0644);
 	}
 
 static void *res_alloc(struct videobuf_queue *q, size_t boff,
-		       unsigned long size, resource_size_t *phy_addr)
+			unsigned long size, resource_size_t *phy_addr)
 {
 	void __iomem *ret = NULL;
 	struct videobuf_res_privdata *res = NULL;
@@ -53,15 +65,15 @@ static void *res_alloc(struct videobuf_queue *q, size_t boff,
 	res  = (struct videobuf_res_privdata *)q->priv_data;
 	MAGIC_CHECK(res->magic, MAGIC_RE_MEM);
 
-	res_size = res->end - res->start + 1;
-	if (boff + size <= res_size) {
-		*phy_addr = res->start + boff;
+	res_size = res->end-res->start+1;
+	if (boff+size <= res_size) {
+		*phy_addr = res->start+boff;
 		/* ret = ioremap_wc(*phy_addr,size); */
 		/* if(!ret) */
 		/* *phy_addr = 0; */
-	} else {
+	} else{
 		pr_err("videobuf_res alloc buff is too small: %lx expected %lx\n",
-		       res_size, boff + size);
+							res_size, boff+size);
 	}
 	return (void *)ret;
 }
@@ -108,7 +120,7 @@ static void videobuf_vm_close(struct vm_area_struct *vma)
 			videobuf_queue_cancel(q);
 
 		for (i = 0; i < VIDEO_MAX_FRAME; i++) {
-			if (!q->bufs[i])
+			if (q->bufs[i] == NULL)
 				continue;
 
 			if (q->bufs[i]->map != map)
@@ -152,8 +164,7 @@ static struct videobuf_buffer *__videobuf_alloc_vb(size_t size)
 
 	vb = kzalloc(size + sizeof(*mem), GFP_KERNEL);
 	if (vb) {
-		vb->priv = ((char *)vb) + size;
-		mem = vb->priv;
+		mem = vb->priv = ((char *)vb) + size;
 		mem->magic = MAGIC_RE_MEM;
 
 		dprintk(1, "%s: allocated at %p(%ld+%ld) & %p(%ld)\n",
@@ -219,7 +230,7 @@ static int __videobuf_mmap_mapper(struct videobuf_queue *q,
 	dprintk(2, "%s\n", __func__);
 
 	/* create mapping + update buffer list */
-	map = kzalloc(sizeof(*map), GFP_KERNEL);
+	map = kzalloc(sizeof(struct videobuf_mapping), GFP_KERNEL);
 	if (!map)
 		return -ENOMEM;
 
@@ -238,7 +249,7 @@ static int __videobuf_mmap_mapper(struct videobuf_queue *q,
 	/* if ((!mem->vaddr)||(!mem->phy_addr)){ */
 	if (!mem->phy_addr) {
 		pr_err("res_alloc size %ld failed\n",
-		       mem->size);
+			mem->size);
 		goto error;
 	}
 	dprintk(1, "res_alloc data is at addr 0x%p (size %lu)\n",
@@ -264,10 +275,9 @@ static int __videobuf_mmap_mapper(struct videobuf_queue *q,
 	vma->vm_flags       |= (VM_DONTEXPAND | VM_IO |
 				(VM_DONTEXPAND | VM_DONTDUMP));
 	vma->vm_private_data = map;
-	/*
-	 *dprintk(1, "mmap %p: q=%p %08lx-%08lx (%lx)",
-	 *	map, q, vma->vm_start, vma->vm_end, buf->bsize);
-	 */
+
+	dprintk(1, "mmap %p: q=%p %08lx-%08lx (%lx)",
+		map, q, vma->vm_start, vma->vm_end, (long int)buf->bsize);
 	dprintk(1, "pgoff %08lx buf %d, vm flag 0x%lx\n",
 		vma->vm_pgoff, buf->i, vma->vm_flags);
 
@@ -290,14 +300,14 @@ static struct videobuf_qtype_ops qops = {
 };
 
 void videobuf_queue_res_init(struct videobuf_queue *q,
-			     const struct videobuf_queue_ops *ops,
-			     struct device *dev,
-			     spinlock_t *irqlock,
-			     enum v4l2_buf_type type,
-			     enum v4l2_field field,
-			     unsigned int msize,
-			     void *priv,
-			     struct mutex *ext_lock)
+				    const struct videobuf_queue_ops *ops,
+				    struct device *dev,
+				    spinlock_t *irqlock,
+				    enum v4l2_buf_type type,
+				    enum v4l2_field field,
+				    unsigned int msize,
+				    void *priv,
+				    struct mutex *ext_lock)
 {
 	struct videobuf_res_privdata *res =
 			(struct videobuf_res_privdata *)priv;
@@ -306,11 +316,11 @@ void videobuf_queue_res_init(struct videobuf_queue *q,
 	MAGIC_CHECK(res->magic, MAGIC_RE_MEM);
 
 	if (res->start >= res->end) {
-		pr_err("%s: resource is invalid.\n", __func__);
+		pr_err("videobuf_queue_res_init: resource is invalid.\n");
 		return;
 	}
 	videobuf_queue_core_init(q, ops, dev, irqlock, type, field, msize,
-				 priv, &qops, ext_lock);
+		priv, &qops, ext_lock);
 }
 EXPORT_SYMBOL_GPL(videobuf_queue_res_init);
 
@@ -326,7 +336,7 @@ resource_size_t videobuf_to_res(struct videobuf_buffer *buf)
 EXPORT_SYMBOL_GPL(videobuf_to_res);
 
 void videobuf_res_free(struct videobuf_queue *q,
-		       struct videobuf_buffer *buf)
+			      struct videobuf_buffer *buf)
 {
 	struct videobuf_res_memory *mem = buf->priv;
 
@@ -353,6 +363,6 @@ void videobuf_res_free(struct videobuf_queue *q,
 }
 EXPORT_SYMBOL_GPL(videobuf_res_free);
 
-//MODULE_DESCRIPTION("helper module to manage video4linux resource buffers");
-//MODULE_AUTHOR("Amlogic");
-//MODULE_LICENSE("GPL");
+MODULE_DESCRIPTION("helper module to manage video4linux resource buffers");
+MODULE_AUTHOR("Amlogic");
+MODULE_LICENSE("GPL");

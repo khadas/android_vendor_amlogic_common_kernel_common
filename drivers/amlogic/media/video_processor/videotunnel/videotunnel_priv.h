@@ -29,53 +29,17 @@
 #include <linux/idr.h>
 #include <linux/kref.h>
 #include <linux/rtmutex.h>
-#include <linux/dma-fence.h>
 
 #include "uapi/videotunnel.h"
 
 #define  VT_POOL_SIZE 32
 #define  VT_MAX_WAIT_MS 4
-#define  VT_CMD_WAIT_MS 16
-
-enum vt_buffer_status {
-	VT_BUFFER_QUEUE,
-	VT_BUFFER_DEQUEUE,
-	VT_BUFFER_ACQUIRE,
-	VT_BUFFER_RELEASE,
-	VT_BUFFER_FREE,
-	VT_BUFFER_INVALID,
-};
-
-enum vt_mode_e {
-	VT_MODE_BLOCK,
-	VT_MODE_NONE_BLOCK,
-	VT_MODE_GAME,
-};
+#define  VT_FENCE_WAIT_MS 3000
 
 union vt_ioctl_arg {
 	struct vt_alloc_id_data alloc_data;
 	struct vt_ctrl_data ctrl_data;
 	struct vt_buffer_data buffer_data;
-};
-
-/*
- * struct vt_state - videotunnel status information
- * @debug_root:		debug fs root
- * @total_fence_get:	number count of total fence fget
- * @total_fence_put:	number count of total fence fput
- * @total_null_fence:		number count of -1 fence
- * @total_dequeue_count:	number count of total dequeue
- * @total_release_count:	number count of total release
- */
-struct vt_state {
-	struct dentry *debug_root;
-
-	long total_fence_get;
-	long total_fence_put;
-	long total_null_fence;
-
-	long total_dequeue_count;
-	long total_release_count;
 };
 
 /*
@@ -93,7 +57,6 @@ struct vt_dev {
 	struct mutex instance_lock; /* protect the instances */
 	struct idr instance_idr;
 	struct rb_root instances;
-	struct vt_state state;
 
 	struct rw_semaphore session_lock;
 	struct rb_root sessions;
@@ -106,18 +69,18 @@ struct vt_dev {
  * struct videotunbel_session - a process block lock address space data
  * @node:			node in the tree of all session
  * @dev:			backpointer to videotunnel device
+ * @instances_head:	an list of all instance allocated in this session
  * @role:			producer or consumer
  * @name:			used for debugging
  * @display_name:	used for debugging (unique version of @name)
  * @display_serial:	used for debugging (to make display_name unique)
  * @task:			used for debugging
  * @cid:			connection id
- * @wait_consumer:	cosunmer wait queue of this session
- * @wait_producer:	producer wait queue of this session
  */
 struct vt_session {
 	struct rb_node node;
 	struct vt_dev *dev;
+	struct list_head instances_head;
 
 	enum vt_role_e role;
 	pid_t pid;
@@ -126,13 +89,6 @@ struct vt_session {
 	int display_serial;
 	struct task_struct *task;
 	long cid;
-	enum vt_mode_e mode;
-	int cmd_status;
-
-	wait_queue_head_t wait_consumer;
-	wait_queue_head_t wait_producer;
-	wait_queue_head_t wait_cmd;
-
 	struct dentry *debug_root;
 };
 
@@ -152,10 +108,10 @@ struct vt_buffer {
 	int buffer_fd_pro;
 	int buffer_fd_con;
 
-	struct file *file_fence;
+	struct fence *file_fence;
 	struct vt_session *session_pro;
 	long cid_pro;
-	struct vt_buffer_data item;
+	struct vt_buffer_item item;
 };
 
 /*
@@ -168,7 +124,6 @@ struct vt_cmd {
 	enum vt_video_cmd_e cmd;
 	int cmd_data;
 	int client_id;
-	struct vt_krect source_crop;
 };
 
 /*
@@ -178,6 +133,7 @@ struct vt_cmd {
  * @node:		node in the videotunel device rbtree
  * @lock:		proctect fifo
  * @dev:		backpointer to device
+ * @entry:		list node in session list
  * @consumer:		consumer session on this instance
  * @wait_consumer:	cosnumer wait queue for buffer
  * @producer:		producer session on this instance
@@ -196,18 +152,18 @@ struct vt_instance {
 	struct rb_node node;
 
 	struct mutex lock; /* proctect fd fifo */
+	struct list_head entry;
 	struct vt_session *consumer;
 	wait_queue_head_t wait_consumer;
 	struct vt_session *producer;
 	wait_queue_head_t wait_producer;
-	wait_queue_head_t wait_cmd;
 
 	struct mutex cmd_lock; /* protect cmd fifo */
+	wait_queue_head_t wait_cmd;
 	DECLARE_KFIFO_PTR(fifo_cmd, struct vt_cmd*);
 
 	struct dentry *debug_root;
 	int fcount;
-	bool used;
 
 	DECLARE_KFIFO_PTR(fifo_to_consumer, struct vt_buffer*);
 	DECLARE_KFIFO_PTR(fifo_to_producer, struct vt_buffer*);

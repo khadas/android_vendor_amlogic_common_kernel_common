@@ -1,4 +1,3 @@
-// SPDX-License-Identifier: GPL-2.0
 #include <linux/idr.h>
 #include <linux/mutex.h>
 #include <linux/device.h>
@@ -8,7 +7,6 @@
 #include <linux/interrupt.h>
 #include <linux/kdev_t.h>
 #include <linux/slab.h>
-#include <linux/ctype.h>
 
 #include "gpiolib.h"
 
@@ -107,14 +105,8 @@ static ssize_t value_show(struct device *dev,
 
 	mutex_lock(&data->mutex);
 
-	status = gpiod_get_value_cansleep(desc);
-	if (status < 0)
-		goto err;
+	status = sprintf(buf, "%d\n", gpiod_get_value_cansleep(desc));
 
-	buf[0] = '0' + status;
-	buf[1] = '\n';
-	status = 2;
-err:
 	mutex_unlock(&data->mutex);
 
 	return status;
@@ -125,7 +117,7 @@ static ssize_t value_store(struct device *dev,
 {
 	struct gpiod_data *data = dev_get_drvdata(dev);
 	struct gpio_desc *desc = data->desc;
-	ssize_t status = 0;
+	ssize_t			status;
 
 	mutex_lock(&data->mutex);
 
@@ -134,11 +126,7 @@ static ssize_t value_store(struct device *dev,
 	} else {
 		long		value;
 
-		if (size <= 2 && isdigit(buf[0]) &&
-		    (size == 1 || buf[1] == '\n'))
-			value = buf[0] - '0';
-		else
-			status = kstrtol(buf, 0, &value);
+		status = kstrtol(buf, 0, &value);
 		if (status == 0) {
 			gpiod_set_value_cansleep(desc, value);
 			status = size;
@@ -149,7 +137,7 @@ static ssize_t value_store(struct device *dev,
 
 	return status;
 }
-static DEVICE_ATTR_PREALLOC(value, S_IWUSR | S_IRUGO, value_show, value_store);
+static DEVICE_ATTR_RW(value);
 
 static irqreturn_t gpio_sysfs_irq(int irq, void *priv)
 {
@@ -362,10 +350,9 @@ static ssize_t active_low_store(struct device *dev,
 }
 static DEVICE_ATTR_RW(active_low);
 
-#ifdef CONFIG_AMLOGIC_MODIFY
+#ifdef CONFIG_AMLOGIC_PINCTRL
 static ssize_t pull_store(struct device *dev,
-			  struct device_attribute *attr, const char *buf,
-			  size_t size)
+		struct device_attribute *attr, const char *buf, size_t size)
 {
 	struct gpiod_data  *data = dev_get_drvdata(dev);
 	struct gpio_desc *desc = data->desc;
@@ -400,10 +387,8 @@ static umode_t gpio_is_visible(struct kobject *kobj, struct attribute *attr,
 		if (!show_direction)
 			mode = 0;
 	} else if (attr == &dev_attr_edge.attr) {
-#ifndef CONFIG_AMLOGIC_MODIFY
 		if (gpiod_to_irq(desc) < 0)
 			mode = 0;
-#endif
 		if (!show_direction && test_bit(FLAG_IS_OUT, &desc->flags))
 			mode = 0;
 	}
@@ -416,7 +401,7 @@ static struct attribute *gpio_attrs[] = {
 	&dev_attr_edge.attr,
 	&dev_attr_value.attr,
 	&dev_attr_active_low.attr,
-#ifdef CONFIG_AMLOGIC_MODIFY
+#ifdef CONFIG_AMLOGIC_PINCTRL
 	&dev_attr_pull.attr,
 #endif
 	NULL,
@@ -487,8 +472,6 @@ static ssize_t export_store(struct class *class,
 	long			gpio;
 	struct gpio_desc	*desc;
 	int			status;
-	struct gpio_chip	*gc;
-	int			offset;
 
 	status = kstrtol(buf, 0, &gpio);
 	if (status < 0)
@@ -498,12 +481,6 @@ static ssize_t export_store(struct class *class,
 	/* reject invalid GPIOs */
 	if (!desc) {
 		pr_warn("%s: invalid GPIO %ld\n", __func__, gpio);
-		return -EINVAL;
-	}
-	gc = desc->gdev->chip;
-	offset = gpio_chip_hwgpio(desc);
-	if (!gpiochip_line_is_valid(gc, offset)) {
-		pr_warn("%s: GPIO %ld masked\n", __func__, gpio);
 		return -EINVAL;
 	}
 
@@ -518,22 +495,17 @@ static ssize_t export_store(struct class *class,
 			status = -ENODEV;
 		goto done;
 	}
-
-	status = gpiod_set_transitory(desc, false);
-	if (!status) {
-		status = gpiod_export(desc, true);
-		if (status < 0)
-			gpiod_free(desc);
-		else
-			set_bit(FLAG_SYSFS, &desc->flags);
-	}
+	status = gpiod_export(desc, true);
+	if (status < 0)
+		gpiod_free(desc);
+	else
+		set_bit(FLAG_SYSFS, &desc->flags);
 
 done:
 	if (status)
 		pr_debug("%s: status %d\n", __func__, status);
 	return status ? : len;
 }
-static CLASS_ATTR_WO(export);
 
 static ssize_t unexport_store(struct class *class,
 				struct class_attribute *attr,
@@ -569,27 +541,25 @@ done:
 		pr_debug("%s: status %d\n", __func__, status);
 	return status ? : len;
 }
-static CLASS_ATTR_WO(unexport);
 
-static struct attribute *gpio_class_attrs[] = {
-	&class_attr_export.attr,
-	&class_attr_unexport.attr,
-	NULL,
+static struct class_attribute gpio_class_attrs[] = {
+	__ATTR(export, 0200, NULL, export_store),
+	__ATTR(unexport, 0200, NULL, unexport_store),
+	__ATTR_NULL,
 };
-ATTRIBUTE_GROUPS(gpio_class);
 
 static struct class gpio_class = {
 	.name =		"gpio",
 	.owner =	THIS_MODULE,
 
-	.class_groups = gpio_class_groups,
+	.class_attrs =	gpio_class_attrs,
 };
 
 
 /**
  * gpiod_export - export a GPIO through sysfs
- * @desc: GPIO to make available, already requested
- * @direction_may_change: true if userspace may change GPIO direction
+ * @gpio: gpio to make available, already requested
+ * @direction_may_change: true if userspace may change gpio direction
  * Context: arch_initcall or later
  *
  * When drivers want to make a GPIO accessible to userspace after they
@@ -697,7 +667,7 @@ static int match_export(struct device *dev, const void *desc)
  * gpiod_export_link - create a sysfs link to an exported GPIO node
  * @dev: device under which to create symlink
  * @name: name of the symlink
- * @desc: GPIO to create symlink to, already exported
+ * @gpio: gpio to create symlink to, already exported
  *
  * Set up a symlink from /sys/.../dev/name to /sys/class/gpio/gpioN
  * node. Caller is responsible for unlinking.
@@ -728,7 +698,7 @@ EXPORT_SYMBOL_GPL(gpiod_export_link);
 
 /**
  * gpiod_unexport - reverse effect of gpiod_export()
- * @desc: GPIO to make unavailable
+ * @gpio: gpio to make unavailable
  *
  * This is implicit on gpiod_free().
  */

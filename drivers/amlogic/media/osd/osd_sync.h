@@ -1,6 +1,18 @@
-/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/amlogic/media/osd/osd_sync.h
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
 #ifndef _OSD_SYNC_H_
@@ -12,15 +24,15 @@ enum {
 	GE2D_COMPOSE_MODE = 2,
 };
 
-#define FB_SYNC_REQUEST_MAGIC            0x54376812
+#define FB_SYNC_REQUEST_MAGIC  0x54376812
 #define FB_SYNC_REQUEST_RENDER_MAGIC_V1  0x55386816
 #define FB_SYNC_REQUEST_RENDER_MAGIC_V2  0x55386817
 
-#define AFBC_EN                BIT(31)
-#define TILED_HEADER_EN        BIT(18)
-#define SUPER_BLOCK_ASPECT     BIT(16)
-#define BLOCK_SPLIT            BIT(9)
-#define YUV_TRANSFORM          BIT(8)
+#define AFBC_EN                (1 << 31)
+#define TILED_HEADER_EN        (1 << 18)
+#define SUPER_BLOCK_ASPECT     (1 << 16)
+#define BLOCK_SPLIT            (1 << 9)
+#define YUV_TRANSFORM          (1 << 8)
 
 /* Blend modes, settable per layer */
 enum {
@@ -99,7 +111,6 @@ struct display_flip_info_s {
 	unsigned int  position_w;
 	unsigned int  position_h;
 };
-
 struct do_hwc_cmd_s {
 	int out_fen_fd;
 	unsigned char hdr_mode;

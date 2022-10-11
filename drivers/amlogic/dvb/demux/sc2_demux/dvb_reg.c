@@ -1,6 +1,18 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/amlogic/dvb/demux/sc2_demux/dvb_reg.c
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
 #include <linux/io.h>
@@ -43,10 +55,10 @@ void aml_write_self(unsigned int reg, unsigned int val)
 		    reg == TSD_PID_READY ||
 		    reg == TSE_PID_READY ||
 		    reg == KT_REE_RDY ||
-		    (reg >= TS_DMA_RCH_READY(0) &&
-		     reg <= TS_DMA_RCH_READY(31)) ||
+		    ((reg >= TS_DMA_RCH_READY(0)) &&
+		     (reg <= TS_DMA_RCH_READY(31))) ||
 		    ((reg >= TS_DMA_WCH_READY(0) &&
-		      reg <= TS_DMA_WCH_READY(127))))
+		      (reg <= TS_DMA_WCH_READY(127)))))
 			return;
 		value = readl(ptr);
 		pr_verify("write addr:%lx, org v:0x%0x, ret v:0x%0x\n",

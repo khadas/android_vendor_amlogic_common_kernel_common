@@ -1,13 +1,24 @@
-/* SPDX-License-Identifier: GPL-2.0+ */
 /*
+ * drivers/amlogic/media/vout/lcd/lcd_tablet/mipi_dsi_util.h
  *
- * Copyright (C) 2019 Amlogic, Inc. All rights reserved.
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
  *
  */
 
 #ifndef MIPI_DSI_UTIL_H
 #define MIPI_DSI_UTIL_H
 #include <linux/amlogic/media/vout/lcd/lcd_vout.h>
+
 
 /* ********************************************************
  * MIPI DSI Data Type/ MIPI DCS Command Type Definitions
@@ -351,6 +362,7 @@ struct dsi_cmd_request_s {
 #define BIT_ACK_ERR_1               1
 #define BIT_ACK_ERR_0               0
 
+
 /* operation mode */
 #define MIPI_DSI_OPERATION_MODE_VIDEO      0
 #define MIPI_DSI_OPERATION_MODE_COMMAND    1
@@ -462,26 +474,27 @@ enum tv_enc_lcd_type_e {
 #define DPHY_TIME_HS_EXIT(ui)       (110 * 100)
 /* max(8*ui, 60+4*ui), (teot)<105+12*ui */
 #define DPHY_TIME_HS_TRAIL(ui)      ((ui > (60 * 100 / 4)) ? \
-					(8 * (ui)) : ((60 * 100) + 4 * (ui)))
+					(8 * ui) : ((60 * 100) + 4 * ui))
 /* (40+4*ui, 85+6*ui) */
-#define DPHY_TIME_HS_PREPARE(ui)    (50 * 100 + 4 * (ui))
+#define DPHY_TIME_HS_PREPARE(ui)    (50 * 100 + 4 * ui)
 /* hs_prepare+hs_zero >145+10*ui */
-#define DPHY_TIME_HS_ZERO(ui)       (160 * 100 + 10 * (ui) - \
+#define DPHY_TIME_HS_ZERO(ui)       (160 * 100 + 10 * ui - \
 					DPHY_TIME_HS_PREPARE(ui))
 /* >60ns, (teot)<105+12*ui */
 #define DPHY_TIME_CLK_TRAIL(ui)     (70 * 100)
 /* >60+52*ui */
-#define DPHY_TIME_CLK_POST(ui)      (2 * (60 * 100 + 52 * (ui)))
+#define DPHY_TIME_CLK_POST(ui)      (2 * (60 * 100 + 52 * ui))
 /* (38, 95) */
 #define DPHY_TIME_CLK_PREPARE(ui)   (50 * 100)
 /* clk_prepare+clk_zero > 300 */
 #define DPHY_TIME_CLK_ZERO(ui)      (320 * 100 - DPHY_TIME_CLK_PREPARE(ui))
 /* >8*ui */
-#define DPHY_TIME_CLK_PRE(ui)       (10 * (ui))
+#define DPHY_TIME_CLK_PRE(ui)       (10 * ui)
 /* >100us */
 #define DPHY_TIME_INIT(ui)          (110 * 1000 * 100)
 /* >1ms */
 #define DPHY_TIME_WAKEUP(ui)        (1020 * 1000 * 100)
+
 
 struct dsi_phy_s {
 	unsigned int lp_tesc;
@@ -526,9 +539,12 @@ struct dsi_vid_s {
 #define DSI_CMD_SIZE_MAX		3000
 #define DSI_CMD_READ_VALID
 
-void mipi_dsi_print_info(struct lcd_config_s *pconf);
-void lcd_mipi_dsi_config_post(struct aml_lcd_drv_s *pdrv);
-void mipi_dsi_link_off(struct aml_lcd_drv_s *pdrv);
-void mipi_dsi_tx_ctrl(struct aml_lcd_drv_s *pdrv, int status);
+extern void mipi_dsi_print_info(struct lcd_config_s *pconf);
+extern int lcd_mipi_dsi_init_table_detect(struct device_node *m_node,
+		struct dsi_config_s *dconf, int on_off);
+extern void lcd_mipi_dsi_config_set(struct lcd_config_s *pconf);
+extern void lcd_mipi_dsi_config_post(struct lcd_config_s *pconf);
+extern void mipi_dsi_link_off(struct lcd_config_s *pconf);
+extern void lcd_mipi_control_set(struct lcd_config_s *pconf, int status);
 
 #endif

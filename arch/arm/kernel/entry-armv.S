@@ -1,10 +1,13 @@
-/* SPDX-License-Identifier: GPL-2.0-only */
 /*
  *  linux/arch/arm/kernel/entry-armv.S
  *
  *  Copyright (C) 1996,1997,1998 Russell King.
  *  ARM700 fix by Matthew Godbolt (linux-user@willothewisp.demon.co.uk)
  *  nommu support by Hyok S. Choi (hyok.choi@samsung.com)
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
  *
  *  Low-level vector interface routines
  *
@@ -19,7 +22,7 @@
 #include <asm/glue-df.h>
 #include <asm/glue-pf.h>
 #include <asm/vfpmacros.h>
-#ifndef CONFIG_GENERIC_IRQ_MULTI_HANDLER
+#ifndef CONFIG_MULTI_IRQ_HANDLER
 #include <mach/entry-macro.S>
 #endif
 #include <asm/thread_notify.h>
@@ -27,7 +30,6 @@
 #include <asm/unistd.h>
 #include <asm/tls.h>
 #include <asm/system_info.h>
-#include <asm/uaccess-asm.h>
 
 #include "entry-header.S"
 #include <asm/entry-macro-multi.S>
@@ -47,7 +49,7 @@
 #else
 	.macro	irq_handler
 #endif
-#ifdef CONFIG_GENERIC_IRQ_MULTI_HANDLER
+#ifdef CONFIG_MULTI_IRQ_HANDLER
 	ldr	r1, =handle_arch_irq
 #ifdef CONFIG_AMLOGIC_VMAP
 	.if \vmap
@@ -103,7 +105,11 @@
 #endif
 	.endm
 
-	.section	.entry.text,"ax",%progbits
+#ifdef CONFIG_KPROBES
+	.section	.kprobes.text,"ax",%progbits
+#else
+	.text
+#endif
 
 /*
  * Invalid mode handlers
@@ -184,8 +190,6 @@ ENDPROC(__und_invalid)
 #else /* !CONFIG_AMLOGIC_VMAP */
 	sub	sp, sp, #(SVC_REGS_SIZE + \stack_hole - 4)
 #endif /* CONFIG_AMLOGIC_VMAP */
-#ifdef CONFIG_AMLOGIC_VMAP
-	.if !\vmap
 #ifdef CONFIG_THUMB2_KERNEL
  SPFIX(	str	r0, [sp]	)	@ temporarily saved
  SPFIX(	mov	r0, sp		)
@@ -195,11 +199,6 @@ ENDPROC(__und_invalid)
  SPFIX(	tst	sp, #4		)
 #endif
  SPFIX(	subeq	sp, sp, #4	)
-	.endif
-#else
- SPFIX(	tst	sp, #4		)
- SPFIX(	subeq	sp, sp, #4	)
-#endif
 	stmia	sp, {r1 - r12}
 
 	ldmia	r0, {r3 - r5}
@@ -207,15 +206,14 @@ ENDPROC(__und_invalid)
 	mov	r6, #-1			@  ""  ""      ""       ""
 #ifdef CONFIG_AMLOGIC_VMAP
 	.if \vmap
-	ldr     r2, [sp, #(TI_VMAP_BACK_SP + SVC_REGS_SIZE - 4)]
+	ldr	r2, [sp, #(TI_VMAP_BACK_SP + SVC_REGS_SIZE - 4)]
 	.else
 	add	r2, sp, #(SVC_REGS_SIZE + \stack_hole - 4)
- SPFIX(	addeq	r2, r2, #4	)
 	.endif
 #else
 	add	r2, sp, #(SVC_REGS_SIZE + \stack_hole - 4)
- SPFIX(	addeq	r2, r2, #4	)
 #endif
+ SPFIX(	addeq	r2, r2, #4	)
 	str	r3, [sp, #-4]!		@ save the "real" r0 copied
 					@ from the exception stack
 
@@ -238,12 +236,12 @@ ENDPROC(__und_invalid)
 	 * get fault task thread info
 	 */
 	ldr	r0, [sp, #(SVC_REGS_SIZE + TI_VMAP_BACK_SP)]
-#ifdef CONFIG_KASAN
+#ifdef CONFIG_AMLOGIC_KASAN32
 	/* FAR may be kasan shadow then nobody will handle it */
 	mrc	p15, 0, r1, c6, c0, 0		@ get FAR
 	bl	pmd_check
 #endif
-	/* sp may not access able when switch task */
+	/* sp may not access able when swith task */
 	mov	r1, r0
 	bl	pmd_check
 	mov	tsk, r0
@@ -276,7 +274,15 @@ ENDPROC(__und_invalid)
 #else
 	get_thread_info tsk
 #endif
-	uaccess_entry tsk, r0, r1, r2, \uaccess
+	ldr	r0, [tsk, #TI_ADDR_LIMIT]
+	mov	r1, #TASK_SIZE
+	str	r1, [tsk, #TI_ADDR_LIMIT]
+	str	r0, [sp, #SVC_ADDR_LIMIT]
+
+	uaccess_save r0
+	.if \uaccess
+	uaccess_disable r0
+	.endif
 
 	.if \trace
 #ifdef CONFIG_TRACE_IRQFLAGS
@@ -302,11 +308,9 @@ __dabt_svc:
 	/* re-build context for normal abort handler */
 	ldr	r0, [sp, #(SVC_REGS_SIZE + TI_VMAP_BACK_SP)]
 	sub	r0, #SVC_REGS_SIZE
-	tst	r0, #4
-	subne	r0, r0, #4
 	mov	r1, sp
 	mov	r2, #SVC_REGS_SIZE
-#ifdef CONFIG_KASAN
+#ifdef CONFIG_AMLOGIC_KASAN32
 	bl	__memcpy		/* copy back sp	*/
 #else
 	bl	memcpy			/* copy back sp	*/
@@ -379,10 +383,31 @@ __und_svc:
 #else
 	svc_entry
 #endif
+	@
+	@ call emulation code, which returns using r9 if it has emulated
+	@ the instruction, or the more conventional lr if we are to treat
+	@ this as a real undefined instruction
+	@
+	@  r0 - instruction
+	@
+#ifndef CONFIG_THUMB2_KERNEL
+	ldr	r0, [r4, #-4]
+#else
+	mov	r1, #2
+	ldrh	r0, [r4, #-2]			@ Thumb instruction at LR - 2
+	cmp	r0, #0xe800			@ 32-bit instruction if xx >= 0
+	blo	__und_svc_fault
+	ldrh	r9, [r4]			@ bottom 16 bits
+	add	r4, r4, #2
+	str	r4, [sp, #S_PC]
+	orr	r0, r9, r0, lsl #16
+#endif
+	badr	r9, __und_svc_finish
+	mov	r2, r4
+	bl	call_fpe
 
 	mov	r1, #4				@ PC correction to apply
- THUMB(	tst	r5, #PSR_T_BIT		)	@ exception taken in Thumb mode?
- THUMB(	movne	r1, #2			)	@ if so, fix up PC correction
+__und_svc_fault:
 	mov	r0, sp				@ struct pt_regs *regs
 	bl	__und_fault
 
@@ -400,11 +425,9 @@ __pabt_svc:
 	/* re-build context for normal abort handler */
 	ldr	r0, [sp, #(SVC_REGS_SIZE + TI_VMAP_BACK_SP)]
 	sub	r0, #SVC_REGS_SIZE
-	tst	r0, #4
-	subne	r0, r0, #4
 	mov	r1, sp
 	mov	r2, #SVC_REGS_SIZE
-#ifdef CONFIG_KASAN
+#ifdef CONFIG_AMLOGIC_KASAN32
 	bl	__memcpy		/* copy back sp	*/
 #else
 	bl	memcpy			/* copy back sp	*/
@@ -553,8 +576,7 @@ ENDPROC(__fiq_abt)
 	@ if it was interrupted in a critical region.  Here we
 	@ perform a quick test inline since it should be false
 	@ 99.9999% of the time.  The rest is done out of line.
-	ldr	r0, =TASK_SIZE
-	cmp	r4, r0
+	cmp	r4, #TASK_SIZE
 	blhs	kuser_cmpxchg64_fixup
 #endif
 #endif
@@ -753,7 +775,7 @@ call_fpe:
 	@ Test if we need to give access to iWMMXt coprocessors
 	ldr	r5, [r10, #TI_FLAGS]
 	rsbs	r7, r8, #(1 << 8)		@ CP 0 or 1 only
-	movscs	r7, r5, lsr #(TIF_USING_IWMMXT + 1)
+	movcss	r7, r5, lsr #(TIF_USING_IWMMXT + 1)
 	bcs	iwmmxt_task_enable
 #endif
  ARM(	add	pc, pc, r8, lsr #6	)
@@ -834,7 +856,6 @@ do_fpe:
  */
 
 	.pushsection .data
-	.align	2
 ENTRY(fp_enter)
 	.word	no_fp
 	.popsection
@@ -908,16 +929,11 @@ ENTRY(__switch_to)
 	ldr	r6, [r2, #TI_CPU_DOMAIN]
 #endif
 	switch_tls r1, r4, r5, r3, r7
-#ifndef CONFIG_AMLOGIC_STACKPROTECTOR
-#if defined(CONFIG_STACKPROTECTOR) && !defined(CONFIG_SMP)
+#if defined(CONFIG_CC_STACKPROTECTOR) && !defined(CONFIG_SMP)
 	ldr	r7, [r2, #TI_TASK]
 	ldr	r8, =__stack_chk_guard
-	.if (TSK_STACK_CANARY > IMM12_MASK)
-	add	r7, r7, #TSK_STACK_CANARY & ~IMM12_MASK
-	.endif
-	ldr	r7, [r7, #TSK_STACK_CANARY & IMM12_MASK]
+	ldr	r7, [r7, #TSK_STACK_CANARY]
 #endif
-#endif /* CONFIG_AMLOGIC_STACKPROTECTOR */
 #ifdef CONFIG_CPU_USE_DOMAINS
 	mcr	p15, 0, r6, c3, c0, 0		@ Set domain register
 #endif
@@ -926,11 +942,9 @@ ENTRY(__switch_to)
 	ldr	r0, =thread_notify_head
 	mov	r1, #THREAD_NOTIFY_SWITCH
 	bl	atomic_notifier_call_chain
-#ifndef CONFIG_AMLOGIC_STACKPROTECTOR
-#if defined(CONFIG_STACKPROTECTOR) && !defined(CONFIG_SMP)
+#if defined(CONFIG_CC_STACKPROTECTOR) && !defined(CONFIG_SMP)
 	str	r7, [r8]
 #endif
-#endif /* CONFIG_AMLOGIC_STACKPROTECTOR */
  THUMB(	mov	ip, r4			   )
 	mov	r0, r5
  ARM(	ldmia	r4, {r4 - sl, fp, sp, pc}  )	@ Load all regs saved previously
@@ -950,7 +964,7 @@ ENDPROC(__switch_to)
  * existing ones.  This mechanism should be used only for things that are
  * really small and justified, and not be abused freely.
  *
- * See Documentation/arm/kernel_user_helpers.rst for formal definitions.
+ * See Documentation/arm/kernel_user_helpers.txt for formal definitions.
  */
  THUMB(	.arm	)
 
@@ -993,7 +1007,7 @@ __kuser_cmpxchg64:				@ 0xffff0f60
 	smp_dmb	arm
 1:	ldrexd	r0, r1, [r2]			@ load current val
 	eors	r3, r0, r4			@ compare with oldval (1)
-	eorseq	r3, r1, r5			@ compare with oldval (2)
+	eoreqs	r3, r1, r5			@ compare with oldval (2)
 	strexdeq r3, r6, r7, [r2]		@ store newval if eq
 	teqeq	r3, #1				@ success?
 	beq	1b				@ if no then retry
@@ -1017,8 +1031,8 @@ __kuser_cmpxchg64:				@ 0xffff0f60
 	ldmia	r1, {r6, lr}			@ load new val
 1:	ldmia	r2, {r0, r1}			@ load current val
 	eors	r3, r0, r4			@ compare with oldval (1)
-	eorseq	r3, r1, r5			@ compare with oldval (2)
-2:	stmiaeq	r2, {r6, lr}			@ store newval if eq
+	eoreqs	r3, r1, r5			@ compare with oldval (2)
+2:	stmeqia	r2, {r6, lr}			@ store newval if eq
 	rsbs	r0, r3, #0			@ set return val and C flag
 	ldmfd	sp!, {r4, r5, r6, pc}
 
@@ -1032,7 +1046,7 @@ kuser_cmpxchg64_fixup:
 	mov	r7, #0xffff0fff
 	sub	r7, r7, #(0xffff0fff - (0xffff0f60 + (1b - __kuser_cmpxchg64)))
 	subs	r8, r4, r7
-	rsbscs	r8, r8, #(2b - 1b)
+	rsbcss	r8, r8, #(2b - 1b)
 	strcs	r7, [sp, #S_PC]
 #if __LINUX_ARM_ARCH__ < 6
 	bcc	kuser_cmpxchg32_fixup
@@ -1090,7 +1104,7 @@ kuser_cmpxchg32_fixup:
 	mov	r7, #0xffff0fff
 	sub	r7, r7, #(0xffff0fff - (0xffff0fc0 + (1b - __kuser_cmpxchg)))
 	subs	r8, r4, r7
-	rsbscs	r8, r8, #(2b - 1b)
+	rsbcss	r8, r8, #(2b - 1b)
 	strcs	r7, [sp, #S_PC]
 	ret	lr
 	.previous
@@ -1342,8 +1356,13 @@ vector_addrexcptn:
 	W(b)	vector_fiq
 
 	.data
-	.align	2
 
 	.globl	cr_alignment
 cr_alignment:
 	.space	4
+
+#ifdef CONFIG_MULTI_IRQ_HANDLER
+	.globl	handle_arch_irq
+handle_arch_irq:
+	.space	4
+#endif

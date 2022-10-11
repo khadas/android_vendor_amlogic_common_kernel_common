@@ -1,10 +1,8 @@
-// SPDX-License-Identifier: GPL-2.0-only
 /*
  * Helpers for the host side of a virtio ring.
  *
  * Since these may be in userspace, we use (inline) accessors.
  */
-#include <linux/compiler.h>
 #include <linux/module.h>
 #include <linux/vringh.h>
 #include <linux/virtio_ring.h>
@@ -192,7 +190,7 @@ static int resize_iovec(struct vringh_kiov *iov, gfp_t gfp)
 	if (flag)
 		new = krealloc(iov->iov, new_num * sizeof(struct iovec), gfp);
 	else {
-		new = kmalloc_array(new_num, sizeof(struct iovec), gfp);
+		new = kmalloc(new_num * sizeof(struct iovec), gfp);
 		if (new) {
 			memcpy(new, iov->iov,
 			       iov->max_num * sizeof(struct iovec));
@@ -823,13 +821,13 @@ EXPORT_SYMBOL(vringh_need_notify_user);
 static inline int getu16_kern(const struct vringh *vrh,
 			      u16 *val, const __virtio16 *p)
 {
-	*val = vringh16_to_cpu(vrh, READ_ONCE(*p));
+	*val = vringh16_to_cpu(vrh, ACCESS_ONCE(*p));
 	return 0;
 }
 
 static inline int putu16_kern(const struct vringh *vrh, __virtio16 *p, u16 val)
 {
-	WRITE_ONCE(*p, cpu_to_vringh16(vrh, val));
+	ACCESS_ONCE(*p) = cpu_to_vringh16(vrh, val);
 	return 0;
 }
 
@@ -848,12 +846,6 @@ static inline int putused_kern(struct vring_used_elem *dst,
 }
 
 static inline int xfer_kern(void *src, void *dst, size_t len)
-{
-	memcpy(dst, src, len);
-	return 0;
-}
-
-static inline int kern_xfer(void *dst, void *src, size_t len)
 {
 	memcpy(dst, src, len);
 	return 0;
@@ -965,7 +957,7 @@ EXPORT_SYMBOL(vringh_iov_pull_kern);
 ssize_t vringh_iov_push_kern(struct vringh_kiov *wiov,
 			     const void *src, size_t len)
 {
-	return vringh_iov_xfer(wiov, (void *)src, len, kern_xfer);
+	return vringh_iov_xfer(wiov, (void *)src, len, xfer_kern);
 }
 EXPORT_SYMBOL(vringh_iov_push_kern);
 

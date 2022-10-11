@@ -1,5 +1,5 @@
 #
-# Amlogic VPU driver configuration
+# Amlogic VPU driver configuation
 #
 
 menu "Amlogic VPU Driver Support"
@@ -14,14 +14,12 @@ config AMLOGIC_VPU
 			and vpu clock gate.
 		All the video modules work on vpu domain.
 
-config AMLOGIC_VPU_CLK_DYNAMIC_ADJ
-	bool "Amlogic VPU Clock Frequency Dynamic Adjust"
+config AMLOGIC_VPU_DYNAMIC_ADJ
+	bool "Amlogic VPU Frequency Dynamic Adjust"
 	default n
 	depends on AMLOGIC_VPU
 	help
 		Amlogic vpu frequency dynamic adjust,
-		allow the vpu clk frequency adjusting dynamically by
-		video modules,
-		and manage the max frequency what video modules required.
+		manage the max frequency what video modules required.
 
 endmenu

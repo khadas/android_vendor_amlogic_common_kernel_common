@@ -1,4 +1,3 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
  * drivers/amlogic/memory_ext/ram_dump.c
  *
@@ -30,7 +29,6 @@
 #include <linux/mm.h>
 #include <linux/reboot.h>
 #include <linux/memblock.h>
-#include <linux/sched/clock.h>
 #include <linux/amlogic/ramdump.h>
 #include <linux/amlogic/reboot.h>
 #include <linux/arm-smccc.h>
@@ -89,7 +87,6 @@ static int __init early_ramdump_para(char *buf)
 	}
 	return 0;
 }
-
 early_param("ramdump", early_ramdump_para);
 
 /*
@@ -248,46 +245,31 @@ static int check_storage_mounted(char **root)
 	int fd, cnt, ret = 0;
 	char mnt_dev[64] =  {}, *mnt_ptr, *root_dir;
 
-	fd = ksys_open("/proc/mounts", O_RDONLY, 0);
+	fd = sys_open("/proc/mounts", O_RDONLY, 0);
 	if (!fd) {
 		pr_debug("%s, open mounts failed:%d\n", __func__, fd);
 		return -EINVAL;
 	}
-	cnt = ksys_read(fd, ram->mnt_buf, PAGE_SIZE);
+	cnt = sys_read(fd, ram->mnt_buf, PAGE_SIZE);
 	if (cnt < 0) {
 		pr_debug("%s, read mounts failed:%d\n", __func__, cnt);
 		ret = -ENODEV;
 		goto exit;
 	}
 	pr_debug("read:%d, %s\n", cnt, (char *)ram->mnt_buf);
-	/* for android */
 	sprintf(mnt_dev, "/dev/block/%s", ram->storage_device);
 	mnt_ptr = strstr((char *)ram->mnt_buf, mnt_dev);
 	if (mnt_ptr) {
 		pr_debug("%s, find %s in buffer, ptr:%p\n",
-			 __func__, mnt_dev, mnt_ptr);
+			__func__, mnt_dev, mnt_ptr);
 		root_dir = strstr(mnt_ptr, " ");
 		root_dir++;
 		*root = root_dir;
-		pr_info("mount:%s root:%s\n", mnt_ptr, root_dir);
-	} else {
-		/* for build root */
-		memset(mnt_dev, 0, sizeof(mnt_dev));
-		sprintf(mnt_dev, "/dev/%s", ram->storage_device);
-		mnt_ptr = strstr((char *)ram->mnt_buf, mnt_dev);
-		if (mnt_ptr) {
-			pr_debug("%s, find %s in buffer, ptr:%p\n",
-				 __func__, mnt_dev, mnt_ptr);
-			root_dir = strstr(mnt_ptr, " ");
-			root_dir++;
-			*root = root_dir;
-			pr_info("mount:%s root:%s\n", mnt_ptr, root_dir);
-		} else {
-			ret = -ENODEV;
-		}
-	}
+		pr_debug("mount:%s root:%s\n", mnt_ptr, root_dir);
+	} else
+		ret = -ENODEV;
 exit:
-	ksys_close(fd);
+	sys_close(fd);
 	return ret;
 }
 
@@ -326,14 +308,14 @@ static size_t save_data(int fd)
 			page++;
 		}
 		ret = map_kernel_range_noflush((unsigned long)buffer,
-					       PAGE_ALIGN(wsize),
-					       PAGE_KERNEL,
-					       pages);
+						PAGE_ALIGN(wsize),
+						PAGE_KERNEL,
+						pages);
 		if (!ret) {
 			pr_err("map page:%lx failed\n", page_to_pfn(page));
 			goto out;
 		}
-		ret = ksys_write(fd, buffer, wsize);
+		ret = sys_write(fd, buffer, wsize);
 		if (ret != wsize) {
 			unmap_kernel_range((unsigned long)buffer,
 					   PAGE_ALIGN(wsize));
@@ -345,7 +327,7 @@ static size_t save_data(int fd)
 		saved += wsize;
 		off   += wsize;
 		pr_debug("%s, write %08lx, size:%08x, saved:%08lx, off:%lx\n",
-			 __func__, s, wsize, saved, off);
+			__func__, s, wsize, saved, off);
 	}
 out:
 	free_vm_area(area);
@@ -377,7 +359,7 @@ static void wait_to_save(struct work_struct *work)
 		if (next_token)
 			*next_token = '\0';
 		sprintf(wname, "%s/crashdump-1.bin", root);
-		fd = ksys_open(wname, OPEN_FLAGS, 0644);
+		fd = sys_open(wname, OPEN_FLAGS, 0644);
 		if (fd < 0) {
 			pr_info("open %s failed:%d\n", wname, fd);
 			need_reboot = 3;
@@ -386,14 +368,14 @@ static void wait_to_save(struct work_struct *work)
 		ret = save_data(fd);
 		if (ret != ram->mem_size) {
 			pr_err("write size %d not match %ld\n",
-			       ret, ram->mem_size);
+				ret, ram->mem_size);
 		}
-		ksys_close(fd);
-		ksys_sync();
+		sys_fsync(fd);
+		sys_close(fd);
+		sys_sync();
 		need_reboot = 1;
-	} else {
+	} else
 		schedule_delayed_work(&ram->work, 500);
-	}
 
 exit:
 	/* Nomatter what happened, reboot must be done in this function */
@@ -410,17 +392,48 @@ static int __init ramdump_probe(struct platform_device *pdev)
 {
 	void __iomem *p = NULL;
 	struct device_node *np;
-	unsigned long total_mem;
+	unsigned long dts_memory[2] = {0}, total_mem;
 	struct resource *res;
 	unsigned int dump_set;
 	int ret;
 	void __iomem *base;
 	const char *dev_name = NULL;
 
-	total_mem = get_num_physpages() << PAGE_SHIFT;
-	pr_info("Total Memory:[%lx]\n", total_mem);
+	np = of_find_node_by_name(NULL, "memory");
+	if (!np)
+		return -EINVAL;
 
-	ram = kzalloc(sizeof(*ram), GFP_KERNEL);
+#ifdef CONFIG_64BIT
+	ret = of_property_read_u64_array(np, "linux,usable-memory",
+					 (u64 *)&dts_memory, 2);
+	if (ret)
+		ret = of_property_read_u64_array(np, "reg",
+						 (u64 *)&dts_memory, 2);
+#else
+	ret = of_property_read_u32_array(np, "linux,usable-memory",
+					 (u32 *)&dts_memory, 2);
+	if (ret)
+		ret = of_property_read_u32_array(np, "reg",
+						 (u32 *)&dts_memory, 2);
+#endif
+	if (ret)
+		pr_info("can't get dts memory\n");
+	else
+		pr_info("MEMORY:[%lx+%lx]\n", dts_memory[0], dts_memory[1]);
+	of_node_put(np);
+
+	/*
+	 * memory in dts is [start_addr size] patten. For amlogic soc,
+	 * ddr address range is started from 0x0, usually start_addr in
+	 * dts should be started with 0x0, but some soc must reserve a
+	 * small framgment of memory at 0x0 for start up code. So start_addr
+	 * can be 0x100000/0x1000000. But we always using 0x0 to get real
+	 * DDR size for ramdump. So we using following formula to get total
+	 * DDR size.
+	 */
+	total_mem = dts_memory[0] + dts_memory[1];
+
+	ram = kzalloc(sizeof(struct ramdump), GFP_KERNEL);
 	if (!ram)
 		return -ENOMEM;
 

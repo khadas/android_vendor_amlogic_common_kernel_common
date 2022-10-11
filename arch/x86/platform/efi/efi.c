@@ -1,4 +1,3 @@
-// SPDX-License-Identifier: GPL-2.0
 /*
  * Common EFI (Extensible Firmware Interface) support functions
  * Based on Extensible Firmware Interface Specification version 1.0
@@ -36,8 +35,9 @@
 #include <linux/efi.h>
 #include <linux/efi-bgrt.h>
 #include <linux/export.h>
-#include <linux/memblock.h>
+#include <linux/bootmem.h>
 #include <linux/slab.h>
+#include <linux/memblock.h>
 #include <linux/spinlock.h>
 #include <linux/uaccess.h>
 #include <linux/time.h>
@@ -47,9 +47,8 @@
 
 #include <asm/setup.h>
 #include <asm/efi.h>
-#include <asm/e820/api.h>
 #include <asm/time.h>
-#include <asm/set_memory.h>
+#include <asm/cacheflush.h>
 #include <asm/tlbflush.h>
 #include <asm/x86_init.h>
 #include <asm/uv/uv.h>
@@ -59,34 +58,9 @@ static efi_system_table_t efi_systab __initdata;
 
 static efi_config_table_type_t arch_tables[] __initdata = {
 #ifdef CONFIG_X86_UV
-	{UV_SYSTEM_TABLE_GUID, "UVsystab", &uv_systab_phys},
+	{UV_SYSTEM_TABLE_GUID, "UVsystab", &efi.uv_systab},
 #endif
 	{NULL_GUID, NULL, NULL},
-};
-
-static const unsigned long * const efi_tables[] = {
-	&efi.mps,
-	&efi.acpi,
-	&efi.acpi20,
-	&efi.smbios,
-	&efi.smbios3,
-	&efi.boot_info,
-	&efi.hcdp,
-	&efi.uga,
-#ifdef CONFIG_X86_UV
-	&uv_systab_phys,
-#endif
-	&efi.fw_vendor,
-	&efi.runtime,
-	&efi.config_table,
-	&efi.esrt,
-	&efi.properties_table,
-	&efi.mem_attr_table,
-#ifdef CONFIG_EFI_RCI2_TABLE
-	&rci2_table_phys,
-#endif
-	&efi.tpm_log,
-	&efi.tpm_final_log,
 };
 
 u64 efi_setup;		/* efi setup_data physical address */
@@ -110,8 +84,6 @@ static efi_status_t __init phys_efi_set_virtual_address_map(
 	pgd_t *save_pgd;
 
 	save_pgd = efi_call_phys_prolog();
-	if (!save_pgd)
-		return EFI_ABORTED;
 
 	/* Disable interrupts around EFI calls: */
 	local_irq_save(flags);
@@ -167,21 +139,21 @@ static void __init do_add_efi_memmap(void)
 		case EFI_BOOT_SERVICES_DATA:
 		case EFI_CONVENTIONAL_MEMORY:
 			if (md->attribute & EFI_MEMORY_WB)
-				e820_type = E820_TYPE_RAM;
+				e820_type = E820_RAM;
 			else
-				e820_type = E820_TYPE_RESERVED;
+				e820_type = E820_RESERVED;
 			break;
 		case EFI_ACPI_RECLAIM_MEMORY:
-			e820_type = E820_TYPE_ACPI;
+			e820_type = E820_ACPI;
 			break;
 		case EFI_ACPI_MEMORY_NVS:
-			e820_type = E820_TYPE_NVS;
+			e820_type = E820_NVS;
 			break;
 		case EFI_UNUSABLE_MEMORY:
-			e820_type = E820_TYPE_UNUSABLE;
+			e820_type = E820_UNUSABLE;
 			break;
 		case EFI_PERSISTENT_MEMORY:
-			e820_type = E820_TYPE_PMEM;
+			e820_type = E820_PMEM;
 			break;
 		default:
 			/*
@@ -189,12 +161,12 @@ static void __init do_add_efi_memmap(void)
 			 * EFI_RUNTIME_SERVICES_DATA EFI_MEMORY_MAPPED_IO
 			 * EFI_MEMORY_MAPPED_IO_PORT_SPACE EFI_PAL_CODE
 			 */
-			e820_type = E820_TYPE_RESERVED;
+			e820_type = E820_RESERVED;
 			break;
 		}
-		e820__range_add(start, size, e820_type);
+		e820_add_region(start, size, e820_type);
 	}
-	e820__update_table(e820_table);
+	sanitize_e820_map(e820->map, ARRAY_SIZE(e820->map), &e820->nr_map);
 }
 
 int __init efi_memblock_x86_reserve_range(void)
@@ -569,6 +541,11 @@ void __init efi_init(void)
 
 	if (efi_enabled(EFI_DBG))
 		efi_print_memmap();
+}
+
+void __init efi_late_init(void)
+{
+	efi_bgrt_init();
 }
 
 void __init efi_set_executable(efi_memory_desc_t *md, bool executable)
@@ -956,14 +933,16 @@ static void __init __efi_enter_virtual_mode(void)
 
 	if (efi_alloc_page_tables()) {
 		pr_err("Failed to allocate EFI page tables\n");
-		goto err;
+		clear_bit(EFI_RUNTIME_SERVICES, &efi.flags);
+		return;
 	}
 
 	efi_merge_regions();
 	new_memmap = efi_map_regions(&count, &pg_shift);
 	if (!new_memmap) {
 		pr_err("Error reallocating memory, EFI runtime non-functional!\n");
-		goto err;
+		clear_bit(EFI_RUNTIME_SERVICES, &efi.flags);
+		return;
 	}
 
 	pa = __pa(new_memmap);
@@ -977,19 +956,16 @@ static void __init __efi_enter_virtual_mode(void)
 
 	if (efi_memmap_init_late(pa, efi.memmap.desc_size * count)) {
 		pr_err("Failed to remap late EFI memory map\n");
-		goto err;
+		clear_bit(EFI_RUNTIME_SERVICES, &efi.flags);
+		return;
 	}
 
-	if (efi_enabled(EFI_DBG)) {
-		pr_info("EFI runtime memory map:\n");
-		efi_print_memmap();
+	BUG_ON(!efi.systab);
+
+	if (efi_setup_page_tables(pa, 1 << pg_shift)) {
+		clear_bit(EFI_RUNTIME_SERVICES, &efi.flags);
+		return;
 	}
-
-	if (WARN_ON(!efi.systab))
-		goto err;
-
-	if (efi_setup_page_tables(pa, 1 << pg_shift))
-		goto err;
 
 	efi_sync_low_kernel_mappings();
 
@@ -1009,12 +985,10 @@ static void __init __efi_enter_virtual_mode(void)
 	}
 
 	if (status != EFI_SUCCESS) {
-		pr_err("Unable to switch EFI into virtual mode (status=%lx)!\n",
-		       status);
-		goto err;
+		pr_alert("Unable to switch EFI into virtual mode (status=%lx)!\n",
+			 status);
+		panic("EFI call to SetVirtualAddressMap() failed!");
 	}
-
-	efi_free_boot_services();
 
 	/*
 	 * Now that EFI is in virtual mode, update the function
@@ -1037,13 +1011,10 @@ static void __init __efi_enter_virtual_mode(void)
 	 * necessary relocation fixups for the new virtual addresses.
 	 */
 	efi_runtime_update_mappings();
+	efi_dump_pagetable();
 
 	/* clean DUMMY object */
 	efi_delete_dummy_variable();
-	return;
-
-err:
-	clear_bit(EFI_RUNTIME_SERVICES, &efi.flags);
 }
 
 void __init efi_enter_virtual_mode(void)
@@ -1055,8 +1026,25 @@ void __init efi_enter_virtual_mode(void)
 		kexec_enter_virtual_mode();
 	else
 		__efi_enter_virtual_mode();
+}
 
-	efi_dump_pagetable();
+/*
+ * Convenience functions to obtain memory types and attributes
+ */
+u32 efi_mem_type(unsigned long phys_addr)
+{
+	efi_memory_desc_t *md;
+
+	if (!efi_enabled(EFI_MEMMAP))
+		return 0;
+
+	for_each_efi_memory_desc(md) {
+		if ((md->phys_addr <= phys_addr) &&
+		    (phys_addr < (md->phys_addr +
+				  (md->num_pages << EFI_PAGE_SHIFT))))
+			return md->type;
+	}
+	return 0;
 }
 
 static int __init arch_parse_efi_cmdline(char *str)
@@ -1072,17 +1060,3 @@ static int __init arch_parse_efi_cmdline(char *str)
 	return 0;
 }
 early_param("efi", arch_parse_efi_cmdline);
-
-bool efi_is_table_address(unsigned long phys_addr)
-{
-	unsigned int i;
-
-	if (phys_addr == EFI_INVALID_TABLE_ADDR)
-		return false;
-
-	for (i = 0; i < ARRAY_SIZE(efi_tables); i++)
-		if (*(efi_tables[i]) == phys_addr)
-			return true;
-
-	return false;
-}

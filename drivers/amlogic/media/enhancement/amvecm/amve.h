@@ -1,4 +1,3 @@
-/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
  * drivers/amlogic/media/enhancement/amvecm/amve.h
  *
@@ -72,22 +71,9 @@ struct ve_regs_s {
 	unsigned int rsv:5;
 };
 
-enum pst_hist_mod {
-	HIST_VB = 0,
-	HIST_UG,
-	HIST_YR,
-	HIST_MAXRGB
-};
-
-enum pst_hist_pos {
-	BEFORE_POST2_MTX = 0,
-	AFTER_POST2_MTX,
-	POS_MAX
-};
-
 extern unsigned int gamma_loadprotect_en;
 extern struct ve_hist_s video_ve_hist;
-void ve_hist_gamma_reset(void);
+extern void ve_hist_gamma_reset(void);
 extern unsigned int ve_size;
 extern struct ve_dnlp_s am_ve_dnlp;
 extern struct tcon_gamma_table_s video_gamma_table_r;
@@ -108,7 +94,7 @@ extern int lut3d_debug;
 extern u16 gamma_data_r[256];
 extern u16 gamma_data_g[256];
 extern u16 gamma_data_b[256];
-void vpp_get_lcd_gamma_table(u32 rgb_mask);
+extern void vpp_get_lcd_gamma_table(u32 rgb_mask);
 
 void ve_on_vs(struct vframe_s *vf);
 
@@ -122,41 +108,39 @@ void ve_set_demo(struct ve_demo_s *p);
 void ve_set_regs(struct ve_regs_s *p);
 void ve_set_regmap(struct ve_regmap_s *p);
 
-void ve_enable_dnlp(void);
-void ve_disable_dnlp(void);
+extern void ve_enable_dnlp(void);
+extern void ve_disable_dnlp(void);
 
 int vpp_get_encl_viu_mux(void);
-void vpp_enable_lcd_gamma_table(int viu_sel, int rdma_write);
-void vpp_disable_lcd_gamma_table(int viu_sel, int rdma_write);
+void vpp_enable_lcd_gamma_table(int viu_sel);
+void vpp_disable_lcd_gamma_table(int viu_sel);
 void vpp_set_lcd_gamma_table(u16 *data, u32 rgb_mask, int viu_sel);
-void amve_write_gamma_table(u16 *data, u32 rgb_mask);
-void vpp_set_rgb_ogo(struct tcon_rgb_ogo_s *p);
-void vpp_phase_lock_on_vs(unsigned int cycle,
-			  unsigned int stamp,
-			  bool lock50,
-			  unsigned int range_fast,
-			  unsigned int range_slow);
+extern void amve_write_gamma_table(u16 *data, u32 rgb_mask);
+extern void vpp_set_rgb_ogo(struct tcon_rgb_ogo_s *p);
+extern void vpp_phase_lock_on_vs(unsigned int cycle,
+				 unsigned int stamp,
+				 bool         lock50,
+				 unsigned int range_fast,
+				 unsigned int range_slow);
 /* #if (MESON_CPU_TYPE>=MESON_CPU_TYPE_MESON6TVD) */
-void ve_frame_size_patch(unsigned int width, unsigned int height);
+extern void ve_frame_size_patch(unsigned int width, unsigned int height);
 /* #endif */
-void ve_dnlp_latch_process(void);
-void ve_lcd_gamma_process(void);
-void lvds_freq_process(void);
-void ve_dnlp_param_update(void);
-void ve_new_dnlp_param_update(void);
-void ve_lc_curve_update(void);
-void ve_lc_latch_process(void);
-void ve_ogo_param_update(void);
-void am_set_regmap(struct am_regs_s *p);
-void sharpness_process(struct vframe_s *vf);
-void amvecm_bricon_process(signed int bri_val,
-			   signed int cont_val,
-			   struct vframe_s *vf);
-void amvecm_color_process(signed int sat_val,
-			  signed int hue_val,
-			  struct vframe_s *vf);
-void amvecm_3d_black_process(void);
-void amvecm_3d_sync_process(void);
+extern void ve_dnlp_latch_process(void);
+extern void ve_lcd_gamma_process(void);
+extern void lvds_freq_process(void);
+extern void ve_dnlp_param_update(void);
+extern void ve_new_dnlp_param_update(void);
+extern void ve_lc_curve_update(void);
+extern void ve_lc_latch_process(void);
+extern void ve_ogo_param_update(void);
+extern void am_set_regmap(struct am_regs_s *p);
+extern void sharpness_process(struct vframe_s *vf);
+extern void amvecm_bricon_process(signed int bri_val,
+				signed int cont_val, struct vframe_s *vf);
+extern void amvecm_color_process(signed int sat_val,
+	signed int hue_val, struct vframe_s *vf);
+extern void amvecm_3d_black_process(void);
+extern void amvecm_3d_sync_process(void);
 extern unsigned int vecm_latch_flag;
 extern unsigned int cm_size;
 extern unsigned int sync_3d_h_start;
@@ -168,11 +152,6 @@ extern unsigned int sync_3d_out_inv;
 extern unsigned int sync_3d_black_color;
 extern unsigned int sync_3d_sync_to_vbo;
 
-extern int fmeter_en;
-extern int cur_sr_level;
-extern int pre_fmeter_level, cur_fmeter_level, fmeter_flag;
-void amve_fmeter_init(int enable);
-void amve_fmetersize_config(u32 sr0_w, u32 sr0_h, u32 sr1_w, u32 sr1_h);
 
 /* #if defined(CONFIG_ARCH_MESON2) */
 /* unsigned long long ve_get_vs_cnt(void); */
@@ -182,48 +161,44 @@ extern int video_rgb_ogo_xvy_mtx;
 #define GAMMA_SIZE 256
 
 extern unsigned int dnlp_sel;
-void ve_dnlp_load_reg(void);
+extern void ve_dnlp_load_reg(void);
 
 /*gxlx sr adaptive setting*/
-void amve_sharpness_adaptive_setting(struct vframe_s *vf,
-				     unsigned int sps_h_en,
-				     unsigned int sps_v_en);
-void amve_sharpness_init(void);
+extern void amve_sharpness_adaptive_setting(struct vframe_s *vf,
+	unsigned int sps_h_en, unsigned int sps_v_en);
+extern void amve_sharpness_init(void);
 extern struct am_regs_s sr1reg_sd_scale;
 extern struct am_regs_s sr1reg_hd_scale;
 extern struct am_regs_s sr1reg_cvbs;
 extern struct am_regs_s sr1reg_hv_noscale;
-void amvecm_fresh_overscan(struct vframe_s *vf);
-void amvecm_reset_overscan(void);
-int vpp_set_lut3d(int bfromkey,
-		  int keyindex,
-		  unsigned int p3dlut_in[][3],
-		  int blut3dcheck);
-int vpp_write_lut3d_section(int index,
-			    int section_len,
-			    unsigned int *p3dlut_section_in);
-int vpp_read_lut3d_section(int index,
-			   int section_len,
-			   unsigned int *p3dlut_section_out);
+extern void amvecm_fresh_overscan(struct vframe_s *vf);
+extern void amvecm_reset_overscan(void);
+void ve_hist_gamma_tgt(struct vframe_s *vf);
+extern unsigned int *plut3d;
+int vpp_set_lut3d(
+	int bfromkey,
+	int keyindex,
+	unsigned int p3dlut_in[][3],
+	int blut3dcheck);
+int vpp_write_lut3d_section(
+	int index,
+	int section_len,
+	unsigned int *p3dlut_section_in);
+int vpp_read_lut3d_section(
+	int index,
+	int section_len,
+	unsigned int *p3dlut_section_out);
 void vpp_lut3d_table_init(int r, int g, int b);
 void vpp_lut3d_table_release(void);
-int vpp_enable_lut3d(int enable);
+int vpp_enable_lut3d(int enable, int vs_wr);
 void dump_plut3d_table(void);
 void dump_plut3d_reg_table(void);
 
-void amvecm_gamma_init(bool en);
-void set_gamma_regs(int en, int sel);
+extern void amvecm_gamma_init(bool en);
+extern void set_gamma_regs(int en, int sel);
 void amvecm_wb_enable(int enable);
 int vpp_pq_ctrl_config(struct pq_ctrl_s pq_cfg);
 unsigned int skip_pq_ctrl_load(struct am_reg_s *p);
 void set_pre_gamma_reg(struct pre_gamma_table_s *pre_gma_tb);
-void lcd_gamma_api(u16 *r_data, u16 *g_data,
-	u16 *b_data, int rdma_write, int rw_flag);
-void vpp_pst_hist_sta_config(int en,
-	enum pst_hist_mod mod,
-	enum pst_hist_pos pos,
-	struct vinfo_s *vinfo);
-void vpp_pst_hist_sta_read(unsigned int *hist);
-void eye_proc(int *rgb, int mtx_on);
 #endif
 

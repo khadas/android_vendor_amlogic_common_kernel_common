@@ -1,4 +1,3 @@
-// SPDX-License-Identifier: GPL-2.0
 /*
  *  NMI backtrace support
  *
@@ -18,7 +17,6 @@
 #include <linux/kprobes.h>
 #include <linux/nmi.h>
 #include <linux/cpu.h>
-#include <linux/sched/debug.h>
 
 #ifdef arch_trigger_cpumask_backtrace
 /* For reliability, we're prepared to waste bits here. */
@@ -79,7 +77,7 @@ void nmi_trigger_cpumask_backtrace(const cpumask_t *mask,
 	 * Force flush any remote buffers that might be stuck in IRQ context
 	 * and therefore could not run their irq_work.
 	 */
-	printk_safe_flush();
+	printk_nmi_flush();
 
 	clear_bit_unlock(0, &backtrace_flag);
 	put_cpu();
@@ -91,13 +89,23 @@ bool nmi_cpu_backtrace(struct pt_regs *regs)
 
 	if (cpumask_test_cpu(cpu, to_cpumask(backtrace_mask))) {
 		if (regs && cpu_in_idle(instruction_pointer(regs))) {
-			pr_warn("NMI backtrace for cpu %d skipped: idling at %pS\n",
-				cpu, (void *)instruction_pointer(regs));
+			pr_warn("NMI backtrace for cpu %d skipped: idling at pc %#lx\n",
+				cpu, instruction_pointer(regs));
 		} else {
 			pr_warn("NMI backtrace for cpu %d\n", cpu);
+			/*
+			 * two reasons for not calling show_regs here
+			 * 1. two many logs(100 lines per second) are
+			 *    introduced, which makes the wanted stack
+			 *    infos missed
+			 * 2. leads to potential external abort on
+			 *    non-linefetch issue
+			 */
+#ifndef CONFIG_AMLOGIC_MODIFY
 			if (regs)
 				show_regs(regs);
 			else
+#endif
 				dump_stack();
 		}
 		cpumask_clear_cpu(cpu, to_cpumask(backtrace_mask));

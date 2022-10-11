@@ -15,6 +15,16 @@ menuconfig AMLOGIC_LED
 
 if AMLOGIC_LED
 
+config AMLOGIC_LED_SYS
+	bool "System LED Support"
+	depends on LEDS_CLASS
+	default n
+	help
+	  This option enables support for system led drivers.
+
+	  Enable this option to allow the userspace to control
+	  the system led.
+
 config AMLOGIC_LEDS_TLC59116
 	tristate "LED Support for the TLC59116"
 	depends on LEDS_CLASS
@@ -28,7 +38,5 @@ config AMLOGIC_LEDS_STATE
 	depends on LEDS_CLASS
 	default n
 	help
-	  Choose this option if you want to use the LED state
-		and led function
-
+	  Choose this option if you want to use the LED state.
 endif

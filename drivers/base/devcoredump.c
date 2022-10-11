@@ -1,7 +1,22 @@
-// SPDX-License-Identifier: GPL-2.0
 /*
+ * This file is provided under the GPLv2 license.
+ *
+ * GPL LICENSE SUMMARY
+ *
  * Copyright(c) 2014 Intel Mobile Communications GmbH
  * Copyright(c) 2015 Intel Deutschland GmbH
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of version 2 of the GNU General Public License as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful, but
+ * WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * General Public License for more details.
+ *
+ * The full GNU General Public License is included in this distribution
+ * in the file called COPYING.
  *
  * Contact Information:
  *  Intel Linux Wireless <ilw@linux.intel.com>
@@ -145,26 +160,33 @@ static ssize_t disabled_store(struct class *class, struct class_attribute *attr,
 
 	return count;
 }
-static CLASS_ATTR_RW(disabled);
 
-static struct attribute *devcd_class_attrs[] = {
-	&class_attr_disabled.attr,
-	NULL,
+static struct class_attribute devcd_class_attrs[] = {
+	__ATTR_RW(disabled),
+	__ATTR_NULL
 };
-ATTRIBUTE_GROUPS(devcd_class);
 
 static struct class devcd_class = {
 	.name		= "devcoredump",
 	.owner		= THIS_MODULE,
 	.dev_release	= devcd_dev_release,
 	.dev_groups	= devcd_dev_groups,
-	.class_groups	= devcd_class_groups,
+	.class_attrs	= devcd_class_attrs,
 };
 
 static ssize_t devcd_readv(char *buffer, loff_t offset, size_t count,
 			   void *data, size_t datalen)
 {
-	return memory_read_from_buffer(buffer, count, &offset, data, datalen);
+	if (offset > datalen)
+		return -EINVAL;
+
+	if (offset + count > datalen)
+		count = datalen - offset;
+
+	if (count)
+		memcpy(buffer, ((u8 *)data) + offset, count);
+
+	return count;
 }
 
 static void devcd_freev(void *data)
@@ -314,7 +336,7 @@ void dev_coredumpm(struct device *dev, struct module *owner,
 EXPORT_SYMBOL_GPL(dev_coredumpm);
 
 /**
- * dev_coredumpsg - create device coredump that uses scatterlist as data
+ * dev_coredumpmsg - create device coredump that uses scatterlist as data
  * parameter
  * @dev: the struct device for the crashed device
  * @table: the dump data

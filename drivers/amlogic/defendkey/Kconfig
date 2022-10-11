@@ -1,10 +1,14 @@
 #
-# Amlogic defendkey device configuration
+# amlogic encrypt img judge
 #
 
+menu "Amlogic defend img file update support"
+
 config AMLOGIC_DEFENDKEY
-	tristate "Amlogic defendkey driver support"
+	bool "defend img update"
 	default n
 	help
-		amlogic defendkey device driver
-		not choose by default
+		defend update system for board, when system is encrypted, the system img
+		must be encrypted with same key in board
+
+endmenu

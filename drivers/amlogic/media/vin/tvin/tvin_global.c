@@ -1,4 +1,3 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
  * drivers/amlogic/media/vin/tvin/tvin_global.c
  *
@@ -19,6 +18,7 @@
 #include <linux/module.h>
 #include <linux/amlogic/media/frame_provider/tvin/tvin.h>
 #include "tvin_global.h"
+
 
 const char *tvin_color_fmt_str(enum tvin_color_fmt_e color_fmt)
 {
@@ -195,8 +195,9 @@ const char *tvin_trans_fmt_str(enum tvin_trans_fmt trans_fmt)
 }
 EXPORT_SYMBOL(tvin_trans_fmt_str);
 
-const char *tvin_trans_color_range_str(enum tvin_color_fmt_range_e
-				       color_range)
+
+const char *tvin_trans_color_range_str(
+	enum tvin_color_fmt_range_e color_range)
 {
 	switch (color_range) {
 	case TVIN_RGB_FULL:
@@ -213,8 +214,8 @@ const char *tvin_trans_color_range_str(enum tvin_color_fmt_range_e
 }
 EXPORT_SYMBOL(tvin_trans_color_range_str);
 
-const char *tvin_trans_force_range_str(enum tvin_force_color_range_e
-				       force_range)
+const char *tvin_trans_force_range_str(
+	enum tvin_force_color_range_e force_range)
 {
 	switch (force_range) {
 	case COLOR_RANGE_AUTO:
@@ -244,5 +245,5 @@ inline bool IS_TVAFE_AVIN_SRC(enum tvin_port_e port)
 	return ((port >= TVIN_PORT_CVBS0) && (port <= TVIN_PORT_CVBS2));
 }
 
-//MODULE_LICENSE("GPL");
+MODULE_LICENSE("GPL");
 

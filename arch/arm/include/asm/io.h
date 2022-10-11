@@ -1,8 +1,11 @@
-/* SPDX-License-Identifier: GPL-2.0-only */
 /*
  *  arch/arm/include/asm/io.h
  *
  *  Copyright (C) 1996-2000 Russell King
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
  *
  * Modifications:
  *  16-Sep-1996	RMK	Inlined the inx/outx functions & optimised for both
@@ -22,9 +25,11 @@
 
 #include <linux/string.h>
 #include <linux/types.h>
+#include <linux/blk_types.h>
 #include <asm/byteorder.h>
 #include <asm/memory.h>
 #include <asm-generic/pci_iomap.h>
+#include <xen/xen.h>
 
 #ifdef CONFIG_AMLOGIC_MODIFY
 #include <linux/amlogic/debug_ftrace_ramoops.h>
@@ -33,6 +38,7 @@
  * ISA I/O bus memory addresses are 1:1 with the physical address.
  */
 #define isa_virt_to_bus virt_to_phys
+#define isa_page_to_bus page_to_phys
 #define isa_bus_to_virt phys_to_virt
 
 /*
@@ -221,16 +227,6 @@ static inline void pci_ioremap_set_mem_type(int mem_type) {}
 extern int pci_ioremap_io(unsigned int offset, phys_addr_t phys_addr);
 
 /*
- * PCI configuration space mapping function.
- *
- * The PCI specification does not allow configuration write
- * transactions to be posted. Add an arch specific
- * pci_remap_cfgspace() definition that is implemented
- * through strongly ordered memory mappings.
- */
-#define pci_remap_cfgspace pci_remap_cfgspace
-void __iomem *pci_remap_cfgspace(resource_size_t res_cookie, size_t size);
-/*
  * Now, pick up the machine-defined IO definitions
  */
 #ifdef CONFIG_NEED_MACH_IO_H
@@ -315,6 +311,8 @@ void __iomem *pci_remap_cfgspace(resource_size_t res_cookie, size_t size);
 extern void _memcpy_fromio(void *, const volatile void __iomem *, size_t);
 extern void _memcpy_toio(volatile void __iomem *, const void *, size_t);
 extern void _memset_io(volatile void __iomem *, int, size_t);
+
+#define mmiowb()
 
 /*
  *  Memory access primitives
@@ -508,6 +506,20 @@ extern void pci_iounmap(struct pci_dev *dev, void __iomem *addr);
 #define xlate_dev_kmem_ptr(p)	p
 
 #include <asm-generic/io.h>
+
+/*
+ * can the hardware map this into one segment or not, given no other
+ * constraints.
+ */
+#define BIOVEC_MERGEABLE(vec1, vec2)	\
+	((bvec_to_phys((vec1)) + (vec1)->bv_len) == bvec_to_phys((vec2)))
+
+struct bio_vec;
+extern bool xen_biovec_phys_mergeable(const struct bio_vec *vec1,
+				      const struct bio_vec *vec2);
+#define BIOVEC_PHYS_MERGEABLE(vec1, vec2)				\
+	(__BIOVEC_PHYS_MERGEABLE(vec1, vec2) &&				\
+	 (!xen_domain() || xen_biovec_phys_mergeable(vec1, vec2)))
 
 #ifdef CONFIG_MMU
 #define ARCH_HAS_VALID_PHYS_ADDR_RANGE

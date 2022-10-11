@@ -1,5 +1,5 @@
 KBUILD_CFLAGS += -Wlarger-than=28792
-#KBUILD_CFLAGS += -Wstack-usage=1856
+KBUILD_CFLAGS += -Wstack-usage=1856
 
 #Amlogic
 snd-soc-dummy_codec-objs := dummy_codec.o
@@ -19,7 +19,6 @@ snd-soc-pcm186x-objs := pcm186x.o pcm186x-i2c.o pcm186x-spi.o
 snd-soc-ssm3515-objs := ssm3515.o
 snd-soc-ssm3525-objs := ssm3525.o
 snd-soc-ad82584f-objs := ad82584f.o
-snd-soc-ad82587d-objs := ad82587d.o
 snd-soc-tas5805-objs := tas5805.o
 
 # Amlogic
@@ -42,23 +41,5 @@ obj-$(CONFIG_AMLOGIC_SND_SOC_SSM3525) += snd-soc-ssm3525.o
 obj-$(CONFIG_AMLOGIC_SND_SOC_TAS575X) += tas575x.o
 obj-$(CONFIG_AMLOGIC_SND_SOC_ES7243) += es7243.o
 obj-$(CONFIG_AMLOGIC_SND_SOC_AD82584F) += ad82584f.o
-obj-$(CONFIG_AMLOGIC_SND_SOC_AD82587D) += ad82587d.o
 obj-$(CONFIG_AMLOGIC_SND_SOC_CS42528) += cs42528.o
 obj-$(CONFIG_AMLOGIC_SND_SOC_TAS5805) += snd-soc-tas5805.o
-
-
-KBUILD_CFLAGS_MODULE += $(GKI_EXT_MODULE_PREDEFINE)
-
-all:
-	@$(MAKE) -C $(KERNEL_SRC) M=$(M)  modules $(GKI_EXT_MODULE_CONFIG)
-	#@$(MAKE) -C $(KERNEL_SRC) M=$(M)/optee --trace  modules
-
-modules_install:
-	@echo "$(MAKE) INSTALL_MOD_STRIP=1 M=$(M) -C $(KERNEL_SRC) modules_install"
-#	@$(MAKE) INSTALL_MOD_STRIP=1 M=$(M) -C $(KERNEL_SRC) modules_install
-#	mkdir -p ${OUT_DIR}/../vendor_lib
-#	cd ${OUT_DIR}/$(M)/; find -name "*.ko" -exec cp {} ${OUT_DIR}/../vendor_lib/ \;
-
-
-clean:
-	$(MAKE) -C $(KERNEL_SRC) M=$(M) clean

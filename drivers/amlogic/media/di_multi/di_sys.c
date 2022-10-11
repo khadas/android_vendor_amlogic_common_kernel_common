@@ -48,7 +48,7 @@
 #include <linux/of_device.h>
 
 #include <linux/amlogic/media/vfm/vframe.h>
-#include <linux/amlogic/media/vpu/vpu.h>
+
 /*dma_get_cma_size_int_byte*/
 #include <linux/amlogic/media/codec_mm/codec_mm.h>
 
@@ -223,7 +223,7 @@ static bool mm_codec_alloc(const char *owner, size_t count,
 static bool mm_cma_alloc(struct device *dev, size_t count,
 			 struct dim_mm_s *o)
 {
-	o->ppage = dma_alloc_from_contiguous(dev, count, 0, 0);
+	o->ppage = dma_alloc_from_contiguous(dev, count, 0);
 	if (o->ppage) {
 		o->addr = page_to_phys(o->ppage);
 		return true;
@@ -610,13 +610,17 @@ void blk_polling(unsigned int ch, struct mtsk_cmd_s *cmd)
 					blk_buf->hf_buff.cnt,
 					blk_buf->hf_buff.mem_start);
 				if (ret) {
-					fcmd->sum_hf_psize -= blk_buf->hf_buff.cnt;
-					memset(&blk_buf->hf_buff, 0, sizeof(blk_buf->hf_buff));
+					fcmd->sum_hf_psize -=
+						blk_buf->hf_buff.cnt;
+					memset(&blk_buf->hf_buff, 0,
+					       sizeof(blk_buf->hf_buff));
 					blk_buf->flg_hf = 0;
 					fcmd->sum_hf_alloc--;
-					dbg_mem2("release:hf:%d\n", blk_buf->header.index);
+					dbg_mem2("release:hf:%d\n",
+						 blk_buf->header.index);
 				} else {
-					PR_ERR("%s:fail.release hf [%d] 0x%x:\n", __func__,
+					PR_ERR("%s:fail.release hf[%d] 0x%x:\n",
+					       __func__,
 					       index, fcmd->sum_hf_psize);
 				}
 			}
@@ -707,13 +711,17 @@ void blk_polling(unsigned int ch, struct mtsk_cmd_s *cmd)
 					blk_buf->hf_buff.cnt,
 					blk_buf->hf_buff.mem_start);
 				if (ret) {
-					fcmd->sum_hf_psize -= blk_buf->hf_buff.cnt;
-					memset(&blk_buf->hf_buff, 0, sizeof(blk_buf->hf_buff));
+					fcmd->sum_hf_psize -=
+						blk_buf->hf_buff.cnt;
+					memset(&blk_buf->hf_buff, 0,
+					       sizeof(blk_buf->hf_buff));
 					blk_buf->flg_hf = 0;
-					dbg_mem2("release:hf:%d\n", blk_buf->header.index);
+					dbg_mem2("release:hf:%d\n",
+						 blk_buf->header.index);
 					fcmd->sum_hf_alloc--;
 				} else {
-					PR_ERR("%s:fail.release hf [%d]\n", __func__,
+					PR_ERR("%s:fail.release hf [%d]\n",
+					       __func__,
 					       index);
 				}
 			}
@@ -764,8 +772,10 @@ void blk_polling(unsigned int ch, struct mtsk_cmd_s *cmd)
 	case ECMD_BLK_ALLOC:
 		/* alloc */
 		chst = dip_chst_get(ch);
-		dbg_mem2("%s:ch[%d] alloc:nub[%d],size[0x%x],top_sts[%d],block[%d]\n",
-			 __func__, ch, cmd->nub, size_p, chst, cmd->block_mode);
+		dbg_mem2("%s:ch[%d] alloc:nub[%d],size[0x%x]\n",
+			 __func__, ch, cmd->nub, size_p);
+		dbg_mem2("%s:top_sts[%d],block[%d]\n",
+			 __func__, chst, cmd->block_mode);
 		cnt = 0;
 		for (i = 0; i < cmd->nub; i++) {
 			if (qbuf_is_empty(pbufq, QBF_BLK_Q_IDLE))
@@ -815,30 +825,36 @@ void blk_polling(unsigned int ch, struct mtsk_cmd_s *cmd)
 			if (cmd->hf_need && !blk_buf->flg_hf) {
 				memset(&omm, 0, sizeof(omm));
 				//aret = dim_mm_alloc(EDI_MEM_M_CMA,
-				aret = dim_mm_alloc(cfgg(MEM_FLAG),
-						    mm->cfg.size_buf_hf >> PAGE_SHIFT,
-						    &omm,
-						    0);
+				aret = dim_mm_alloc(
+					cfgg(MEM_FLAG),
+					mm->cfg.size_buf_hf >> PAGE_SHIFT,
+					&omm, 0);
 				if (!aret) {
-					PR_ERR("2:%s: alloc hf failed %d fail.0x%x;%d\n",
+					PR_ERR("2:%s:alloc hf failed %d fail\n",
 					       __func__,
-						blk_buf->header.index,
+						blk_buf->header.index);
+					PR_ERR("2:%s:alloc hf failed 0x%x;%d\n",
+					       __func__,
 						fcmd->sum_hf_psize,
 						fcmd->sum_hf_alloc);
 					blk_buf->flg_hf = 0;
 				} else {
 					blk_buf->flg_hf = 1;
 					blk_buf->hf_buff.mem_start = omm.addr;
-					blk_buf->hf_buff.cnt = mm->cfg.size_buf_hf >> PAGE_SHIFT;
+					blk_buf->hf_buff.cnt =
+						mm->cfg.size_buf_hf >> PAGE_SHIFT;
 					blk_buf->hf_buff.pages = omm.ppage;
-					fcmd->sum_hf_psize += blk_buf->hf_buff.cnt;
+					fcmd->sum_hf_psize +=
+						blk_buf->hf_buff.cnt;
 					fcmd->sum_hf_alloc++;
 					dbg_mem2("alloc:hf:%d:0x%x\n",
-						 blk_buf->header.index, fcmd->sum_hf_psize);
+						 blk_buf->header.index,
+						 fcmd->sum_hf_psize);
 				}
 
 			} else if (cmd->hf_need && blk_buf->flg_hf) {
-				PR_ERR("%s:have hf?%d\n", __func__, blk_buf->header.index);
+				PR_ERR("%s:have hf?%d\n", __func__,
+				       blk_buf->header.index);
 			} else {
 				blk_buf->flg_hf = 0;
 			}
@@ -1003,10 +1019,10 @@ void pat_clear_mem(struct device *dev,
 	unsigned int pat_size;
 	struct div2_mm_s *mm;
 
-	if (!dev	||
-	    !pch	||
-	    !pat_buf	||
-	    !pat_buf->vaddr) {
+	if ((!dev)	||
+	    (!pch)	||
+	    (!pat_buf)	||
+	    (!pat_buf->vaddr)) {
 		PR_ERR("%s\n", __func__);
 		return;
 	}
@@ -1032,10 +1048,10 @@ void pat_frash(struct device *dev,
 	unsigned int pat_size;
 	struct div2_mm_s *mm;
 
-	if (!dev	||
-	    !pch	||
-	    !pat_buf	||
-	    !pat_buf->vaddr) {
+	if ((!dev)	||
+	    (!pch)	||
+	    (!pat_buf)	||
+	    (!pat_buf->vaddr)) {
 		PR_ERR("%s\n", __func__);
 		return;
 	}
@@ -1391,12 +1407,14 @@ static void dim_buf_set_addr(unsigned int ch, struct di_buf_s *buf_p)
 
 		if (mm->cfg.size_buf_hf) {
 			if (buf_p->blk_buf->flg_hf) {
-				buf_p->hf_adr = buf_p->blk_buf->hf_buff.mem_start;
+				buf_p->hf_adr =
+					buf_p->blk_buf->hf_buff.mem_start;
 				di_hf_set_buffer(buf_p, mm);
 			} else {
 				PR_ERR("%s:size:[%d]:flg[%d]\n",
 				       __func__,
-				       mm->cfg.size_buf_hf, buf_p->blk_buf->flg_hf);
+				       mm->cfg.size_buf_hf,
+				       buf_p->blk_buf->flg_hf);
 				buf_p->hf_adr = 0;
 			}
 		} else {
@@ -1440,10 +1458,11 @@ static void dim_buf_set_addr(unsigned int ch, struct di_buf_s *buf_p)
 		buf_p->insert_adr	= 0;
 	}
 
-	dbg_mem2("%s:%px,btype[%d]:index[%d]:i[%d]:nr[0x%lx]:hf:[0x%lx]\n", __func__,
+	dbg_mem2("%s:%px,btype[%d]:index[%d]\n", __func__,
 		 buf_p,
 		 buf_p->type,
-		 buf_p->index,
+		 buf_p->index);
+	dbg_mem2("%s:i[%d]:nr[0x%lx]:hf:[0x%lx]\n", __func__,
 		 buf_p->buf_is_i,
 		 buf_p->nr_adr,
 		 buf_p->hf_adr);
@@ -1772,7 +1791,8 @@ void di_buf_no2wait(struct di_ch_s *pch)
 	PR_INF("%s:%d\n", __func__, len);
 }
 
-static unsigned int cnt_out_buffer_h_size(struct di_ch_s *pch, unsigned int cvs_h)
+static unsigned int cnt_out_buffer_h_size(struct di_ch_s *pch,
+	unsigned int cvs_h)
 {
 	unsigned int out_format;
 	unsigned int buf_hsize = 0;
@@ -1801,9 +1821,9 @@ bool mem_cfg_pst(struct di_ch_s *pch)
 	struct di_buffer *buffer;
 	struct div2_mm_s *mm;
 
-//	dbg_dt("%s:1\n", __func__);
+	dbg_dt("%s:1\n", __func__);
 	if (!dip_itf_is_ins_exbuf(pch)) {
-//		dbg_dt("%s:5\n", __func__);
+		dbg_dt("%s:5\n", __func__);
 		return false;
 	}
 	ch = pch->ch_id;
@@ -1854,7 +1874,8 @@ void mem_resize_buf(struct di_ch_s *pch, struct di_buf_s *di_buf)
 	if (dip_itf_is_ins_exbuf(pch)) {
 		buf = (struct di_buffer *)di_buf->c.buffer;
 		if (buf && buf->vf) {
-			di_buf->canvas_width[NR_CANVAS] = buf->vf->canvas0_config[0].width;
+			di_buf->canvas_width[NR_CANVAS] =
+				buf->vf->canvas0_config[0].width;
 			return;
 		}
 		PR_ERR("%s:\n", __func__);
@@ -2350,7 +2371,8 @@ void dim_post_keep_back_recycle(struct di_ch_s *pch)
 }
 
 /* @ary_note: unreg buf only */
-void mem_release(struct di_ch_s *pch, struct dim_mm_blk_s **blks, unsigned int blk_nub)
+void mem_release(struct di_ch_s *pch, struct dim_mm_blk_s **blks,
+	unsigned int blk_nub)
 {
 	//unsigned int tmpa[MAX_FIFO_SIZE];
 	//unsigned int psize, itmp;
@@ -3623,13 +3645,18 @@ static const struct di_meson_data  data_sm1 = {
 	.ic_id	= DI_IC_ID_SM1,
 };
 
+static const struct di_meson_data  data_tl1 = {
+	.name = "dim_tl1",
+	.ic_id	= DI_IC_ID_TL1,
+};
+
 static const struct di_meson_data  data_tm2_vb = {
 	.name = "dim_tm2_vb",
 	.ic_id	= DI_IC_ID_TM2B,
 };
 
 static const struct di_meson_data  data_sc2 = {
-	.name = "dim_sc2",//sc2c ic_sub_ver=1,DI_IC_REV_SUB
+	.name = "dim_sc2",
 	.ic_id	= DI_IC_ID_SC2,
 };
 
@@ -3661,7 +3688,6 @@ static const struct di_meson_data  data_s4 = {
 static const struct di_meson_data  data_t3 = {
 	.name = "dim_t3",
 	.ic_id	= DI_IC_ID_T3,
-	.support = IC_SUPPORT_DECONTOUR
 };
 
 /* #ifdef CONFIG_USE_OF */
@@ -3673,6 +3699,8 @@ static const struct of_device_id amlogic_deinterlace_dt_match[] = {
 		.data = &data_g12b,
 	}, {	.compatible = "amlogic, dim-sm1",
 		.data = &data_sm1,
+	}, {	.compatible = "amlogic, dim-tl1",
+		.data = &data_tl1,
 	}, {	.compatible = "amlogic, dim-tm2vb",
 		.data = &data_tm2_vb,
 	}, {	.compatible = "amlogic, dim-sc2",
@@ -3685,26 +3713,26 @@ static const struct of_device_id amlogic_deinterlace_dt_match[] = {
 		.data = &data_t5d_va,
 	}, {	.compatible = "amlogic, dim-t5dvb",
 		.data = &data_t5d_vb,
+	}, {	.compatible = "amlogic, dimv3-g12a",
+		.data = &data_g12a,
+	}, {	.compatible = "amlogic, dimv3-g12b",
+		.data = &data_g12b,
+	}, {	.compatible = "amlogic, dimv3-sm1",
+		.data = &data_sm1,
+	}, {	.compatible = "amlogic, dimv3-tm2vb",
+		.data = &data_tm2_vb,
+	}, {	.compatible = "amlogic, dimv3-t5",
+		.data = &data_t5,
+	}, {	.compatible = "amlogic, dimv3-t5d",
+		.data = &data_t5d_va,
+	}, {	.compatible = "amlogic, dimv3-sc2",
+		.data = &data_sc2,
 	}, {	.compatible = "amlogic, dim-s4",
 		.data = &data_s4,
 	}, {	.compatible = "amlogic, dim-t3",
 		.data = &data_t3,
 	}, {}
 };
-
-void dim_vpu_dev_register(struct di_dev_s *vdevp)
-{
-	vdevp->dim_vpu_clk_gate_dev = vpu_dev_register(VPU_VPU_CLKB,
-						       DEVICE_NAME);
-	vdevp->dim_vpu_pd_dec = vpu_dev_register(VPU_AFBC_DEC,
-						 DEVICE_NAME);
-	vdevp->dim_vpu_pd_dec1 = vpu_dev_register(VPU_AFBC_DEC1,
-						  DEVICE_NAME);
-	vdevp->dim_vpu_pd_vd1 = vpu_dev_register(VPU_VIU_VD1,
-						 DEVICE_NAME);
-	vdevp->dim_vpu_pd_post = vpu_dev_register(VPU_DI_POST,
-						  DEVICE_NAME);
-}
 
 static int dim_probe(struct platform_device *pdev)
 {
@@ -3779,13 +3807,8 @@ static int dim_probe(struct platform_device *pdev)
 	}
 	pdata = (struct di_data_l_s *)di_pdev->data_l;
 	pdata->mdata = match->data;
-	if (DIM_IS_IC(SC2) && is_meson_rev_c())
-		pdata->ic_sub_ver = DI_IC_REV_SUB;
-	else
-		pdata->ic_sub_ver = DI_IC_REV_MAJOR;
-
-	PR_INF("match name: %s:id[%d]:ver[%d]\n", pdata->mdata->name,
-	       pdata->mdata->ic_id, pdata->ic_sub_ver);
+	PR_INF("match name: %s:id[%d]\n", pdata->mdata->name,
+	       pdata->mdata->ic_id);
 
 	ret = of_reserved_mem_device_init(&pdev->dev);
 	if (ret != 0)
@@ -3877,8 +3900,6 @@ static int dim_probe(struct platform_device *pdev)
 	device_create_file(di_devp->dev, &dev_attr_frame_format);
 	device_create_file(di_devp->dev, &dev_attr_tvp_region);
 	device_create_file(di_devp->dev, &dev_attr_kpi_frame_num);
-	dim_vpu_dev_register(di_devp);
-
 	//set ic version need before PQ init
 	dil_set_diffver_flag(1);
 	dil_set_cpuver_flag(get_datal()->mdata->ic_id);
@@ -3921,7 +3942,6 @@ static int dim_probe(struct platform_device *pdev)
 
 	dim_set_di_flag();
 	dim_polic_prob();
-	dct_pre_prob(pdev);
 	dcntr_prob();
 	dip_prob_ch();
 
@@ -4118,7 +4138,7 @@ static struct platform_driver di_driver = {
 	}
 };
 
-int __init dim_module_init(void)
+static int __init dim_module_init(void)
 {
 	int ret = 0;
 
@@ -4134,13 +4154,16 @@ int __init dim_module_init(void)
 	return 0;
 }
 
-void __exit dim_module_exit(void)
+static void __exit dim_module_exit(void)
 {
 	platform_driver_unregister(&di_driver);
 	PR_INF("%s: ok.\n", __func__);
 }
 
-//MODULE_DESCRIPTION("AMLOGIC MULTI-DI driver");
-//MODULE_LICENSE("GPL");
-//MODULE_VERSION("4.0.0");
+module_init(dim_module_init);
+module_exit(dim_module_exit);
+
+MODULE_DESCRIPTION("AMLOGIC MULTI-DI driver");
+MODULE_LICENSE("GPL");
+MODULE_VERSION("4.0.0");
 

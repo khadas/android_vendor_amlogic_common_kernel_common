@@ -1,6 +1,18 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/amlogic/led/leds_state.c
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
 #include <linux/module.h>
@@ -197,9 +209,9 @@ int meson_led_state_set_blink_on(u32 led_id, u32 blink_times,
 	u32 data[5];
 	int ret, count;
 
-	if (blink_times > MESON_LEDS_MAX_BLINK_CNT ||
-	    blink_high > MESON_LEDS_MAX_HIGH_MS ||
-	    blink_low > MESON_LEDS_MAX_LOW_MS) {
+	if ((blink_times > MESON_LEDS_MAX_BLINK_CNT) ||
+	    (blink_high > MESON_LEDS_MAX_HIGH_MS) ||
+	    (blink_low > MESON_LEDS_MAX_LOW_MS)) {
 		pr_err("%s %s Parameter setting out of range!\n",
 		       DRIVER_NAME, __func__);
 		return -EINVAL;
@@ -242,9 +254,9 @@ int meson_led_state_set_blink_off(u32 led_id, u32 blink_times,
 	u32 data[5];
 	int ret, count;
 
-	if (blink_times > MESON_LEDS_MAX_BLINK_CNT ||
-	    blink_high > MESON_LEDS_MAX_HIGH_MS ||
-	    blink_low > MESON_LEDS_MAX_LOW_MS) {
+	if ((blink_times > MESON_LEDS_MAX_BLINK_CNT) ||
+	    (blink_high > MESON_LEDS_MAX_HIGH_MS) ||
+	    (blink_low > MESON_LEDS_MAX_LOW_MS)) {
 		pr_err("%s %s Parameter setting out of range!\n",
 		       DRIVER_NAME, __func__);
 		return -EINVAL;
@@ -368,7 +380,7 @@ static const struct of_device_id of_led_state_match[] = {
 	{ .compatible = "amlogic,state-led-aocpu", },
 	{},
 };
-MODULE_DEVICE_TABLE(led, of_led_state_match);
+MODULE_DEVICE_TABLE(of, of_pwm_leds_match);
 
 static struct platform_driver led_state_driver = {
 	.probe		= meson_led_state_probe,
@@ -390,3 +402,4 @@ module_platform_driver(led_state_driver);
 MODULE_AUTHOR("Bichao Zheng <bichao.zheng@amlogic.com>");
 MODULE_DESCRIPTION("LED STATE driver for amlogic");
 MODULE_LICENSE("GPL");
+

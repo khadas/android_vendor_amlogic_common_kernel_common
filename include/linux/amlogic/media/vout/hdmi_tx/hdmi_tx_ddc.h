@@ -1,13 +1,25 @@
-/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * include/linux/amlogic/media/vout/hdmi_tx/hdmi_tx_ddc.h
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
 #ifndef __HDMI_TX_DDC_H__
 #define __HDMI_TX_DDC_H__
 
 #include <linux/types.h>
-#include <linux/amlogic/media/vout/hdmi_tx/hdmi_tx_module.h>
+#include "hdmi_tx_module.h"
 
 #define EDID_SLAVE	0x50
 	#define EDIDSEG_ADR	0x30
@@ -68,8 +80,8 @@ enum hdcp_addr {
 
 int hdmitx_ddc_hw_op(enum ddc_op cmd);
 
-void scdc_rd_sink(u8 adr, u8 *val);
-void scdc_wr_sink(u8 adr, u8 val);
+void scdc_rd_sink(uint8_t adr, uint8_t *val);
+void scdc_wr_sink(uint8_t adr, uint8_t val);
 uint32_t hdcp_rd_hdcp14_ver(void);
 uint32_t hdcp_rd_hdcp22_ver(void);
 void scdc_config(struct hdmitx_dev *hdev);

@@ -1,9 +1,12 @@
-/* SPDX-License-Identifier: GPL-2.0-only */
 /*
  *  linux/arch/arm/vfp/vfphw.S
  *
  *  Copyright (C) 2004 ARM Limited.
  *  Written by Deep Blue Solutions Limited.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
  *
  * This code is called from the kernel's undefined instruction trap.
  * r9 holds the return address for successful handling.
@@ -78,7 +81,11 @@
 ENTRY(vfp_support_entry)
 	DBGSTR3	"instr %08x pc %08x state %p", r0, r2, r10
 
-	.fpu	vfpv2
+	ldr	r3, [sp, #S_PSR]	@ Neither lazy restore nor FP exceptions
+	and	r3, r3, #MODE_MASK	@ are supported in kernel mode
+	teq	r3, #USR_MODE
+	bne	vfp_kmode_exception	@ Returns through lr
+
 	VFPFMRX	r1, FPEXC		@ Is the VFP enabled?
 	DBGSTR1	"fpexc %08x", r1
 	tst	r1, #FPEXC_EN
@@ -109,8 +116,6 @@ ENTRY(vfp_support_entry)
 	VFPFSTMIA r4, r5		@ save the working registers
 	VFPFMRX	r5, FPSCR		@ current status
 #ifndef CONFIG_CPU_FEROCEON
-#ifndef CONFIG_AMLOGIC_ARMV8_AARCH32
-
 	tst	r1, #FPEXC_EX		@ is there additional state to save?
 	beq	1f
 	VFPFMRX	r6, FPINST		@ FPINST (only if FPEXC.EX is set)
@@ -118,7 +123,6 @@ ENTRY(vfp_support_entry)
 	beq	1f
 	VFPFMRX	r8, FPINST2		@ FPINST2 if needed (and present)
 1:
-#endif
 #endif
 	stmia	r4, {r1, r5, r6, r8}	@ save FPEXC, FPSCR, FPINST, FPINST2
 vfp_reload_hw:
@@ -155,7 +159,6 @@ vfp_reload_hw:
 					@ FPEXC is in a safe state
 	ldmia	r10, {r1, r5, r6, r8}	@ load FPEXC, FPSCR, FPINST, FPINST2
 #ifndef CONFIG_CPU_FEROCEON
-#ifndef CONFIG_AMLOGIC_ARMV8_AARCH32
 	tst	r1, #FPEXC_EX		@ is there additional state to restore?
 	beq	1f
 	VFPFMXR	FPINST, r6		@ restore FPINST (only if FPEXC.EX is set)
@@ -163,7 +166,6 @@ vfp_reload_hw:
 	beq	1f
 	VFPFMXR	FPINST2, r8		@ FPINST2 if needed (and present)
 1:
-#endif
 #endif
 	VFPFMXR	FPSCR, r5		@ restore status
 
@@ -230,7 +232,6 @@ ENTRY(vfp_save_state)
 	DBGSTR1	"save VFP state %p", r0
 	VFPFSTMIA r0, r2		@ save the working registers
 	VFPFMRX	r2, FPSCR		@ current status
-#ifndef CONFIG_AMLOGIC_ARMV8_AARCH32
 	tst	r1, #FPEXC_EX		@ is there additional state to save?
 	beq	1f
 	VFPFMRX	r3, FPINST		@ FPINST (only if FPEXC.EX is set)
@@ -238,7 +239,6 @@ ENTRY(vfp_save_state)
 	beq	1f
 	VFPFMRX	r12, FPINST2		@ FPINST2 if needed (and present)
 1:
-#endif
 	stmia	r0, {r1, r2, r3, r12}	@ save FPEXC, FPSCR, FPINST, FPINST2
 	ret	lr
 ENDPROC(vfp_save_state)
@@ -261,14 +261,11 @@ vfp_current_hw_state_address:
 
 ENTRY(vfp_get_float)
 	tbl_branch r0, r3, #3
-	.fpu	vfpv2
 	.irp	dr,0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15
-1:	vmov	r0, s\dr
+1:	mrc	p10, 0, r0, c\dr, c0, 0	@ fmrs	r0, s0
 	ret	lr
 	.org	1b + 8
-	.endr
-	.irp	dr,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31
-1:	vmov	r0, s\dr
+1:	mrc	p10, 0, r0, c\dr, c0, 4	@ fmrs	r0, s1
 	ret	lr
 	.org	1b + 8
 	.endr
@@ -276,14 +273,11 @@ ENDPROC(vfp_get_float)
 
 ENTRY(vfp_put_float)
 	tbl_branch r1, r3, #3
-	.fpu	vfpv2
 	.irp	dr,0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15
-1:	vmov	s\dr, r0
+1:	mcr	p10, 0, r0, c\dr, c0, 0	@ fmsr	r0, s0
 	ret	lr
 	.org	1b + 8
-	.endr
-	.irp	dr,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31
-1:	vmov	s\dr, r0
+1:	mcr	p10, 0, r0, c\dr, c0, 4	@ fmsr	r0, s1
 	ret	lr
 	.org	1b + 8
 	.endr
@@ -291,17 +285,15 @@ ENDPROC(vfp_put_float)
 
 ENTRY(vfp_get_double)
 	tbl_branch r0, r3, #3
-	.fpu	vfpv2
 	.irp	dr,0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15
-1:	vmov	r0, r1, d\dr
+1:	fmrrd	r0, r1, d\dr
 	ret	lr
 	.org	1b + 8
 	.endr
 #ifdef CONFIG_VFPv3
 	@ d16 - d31 registers
-	.fpu	vfpv3
-	.irp	dr,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31
-1:	vmov	r0, r1, d\dr
+	.irp	dr,0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15
+1:	mrrc	p11, 3, r0, r1, c\dr	@ fmrrd	r0, r1, d\dr
 	ret	lr
 	.org	1b + 8
 	.endr
@@ -315,17 +307,15 @@ ENDPROC(vfp_get_double)
 
 ENTRY(vfp_put_double)
 	tbl_branch r2, r3, #3
-	.fpu	vfpv2
 	.irp	dr,0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15
-1:	vmov	d\dr, r0, r1
+1:	fmdrr	d\dr, r0, r1
 	ret	lr
 	.org	1b + 8
 	.endr
 #ifdef CONFIG_VFPv3
-	.fpu	vfpv3
 	@ d16 - d31 registers
-	.irp	dr,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31
-1:	vmov	d\dr, r0, r1
+	.irp	dr,0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15
+1:	mcrr	p11, 3, r0, r1, c\dr	@ fmdrr	r0, r1, d\dr
 	ret	lr
 	.org	1b + 8
 	.endr

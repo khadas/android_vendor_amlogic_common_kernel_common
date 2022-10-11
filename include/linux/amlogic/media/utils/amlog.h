@@ -1,6 +1,18 @@
-/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * include/linux/amlogic/media/utils/amlog.h
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
 #ifndef __AMLOG_H
@@ -35,45 +47,45 @@ MODULE_PARM_DESC(LOG_MASK_VAR, desc_mask)
 
 extern u32 LOG_LEVEL_VAR, LOG_MASK_VAR;
 
-#define amlog(x...) pr_info(x)
+#define amlog(x...) printk(x)
 
 #define amlog_level(level, x...) \
 	do { \
-		if ((level) >= LOG_LEVEL_VAR) \
-			pr_info(x); \
+		if (level >= LOG_LEVEL_VAR) \
+			printk(x); \
 	} while (0)
 
 #define amlog_mask(mask, x...) \
 	do { \
-		if ((mask) & LOG_MASK_VAR) \
-			pr_info(x); \
+		if (mask & LOG_MASK_VAR) \
+			printk(x); \
 	} while (0)
 
 #define amlog_mask_level(mask, level, x...) \
 	do { \
-		if (((level) >= LOG_LEVEL_VAR) && ((mask) & LOG_MASK_VAR)) \
-			pr_info(x); \
+		if ((level >= LOG_LEVEL_VAR) && (mask & LOG_MASK_VAR)) \
+			printk(x); \
 	} while (0)
 
-#define amlog_if(cond, x...) do {if (cond) pr_info(x); } while {0}
+#define amlog_if(cond, x...) do {if (cond) printk(x); } while {0}
 
 #define amlog_level_if(cond, level, x...) \
 	do { \
-		if ((cond) && ((level) >= LOG_LEVEL_VAR)) \
-			pr_info(x); \
+		if ((cond) && (level >= LOG_LEVEL_VAR)) \
+			printk(x); \
 	} while (0)
 
 #define amlog_mask_if(cond, mask, x...) \
 	do { \
-		if ((cond) && ((mask) & LOG_MASK_VAR)) \
-			pr_info(x); \
+		if ((cond) && (mask & LOG_MASK_VAR)) \
+			printk(x); \
 	} while (0)
 
 #define amlog_mask_levelif(cond, mask, level, x...) \
 	do { \
-		if ((cond) && ((level) >= LOG_LEVEL_VAR) &&\
-					((mask) & LOG_MASK_VAR)) \
-			pr_info(x...); \
+		if ((cond) && (level >= LOG_LEVEL_VAR) &&\
+					(mask & LOG_MASK_VAR)) \
+			printk(x...); \
 	} while (0)
 
 #else

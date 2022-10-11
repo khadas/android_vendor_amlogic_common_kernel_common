@@ -1,6 +1,8 @@
-ccflags-y += -DMODIFY_TIMESTAMP_INC_WITH_PLL -DCALC_CACHED_TIME
+obj-$(CONFIG_AMLOGIC_MEDIA_VIDEO)	+=	frame_sync.o
 
-$(MEDIA_MODULE_NAME)-$(CONFIG_AMLOGIC_MEDIA_FRAME_SYNC) += frame_sync/ptsserv.o
-$(MEDIA_MODULE_NAME)-$(CONFIG_AMLOGIC_MEDIA_FRAME_SYNC) += frame_sync/timestamp.o
-$(MEDIA_MODULE_NAME)-$(CONFIG_AMLOGIC_MEDIA_FRAME_SYNC) += frame_sync/tsync.o
-$(MEDIA_MODULE_NAME)-$(CONFIG_AMLOGIC_MEDIA_FRAME_SYNC) += frame_sync/tsync_pcr.o
+ccflags-y = -DMODIFY_TIMESTAMP_INC_WITH_PLL -DCALC_CACHED_TIME #-DUSE_VMASTER_MODE
+
+frame_sync-objs	+=	ptsserv.o
+frame_sync-objs	+=	timestamp.o
+frame_sync-objs	+=	tsync.o
+frame_sync-objs	+=	tsync_pcr.o

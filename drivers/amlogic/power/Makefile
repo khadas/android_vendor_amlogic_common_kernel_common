@@ -1,6 +1,9 @@
-MODULE_NAME = aml_power
 
-obj-$(CONFIG_AMLOGIC_POWER)		+= $(MODULE_NAME).o
-$(MODULE_NAME)-y += power_ctrl.o sec_pwr_ctrl.o sec_power_domain.o power_domain_sysfs.o
+obj-$(CONFIG_AMLOGIC_PMU)                   += aml_pmu/
+obj-$(CONFIG_AMLOGIC_PMU_OF)                += aml_pmu_of_common.o
 
-obj-$(CONFIG_AMLOGIC_POWER_SUPPLY)	+= supply/
+obj-$(CONFIG_AMLOGIC_M8B_DVFS)              += aml_dvfs/
+obj-$(CONFIG_AMLOGIC_POWER)                 += power_ctrl.o
+obj-$(CONFIG_AMLOGIC_POWER)		+= sec_pwr_ctrl.o
+obj-$(CONFIG_AMLOGIC_POWER)		+= sc2_power_domain.o
+obj-$(CONFIG_AMLOGIC_POWER)		+= power_domain_sysfs.o

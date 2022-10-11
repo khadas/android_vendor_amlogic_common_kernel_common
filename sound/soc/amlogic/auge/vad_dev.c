@@ -1,9 +1,19 @@
-// SPDX-License-Identifier: GPL-2.0
 /*
- * Copyright (C) 2019 Amlogic, Inc. All rights reserved.
+ * sound/soc/amlogic/auge/vad_dev.c
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
  *
  */
-
 #define DEBUG
 
 #include <linux/module.h>
@@ -40,17 +50,15 @@ static ssize_t readable_show(struct class *cla, struct class_attribute *attr,
 	return sprintf(buf, "%d\n", readable);
 }
 
-static CLASS_ATTR_RO(readable);
-static struct attribute *vad_class_attrs[] = {
-	&class_attr_readable.attr,
-	NULL
+static struct class_attribute vad_attrs[] = {
+	__ATTR_RO(readable),
+
+	__ATTR_NULL
 };
-ATTRIBUTE_GROUPS(vad_class);
 
 static struct class vad_class = {
 	.name = DRV_NAME,
-	.owner = THIS_MODULE,
-	.class_groups = vad_class_groups,
+	.class_attrs = vad_attrs,
 };
 
 static int vad_open(struct inode *inode, struct file *file)
@@ -60,7 +68,8 @@ static int vad_open(struct inode *inode, struct file *file)
 	return 0;
 }
 
-static long vad_unlocked_ioctl(struct file *file,
+static long vad_unlocked_ioctl(
+	struct file *file,
 	unsigned int cmd,
 	unsigned long arg)
 {
@@ -78,8 +87,9 @@ static long vad_unlocked_ioctl(struct file *file,
 		if (copy_from_user(&xferi, _xferi, sizeof(xferi)))
 			return 0;
 
-		result = vad_transfer_chunk_data((unsigned long)xferi.buf,
-						 xferi.frames);
+		result = vad_transfer_chunk_data(
+					(unsigned long)xferi.buf,
+					xferi.frames);
 
 		__put_user(result, &_xferi->result);
 
@@ -96,8 +106,10 @@ static long vad_unlocked_ioctl(struct file *file,
 	return -ENOTTY;
 }
 
+
 #ifdef CONFIG_COMPAT
-static long vad_ioctl_compat(struct file *file,
+static long vad_ioctl_compat(
+	struct file *file,
 	unsigned int cmd,
 	unsigned long arg)
 {
@@ -115,7 +127,7 @@ static const struct file_operations vad_fops = {
 	.compat_ioctl   = vad_ioctl_compat,
 };
 
-int __init vad_dev_init(void)
+static int __init vad_init(void)
 {
 	struct device *vad_dev;
 	struct class *p_vad_class;
@@ -138,7 +150,7 @@ int __init vad_dev_init(void)
 	vad_dev = device_create(p_vad_class,
 				NULL, MKDEV(VAD_MAJOR, 0),
 				NULL, DRV_NAME);
-	if (!vad_dev) {
+	if (vad_dev == NULL) {
 		ret = -EEXIST;
 		goto err2;
 	}
@@ -154,13 +166,10 @@ err0:
 	return ret;
 }
 
-void __exit vad_dev_exit(void)
+static void __exit vad_exit(void)
 {
 	unregister_chrdev(VAD_MAJOR, DRV_NAME);
 }
 
-#ifndef MODULE
-module_init(vad_dev_init);
-module_exit(vad_dev_exit);
-#endif
-
+module_init(vad_init);
+module_exit(vad_exit);

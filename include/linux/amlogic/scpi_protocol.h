@@ -1,11 +1,24 @@
-/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * include/linux/amlogic/scpi_protocol.h
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
 #ifndef _SCPI_PROTOCOL_H_
 #define _SCPI_PROTOCOL_H_
 #include <linux/types.h>
+#include <linux/amlogic/meson_mhu_common.h>
 
 enum scpi_client_id {
 	SCPI_CL_NONE,
@@ -59,31 +72,18 @@ enum scpi_std_cmd {
 	SCPI_CMD_GET_ETHERNET_CALC = 0x32,
 	SCPI_CMD_GET_CPUINFO = 0x33,
 	SCPI_CMD_INIT_DSP = 0x34,
-	SCPI_CMD_HIFI4STOP	= 0x4d,
-
-	SCPI_CMD_HIFI4LOGCTL		= 0x50,
-	SCPI_CMD_HIFI4SYSTLOG		= 0x51,
 
 	SCPI_CMD_GET_CEC1		= 0xB4,
 	SCPI_CMD_GET_CEC2		= 0xB5,
-	SCPI_CMD_SET_CEC_DATA		= 0xB6,/*to aocpu cec module*/
-	SCPI_CMD_SEND_DSP_DATA		= 0xB6,
-	SCPI_CMD_SET_CEC1		= 0xB7,
-	SCPI_CMD_SET_CEC2		= 0xB8,
-	SCPI_CMD_GET_CEC_REASON		= 0xB9,
-	SCPI_CMD_SET_CEC_REASON		= 0xBA,
+	SCPI_CMD_SET_CEC_DATA		= 0xB6,
 	SCPI_CMD_GET_CEC_OTP_MSG	= 0xBB,
 	SCPI_CMD_GET_CEC_AS_MSG		= 0xBC,
 	SCPI_CMD_BL4_WAIT_UNLOCK	= 0xD6,
 	SCPI_CMD_BL4_SEND		= 0xD7,
 	SCPI_CMD_BL4_LISTEN		= 0xD8,
+	SCPI_CMD_UINTTEST		= 0xFA,
 	SCPI_CMD_LEDS_STATE		= 0xF7,
 	SCPI_CMD_COUNT
-};
-
-enum scpi_req_cmd {
-	SCPI_REQ_INVALID		= 0x00,
-	SCPI_REQ_COUNT
 };
 
 enum scpi_get_pfm_type {
@@ -110,14 +110,7 @@ struct bl40_msg_buf {
 	char buf[512];
 } __packed;
 
-struct hifi4syslog {
-	char syslogstate[4];
-	u32 logbaseaddr;
-	u32 syslogsize;
-	u32 loghead;
-	u32 logtail;
-} __packed;
-
+/*donot add more scpi api*/
 unsigned long scpi_clk_get_val(u16 clk_id);
 int scpi_clk_set_val(u16 clk_id, unsigned long rate);
 int scpi_dvfs_get_idx(u8 domain);
@@ -125,15 +118,14 @@ int scpi_dvfs_set_idx(u8 domain, u8 idx);
 struct scpi_dvfs_info *scpi_dvfs_get_opps(u8 domain);
 int scpi_get_sensor(char *name);
 int scpi_get_sensor_value(u16 sensor, u32 *val);
-int scpi_send_usr_data(u32 client_id, u32 *val, u32 size);
+int scpi_send_usr_data(u32 client_id, void *val, u32 size);
 int scpi_get_vrtc(u32 *p_vrtc);
 int scpi_set_vrtc(u32 vrtc_val);
 int scpi_get_ring_value(unsigned char *val);
 int scpi_get_wakeup_reason(u32 *wakeup_reason);
 int scpi_clr_wakeup_reason(void);
 int scpi_get_cec_val(enum scpi_std_cmd index, u32 *p_cec);
-int scpi_set_cec_val(enum scpi_std_cmd index, u32 cec_data);
-int scpi_send_cec_data(u32 cmd_id, u32 *val, u32 size);
+int scpi_send_cec_data(u32 cmd_id, void *val, u32 size);
 int scpi_get_cec_wk_msg(enum scpi_std_cmd index, unsigned char *cec_msg);
 u8  scpi_get_ethernet_calc(void);
 int scpi_get_cpuinfo(enum scpi_get_pfm_type type, u32 *freq, u32 *vol);
@@ -149,15 +141,10 @@ enum scpi_chan {
 	SCPI_OTHER = 4, /* to other core */
 	SCPI_MAXNUM,
 };
-
 /* use this api send data to aocpu/secpu/dsp/cm3/cm4
  * donnot need add other api for your self
  * channel: SPCI_DSPA/SCPI_AOCPU and other
  */
 int scpi_send_data(void *data, int size, int channel,
 		   int cmd, void *revdata, int revsize);
-int mbox_message_send_ao_sync(struct device *dev, int cmd, void *sdata,
-		int tx_size, void *rdata, int rx_size, int idx);
-int mbox_message_send_sec_sync(struct device *dev, int cmd, void *sdata,
-		size_t tx_size, void *rdata, size_t *rx_size, int idx);
 #endif /*_SCPI_PROTOCOL_H_*/

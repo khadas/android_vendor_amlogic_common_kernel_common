@@ -60,26 +60,21 @@
 #include "dwc_otg_pcd.h"
 
 #include <linux/of_platform.h>
-#include <linux/of_gpio.h>
+#include <linux/amlogic/aml_gpio_consumer.h>
 #include <linux/clk.h>
 #include <linux/io.h>
 #include <asm/io.h>
-//#include <asm/sizes.h>
+#include <asm/sizes.h>
 #include <linux/of_address.h>
 #include <linux/platform_device.h>
 #include <linux/amlogic/usbtype.h>
 #include <linux/usb.h>
 #include <linux/usb/hcd.h>
 #include <linux/workqueue.h>
+#include <linux/amlogic/cpu_version.h>
 #ifdef CONFIG_AMLOGIC_LEGACY_EARLY_SUSPEND
 #include <linux/amlogic/pm.h>
 #endif
-
-#ifdef CONFIG_AMLOGIC_USB3PHY
-#include <linux/amlogic/usb-v2.h>
-#endif
-
-#include <linux/amlogic/gki_module.h>
 
 #define DWC_DRIVER_VERSION	"3.10a 12-MAY-2014"
 #define DWC_DRIVER_DESC		"HS OTG USB Controller driver"
@@ -152,7 +147,6 @@ struct dwc_otg_driver_module_params {
 	int32_t otg_ver;
 	int32_t adp_enable;
 	int32_t host_only;
-	s32 eltest_flag;
 };
 
 static struct dwc_otg_driver_module_params dwc_otg_module_params = {
@@ -239,7 +233,6 @@ static struct dwc_otg_driver_module_params dwc_otg_module_params = {
 	.ahb_single = 1,
 	.otg_ver = -1,
 	.adp_enable = -1,
-	.eltest_flag = -1,
 };
 
 bool force_device_mode;
@@ -247,7 +240,7 @@ module_param_named(otg_device, force_device_mode,
 		bool, S_IRUGO | S_IWUSR);
 
 static char otg_mode_string[2] = "0";
-static int force_otg_mode(char *s)
+static int __init force_otg_mode(char *s)
 {
 	if (s != NULL)
 		sprintf(otg_mode_string, "%s", s);
@@ -614,53 +607,28 @@ void dwc_otg_charger_detect_notifier_call(int bc_mode)
 
 static void amlogic_device_detect_work(struct work_struct *work)
 {
-	dwc_otg_device_t *otgdev =
+	dwc_otg_device_t *dwc_otg_device =
 		container_of(work, dwc_otg_device_t, work.work);
-	dwc_otg_device_global_regs_t *dev_global_regs =
-		otgdev->core_if->dev_if->dev_global_regs;
-	struct dwc_otg_cil_callbacks *pcd_cb =
-		otgdev->pcd->core_if->pcd_cb;
-	#define TM msecs_to_jiffies(100)
+	int ret;
 
-	static u64 sof_cnt_pre;
-	static u32 sofstop_flag;
-	dsts_data_t dsts;
-
-	if (dwc_otg_module_params.eltest_flag == 1) {
-		dsts.d32 = DWC_READ_REG32(&dev_global_regs->dsts);
-		if (otgdev->core_if->dev_if->suspend_no != 1 && dsts.b.suspsts != 1) {
-			dsts.d32 = DWC_READ_REG32(&dev_global_regs->dsts);
+	if (USB_OTG == dwc_otg_device->core_if->controller_type) {
+		if (dwc_otg_device->core_if->phy_interface == 1)
+			ret = device_status((unsigned long)dwc_otg_device->
+					core_if->usb_peri_reg);
+		else
+			ret = device_status_v2((unsigned long)dwc_otg_device->
+					core_if->usb_peri_reg);
+		if (!ret) {
+			DWC_PRINTF("usb device plug out, stop pcd!!!\n");
+			if (dwc_otg_device->pcd->core_if->pcd_cb->stop)
+				dwc_otg_device->pcd->core_if->
+					pcd_cb->stop(dwc_otg_device->pcd);
 		} else {
-			DWC_PRINTF("suspend---eltest_flag-----!\n");
-			schedule_delayed_work(&otgdev->work, 2000);
-			return;
-		}
-	} else {
-		if (otgdev->core_if->dev_if->suspend_no != 1) {
-			dsts.d32 = DWC_READ_REG32(&dev_global_regs->dsts);
-		} else {
-			DWC_PRINTF("suspend--------!\n");
-			schedule_delayed_work(&otgdev->work, 2000);
-			return;
+			schedule_delayed_work(&dwc_otg_device->work,
+				msecs_to_jiffies(100));
 		}
 	}
-	if (sof_cnt_pre == dsts.b.soffn) {
-		sofstop_flag++;
-		if (sofstop_flag == 2) {
-			DWC_PRINTF("usbplug out,stop pcd!\n");
-			if (pcd_cb->stop)
-				pcd_cb->stop(otgdev->pcd);
-			sofstop_flag = 0;
-		} else {
-			schedule_delayed_work(&otgdev->work,
-					      TM);
-		}
 
-	} else {
-		sof_cnt_pre = dsts.b.soffn;
-		sofstop_flag = 0;
-		schedule_delayed_work(&otgdev->work, TM);
-	}
 	return;
 }
 
@@ -1096,6 +1064,11 @@ static int dwc_otg_driver_probe(struct platform_device *pdev)
 			if (prop)
 				phy_otg = of_read_ulong(prop, 1);
 
+			if (is_meson_g12b_cpu()) {
+				if (!is_meson_rev_a())
+					phy_interface = 2;
+			}
+
 			dwc_otg_module_params.host_rx_fifo_size = dwc_otg_module_params.data_fifo_size / 2;
 			DWC_PRINTF("dwc_otg: %s: type: %d speed: %d, ",
 				s_clock_name, port_type, port_speed);
@@ -1442,7 +1415,9 @@ static int dwc_otg_driver_probe(struct platform_device *pdev)
 
 #ifdef CONFIG_AMLOGIC_USB3PHY
 	if (dwc_otg_device->core_if->controller_type == USB_OTG) {
-		if (dwc_otg_device->core_if->phy_interface != 1) {
+		if (dwc_otg_device->core_if->phy_interface == 1) {
+			aml_new_usb_init();
+		} else {
 			if (dwc_otg_device->core_if->phy_otg)
 				aml_new_otg_init();
 			else
@@ -1476,7 +1451,6 @@ static int dwc2_suspend(struct device *dev)
 	const char *s_clock_name = NULL;
 	const char *cpu_type = NULL;
 
-	g_dwc_otg_device[pdev->id]->core_if->dev_if->suspend_no = 1;
 	s_clock_name = of_get_property(pdev->dev.of_node, "clock-src", NULL);
 	if (!s_clock_name)
 		return 0;
@@ -1505,7 +1479,6 @@ static int dwc2_resume(struct device *dev)
 	clk_resume_usb(pdev, s_clock_name,
 			(unsigned long)(g_dwc_otg_device[pdev->id]->
 				core_if->usb_peri_reg), cpu_type);
-	g_dwc_otg_device[pdev->id]->core_if->dev_if->suspend_no = 0;
 
 	return 0;
 }
@@ -1799,8 +1772,6 @@ module_param_named(adp_enable, dwc_otg_module_params.adp_enable, int, 0444);
 MODULE_PARM_DESC(adp_enable, "ADP Enable 0=ADP Disabled 1=ADP Enabled");
 module_param_named(otg_ver, dwc_otg_module_params.otg_ver, int, 0444);
 MODULE_PARM_DESC(otg_ver, "OTG revision supported 0=OTG 1.3 1=OTG 2.0");
-module_param_named(eltest_flag, dwc_otg_module_params.eltest_flag, int, 0644);
-MODULE_PARM_DESC(eltest_flag, "EL test=1");
 
 /** @page "Module Parameters"
  *

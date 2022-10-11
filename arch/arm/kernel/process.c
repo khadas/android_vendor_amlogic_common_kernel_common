@@ -1,23 +1,24 @@
-// SPDX-License-Identifier: GPL-2.0-only
 /*
  *  linux/arch/arm/kernel/process.c
  *
  *  Copyright (C) 1996-2000 Russell King - Converted to ARM.
  *  Original Copyright (C) 1995  Linus Torvalds
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
  */
 #include <stdarg.h>
 
 #include <linux/export.h>
 #include <linux/sched.h>
-#include <linux/sched/debug.h>
-#include <linux/sched/task.h>
-#include <linux/sched/task_stack.h>
 #include <linux/kernel.h>
 #include <linux/mm.h>
 #include <linux/stddef.h>
 #include <linux/unistd.h>
 #include <linux/user.h>
 #include <linux/interrupt.h>
+#include <linux/kallsyms.h>
 #include <linux/init.h>
 #include <linux/elfcore.h>
 #include <linux/pm.h>
@@ -40,7 +41,7 @@
 #include <linux/amlogic/debug_lockup.h>
 #endif
 
-#if defined(CONFIG_STACKPROTECTOR) && !defined(CONFIG_STACKPROTECTOR_PER_TASK)
+#ifdef CONFIG_CC_STACKPROTECTOR
 #include <linux/stackprotector.h>
 unsigned long __stack_chk_guard __read_mostly;
 EXPORT_SYMBOL(__stack_chk_guard);
@@ -90,6 +91,7 @@ void arch_cpu_idle_enter(void)
 #ifdef CONFIG_AMLOGIC_DEBUG_LOCKUP
 	__arch_cpu_idle_enter();
 #endif
+	idle_notifier_call_chain(IDLE_START);
 	ledtrig_cpu(CPU_LED_IDLE_START);
 #ifdef CONFIG_PL310_ERRATA_769419
 	wmb();
@@ -99,6 +101,7 @@ void arch_cpu_idle_enter(void)
 void arch_cpu_idle_exit(void)
 {
 	ledtrig_cpu(CPU_LED_IDLE_END);
+	idle_notifier_call_chain(IDLE_END);
 #ifdef CONFIG_AMLOGIC_DEBUG_LOCKUP
 	__arch_cpu_idle_exit();
 #endif
@@ -148,7 +151,7 @@ static void show_data(unsigned long addr, int nbytes, const char *name)
 			return;
 #endif
 
-	pr_info("\n%s: %#lx:\n", name, addr);
+	printk("\n%s: %#lx:\n", name, addr);
 
 	/*
 	 * round address down to a 32 bit boundary
@@ -158,19 +161,20 @@ static void show_data(unsigned long addr, int nbytes, const char *name)
 	nbytes += (addr & (sizeof(u32) - 1));
 	nlines = (nbytes + 31) / 32;
 
+
 	for (i = 0; i < nlines; i++) {
 		/*
 		 * just display low 16 bits of address to keep
 		 * each line of the dump < 80 characters
 		 */
-		pr_info("%04lx ", (unsigned long)p & 0xffff);
+		printk("%04lx ", (unsigned long)p & 0xffff);
 		for (j = 0; j < 8; j++) {
 			u32	data;
-
-			if (probe_kernel_address(p, data))
+			if (probe_kernel_address(p, data)) {
 				pr_cont(" ********");
-			else
+			} else {
 				pr_cont(" %08x", data);
+			}
 			++p;
 		}
 		pr_cont("\n");
@@ -187,7 +191,7 @@ static void show_user_data(unsigned long addr, int nbytes, const char *name)
 	int	nlines;
 	u32	*p;
 
-	if (!access_ok((void *)addr, nbytes))
+	if (!access_ok(VERIFY_READ, (void *)addr, nbytes))
 		return;
 
 #ifdef CONFIG_AMLOGIC_MODIFY
@@ -364,9 +368,8 @@ void show_vma(struct mm_struct *mm, unsigned long addr)
 		if (!IS_ERR(p)) {
 			mangle_path(file_name, p, "\n");
 			pr_cont("%s", p);
-		} else {
+		} else
 			pr_cont(" get file path failed\n");
-		}
 		goto done;
 	}
 
@@ -426,6 +429,7 @@ static void show_vmalloc_pfn(struct pt_regs *regs)
 				i, regs->uregs[i], page_to_pfn(page));
 		}
 	}
+
 }
 #endif /* CONFIG_AMLOGIC_USER_FAULT */
 
@@ -456,18 +460,18 @@ void __show_regs(struct pt_regs *regs)
 
 	show_regs_print_info(KERN_DEFAULT);
 
-	printk("PC is at %pS\n", (void *)instruction_pointer(regs));
-	printk("LR is at %pS\n", (void *)regs->ARM_lr);
+	print_symbol("PC is at %s\n", instruction_pointer(regs));
+	print_symbol("LR is at %s\n", regs->ARM_lr);
 #ifdef CONFIG_AMLOGIC_USER_FAULT
 	if (user_mode(regs)) {
 		show_vma(current->mm, instruction_pointer(regs));
 		show_vma(current->mm, regs->ARM_lr);
 	}
 #endif
-	printk("pc : [<%08lx>]    lr : [<%08lx>]    psr: %08lx\n",
-	       regs->ARM_pc, regs->ARM_lr, regs->ARM_cpsr);
-	printk("sp : %08lx  ip : %08lx  fp : %08lx\n",
-	       regs->ARM_sp, regs->ARM_ip, regs->ARM_fp);
+	printk("pc : [<%08lx>]    lr : [<%08lx>]    psr: %08lx\n"
+	       "sp : %08lx  ip : %08lx  fp : %08lx\n",
+		regs->ARM_pc, regs->ARM_lr, regs->ARM_cpsr,
+		regs->ARM_sp, regs->ARM_ip, regs->ARM_fp);
 	printk("r10: %08lx  r9 : %08lx  r8 : %08lx\n",
 		regs->ARM_r10, regs->ARM_r9,
 		regs->ARM_r8);
@@ -496,7 +500,7 @@ void __show_regs(struct pt_regs *regs)
 		if ((domain & domain_mask(DOMAIN_USER)) ==
 		    domain_val(DOMAIN_USER, DOMAIN_NOACCESS))
 			segment = "none";
-		else if (fs == KERNEL_DS)
+		else if (fs == get_ds())
 			segment = "kernel";
 		else
 			segment = "user";
@@ -582,8 +586,8 @@ void release_thread(struct task_struct *dead_task)
 asmlinkage void ret_from_fork(void) __asm__("ret_from_fork");
 
 int
-copy_thread_tls(unsigned long clone_flags, unsigned long stack_start,
-	    unsigned long stk_sz, struct task_struct *p, unsigned long tls)
+copy_thread(unsigned long clone_flags, unsigned long stack_start,
+	    unsigned long stk_sz, struct task_struct *p)
 {
 	struct thread_info *thread = task_thread_info(p);
 	struct pt_regs *childregs = task_pt_regs(p);
@@ -617,14 +621,10 @@ copy_thread_tls(unsigned long clone_flags, unsigned long stack_start,
 	clear_ptrace_hw_breakpoint(p);
 
 	if (clone_flags & CLONE_SETTLS)
-		thread->tp_value[0] = tls;
+		thread->tp_value[0] = childregs->ARM_r3;
 	thread->tp_value[1] = get_tpuser();
 
 	thread_notify(THREAD_NOTIFY_COPY, thread);
-
-#ifdef CONFIG_STACKPROTECTOR_PER_TASK
-	thread->stack_canary = p->stack_canary;
-#endif
 
 	return 0;
 }
@@ -677,6 +677,11 @@ unsigned long get_wchan(struct task_struct *p)
 	return 0;
 }
 
+unsigned long arch_randomize_brk(struct mm_struct *mm)
+{
+	return randomize_page(mm->brk, 0x02000000);
+}
+
 #ifdef CONFIG_MMU
 #ifdef CONFIG_KUSER_HELPERS
 /*
@@ -684,15 +689,15 @@ unsigned long get_wchan(struct task_struct *p)
  * atomic helpers. Insert it into the gate_vma so that it is visible
  * through ptrace and /proc/<pid>/mem.
  */
-static struct vm_area_struct gate_vma;
+static struct vm_area_struct gate_vma = {
+	.vm_start	= 0xffff0000,
+	.vm_end		= 0xffff0000 + PAGE_SIZE,
+	.vm_flags	= VM_READ | VM_EXEC | VM_MAYREAD | VM_MAYEXEC,
+};
 
 static int __init gate_vma_init(void)
 {
-	vma_init(&gate_vma, NULL);
 	gate_vma.vm_page_prot = PAGE_READONLY_EXEC;
-	gate_vma.vm_start = 0xffff0000;
-	gate_vma.vm_end	= 0xffff0000 + PAGE_SIZE;
-	gate_vma.vm_flags = VM_READ | VM_EXEC | VM_MAYREAD | VM_MAYEXEC;
 	return 0;
 }
 arch_initcall(gate_vma_init);
@@ -757,17 +762,9 @@ static unsigned long sigpage_addr(const struct mm_struct *mm,
 static struct page *signal_page;
 extern struct page *get_signal_page(void);
 
-static int sigpage_mremap(const struct vm_special_mapping *sm,
-		struct vm_area_struct *new_vma)
-{
-	current->mm->context.sigpage = new_vma->vm_start;
-	return 0;
-}
-
 static const struct vm_special_mapping sigpage_mapping = {
 	.name = "[sigpage]",
 	.pages = &signal_page,
-	.mremap = sigpage_mremap,
 };
 
 int arch_setup_additional_pages(struct linux_binprm *bprm, int uses_interp)

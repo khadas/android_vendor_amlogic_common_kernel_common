@@ -1,8 +1,12 @@
-// SPDX-License-Identifier: GPL-2.0-only
 /*
  * Driver for ISSI IS31FL32xx family of I2C LED controllers
  *
  * Copyright 2015 Allworx Corp.
+ *
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
  *
  * Datasheets:
  *   http://www.issi.com/US/product-analog-fxled-driver.shtml
@@ -80,6 +84,7 @@ struct is31fl32xx_chipdef {
 	bool	pwm_registers_reversed;
 	u8	led_control_register_base;
 	u8	enable_bits_per_led_control_register;
+	u8	pwm_frequency_set_reg;
 	int (*reset_func)(struct is31fl32xx_priv *priv);
 	int (*sw_shutdown_func)(struct is31fl32xx_priv *priv, bool enable);
 };
@@ -91,6 +96,7 @@ static const struct is31fl32xx_chipdef is31fl3236_cdef = {
 	.global_control_reg			= 0x4a,
 	.reset_reg				= 0x4f,
 	.pwm_register_base			= 0x01,
+	.pwm_frequency_set_reg                  = 0x4b,
 	.led_control_register_base		= 0x26,
 	.enable_bits_per_led_control_register	= 1,
 };
@@ -304,8 +310,8 @@ static int is31fl32xx_init_regs(struct is31fl32xx_priv *priv)
 
 		for (i = 0; i < num_regs; i++) {
 			ret = is31fl32xx_write(priv,
-					       cdef->led_control_register_base+i,
-					       value);
+				cdef->led_control_register_base+i,
+				value);
 			if (ret)
 				return ret;
 		}
@@ -321,7 +327,19 @@ static int is31fl32xx_init_regs(struct is31fl32xx_priv *priv)
 			return ret;
 	}
 
+	if (cdef->pwm_frequency_set_reg) {
+		ret = is31fl32xx_write(priv, cdef->pwm_frequency_set_reg, 0x01);
+		if (ret)
+			return ret;
+	}
+
 	return 0;
+}
+
+static inline size_t sizeof_is31fl32xx_priv(int num_leds)
+{
+	return sizeof(struct is31fl32xx_priv) +
+		      (sizeof(struct is31fl32xx_led_data) * num_leds);
 }
 
 static int is31fl32xx_parse_child_dt(const struct device *dev,
@@ -335,11 +353,11 @@ static int is31fl32xx_parse_child_dt(const struct device *dev,
 	if (of_property_read_string(child, "label", &cdev->name))
 		cdev->name = child->name;
 
-	ret = of_property_read_u32(child, "reg", &reg);
+	ret = of_property_read_u32(child, "reg_offset", &reg);
 	if (ret || reg < 1 || reg > led_data->priv->cdef->channels) {
 		dev_err(dev,
-			"Child node %pOF does not have a valid reg property\n",
-			child);
+			"Child node %s does not have a valid reg property\n",
+			child->full_name);
 		return -EINVAL;
 	}
 	led_data->channel = reg;
@@ -413,7 +431,7 @@ err:
 }
 
 static const struct of_device_id of_is31fl32xx_match[] = {
-	{ .compatible = "issi,is31fl3236", .data = &is31fl3236_cdef, },
+	{ .compatible = "issi,is31fl3236,gva", .data = &is31fl3236_cdef, },
 	{ .compatible = "issi,is31fl3235", .data = &is31fl3235_cdef, },
 	{ .compatible = "issi,is31fl3218", .data = &is31fl3218_cdef, },
 	{ .compatible = "si-en,sn3218",    .data = &is31fl3218_cdef, },
@@ -444,7 +462,7 @@ static int is31fl32xx_probe(struct i2c_client *client,
 	if (!count)
 		return -EINVAL;
 
-	priv = devm_kzalloc(dev, struct_size(priv, leds, count),
+	priv = devm_kzalloc(dev, sizeof_is31fl32xx_priv(count),
 			    GFP_KERNEL);
 	if (!priv)
 		return -ENOMEM;

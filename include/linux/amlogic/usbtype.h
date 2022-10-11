@@ -1,6 +1,18 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * include/linux/amlogic/usbtype.h
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
 #ifndef __USB_CLK_HEADER_
@@ -31,11 +43,6 @@
 enum usb3_phy_func_e {
 	AML_USB3_PHY_DISABLE = 0,
 	AML_USB3_PHY_ENABLE,
-};
-
-enum usb2_phy_func_e {
-	AML_USB2_PHY_DISABLE = 0,
-	AML_USB2_PHY_ENABLE,
 };
 
 enum usb_port_type_e {
@@ -92,18 +99,6 @@ int clk_suspend_usb(struct platform_device *pdev, const char *s_clock_name,
 
 int device_status(unsigned long usb_peri_reg);
 int device_status_v2(unsigned long usb_peri_reg);
-
-int crg_clk_enable_usb(struct platform_device *pdev,
-	 unsigned long usb_peri_reg, int controller_type);
-
-int crg_clk_disable_usb(struct platform_device *pdev, unsigned long usb_peri_reg);
-
-int crg_clk_resume_usb(struct platform_device *pdev, unsigned long usb_peri_reg);
-
-int crg_clk_suspend_usb(struct platform_device *pdev, unsigned long usb_peri_reg);
-
-int crg_device_status(unsigned long usb_peri_reg);
-int crg_device_status_v2(unsigned long usb_peri_reg);
 
 extern int dwc_otg_power_register_notifier(struct notifier_block *nb);
 extern int dwc_otg_power_unregister_notifier(struct notifier_block *nb);

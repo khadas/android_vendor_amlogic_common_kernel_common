@@ -1,8 +1,19 @@
-/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/amlogic/media/dtv_demod/include/demod_dbg.h
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
-
 #ifndef __DTV_DMD_DBG_H
 #define __DTV_DMD_DBG_H
 #include <linux/bitops.h>
@@ -39,6 +50,4 @@ void aml_demod_dbg_init(void);
 void aml_demod_dbg_exit(void);
 int dtvdemod_create_class_files(struct class *clsp);
 void dtvdemod_remove_class_files(struct class *clsp);
-unsigned int clear_ddr_bus_data(void);
-
 #endif

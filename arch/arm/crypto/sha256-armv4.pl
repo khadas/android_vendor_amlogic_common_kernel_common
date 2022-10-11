@@ -1,19 +1,12 @@
 #!/usr/bin/env perl
-# SPDX-License-Identifier: GPL-2.0
-
-# This code is taken from the OpenSSL project but the author (Andy Polyakov)
-# has relicensed it under the GPLv2. Therefore this program is free software;
-# you can redistribute it and/or modify it under the terms of the GNU General
-# Public License version 2 as published by the Free Software Foundation.
-#
-# The original headers, including the original license headers, are
-# included below for completeness.
 
 # ====================================================================
 # Written by Andy Polyakov <appro@openssl.org> for the OpenSSL
 # project. The module is, however, dual licensed under OpenSSL and
 # CRYPTOGAMS licenses depending on where you obtain it. For further
 # details see http://www.openssl.org/~appro/cryptogams/.
+#
+# Permission to use under GPL terms is granted.
 # ====================================================================
 
 # SHA256 block procedure for ARMv4. May 2007.
@@ -175,6 +168,7 @@ $code=<<___;
 #else
 .syntax unified
 # ifdef __thumb2__
+#  define adrl adr
 .thumb
 # else
 .code   32
@@ -470,8 +464,7 @@ sha256_block_data_order_neon:
 	stmdb	sp!,{r4-r12,lr}
 
 	sub	$H,sp,#16*4+16
-	adr	$Ktbl,.Lsha256_block_data_order
-	sub	$Ktbl,$Ktbl,#.Lsha256_block_data_order-K256
+	adrl	$Ktbl,K256
 	bic	$H,$H,#15		@ align for 128-bit stores
 	mov	$t2,sp
 	mov	sp,$H			@ alloca

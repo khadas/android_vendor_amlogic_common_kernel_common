@@ -173,7 +173,6 @@ struct dualsense_touch_point {
 	uint8_t x_hi:4, y_lo:4;
 	uint8_t y_hi;
 } __packed;
-static_assert(sizeof(struct dualsense_touch_point) == 4);
 
 /* Main DualSense input report excluding any BT/USB specific headers. */
 struct dualsense_input_report {
@@ -197,8 +196,6 @@ struct dualsense_input_report {
 	uint8_t status;
 	uint8_t reserved4[10];
 } __packed;
-/* Common input report size shared equals the size of the USB report minus 1 byte for ReportID. */
-static_assert(sizeof(struct dualsense_input_report) == DS_INPUT_REPORT_USB_SIZE - 1);
 
 /* Common data between DualSense BT/USB main output report. */
 struct dualsense_output_report_common {
@@ -226,7 +223,6 @@ struct dualsense_output_report_common {
 	uint8_t lightbar_green;
 	uint8_t lightbar_blue;
 } __packed;
-static_assert(sizeof(struct dualsense_output_report_common) == 47);
 
 struct dualsense_output_report_bt {
 	uint8_t report_id; /* 0x31 */
@@ -236,14 +232,12 @@ struct dualsense_output_report_bt {
 	uint8_t reserved[24];
 	__le32 crc32;
 } __packed;
-static_assert(sizeof(struct dualsense_output_report_bt) == DS_OUTPUT_REPORT_BT_SIZE);
 
 struct dualsense_output_report_usb {
 	uint8_t report_id; /* 0x02 */
 	struct dualsense_output_report_common common;
 	uint8_t reserved[15];
 } __packed;
-static_assert(sizeof(struct dualsense_output_report_usb) == DS_OUTPUT_REPORT_USB_SIZE);
 
 /*
  * The DualSense has a main output report used to control most features. It is
@@ -322,7 +316,7 @@ static int ps_devices_list_remove(struct ps_device *dev)
 
 static int ps_device_set_player_id(struct ps_device *dev)
 {
-	int ret = ida_alloc(&ps_player_id_allocator, GFP_KERNEL);
+	int ret = ida_simple_get(&ps_player_id_allocator, 0, 0, GFP_KERNEL);
 
 	if (ret < 0)
 		return ret;
@@ -333,7 +327,7 @@ static int ps_device_set_player_id(struct ps_device *dev)
 
 static void ps_device_release_player_id(struct ps_device *dev)
 {
-	ida_free(&ps_player_id_allocator, dev->player_id);
+	ida_simple_remove(&ps_player_id_allocator, dev->player_id);
 
 	dev->player_id = U32_MAX;
 }
@@ -1291,7 +1285,7 @@ static int ps_probe(struct hid_device *hdev, const struct hid_device_id *id)
 		}
 	}
 
-	ret = devm_device_add_group(&hdev->dev, &ps_device_attribute_group);
+	ret = sysfs_create_group(&hdev->dev.kobj, &ps_device_attribute_group);
 	if (ret) {
 		hid_err(hdev, "Failed to register sysfs nodes.\n");
 		goto err_close;
@@ -1315,6 +1309,8 @@ static void ps_remove(struct hid_device *hdev)
 
 	hid_hw_close(hdev);
 	hid_hw_stop(hdev);
+
+	sysfs_remove_group(&hdev->dev.kobj, &ps_device_attribute_group);
 }
 
 static const struct hid_device_id ps_devices[] = {

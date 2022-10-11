@@ -1,7 +1,16 @@
-// SPDX-License-Identifier: GPL-2.0-or-later
 /*
  * Copyright (c) 2010 Sascha Hauer <s.hauer@pengutronix.de>
  * Copyright (C) 2005-2009 Freescale Semiconductor, Inc.
+ *
+ * This program is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License as published by the
+ * Free Software Foundation; either version 2 of the License, or (at your
+ * option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but
+ * WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
+ * or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * for more details.
  */
 #include <linux/export.h>
 #include <linux/kernel.h>
@@ -103,7 +112,7 @@ int ipu_dp_set_global_alpha(struct ipu_dp *dp, bool enable,
 		writel(reg & ~DP_COM_CONF_GWAM, flow->base + DP_COM_CONF);
 	}
 
-	ipu_srm_dp_update(priv->ipu, true);
+	ipu_srm_dp_sync_update(priv->ipu);
 
 	mutex_unlock(&priv->mutex);
 
@@ -118,7 +127,7 @@ int ipu_dp_set_window_pos(struct ipu_dp *dp, u16 x_pos, u16 y_pos)
 
 	writel((x_pos << 16) | y_pos, flow->base + DP_FG_POS);
 
-	ipu_srm_dp_update(priv->ipu, true);
+	ipu_srm_dp_sync_update(priv->ipu);
 
 	return 0;
 }
@@ -199,7 +208,7 @@ int ipu_dp_setup_channel(struct ipu_dp *dp,
 					flow->out_cs, DP_COM_CONF_CSC_DEF_FG);
 	}
 
-	ipu_srm_dp_update(priv->ipu, true);
+	ipu_srm_dp_sync_update(priv->ipu);
 
 	mutex_unlock(&priv->mutex);
 
@@ -239,7 +248,7 @@ int ipu_dp_enable_channel(struct ipu_dp *dp)
 	reg |= DP_COM_CONF_FG_EN;
 	writel(reg, flow->base + DP_COM_CONF);
 
-	ipu_srm_dp_update(priv->ipu, true);
+	ipu_srm_dp_sync_update(priv->ipu);
 
 	mutex_unlock(&priv->mutex);
 
@@ -247,7 +256,7 @@ int ipu_dp_enable_channel(struct ipu_dp *dp)
 }
 EXPORT_SYMBOL_GPL(ipu_dp_enable_channel);
 
-void ipu_dp_disable_channel(struct ipu_dp *dp, bool sync)
+void ipu_dp_disable_channel(struct ipu_dp *dp)
 {
 	struct ipu_flow *flow = to_flow(dp);
 	struct ipu_dp_priv *priv = flow->priv;
@@ -270,7 +279,10 @@ void ipu_dp_disable_channel(struct ipu_dp *dp, bool sync)
 	writel(reg, flow->base + DP_COM_CONF);
 
 	writel(0, flow->base + DP_FG_POS);
-	ipu_srm_dp_update(priv->ipu, sync);
+	ipu_srm_dp_sync_update(priv->ipu);
+
+	if (ipu_idmac_channel_busy(priv->ipu, IPUV3_CHANNEL_MEM_BG_SYNC))
+		ipu_wait_interrupt(priv->ipu, IPU_IRQ_DP_SF_END, 50);
 
 	mutex_unlock(&priv->mutex);
 }

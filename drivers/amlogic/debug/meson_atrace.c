@@ -1,14 +1,25 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/amlogic/debug/meson_atrace.c
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
-
 #include <linux/module.h>
 
 #define CREATE_TRACE_POINTS
 #include <trace/events/meson_atrace.h>
 
-static u64 atrace_tag;
+static uint64_t atrace_tag;
 
 #define TAG_INFO(name) \
 	{ #name,  KERNEL_ATRACE_TAG_ ## name }
@@ -25,8 +36,6 @@ struct {
 	TAG_INFO(AMLVIDEO),
 	TAG_INFO(VIDEO_COMPOSER),
 	TAG_INFO(V4L2),
-	TAG_INFO(CPUFREQ),
-	TAG_INFO(MSYNC),
 	{ NULL, 0 }
 };
 
@@ -79,21 +88,15 @@ static ssize_t store_atrace_tag(struct class *class,
 	return size;
 }
 
-static struct class_attribute debug_attrs[] = {
+
+static struct class_attribute debug_class_attrs[] = {
 	__ATTR(atrace_tag, 0664, show_atrace_tag, store_atrace_tag),
 	__ATTR_NULL
 };
 
-static struct attribute *debug_class_attrs[] = {
-	&debug_attrs[0].attr,
-	NULL
-};
-
-ATTRIBUTE_GROUPS(debug_class);
-
 static struct class debug_class = {
 		.name = "debug",
-		.class_groups = debug_class_groups,
+		.class_attrs = debug_class_attrs,
 	};
 
 static int __init debug_module_init(void)
@@ -122,6 +125,7 @@ void meson_atrace(int tag, const char *name, unsigned int flags,
 		trace_tracing_mark_write(name, flags, value);
 }
 EXPORT_SYMBOL_GPL(meson_atrace);
+
 
 module_init(debug_module_init);
 module_exit(debug_module_exit);

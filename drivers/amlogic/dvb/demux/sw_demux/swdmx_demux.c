@@ -1,6 +1,18 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/amlogic/dvb/demux/sw_demux/swdmx_demux.c
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
 #include "swdemux_internal.h"
@@ -332,7 +344,7 @@ swdmx_ts_filter_set_params(struct swdmx_tsfilter *filter,
 {
 	SWDMX_ASSERT(filter && params);
 
-	if (!swdmx_is_valid_pid(params->pid) || params->pid == 0x1fff) {
+	if (!swdmx_is_valid_pid(params->pid) || (params->pid == 0x1fff)) {
 		swdmx_log("illegal PID 0x%04x", params->pid);
 		return SWDMX_ERR;
 	}
@@ -352,7 +364,7 @@ swdmx_ts_filter_set_params(struct swdmx_tsfilter *filter,
 	if (filter->state == SWDMX_FILTER_STATE_INIT)
 		filter->state = SWDMX_FILTER_STATE_SET;
 
-	if (filter->state == SWDMX_FILTER_STATE_RUN && !filter->pid_filter) {
+	if ((filter->state == SWDMX_FILTER_STATE_RUN) && !filter->pid_filter) {
 		struct swdmx_pid_filter *pid_filter;
 
 		pid_filter = pid_filter_get(filter->dmx, params->pid);
@@ -488,7 +500,7 @@ swdmx_sec_filter_set_params(struct swdmx_secfilter *filter,
 	if (filter->state == SWDMX_FILTER_STATE_INIT)
 		filter->state = SWDMX_FILTER_STATE_SET;
 
-	if (filter->state == SWDMX_FILTER_STATE_RUN && !filter->pid_filter) {
+	if ((filter->state == SWDMX_FILTER_STATE_RUN) && !filter->pid_filter) {
 		struct swdmx_pid_filter *pid_filter;
 
 		pid_filter = pid_filter_get(filter->dmx, params->pid);

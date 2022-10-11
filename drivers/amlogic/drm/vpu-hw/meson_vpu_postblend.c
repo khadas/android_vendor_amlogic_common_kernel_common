@@ -1,6 +1,18 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/amlogic/drm/vpu-hw/meson_vpu_postblend.c
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
 /* Amlogic Headers */
@@ -165,18 +177,10 @@ static void postblend_set_state(struct meson_vpu_block *vblk,
 	if (0)
 		vpp_osd2_blend_scope_set(reg, scope);
 
-	if (amc->blank_enable) {
+	if (amc->blank_enable)
 		vpp_osd1_postblend_mux_set(postblend->reg, VPP_NULL);
-	} else {
-		/*dout switch config*/
-		osd1_blend_switch_set(postblend->reg, VPP_POSTBLEND);
-		osd2_blend_switch_set(postblend->reg, VPP_POSTBLEND);
-		/*vpp input config*/
-		vpp_osd1_preblend_mux_set(postblend->reg, VPP_NULL);
-		vpp_osd2_preblend_mux_set(postblend->reg, VPP_NULL);
+	else
 		vpp_osd1_postblend_mux_set(postblend->reg, VPP_OSD1);
-		vpp_osd2_postblend_mux_set(postblend->reg, VPP_NULL);
-	}
 
 	osd1_blend_premult_set(reg);
 	if (0)
@@ -196,7 +200,6 @@ static void postblend_hw_disable(struct meson_vpu_block *vblk)
 {
 	struct meson_vpu_postblend *postblend = to_postblend_block(vblk);
 
-	vpp_osd1_postblend_mux_set(postblend->reg, VPP_NULL);
 	DRM_DEBUG("%s disable called.\n", postblend->base.name);
 }
 
@@ -243,6 +246,14 @@ static void postblend_hw_init(struct meson_vpu_block *vblk)
 	struct meson_vpu_postblend *postblend = to_postblend_block(vblk);
 
 	postblend->reg = &postblend_reg;
+	/*dout switch config*/
+	osd1_blend_switch_set(postblend->reg, VPP_POSTBLEND);
+	osd2_blend_switch_set(postblend->reg, VPP_POSTBLEND);
+	/*vpp input config*/
+	vpp_osd1_preblend_mux_set(postblend->reg, VPP_NULL);
+	vpp_osd2_preblend_mux_set(postblend->reg, VPP_NULL);
+	vpp_osd1_postblend_mux_set(postblend->reg, VPP_OSD1);
+	vpp_osd2_postblend_mux_set(postblend->reg, VPP_NULL);
 	DRM_DEBUG("%s hw_init called.\n", postblend->base.name);
 }
 

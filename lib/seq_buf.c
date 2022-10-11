@@ -1,4 +1,3 @@
-// SPDX-License-Identifier: GPL-2.0
 /*
  * seq_buf.c
  *
@@ -140,7 +139,7 @@ int seq_buf_bprintf(struct seq_buf *s, const char *fmt, const u32 *binary)
  */
 int seq_buf_puts(struct seq_buf *s, const char *str)
 {
-	size_t len = strlen(str);
+	unsigned int len = strlen(str);
 
 	WARN_ON(s->size == 0);
 

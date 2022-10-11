@@ -1,4 +1,3 @@
-/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
  * drivers/amlogic/media/enhancement/amvecm/hdr/am_hdr10_plus_ootf.h
  *
@@ -139,11 +138,13 @@ struct hdr10pgen_param_s {
 
 void basisootf_params_init(struct basisootf_params *basisootf_params);
 
-int calcp1(int sx, int sy, int tgtL, int calcmaxl,
-	   struct basisootf_params *basisootf_params,
-	   int *p1_red_gain);
-int hdr10_plus_ootf_gen(int panel_lumin,
-			int force_source_lumin,
-			struct hdr10pgen_param_s *hdr10pgen_param);
+int calcp1(
+	int sx, int sy, int tgtL, int calcmaxl,
+	struct basisootf_params *basisootf_params,
+	int *p1_red_gain);
+int hdr10_plus_ootf_gen(
+	int panel_lumin,
+	int force_source_lumin,
+	struct hdr10pgen_param_s *hdr10pgen_param);
 #endif /* AM_HDR10_PLUS_OOTF_H */
 

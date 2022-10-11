@@ -1,12 +1,23 @@
-/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * include/linux/amlogic/media/vout/vinfo.h
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
 #ifndef _VINFO_H_
 #define _VINFO_H_
-#include <linux/amlogic/media/video_common.h>
-#include <linux/types.h>
+#include <linux/amlogic/media/vfm/video_common.h>
 
 /* the MSB is represent vmode set by vmode_init */
 #define	VMODE_INIT_BIT_MASK	0x8000
@@ -69,7 +80,6 @@ struct master_display_info_s {
 	u32 max_content;		/* Maximum Content Light Level */
 	u32 max_frame_average;	/* Maximum Frame-average Light Level */
 };
-
 /*
  *hdr_dynamic_type
  * 0x0001: type_1_hdr_metadata_version
@@ -85,12 +95,13 @@ struct hdr_dynamic {
 };
 
 struct hdr10_plus_info {
-	u32 ieeeoui;
-	u8 length;
-	u8 application_version;
+	uint32_t ieeeoui;
+	uint8_t length;
+	uint8_t application_version;
 };
 
 struct cuva_info {
+	u32 cuva_support;
 	u8 rawdata[15];
 	u8 length;
 	u32 ieeeoui;
@@ -126,18 +137,17 @@ struct hdr_info {
 	u32 lumi_min; /* RX EDID Lumi Min value */
 	struct cuva_info cuva_info;
 };
-
 struct hdr10plus_para {
-	u8 application_version;
-	u8 targeted_max_lum;
-	u8 average_maxrgb;
-	u8 distribution_values[9];
-	u8 num_bezier_curve_anchors;
-	u32 knee_point_x;
-	u32 knee_point_y;
-	u8 bezier_curve_anchors[9];
-	u8 graphics_overlay_flag;
-	u8 no_delay_flag;
+	uint8_t application_version;
+	uint8_t targeted_max_lum;
+	uint8_t average_maxrgb;
+	uint8_t distribution_values[9];
+	uint8_t num_bezier_curve_anchors;
+	uint32_t knee_point_x;
+	uint32_t knee_point_y;
+	uint8_t bezier_curve_anchors[9];
+	uint8_t graphics_overlay_flag;
+	uint8_t no_delay_flag;
 };
 
 enum eotf_type {
@@ -163,39 +173,40 @@ enum mode_type {
 #define HDR10_PLUS_ENABLE_VSIF  1
 #define HDR10_PLUS_ZERO_VSIF    2
 
+
 /* Dolby Version VSIF  parameter*/
 struct dv_vsif_para {
-	u8 ver; /* 0 or 1 or 2*/
-	u8 length;/*ver1: 15 or 12*/
-	u8 ver2_l11_flag;
+	uint8_t ver; /* 0 or 1 or 2*/
+	uint8_t length;/*ver1: 15 or 12*/
+	uint8_t ver2_l11_flag;
 	union {
 		struct {
-			u8 low_latency:1;
-			u8 dobly_vision_signal:1;
-			u8 backlt_ctrl_MD_present:1;
-			u8 auxiliary_MD_present:1;
-			u8 eff_tmax_PQ_hi;
-			u8 eff_tmax_PQ_low;
-			u8 auxiliary_runmode;
-			u8 auxiliary_runversion;
-			u8 auxiliary_debug0;
+			uint8_t low_latency:1;
+			uint8_t dobly_vision_signal:1;
+			uint8_t backlt_ctrl_MD_present:1;
+			uint8_t auxiliary_MD_present:1;
+			uint8_t eff_tmax_PQ_hi;
+			uint8_t eff_tmax_PQ_low;
+			uint8_t auxiliary_runmode;
+			uint8_t auxiliary_runversion;
+			uint8_t auxiliary_debug0;
 		} ver2;
 		struct {
-			u8 low_latency:1;
-			u8 dobly_vision_signal:1;
-			u8 backlt_ctrl_MD_present:1;
-			u8 auxiliary_MD_present:1;
-			u8 eff_tmax_PQ_hi;
-			u8 eff_tmax_PQ_low;
-			u8 auxiliary_runmode;
-			u8 auxiliary_runversion;
-			u8 auxiliary_debug0;
-			u8 content_type;
-			u8 content_sub_type;
-			u8 crf;
-			u8 intended_white_point;
-			u8 l11_byte2;
-			u8 l11_byte3;
+			uint8_t low_latency:1;
+			uint8_t dobly_vision_signal:1;
+			uint8_t backlt_ctrl_MD_present:1;
+			uint8_t auxiliary_MD_present:1;
+			uint8_t eff_tmax_PQ_hi;
+			uint8_t eff_tmax_PQ_low;
+			uint8_t auxiliary_runmode;
+			uint8_t auxiliary_runversion;
+			uint8_t auxiliary_debug0;
+			uint8_t content_type;
+			uint8_t content_sub_type;
+			uint8_t crf;
+			uint8_t intended_white_point;
+			uint8_t l11_byte2;
+			uint8_t l11_byte3;
 		} ver2_l11;
 	} vers;
 };
@@ -266,56 +277,59 @@ enum block_type {
 struct dv_info {
 	unsigned char rawdata[27];
 	enum block_type block_flag;
-	u32 ieeeoui;
-	u8 ver; /* 0 or 1 or 2*/
-	u8 length;/*ver1: 15 or 12*/
+	uint32_t ieeeoui;
+	uint8_t ver; /* 0 or 1 or 2*/
+	uint8_t length;/*ver1: 15 or 12*/
 
-	u8 sup_yuv422_12bit:1;
+	uint8_t sup_yuv422_12bit:1;
 	/* if as 0, then support RGB tunnel mode */
-	u8 sup_2160p60hz:1;
+	uint8_t sup_2160p60hz:1;
 	/* if as 0, then support 2160p30hz */
-	u8 sup_global_dimming:1;
-	u8 dv_emp_cap:1;
-	u16 Rx;
-	u16 Ry;
-	u16 Gx;
-	u16 Gy;
-	u16 Bx;
-	u16 By;
-	u16 Wx;
-	u16 Wy;
-	u16 tminPQ;
-	u16 tmaxPQ;
-	u8 dm_major_ver;
-	u8 dm_minor_ver;
-	u8 dm_version;
-	u8 tmaxLUM;
-	u8 colorimetry:1;/* ver1*/
-	u8 tminLUM;
-	u8 low_latency;/* ver1_12 and 2*/
-	u8 sup_backlight_control:1;/*only ver2*/
-	u8 backlt_min_luma;/*only ver2*/
-	u8 Interface;/*only ver2*/
-	u8 sup_10b_12b_444;/*only ver2*/
+	uint8_t sup_global_dimming:1;
+	uint8_t dv_emp_cap:1;
+	uint16_t Rx;
+	uint16_t Ry;
+	uint16_t Gx;
+	uint16_t Gy;
+	uint16_t Bx;
+	uint16_t By;
+	uint16_t Wx;
+	uint16_t Wy;
+	uint16_t tminPQ;
+	uint16_t tmaxPQ;
+	uint8_t dm_major_ver;
+	uint8_t dm_minor_ver;
+	uint8_t dm_version;
+	uint8_t tmaxLUM;
+	uint8_t colorimetry:1;/* ver1*/
+	uint8_t tminLUM;
+	uint8_t low_latency;/* ver1_12 and 2*/
+	uint8_t sup_backlight_control:1;/*only ver2*/
+	uint8_t backlt_min_luma;/*only ver2*/
+	uint8_t Interface;/*only ver2*/
+	uint8_t sup_10b_12b_444;/*only ver2*/
 };
 
 struct vout_device_s {
 	const struct dv_info *dv_info;
 	void (*fresh_tx_hdr_pkt)(struct master_display_info_s *data);
 	void (*fresh_tx_vsif_pkt)(enum eotf_type type,
-				  enum mode_type tunnel_mode,
-				  struct dv_vsif_para *data,
-				  bool signal_sdr);
+		enum mode_type tunnel_mode, struct dv_vsif_para *data,
+		bool signal_sdr);
 	void (*fresh_tx_hdr10plus_pkt)(unsigned int flag,
-				       struct hdr10plus_para *data);
+		struct hdr10plus_para *data);
 	void (*fresh_tx_cuva_hdr_vsif)(struct cuva_hdr_vsif_para *data);
 	void (*fresh_tx_cuva_hdr_vs_emds)(struct cuva_hdr_vs_emds_para *data);
 	void (*fresh_tx_emp_pkt)(unsigned char *data, unsigned int type,
-				 unsigned int size);
-	void (*get_attr)(char attr[16]);
-	void (*setup_attr)(const char *buf);
-	void (*video_mute)(unsigned int flag);
+		unsigned int size);
 };
+
+int send_emp(enum eotf_type type,
+	enum mode_type tunnel_mode,
+	struct dv_vsif_para *vsif_data,
+	unsigned char *p_vsem,
+	int vsem_len,
+	bool signal_sdr);
 
 struct vinfo_base_s {
 	enum vmode_e mode;
@@ -362,7 +376,7 @@ struct vinfo_s {
 	enum vinfo_3d_e info_3d;
 	enum vout_fr_adj_type_e fr_adj_type;
 	enum color_fmt_e viu_color_fmt;
-	unsigned int viu_mux; /*bit[3:0]: venc_sel; bit[7:4]: venc_index*/
+	enum viu_mux_e viu_mux;
 	struct master_display_info_s master_display_info;
 	struct hdr_info hdr_info;
 	struct rx_av_latency rx_latency;

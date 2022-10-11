@@ -1,6 +1,18 @@
-/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * include/linux/amlogic/media/vout/vout_notify.h
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
 #ifndef _VOUT_NOTIFY_H_
@@ -22,159 +34,79 @@ struct vframe_match_s {
 };
 
 struct vout_op_s {
-	struct vinfo_s *(*get_vinfo)(void *data);
-	int (*set_vmode)(enum vmode_e vmode, void *data);
-	enum vmode_e (*validate_vmode)(char *name, unsigned int frac,
-				       void *data);
-	int (*check_same_vmodeattr)(char *name, void *data);
-	int (*vmode_is_supported)(enum vmode_e vmode, void *data);
-	int (*disable)(enum vmode_e vmode, void *data);
-	int (*set_state)(int state, void *data);
-	int (*clr_state)(int state, void *data);
-	int (*get_state)(void *data);
-	int (*get_disp_cap)(char *buf, void *data);
-	int (*set_vframe_rate_hint)(int policy, void *data);
-	int (*get_vframe_rate_hint)(void *data);
-	void (*set_bist)(unsigned int num, void *data);
-	int (*vout_suspend)(void *data);
-	int (*vout_resume)(void *data);
-	int (*vout_shutdown)(void *data);
+	struct vinfo_s *(*get_vinfo)(void);
+	int (*set_vmode)(enum vmode_e);
+	enum vmode_e (*validate_vmode)(char *name, unsigned int frac);
+	int (*check_same_vmodeattr)(char *name);
+	int (*vmode_is_supported)(enum vmode_e);
+	int (*disable)(enum vmode_e);
+	int (*set_state)(int);
+	int (*clr_state)(int);
+	int (*get_state)(void);
+	int (*get_disp_cap)(char *buf);
+	int (*set_vframe_rate_hint)(int);
+	int (*get_vframe_rate_hint)(void);
+	void (*set_bist)(unsigned int);
+	int (*vout_suspend)(void);
+	int (*vout_resume)(void);
+	int (*vout_shutdown)(void);
+	int (*set_clock_drift)(int);
 };
 
 struct vout_server_s {
 	struct list_head list;
 	char *name;
 	struct vout_op_s op;
-	void *data;
 };
 
 struct vout_module_s {
 	struct list_head vout_server_list;
 	struct vout_server_s *curr_vout_server;
-	struct vout_server_s *next_vout_server;
 	unsigned int init_flag;
 	/* fr_policy: 0=disable, 1=nearby, 2=force */
 	unsigned int fr_policy;
 };
 
-#ifdef CONFIG_AMLOGIC_VOUT_SERVE
-int vout_register_client(struct notifier_block *p);
-int vout_unregister_client(struct notifier_block *p);
-int vout_notifier_call_chain(unsigned int long, void *p);
-int vout_register_server(struct vout_server_s *p);
-int vout_unregister_server(struct vout_server_s *p);
+extern int vout_register_client(struct notifier_block *p);
+extern int vout_unregister_client(struct notifier_block *p);
+extern int vout_notifier_call_chain(unsigned int long, void *p);
+extern int vout_register_server(struct vout_server_s *p);
+extern int vout_unregister_server(struct vout_server_s *p);
 
 int get_vout_disp_cap(char *buf);
-struct vinfo_s *get_current_vinfo(void);
-enum vmode_e get_current_vmode(void);
+extern struct vinfo_s *get_current_vinfo(void);
+extern enum vmode_e get_current_vmode(void);
 int set_vframe_rate_hint(int duration);
 int get_vframe_rate_hint(void);
-int set_vframe_rate_policy(int policy);
-int get_vframe_rate_policy(void);
-void set_vout_bist(unsigned int bist);
-#else
-static inline int vout_register_client(struct notifier_block *p)
-{
-	return 0;
-}
-
-static inline int vout_unregister_client(struct notifier_block *p)
-{
-	return 0;
-}
-
-static inline int vout_notifier_call_chain(unsigned int long, void *p)
-{
-	return 0;
-}
-
-static inline int vout_register_server(struct vout_server_s *p)
-{
-	return 0;
-}
-
-static inline int vout_unregister_server(struct vout_server_s *p)
-{
-	return 0;
-}
-
-static inline int get_vout_disp_cap(char *buf)
-{
-	return 0;
-}
-
-static inline struct vinfo_s *get_current_vinfo(void)
-{
-	return NULL;
-}
-
-static inline enum vmode_e get_current_vmode(void)
-{
-	return 0;
-}
-
-static inline int set_vframe_rate_hint(int duration)
-{
-	return 0;
-}
-
-static inline int get_vframe_rate_hint(void)
-{
-	return 0;
-}
-
-static inline int set_vframe_rate_policy(int policy)
-{
-	return 0;
-}
-
-static inline int get_vframe_rate_policy(void)
-{
-	return 0;
-}
-
-static inline void set_vout_bist(unsigned int bist)
-{
-	/*return;*/
-}
-
-#endif
+extern int set_vframe_rate_policy(int pol);
+extern int get_vframe_rate_policy(void);
+extern void set_vout_bist(unsigned int bist);
+int set_vframe_rate_end_hint(void);
 
 #ifdef CONFIG_AMLOGIC_VOUT2_SERVE
-int vout2_register_client(struct notifier_block *p);
-int vout2_unregister_client(struct notifier_block *p);
-int vout2_notifier_call_chain(unsigned int long, void *p);
-int vout2_register_server(struct vout_server_s *p);
-int vout2_unregister_server(struct vout_server_s *p);
+extern int vout2_register_client(struct notifier_block *p);
+extern int vout2_unregister_client(struct notifier_block *p);
+extern int vout2_notifier_call_chain(unsigned int long, void *p);
+extern int vout2_register_server(struct vout_server_s *p);
+extern int vout2_unregister_server(struct vout_server_s *p);
 
 int get_vout2_disp_cap(char *buf);
-struct vinfo_s *get_current_vinfo2(void);
-enum vmode_e get_current_vmode2(void);
+extern struct vinfo_s *get_current_vinfo2(void);
+extern enum vmode_e get_current_vmode2(void);
 int set_vframe2_rate_hint(int duration);
 int get_vframe2_rate_hint(void);
-int set_vframe2_rate_policy(int policy);
-int get_vframe2_rate_policy(void);
-void set_vout2_bist(unsigned int bist);
+extern int set_vframe2_rate_policy(int pol);
+extern int get_vframe2_rate_policy(void);
+extern void set_vout2_bist(unsigned int bist);
+int set_vframe2_rate_end_hint(void);
 
 #endif
 
-#ifdef CONFIG_AMLOGIC_VOUT3_SERVE
-int vout3_register_client(struct notifier_block *p);
-int vout3_unregister_client(struct notifier_block *p);
-int vout3_notifier_call_chain(unsigned int long, void *p);
-int vout3_register_server(struct vout_server_s *p);
-int vout3_unregister_server(struct vout_server_s *p);
+/* vdac ctrl,adc/dac ref signal,cvbs out signal
+ * module index: atv demod:0x01; dtv demod:0x02; tvafe:0x4; dac:0x8
+ */
+extern void vdac_enable(bool on, unsigned int module_sel);
 
-int get_vout3_disp_cap(char *buf);
-struct vinfo_s *get_current_vinfo3(void);
-enum vmode_e get_current_vmode3(void);
-int set_vframe3_rate_hint(int duration);
-int get_vframe3_rate_hint(void);
-int set_vframe3_rate_policy(int policy);
-int get_vframe3_rate_policy(void);
-void set_vout3_bist(unsigned int bist);
-
-#endif
 
 #define VOUT_EVENT_MODE_CHANGE_PRE     0x00010000
 #define VOUT_EVENT_MODE_CHANGE         0x00020000
@@ -194,20 +126,15 @@ void set_vout3_bist(unsigned int bist);
 		_IOW(VOUT_IOC_TYPE, VOUT_IOC_NR_SET_VINFO, struct vinfo_base_s)
 /* ******************************** */
 
-char *get_vout_mode_internal(void);
-char *get_vout_mode_uboot(void);
-int get_vout_mode_uboot_state(void);
+extern char *get_vout_mode_internal(void);
+extern char *get_vout_mode_uboot(void);
 
-int set_vout_mode(char *name);
-void set_vout_init(enum vmode_e mode);
-void update_vout_viu(void);
-int set_vout_vmode(enum vmode_e mode);
-int set_vout_mode_pre_process(enum vmode_e mode);
-int set_vout_mode_post_process(enum vmode_e mode);
-int set_vout_mode_name(char *name);
+extern int set_vout_mode(char *name);
+extern void set_vout_init(enum vmode_e mode);
+extern void update_vout_viu(void);
+extern int set_vout_vmode(enum vmode_e mode);
 enum vmode_e validate_vmode(char *name, unsigned int frac);
-int set_current_vmode(enum vmode_e mode);
-
-void disable_vout_mode_set_sysfs(void);
+extern int set_current_vmode(enum vmode_e mode);
+int set_clock_drift(int ppm);
 
 #endif /* _VOUT_NOTIFY_H_ */

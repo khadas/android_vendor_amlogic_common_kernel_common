@@ -1,4 +1,3 @@
-/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
  * drivers/amlogic/media/vin/tvin/tvin_regs.h
  *
@@ -19,4 +18,9 @@
 #ifndef __TVIN_REGS_H
 #define __TVIN_REGS_H
 
+
+
+
+
 #endif
+

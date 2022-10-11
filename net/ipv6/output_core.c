@@ -1,4 +1,3 @@
-// SPDX-License-Identifier: GPL-2.0-only
 /*
  * IPv6 library code, needed by static components when full IPv6 support is
  * not configured or static.  These functions are needed by GSO/GRO implementation.
@@ -50,7 +49,7 @@ static u32 __ipv6_select_ident(struct net *net,
  *
  * The network header must be set before calling this.
  */
-__be32 ipv6_proxy_select_ident(struct net *net, struct sk_buff *skb)
+void ipv6_proxy_select_ident(struct net *net, struct sk_buff *skb)
 {
 	struct in6_addr buf[2];
 	struct in6_addr *addrs;
@@ -61,10 +60,10 @@ __be32 ipv6_proxy_select_ident(struct net *net, struct sk_buff *skb)
 				   offsetof(struct ipv6hdr, saddr),
 				   sizeof(buf), buf);
 	if (!addrs)
-		return 0;
+		return;
 
 	id = __ipv6_select_ident(net, &addrs[1], &addrs[0]);
-	return htonl(id);
+	skb_shinfo(skb)->ip6_frag_id = htonl(id);
 }
 EXPORT_SYMBOL_GPL(ipv6_proxy_select_ident);
 

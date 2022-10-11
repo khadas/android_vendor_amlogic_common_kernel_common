@@ -1,6 +1,18 @@
-/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/amlogic/media/vin/tvin/hdmirx/hdmi_rx_wrapper.h
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
 #ifndef HDMI_RX_WRAPPER_H_
@@ -12,25 +24,25 @@
 #define HTOTAL_EN		0x04
 #define VTOTAL_EN		0x08
 #define COLSPACE_EN		0x10
-#define REFRESH_RATE_EN	0x20
+#define REFRESH_RATE_EN 0x20
 #define REPEAT_EN		0x40
 #define DVI_EN			0x80
-#define INTERLACED_EN		0x100
+#define INTERLACED_EN	0x100
 #define HDCP_ENC_EN		0x200
-#define COLOR_DEP_EN		0x400
+#define COLOR_DEP_EN	0x400
 #define ERR_CNT_EN		0x800
-#define TMDS_VALID_EN		0x1000
+#define TMDS_VALID_EN	0x1000
 
 /* aud sample rate stable range */
 /* #define AUD_SR_RANGE 2000 */
-#define PHY_REQUEST_CLK_MIN	170000000
-#define PHY_REQUEST_CLK_MAX	370000000
-#define TIMER_STATE_CHECK	(1 * HZ / 100)
+#define PHY_REQUEST_CLK_MIN		170000000
+#define PHY_REQUEST_CLK_MAX		370000000
+#define TIMER_STATE_CHECK		(1*HZ/100)
 
 struct freq_ref_s {
 	bool interlace;
-	u8 cd420;
-	u8 type_3d;
+	uint8_t cd420;
+	uint8_t type_3d;
 	unsigned int hactive;
 	unsigned int vactive;
 	enum hdmi_vic_e vic;
@@ -86,7 +98,6 @@ enum err_recovery_mode_e {
 	ERR_REC_HPD_RST,
 	ERR_REC_END
 };
-
 enum aud_clk_err_e {
 	E_AUDPLL_OK,
 	E_REQUESTCLK_ERR,
@@ -117,36 +128,34 @@ enum fps_e {
 };
 
 /* signal */
-extern u32 force_vic;
+extern int force_vic;
 extern bool already_start_dec;
 extern bool vpp_mute_enable;
-extern u32 dbg_cs;
-
-enum tvin_sig_fmt_e hdmirx_hw_get_fmt(void);
-void rx_main_state_machine(void);
-void rx_err_monitor(void);
-void rx_nosig_monitor(void);
-bool rx_is_nosig(void);
-bool rx_is_sig_ready(void);
-void hdmirx_open_port(enum tvin_port_e port);
-void hdmirx_close_port(void);
-bool is_clk_stable(void);
-unsigned int rx_get_pll_lock_sts(void);
-unsigned int rx_get_scdc_clkrate_sts(void);
-void set_scdc_cfg(int hpdlow, int pwrprovided);
-void fsm_restart(void);
-void rx_5v_monitor(void);
-void rx_audio_pll_sw_update(void);
-void rx_acr_info_sw_update(void);
-void rx_sw_reset(int level);
-void rx_aud_pll_ctl(bool en);
-void hdmirx_timer_handler(struct timer_list *t);
-void rx_tmds_resource_allocate(struct device *dev);
-void rx_emp_resource_allocate(struct device *dev);
-void rx_emp_data_capture(void);
-void rx_tmds_data_capture(void);
-void dump_state(int enable);
-void hdmirx_init_params(void);
+extern enum tvin_sig_fmt_e hdmirx_hw_get_fmt(void);
+extern void rx_main_state_machine(void);
+extern void rx_err_monitor(void);
+extern void rx_nosig_monitor(void);
+extern bool rx_is_nosig(void);
+extern bool rx_is_sig_ready(void);
+extern void hdmirx_open_port(enum tvin_port_e port);
+extern void hdmirx_close_port(void);
+extern bool is_clk_stable(void);
+extern unsigned int rx_get_pll_lock_sts(void);
+extern unsigned int rx_get_scdc_clkrate_sts(void);
+extern void set_scdc_cfg(int hpdlow, int pwrprovided);
+extern void fsm_restart(void);
+extern void rx_5v_monitor(void);
+extern void rx_audio_pll_sw_update(void);
+extern void rx_acr_info_sw_update(void);
+extern void rx_sw_reset(int level);
+extern void rx_aud_pll_ctl(bool en);
+extern void hdmirx_timer_handler(unsigned long arg);
+extern void rx_tmds_resource_allocate(struct device *dev);
+extern void rx_emp_resource_allocate(struct device *dev);
+extern void rx_emp_data_capture(void);
+extern void rx_tmds_data_capture(void);
+extern void dump_state(int enable);
+extern void hdmirx_init_params(void);
 void fs_mode_init(void);
 void set_video_mute(bool on);
 void __attribute__((weak))set_video_mute(bool on)
@@ -159,3 +168,4 @@ int __attribute__((weak))get_video_mute(void)
 	return 0;
 }
 #endif
+

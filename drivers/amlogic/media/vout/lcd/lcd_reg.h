@@ -1,21 +1,31 @@
-/* SPDX-License-Identifier: GPL-2.0+ */
 /*
+ * drivers/amlogic/media/vout/lcd/lcd_reg.h
  *
- * Copyright (C) 2019 Amlogic, Inc. All rights reserved.
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
  *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
  *
  */
 
 #ifndef __LCD_REG_H__
 #define __LCD_REG_H__
-#include <linux/amlogic/media/vout/lcd/lcd_vout.h>
-#include "edp_tx_reg.h"
+#include <linux/amlogic/iomap.h>
 
 /* register offset address define */
 /* base & offset */
 
-#define LCD_REG_OFFSET(reg)                   (((reg) << 2))
+#define LCD_REG_OFFSET(reg)                   ((reg << 2))
+#define LCD_REG_OFFSET_MIPI_HOST(reg)         (((reg & 0xff) << 2))
 #define LCD_REG_OFFSET_BYTE(reg)              ((reg))
+
 
 /* PERIPHS: 0xc8834400 */
 #define PREG_PAD_GPIO1_EN_N                        0x0f
@@ -65,33 +75,13 @@
 #define PERIPHS_PIN_MUX_E_TL1                      0x0be
 #define PERIPHS_PIN_MUX_F_TL1                      0x0bf
 
-#define PADCTRL_PIN_MUX_REG0                       0x0000
-#define PADCTRL_PIN_MUX_REG1                       0x0001
-#define PADCTRL_PIN_MUX_REG2                       0x0002
-#define PADCTRL_PIN_MUX_REG3                       0x0003
-#define PADCTRL_PIN_MUX_REG4                       0x0004
-#define PADCTRL_PIN_MUX_REG5                       0x0005
-#define PADCTRL_PIN_MUX_REG6                       0x0006
-#define PADCTRL_PIN_MUX_REG7                       0x0007
-#define PADCTRL_PIN_MUX_REG8                       0x0008
-#define PADCTRL_PIN_MUX_REG9                       0x0009
-#define PADCTRL_PIN_MUX_REGA                       0x000a
-#define PADCTRL_PIN_MUX_REGB                       0x000b
-#define PADCTRL_PIN_MUX_REGC                       0x000c
-#define PADCTRL_PIN_MUX_REGD                       0x000d
-#define PADCTRL_PIN_MUX_REGE                       0x000e
-#define PADCTRL_PIN_MUX_REGF                       0x000f
-#define PADCTRL_PIN_MUX_REGG                       0x0010
-#define PADCTRL_PIN_MUX_REGH                       0x0011
-#define PADCTRL_PIN_MUX_REGI                       0x0012
-#define PADCTRL_PIN_MUX_REGJ                       0x0013
-#define PADCTRL_PIN_MUX_REGK                       0x0014
-#define PADCTRL_PIN_MUX_REGL                       0x0015
-#define PADCTRL_PIN_MUX_REGM                       0x0016
-#define PADCTRL_PIN_MUX_REGN                       0x0017
-#define PADCTRL_PIN_MUX_REGO                       0x0018
 
 /* HIU:  HHI_CBUS_BASE = 0x10 */
+#define HHI_GCLK_MPEG0                             0x50
+#define HHI_GCLK_MPEG1                             0x51
+#define HHI_GCLK_MPEG2                             0x52
+#define HHI_GCLK_OTHER                             0x54
+
 #define HHI_VIID_PLL_CNTL4                         0x46
 #define HHI_VIID_PLL_CNTL                          0x47
 #define HHI_VIID_PLL_CNTL2                         0x48
@@ -148,33 +138,15 @@
 #define HHI_EDP_APB_CLK_CNTL_M8M2                  0x82
 #define HHI_EDP_TX_PHY_CNTL0                       0x9c
 #define HHI_EDP_TX_PHY_CNTL1                       0x9d
-/*  T7  */
-#define CLKCTRL_VID_CLK0_CTRL                      0x0030
-#define CLKCTRL_VID_CLK0_CTRL2                     0x0031
-#define CLKCTRL_VID_CLK0_DIV                       0x0032
-#define CLKCTRL_VIID_CLK0_DIV                      0x0033
-#define CLKCTRL_VIID_CLK0_CTRL                     0x0034
-#define CLKCTRL_VID_CLK1_CTRL                      0x0073
-#define CLKCTRL_VID_CLK1_CTRL2                     0x0074
-#define CLKCTRL_VID_CLK1_DIV                       0x0075
-#define CLKCTRL_VIID_CLK1_DIV                      0x0076
-#define CLKCTRL_VIID_CLK1_CTRL                     0x0077
-#define CLKCTRL_VID_CLK2_CTRL                      0x0078
-#define CLKCTRL_VID_CLK2_CTRL2                     0x0079
-#define CLKCTRL_VID_CLK2_DIV                       0x007a
-#define CLKCTRL_VIID_CLK2_DIV                      0x007b
-#define CLKCTRL_VIID_CLK2_CTRL                     0x007c
-#define CLKCTRL_MIPIDSI_PHY_CLK_CTRL               0x0041
-#define CLKCTRL_MIPI_DSI_MEAS_CLK_CTRL             0x0080
-
-/* g12A */
-#define HHI_HDMI_PLL_CNTL0                         0xc8
-#define HHI_HDMI_PLL_CNTL1                         0xc9
-#define HHI_HDMI_PLL_CNTL2                         0xca
-#define HHI_HDMI_PLL_CNTL3                         0xcb
-#define HHI_HDMI_PLL_CNTL4                         0xcc
-#define HHI_HDMI_PLL_CNTL5                         0xcd
-#define HHI_HDMI_PLL_CNTL6                         0xce
+/* g9tv */
+#define HHI_HDMI_PLL_CNTL                          0xc8
+#define HHI_HDMI_PLL_CNTL2                         0xc9
+#define HHI_HDMI_PLL_CNTL3                         0xca
+#define HHI_HDMI_PLL_CNTL4                         0xcb
+#define HHI_HDMI_PLL_CNTL5                         0xcc
+#define HHI_HDMI_PLL_CNTL6                         0xcd
+/* G12A */
+#define HHI_HDMI_PLL_CNTL7                         0xce
 /* TL1 */
 #define HHI_TCON_PLL_CNTL0                         0x020
 #define HHI_TCON_PLL_CNTL1                         0x021
@@ -187,8 +159,10 @@
 #define HHI_DIF_CSI_PHY_CNTL1                      0xd9
 #define HHI_DIF_CSI_PHY_CNTL2                      0xda
 #define HHI_DIF_CSI_PHY_CNTL3                      0xdb
-#define HHI_LVDS_TX_PHY_CNTL0                      0x9a
-#define HHI_LVDS_TX_PHY_CNTL1                      0x9b
+#define HHI_LVDS_TX_PHY_CNTL0                      0xde
+#define HHI_LVDS_TX_PHY_CNTL1                      0xdf
+#define HHI_LVDS_TX_PHY_CNTL0_TL1                  0x9a
+#define HHI_LVDS_TX_PHY_CNTL1_TL1                  0x9b
 #define HHI_VID2_PLL_CNTL                          0xe0
 #define HHI_VID2_PLL_CNTL2                         0xe1
 #define HHI_VID2_PLL_CNTL3                         0xe2
@@ -210,17 +184,25 @@
 #define HHI_DIF_CSI_PHY_CNTL8                      0xec
 #define HHI_DIF_CSI_PHY_CNTL9                      0xed
 
+/* AXG use PLL   0xff63c000 */
+#define HHI_GP0_PLL_CNTL_AXG                       0x10
+#define HHI_GP0_PLL_CNTL2_AXG                      0x11
+#define HHI_GP0_PLL_CNTL3_AXG                      0x12
+#define HHI_GP0_PLL_CNTL4_AXG                      0x13
+#define HHI_GP0_PLL_CNTL5_AXG                      0x14
+#define HHI_GP0_PLL_CNTL1_AXG                      0x16
+
 /* G12A use PLL   0xff63c000 */
-#define HHI_GP0_PLL_CNTL0                          0x10
-#define HHI_GP0_PLL_CNTL1                          0x11
-#define HHI_GP0_PLL_CNTL2                          0x12
-#define HHI_GP0_PLL_CNTL3                          0x13
-#define HHI_GP0_PLL_CNTL4                          0x14
-#define HHI_GP0_PLL_CNTL5                          0x15
-#define HHI_GP0_PLL_CNTL6                          0x16
+#define HHI_GP0_PLL_CNTL0_G12A                     0x10
+#define HHI_GP0_PLL_CNTL1_G12A                     0x11
+#define HHI_GP0_PLL_CNTL2_G12A                     0x12
+#define HHI_GP0_PLL_CNTL3_G12A                     0x13
+#define HHI_GP0_PLL_CNTL4_G12A                     0x14
+#define HHI_GP0_PLL_CNTL5_G12A                     0x15
+#define HHI_GP0_PLL_CNTL6_G12A                     0x16
 
 #define HHI_MIPIDSI_PHY_CLK_CNTL                   0x95
-#define HHI_VDIN_MEAS_CLK_CNTL                     0x094
+
 
 #define HHI_MIPI_CNTL0                             0x00
 #define HHI_MIPI_CNTL1                             0x01
@@ -230,59 +212,6 @@
 #define HHI_DIF_TCON_CNTL1                         0x3d
 #define HHI_DIF_TCON_CNTL2                         0x3e
 #define HHI_TCON_CLK_CNTL                          0x9c
-
-#define ANACTRL_DIF_PHY_CNTL1                      0x00c8
-#define ANACTRL_DIF_PHY_CNTL2                      0x00c9
-#define ANACTRL_DIF_PHY_CNTL3                      0x00ca
-#define ANACTRL_DIF_PHY_CNTL4                      0x00cb
-#define ANACTRL_DIF_PHY_CNTL5                      0x00cc
-#define ANACTRL_DIF_PHY_CNTL6                      0x00cd
-#define ANACTRL_DIF_PHY_CNTL7                      0x00ce
-#define ANACTRL_DIF_PHY_CNTL8                      0x00cf
-#define ANACTRL_DIF_PHY_CNTL9                      0x00d0
-#define ANACTRL_DIF_PHY_CNTL10                     0x00d1
-#define ANACTRL_DIF_PHY_CNTL11                     0x00d2
-#define ANACTRL_DIF_PHY_CNTL12                     0x00d3
-#define ANACTRL_DIF_PHY_CNTL13                     0x00d4
-#define ANACTRL_DIF_PHY_CNTL14                     0x00d5
-#define ANACTRL_DIF_PHY_CNTL15                     0x00d6
-#define ANACTRL_DIF_PHY_CNTL16                     0x00d7
-#define ANACTRL_DIF_PHY_CNTL17                     0x00d8
-#define ANACTRL_DIF_PHY_CNTL18                     0x00d9
-#define ANACTRL_DIF_PHY_CNTL19                     0x00da
-#define ANACTRL_DIF_PHY_CNTL20                     0x00db
-#define ANACTRL_DIF_PHY_CNTL21                     0x00dc
-#define ANACTRL_TCON_PLL0_CNTL0                    0x00e0
-#define ANACTRL_TCON_PLL0_CNTL1                    0x00e1
-#define ANACTRL_TCON_PLL0_CNTL2                    0x00e2
-#define ANACTRL_TCON_PLL0_CNTL3                    0x00e3
-#define ANACTRL_TCON_PLL0_CNTL4                    0x00e4
-#define ANACTRL_TCON_PLL1_CNTL0                    0x00e5
-#define ANACTRL_TCON_PLL1_CNTL1                    0x00e6
-#define ANACTRL_TCON_PLL1_CNTL2                    0x00e7
-#define ANACTRL_TCON_PLL1_CNTL3                    0x00e8
-#define ANACTRL_TCON_PLL1_CNTL4                    0x00e9
-#define ANACTRL_TCON_PLL2_CNTL0                    0x00ea
-#define ANACTRL_TCON_PLL2_CNTL1                    0x00eb
-#define ANACTRL_TCON_PLL2_CNTL2                    0x00ec
-#define ANACTRL_TCON_PLL2_CNTL3                    0x00ed
-#define ANACTRL_TCON_PLL2_CNTL4                    0x00ee
-#define ANACTRL_TCON_PLL0_STS                      0x00ef
-#define ANACTRL_TCON_PLL1_STS                      0x00f0
-#define ANACTRL_TCON_PLL2_STS                      0x00f1
-
-#define COMBO_DPHY_CNTL0                           0x0000
-#define COMBO_DPHY_CNTL1                           0x0001
-#define COMBO_DPHY_VID_PLL0_DIV                    0x0002
-#define COMBO_DPHY_VID_PLL1_DIV                    0x0003
-#define COMBO_DPHY_VID_PLL2_DIV                    0x0004
-#define COMBO_DPHY_EDP_PIXEL_CLK_DIV               0x0005
-#define COMBO_DPHY_EDP_LVDS_TX_PHY0_CNTL0          0x0006
-#define COMBO_DPHY_EDP_LVDS_TX_PHY1_CNTL0          0x0007
-#define COMBO_DPHY_EDP_LVDS_TX_PHY2_CNTL0          0x0008
-#define COMBO_DPHY_EDP_LVDS_TX_PHY0_CNTL1          0x0009
-#define COMBO_DPHY_EDP_LVDS_TX_PHY1_CNTL1          0x000a
-#define COMBO_DPHY_EDP_LVDS_TX_PHY2_CNTL1          0x000b
 
 /*  Global control:  RESET_CBUS_BASE = 0x11 */
 #define VERSION_CTRL                               0x1100
@@ -304,27 +233,31 @@
 #define CRT_MASK                                   0x1117
 #define RESET7_MASK                                0x1118
 
-#define RESETCTRL_RESET0                           0x0000
-#define RESETCTRL_RESET1                           0x0001
-#define RESETCTRL_RESET2                           0x0002
-#define RESETCTRL_RESET3                           0x0003
-#define RESETCTRL_RESET4                           0x0004
-#define RESETCTRL_RESET5                           0x0005
-#define RESETCTRL_RESET6                           0x0006
-#define RESETCTRL_RESET0_LEVEL                     0x0010
-#define RESETCTRL_RESET1_LEVEL                     0x0011
-#define RESETCTRL_RESET2_LEVEL                     0x0012
-#define RESETCTRL_RESET3_LEVEL                     0x0013
-#define RESETCTRL_RESET4_LEVEL                     0x0014
-#define RESETCTRL_RESET5_LEVEL                     0x0015
-#define RESETCTRL_RESET6_LEVEL                     0x0016
-#define RESETCTRL_RESET0_MASK                      0x0020
-#define RESETCTRL_RESET1_MASK                      0x0021
-#define RESETCTRL_RESET2_MASK                      0x0022
-#define RESETCTRL_RESET3_MASK                      0x0023
-#define RESETCTRL_RESET4_MASK                      0x0024
-#define RESETCTRL_RESET5_MASK                      0x0025
-#define RESETCTRL_RESET6_MASK                      0x0026
+#define VERSION_CTRL_T5                            0x0000
+#define RESET0_REGISTER_T5                         0x0001
+#define RESET1_REGISTER_T5                         0x0002
+#define RESET2_REGISTER_T5                         0x0003
+#define RESET3_REGISTER_T5                         0x0004
+#define RESET4_REGISTER_T5                         0x0005
+#define RESET5_REGISTER_T5                         0x0006
+#define RESET6_REGISTER_T5                         0x0007
+#define RESET7_REGISTER_T5                         0x0008
+#define RESET0_MASK_T5                             0x0010
+#define RESET1_MASK_T5                             0x0011
+#define RESET2_MASK_T5                             0x0012
+#define RESET3_MASK_T5                             0x0013
+#define RESET4_MASK_T5                             0x0014
+#define RESET5_MASK_T5                             0x0015
+#define RESET6_MASK_T5                             0x0016
+#define RESET7_MASK_T5                             0x0017
+#define RESET0_LEVEL_T5                            0x0020
+#define RESET1_LEVEL_T5                            0x0021
+#define RESET2_LEVEL_T5                            0x0022
+#define RESET3_LEVEL_T5                            0x0023
+#define RESET4_LEVEL_T5                            0x0024
+#define RESET5_LEVEL_T5                            0x0025
+#define RESET6_LEVEL_T5                            0x0026
+#define RESET7_LEVEL_T5                            0x0027
 
 /* ********************************
  * TCON:  VCBUS_BASE = 0x14
@@ -339,9 +272,6 @@
 #define L_POL_CNTL_ADDR                            0x1407
 #define L_DITH_CNTL_ADDR                           0x1408
 #define L_GAMMA_PROBE_CTRL                         0x1409
-
-#define LCD_GAMMA_CNTL_PORT0                       0x14b4
-
 /* read only */
 #define L_GAMMA_PROBE_COLOR_L                      0x140a
 #define L_GAMMA_PROBE_COLOR_H                      0x140b
@@ -435,7 +365,7 @@
 #define L_LCD_MCU_CTL                              0x145d
 
 /* **************************************************
- *  Dual port MLVDS registers
+ *  Dual port mLVDS registers
  */
 /* bit 3 - enable_u_dual_mlvds_dp_clk
  * bit 2 - enable_u_map_mlvds_r_clk
@@ -480,39 +410,39 @@
  */
 #define V_INVERSION_CONTROL                        0x1472
 #define MLVDS2_CONTROL                             0x1474
-   #define     MLVDS2_RESERVED  15
-   #define     MLVDS2_DOUBLE_PATTERN  14
+   #define     mLVDS2_RESERVED  15
+   #define     mLVDS2_double_pattern  14
    /* 13:8  // each channel has one bit */
-   #define     MLVDS2_INS_RESET  8
-   #define     MLVDS2_DUAL_GATE  7
+   #define     mLVDS2_ins_reset  8
+   #define     mLVDS2_dual_gate  7
    /* 0=6Bits, 1=8Bits */
-   #define     MLVDS2_BIT_NUM    6
+   #define     mLVDS2_bit_num    6
    /* 0=3Pairs, 1=6Pairs */
-   #define     MLVDS2_PAIR_NUM   5
-   #define     MLVDS2_MSB_FIRST  4
-   #define     MLVDS2_PORT_SWAP  3
-   #define     MLVDS2_MLSB_SWAP  2
-   #define     MLVDS2_PN_SWAP    1
-   #define     MLVDS2_EN         0
+   #define     mLVDS2_pair_num   5
+   #define     mLVDS2_msb_first  4
+   #define     mLVDS2_PORT_SWAP  3
+   #define     mLVDS2_MLSB_SWAP  2
+   #define     mLVDS2_PN_SWAP    1
+   #define     mLVDS2_en         0
 #define MLVDS2_CONFIG_HI                           0x1475
 #define MLVDS2_CONFIG_LO                           0x1476
    /* Bit 31:29 */
-   #define     MLVDS2_RESET_OFFSET         29
+   #define     mLVDS2_reset_offset         29
    /* Bit 28:23 */
-   #define     MLVDS2_RESET_LENGTH         23
+   #define     mLVDS2_reset_length         23
    /* Bit 22:20 */
-   #define     MLVDS2_CONFIG_RESERVED      20
-   #define     MLVDS2_RESET_START_BIT12    19
-   #define     MLVDS2_DATA_WRITE_TOGGLE    18
-   #define     MLVDS2_DATA_WRITE_INI       17
-   #define     MLVDS2_DATA_LATCH_1_TOGGLE  16
-   #define     MLVDS2_DATA_LATCH_1_INI     15
-   #define     MLVDS2_DATA_LATCH_0_TOGGLE  14
-   #define     MLVDS2_DATA_LATCH_0_INI     13
+   #define     mLVDS2_config_reserved      20
+   #define     mLVDS2_reset_start_bit12    19
+   #define     mLVDS2_data_write_toggle    18
+   #define     mLVDS2_data_write_ini       17
+   #define     mLVDS2_data_latch_1_toggle  16
+   #define     mLVDS2_data_latch_1_ini     15
+   #define     mLVDS2_data_latch_0_toggle  14
+   #define     mLVDS2_data_latch_0_ini     13
    /* 0=same as reset_0, 1=1 clock delay of reset_0 */
-   #define     MLVDS2_RESET_1_SELECT       12
+   #define     mLVDS2_reset_1_select       12
    /* Bit 11:0 */
-   #define     MLVDS2_RESET_START           0
+   #define     mLVDS2_reset_start           0
 #define MLVDS2_DUAL_GATE_WR_START                  0x1477
    /* Bit 12:0 */
    #define     mlvds2_dual_gate_wr_start    0
@@ -527,7 +457,7 @@
    #define     mlvds2_dual_gate_rd_end      0
 #define MLVDS2_SECOND_RESET_CTL                    0x147b
    /* Bit 12:0 */
-   #define     MLVDS2_2ND_RESET_START      0
+   #define     mLVDS2_2nd_reset_start       0
 #define MLVDS2_DUAL_GATE_CTL_HI                    0x147c
 #define MLVDS2_DUAL_GATE_CTL_LO                    0x147d
    /* Bit 7:0 */
@@ -543,15 +473,15 @@
    #define     mlvds2_scan_mode_start_line  0
 #define MLVDS2_RESET_CONFIG_HI                     0x147e
 #define MLVDS2_RESET_CONFIG_LO                     0x147f
-   #define     MLVDS2_RESET_RANGE_ENABLE   31
-   #define     MLVDS2_RESET_RANGE_INV      30
-   #define     MLVDS2_RESET_CONFIG_RES1    29
+   #define     mLVDS2_reset_range_enable   31
+   #define     mLVDS2_reset_range_inv      30
+   #define     mLVDS2_reset_config_res1    29
    /* Bit 11:0 */
-   #define     MLVDS2_RESET_RANGE_LINE_0   16
+   #define     mLVDS2_reset_range_line_0   16
    /* Bit 2:0 */
-   #define     MLVDS2_RESET_CONFIG_RES3    13
+   #define     mLVDS2_reset_config_res3    13
    /* Bit 11:0 */
-   #define     MLVDS2_RESET_RANGE_LINE_1    0
+   #define     mLVDS2_reset_range_line_1    0
 
 /* ************************************
  *  TCON register
@@ -714,46 +644,46 @@
    #define     RGB_SWP          1
    #define     BIT_SWP          0
 #define MLVDS_CONTROL                              0x14c3
-   #define     MLVDS_RESERVED   15
-   #define     MLVDS_DOUBLE_PATTERN  14
+   #define     mLVDS_RESERVED   15
+   #define     mLVDS_double_pattern  14
    /* 13:8  // each channel has one bit */
-   #define     MLVDS_INS_RESET  8
-   #define     MLVDS_DUAL_GATE  7
+   #define     mLVDS_ins_reset  8
+   #define     mLVDS_dual_gate  7
    /* 0=6Bits, 1=8Bits */
-   #define     MLVDS_BIT_NUM    6
+   #define     mLVDS_bit_num    6
    /* 0=3Pairs, 1=6Pairs */
-   #define     MLVDS_PAIR_NUM   5
-   #define     MLVDS_MSB_FIRST  4
-   #define     MLVDS_PORT_SWAP  3
-   #define     MLVDS_MLSB_SWAP  2
-   #define     MLVDS_PN_SWAP    1
-   #define     MLVDS_EN         0
+   #define     mLVDS_pair_num   5
+   #define     mLVDS_msb_first  4
+   #define     mLVDS_PORT_SWAP  3
+   #define     mLVDS_MLSB_SWAP  2
+   #define     mLVDS_PN_SWAP    1
+   #define     mLVDS_en         0
 #define MLVDS_RESET_PATTERN_HI                     0x14c4
 #define MLVDS_RESET_PATTERN_LO                     0x14c5
    /* Bit 47:16 */
-   #define     MLVDS_RESET_      0
-#define MLVDS_RESET_PATTERN_EXT                0x14c6
+   #define     mLVDS_reset_pattern      0
+#define MLVDS_RESET_PATTERN_EXT                    0x14c6
    /* Bit 15:0 */
-   #define     mlvds_reset_pattern_ext  0
+   #define     mLVDS_reset_pattern_ext  0
 #define MLVDS_CONFIG_HI                            0x14c7
 #define MLVDS_CONFIG_LO                            0x14c8
    /* Bit 31:29 */
-   #define     MLVDS_RESET_OFFSET         29
+   #define     mLVDS_reset_offset         29
    /* Bit 28:23 */
-   #define     MLVDS_RESET_LENGTH         23
+   #define     mLVDS_reset_length         23
    /* Bit 22:20 */
-   #define     MLVDS_CONFIG_RESERVED      20
-   #define     MLVDS_RESET_START_BIT12    19
-   #define     MLVDS_DATA_WRITE_TOGGLE    18
-   #define     MLVDS_DATA_WRITE_INI       17
-   #define     MLVDS_DATA_LATCH_1_TOGGLE  16
-   #define     MLVDS_DATA_LATCH_1_INI     15
-   #define     MLVDS_DATA_LATCH_0_TOGGLE  14
-   #define     MLVDS_DATA_LATCH_0_INI     13
+   #define     mLVDS_config_reserved      20
+   #define     mLVDS_reset_start_bit12    19
+   #define     mLVDS_data_write_toggle    18
+   #define     mLVDS_data_write_ini       17
+   #define     mLVDS_data_latch_1_toggle  16
+   #define     mLVDS_data_latch_1_ini     15
+   #define     mLVDS_data_latch_0_toggle  14
+   #define     mLVDS_data_latch_0_ini     13
    /* 0 - same as reset_0, 1 - 1 clock delay of reset_0 */
-   #define     MLVDS_RESET_1_SELECT       12
+   #define     mLVDS_reset_1_select       12
    /* Bit 11:0 */
-   #define     MLVDS_RESET_START           0
+   #define     mLVDS_reset_start           0
 #define TCON_DOUBLE_CTL                            0x14c9
    /* Bit 7:0 */
    #define     tcon_double_ini             8
@@ -884,7 +814,7 @@
    #define     mlvds_dual_gate_rd_end      0
 #define MLVDS_SECOND_RESET_CTL                     0x14fa
    /* Bit 12:0 */
-   #define     MLVDS_2ND_RESET_START       0
+   #define     mLVDS_2nd_reset_start       0
 #define MLVDS_DUAL_GATE_CTL_HI                     0x14fb
 #define MLVDS_DUAL_GATE_CTL_LO                     0x14fc
    /* Bit 7:0 */
@@ -900,37 +830,16 @@
    #define     mlvds_scan_mode_start_line  0
 #define MLVDS_RESET_CONFIG_HI                      0x14fd
 #define MLVDS_RESET_CONFIG_LO                      0x14fe
-   #define     MLVDS_RESET_RANGE_ENABLE   31
-   #define     MLVDS_RESET_RANGE_INV      30
-   #define     MLVDS_RESET_CONFIG_RES1    29
+   #define     mLVDS_reset_range_enable   31
+   #define     mLVDS_reset_range_inv      30
+   #define     mLVDS_reset_config_res1    29
    /* Bit 11:0 */
-   #define     MLVDS_RESET_RANGE_LINE_0   16
+   #define     mLVDS_reset_range_line_0   16
    /* Bit 2:0 */
-   #define     MLVDS_RESET_CONFIG_RES3    13
+   #define     mLVDS_reset_config_res3    13
    /* Bit 11:0 */
-   #define     MLVDS_RESET_RANGE_LINE_1    0
+   #define     mLVDS_reset_range_line_1    0
 
-#define DE_HS_ADDR_T7                              0x19d1
-// New from M3 :
-// Bit 15:12 -- Enable OFFSET Double Generate(TOCN3-TCON0)
-#define DE_HE_ADDR_T7                               0x19d2
-#define DE_VS_ADDR_T7                              0x19d3
-#define DE_VE_ADDR_T7                              0x19d4
-#define HSYNC_HS_ADDR_T7                           0x19d5
-#define HSYNC_HE_ADDR_T7                           0x19d6
-#define HSYNC_VS_ADDR_T7                           0x19d7
-#define HSYNC_VE_ADDR_T7                           0x19d8
-#define VSYNC_HS_ADDR_T7                           0x19d9
-#define VSYNC_HE_ADDR_T7                           0x19da
-#define VSYNC_VS_ADDR_T7                           0x19db
-#define VSYNC_VE_ADDR_T7                           0x19dc
-
-#define LVDS_SER_EN_T7                             0x19f0
-#define LVDS_PACK_CNTL_ADDR_T7                     0x19d0
-#define LVDS_GEN_CNTL_T7                           0x19e0
-#define P2P_CH_SWAP0_T7                            0x195e
-#define P2P_CH_SWAP1_T7                            0x195f
-#define P2P_BIT_REV_T7                             0x1950
 /* **************************************************************************
  * Vbyone registers  (Note: no MinLVDS in G9tv, share the register)
  */
@@ -974,46 +883,6 @@
 #define VBO_INFILTER_TICK_PERIOD_L                 0x14f9
 #define VBO_INSGN_CTRL                             0x14fa
 #define VBO_INFILTER_TICK_PERIOD_H                 0x1477
-/* T7 */
-#define VBO_CTRL_L_T7                              0x1960
-#define VBO_CTRL_H_T7                              0x1961
-#define VBO_SOFT_RST_T7                            0x1962
-#define VBO_LANES_T7                               0x1963
-#define VBO_VIN_CTRL_T7                            0x1964
-#define VBO_ACT_VSIZE_T7                           0x1965
-#define VBO_REGION_00_T7                           0x1966
-#define VBO_REGION_01_T7                           0x1967
-#define VBO_REGION_02_T7                           0x1968
-#define VBO_REGION_03_T7                           0x1969
-#define VBO_VBK_CTRL_0_T7                          0x196a
-#define VBO_VBK_CTRL_1_T7                          0x196b
-#define VBO_HBK_CTRL_T7                            0x196c
-#define VBO_PXL_CTRL_T7                            0x196d
-#define VBO_LANE_SKEW_L_T7                         0x196e
-#define VBO_LANE_SKEW_H_T7                         0x196f
-#define VBO_GCLK_LANE_L_T7                         0x1970
-#define VBO_GCLK_LANE_H_T7                         0x1971
-#define VBO_GCLK_MAIN_T7                           0x1972
-#define VBO_STATUS_L_T7                            0x1973
-#define VBO_STATUS_H_T7                            0x1974
-#define VBO_LANE_OUTPUT_T7                         0x1975
-#define LCD_PORT_SWAP_T7                           0x1976
-#define VBO_TMCHK_THRD_L_T7                        0x1978
-#define VBO_TMCHK_THRD_H_T7                        0x1979
-#define VBO_FSM_HOLDER_L_T7                        0x197a
-#define VBO_FSM_HOLDER_H_T7                        0x197b
-#define VBO_INTR_STATE_CTRL_T7                     0x197c
-#define VBO_INTR_UNMASK_T7                         0x197d
-#define VBO_TMCHK_HSYNC_STATE_L_T7                 0x197e
-#define VBO_TMCHK_HSYNC_STATE_H_T7                 0x197f
-#define VBO_TMCHK_VSYNC_STATE_L_T7                 0x19f4
-#define VBO_TMCHK_VSYNC_STATE_H_T7                 0x19f5
-#define VBO_TMCHK_VDE_STATE_L_T7                   0x19f6
-#define VBO_TMCHK_VDE_STATE_H_T7                   0x19f7
-#define VBO_INTR_STATE_T7                          0x19f8
-#define VBO_INFILTER_CTRL_T7                       0x19f9
-#define VBO_INSGN_CTRL_T7                          0x19fa
-#define VBO_INFILTER_CTRL_H_T7                     0x1977
 
 /* ********************************
  * Video Interface:  VENC_VCBUS_BASE = 0x1b
@@ -1108,15 +977,6 @@
 #define ENCL_INBUF_CNTL1                           0x1cd4
 #define ENCL_INBUF_CNT                             0x1cd5
 
-#define VPU_VENC_CTRL                              0x1cef
-#define VPU_DISP_VIU0_CTRL                         0x2786
-#define VPU_DISP_VIU1_CTRL                         0x2787
-#define VPU_DISP_VIU2_CTRL                         0x2788
-
-#define LCD_RGB_BASE_ADDR                          0x14a5
-#define LCD_RGB_COEFF_ADDR                         0x14a6
-#define LCD_POL_CNTL_ADDR                          0x14a7
-#define LCD_DITH_CNTL_ADDR                         0x14a8
 /* ********************************
  * TCON TOP:  TCON_TOP_BASE = 0x2000
  * ********************************
@@ -1289,7 +1149,6 @@
  */
 #define VPU_VIU_VENC_MUX_CTRL                      0x271a
 #define ENCL_INFO_READ                             0x271f
-#define VPU_VENCP_STAT                             0x1cec
 
 /* Bit  6 RW, gclk_mpeg_vpu_misc
  * Bit  5 RW, gclk_mpeg_venc_l_top
@@ -1314,53 +1173,53 @@
  * VCBUS_BASE = 0x2c(0x2c00 - 0x2cff)
  */
 /* DWC IP registers */
-#define MIPI_DSI_DWC_VERSION_OS                    0x0000
-#define MIPI_DSI_DWC_PWR_UP_OS                     0x0001
-#define MIPI_DSI_DWC_CLKMGR_CFG_OS                 0x0002
-#define MIPI_DSI_DWC_DPI_VCID_OS                   0x0003
-#define MIPI_DSI_DWC_DPI_COLOR_CODING_OS           0x0004
-#define MIPI_DSI_DWC_DPI_CFG_POL_OS                0x0005
-#define MIPI_DSI_DWC_DPI_LP_CMD_TIM_OS             0x0006
-#define MIPI_DSI_DWC_PCKHDL_CFG_OS                 0x000b
-#define MIPI_DSI_DWC_GEN_VCID_OS                   0x000c
-#define MIPI_DSI_DWC_MODE_CFG_OS                   0x000d
-#define MIPI_DSI_DWC_VID_MODE_CFG_OS               0x000e
-#define MIPI_DSI_DWC_VID_PKT_SIZE_OS               0x000f
-#define MIPI_DSI_DWC_VID_NUM_CHUNKS_OS             0x0010
-#define MIPI_DSI_DWC_VID_NULL_SIZE_OS              0x0011
-#define MIPI_DSI_DWC_VID_HSA_TIME_OS               0x0012
-#define MIPI_DSI_DWC_VID_HBP_TIME_OS               0x0013
-#define MIPI_DSI_DWC_VID_HLINE_TIME_OS             0x0014
-#define MIPI_DSI_DWC_VID_VSA_LINES_OS              0x0015
-#define MIPI_DSI_DWC_VID_VBP_LINES_OS              0x0016
-#define MIPI_DSI_DWC_VID_VFP_LINES_OS              0x0017
-#define MIPI_DSI_DWC_VID_VACTIVE_LINES_OS          0x0018
-#define MIPI_DSI_DWC_EDPI_CMD_SIZE_OS              0x0019
-#define MIPI_DSI_DWC_CMD_MODE_CFG_OS               0x001a
-#define MIPI_DSI_DWC_GEN_HDR_OS                    0x001b
-#define MIPI_DSI_DWC_GEN_PLD_DATA_OS               0x001c
-#define MIPI_DSI_DWC_CMD_PKT_STATUS_OS             0x001d
-#define MIPI_DSI_DWC_TO_CNT_CFG_OS                 0x001e
-#define MIPI_DSI_DWC_HS_RD_TO_CNT_OS               0x001f
-#define MIPI_DSI_DWC_LP_RD_TO_CNT_OS               0x0020
-#define MIPI_DSI_DWC_HS_WR_TO_CNT_OS               0x0021
-#define MIPI_DSI_DWC_LP_WR_TO_CNT_OS               0x0022
-#define MIPI_DSI_DWC_BTA_TO_CNT_OS                 0x0023
-#define MIPI_DSI_DWC_SDF_3D_OS                     0x0024
-#define MIPI_DSI_DWC_LPCLK_CTRL_OS                 0x0025
-#define MIPI_DSI_DWC_PHY_TMR_LPCLK_CFG_OS          0x0026
-#define MIPI_DSI_DWC_PHY_TMR_CFG_OS                0x0027
-#define MIPI_DSI_DWC_PHY_RSTZ_OS                   0x0028
-#define MIPI_DSI_DWC_PHY_IF_CFG_OS                 0x0029
-#define MIPI_DSI_DWC_PHY_ULPS_CTRL_OS              0x002a
-#define MIPI_DSI_DWC_PHY_TX_TRIGGERS_OS            0x002b
-#define MIPI_DSI_DWC_PHY_STATUS_OS                 0x002c
-#define MIPI_DSI_DWC_PHY_TST_CTRL0_OS              0x002d
-#define MIPI_DSI_DWC_PHY_TST_CTRL1_OS              0x002e
-#define MIPI_DSI_DWC_INT_ST0_OS                    0x002f
-#define MIPI_DSI_DWC_INT_ST1_OS                    0x0030
-#define MIPI_DSI_DWC_INT_MSK0_OS                   0x0031
-#define MIPI_DSI_DWC_INT_MSK1_OS                   0x0032
+#define MIPI_DSI_DWC_VERSION_OS                    0x1800
+#define MIPI_DSI_DWC_PWR_UP_OS                     0x1801
+#define MIPI_DSI_DWC_CLKMGR_CFG_OS                 0x1802
+#define MIPI_DSI_DWC_DPI_VCID_OS                   0x1803
+#define MIPI_DSI_DWC_DPI_COLOR_CODING_OS           0x1804
+#define MIPI_DSI_DWC_DPI_CFG_POL_OS                0x1805
+#define MIPI_DSI_DWC_DPI_LP_CMD_TIM_OS             0x1806
+#define MIPI_DSI_DWC_PCKHDL_CFG_OS                 0x180b
+#define MIPI_DSI_DWC_GEN_VCID_OS                   0x180c
+#define MIPI_DSI_DWC_MODE_CFG_OS                   0x180d
+#define MIPI_DSI_DWC_VID_MODE_CFG_OS               0x180e
+#define MIPI_DSI_DWC_VID_PKT_SIZE_OS               0x180f
+#define MIPI_DSI_DWC_VID_NUM_CHUNKS_OS             0x1810
+#define MIPI_DSI_DWC_VID_NULL_SIZE_OS              0x1811
+#define MIPI_DSI_DWC_VID_HSA_TIME_OS               0x1812
+#define MIPI_DSI_DWC_VID_HBP_TIME_OS               0x1813
+#define MIPI_DSI_DWC_VID_HLINE_TIME_OS             0x1814
+#define MIPI_DSI_DWC_VID_VSA_LINES_OS              0x1815
+#define MIPI_DSI_DWC_VID_VBP_LINES_OS              0x1816
+#define MIPI_DSI_DWC_VID_VFP_LINES_OS              0x1817
+#define MIPI_DSI_DWC_VID_VACTIVE_LINES_OS          0x1818
+#define MIPI_DSI_DWC_EDPI_CMD_SIZE_OS              0x1819
+#define MIPI_DSI_DWC_CMD_MODE_CFG_OS               0x181a
+#define MIPI_DSI_DWC_GEN_HDR_OS                    0x181b
+#define MIPI_DSI_DWC_GEN_PLD_DATA_OS               0x181c
+#define MIPI_DSI_DWC_CMD_PKT_STATUS_OS             0x181d
+#define MIPI_DSI_DWC_TO_CNT_CFG_OS                 0x181e
+#define MIPI_DSI_DWC_HS_RD_TO_CNT_OS               0x181f
+#define MIPI_DSI_DWC_LP_RD_TO_CNT_OS               0x1820
+#define MIPI_DSI_DWC_HS_WR_TO_CNT_OS               0x1821
+#define MIPI_DSI_DWC_LP_WR_TO_CNT_OS               0x1822
+#define MIPI_DSI_DWC_BTA_TO_CNT_OS                 0x1823
+#define MIPI_DSI_DWC_SDF_3D_OS                     0x1824
+#define MIPI_DSI_DWC_LPCLK_CTRL_OS                 0x1825
+#define MIPI_DSI_DWC_PHY_TMR_LPCLK_CFG_OS          0x1826
+#define MIPI_DSI_DWC_PHY_TMR_CFG_OS                0x1827
+#define MIPI_DSI_DWC_PHY_RSTZ_OS                   0x1828
+#define MIPI_DSI_DWC_PHY_IF_CFG_OS                 0x1829
+#define MIPI_DSI_DWC_PHY_ULPS_CTRL_OS              0x182a
+#define MIPI_DSI_DWC_PHY_TX_TRIGGERS_OS            0x182b
+#define MIPI_DSI_DWC_PHY_STATUS_OS                 0x182c
+#define MIPI_DSI_DWC_PHY_TST_CTRL0_OS              0x182d
+#define MIPI_DSI_DWC_PHY_TST_CTRL1_OS              0x182e
+#define MIPI_DSI_DWC_INT_ST0_OS                    0x182f
+#define MIPI_DSI_DWC_INT_ST1_OS                    0x1830
+#define MIPI_DSI_DWC_INT_MSK0_OS                   0x1831
+#define MIPI_DSI_DWC_INT_MSK1_OS                   0x1832
 
 /* Top-level registers */
 /* [31: 3]    Reserved.     Default 0.
@@ -1371,7 +1230,7 @@
  *     [0] RW dwc_rst_n:  Default 1.
  *		1=Assert SW reset on IP core.   0=Release reset.
  */
-#define MIPI_DSI_TOP_SW_RESET                      0x00f0
+#define MIPI_DSI_TOP_SW_RESET                      0x18f0
 /* [31: 5] Reserved.   Default 0.
  *     [4] RW manual_edpihalt: Default 0.
  *		1=Manual suspend VencL; 0=do not suspend VencL.
@@ -1386,7 +1245,7 @@
  *     [0] RW enable_sysclk: A manual clock gate option, due to DWC IP does not
  *		have auto-clock gating. 1=Enable sysclk.      Default 0.
  */
-#define MIPI_DSI_TOP_CLK_CNTL                      0x00f1
+#define MIPI_DSI_TOP_CLK_CNTL                      0x18f1
 /* [31:24]    Reserved. Default 0.
  * [23:20] RW dpi_color_mode: Define DPI pixel format. Default 0.
  *		0=16-bit RGB565 config 1;
@@ -1430,17 +1289,17 @@
  *     [1]    Reserved.  Default 0.
  *     [0]    Reserved.  Default 0.
  */
-#define MIPI_DSI_TOP_CNTL                          0x00f2
-#define MIPI_DSI_TOP_SUSPEND_CNTL                  0x00f3
-#define MIPI_DSI_TOP_SUSPEND_LINE                  0x00f4
-#define MIPI_DSI_TOP_SUSPEND_PIX                   0x00f5
-#define MIPI_DSI_TOP_MEAS_CNTL                     0x00f6
+#define MIPI_DSI_TOP_CNTL                          0x18f2
+#define MIPI_DSI_TOP_SUSPEND_CNTL                  0x18f3
+#define MIPI_DSI_TOP_SUSPEND_LINE                  0x18f4
+#define MIPI_DSI_TOP_SUSPEND_PIX                   0x18f5
+#define MIPI_DSI_TOP_MEAS_CNTL                     0x18f6
 /* [0] R  stat_edpihalt:  edpihalt signal from IP.    Default 0. */
-#define MIPI_DSI_TOP_STAT                          0x00f7
-#define MIPI_DSI_TOP_MEAS_STAT_TE0                 0x00f8
-#define MIPI_DSI_TOP_MEAS_STAT_TE1                 0x00f9
-#define MIPI_DSI_TOP_MEAS_STAT_VS0                 0x00fa
-#define MIPI_DSI_TOP_MEAS_STAT_VS1                 0x00fb
+#define MIPI_DSI_TOP_STAT                          0x18f7
+#define MIPI_DSI_TOP_MEAS_STAT_TE0                 0x18f8
+#define MIPI_DSI_TOP_MEAS_STAT_TE1                 0x18f9
+#define MIPI_DSI_TOP_MEAS_STAT_VS0                 0x18fa
+#define MIPI_DSI_TOP_MEAS_STAT_VS1                 0x18fb
 /* [31:16] RW intr_stat/clr. Default 0.
  *		For each bit, read as this interrupt level status,
  *		write 1 to clear.
@@ -1461,14 +1320,77 @@
  *	[    1] vs_rise interrupt
  *	[    0] dwc_edpite interrupt
  */
-#define MIPI_DSI_TOP_INTR_CNTL_STAT                0x00fc
+#define MIPI_DSI_TOP_INTR_CNTL_STAT                0x18fc
 // 31: 2    Reserved.   Default 0.
 //  1: 0 RW mem_pd.     Default 3.
-#define MIPI_DSI_TOP_MEM_PD                        0x00fd
+#define MIPI_DSI_TOP_MEM_PD                        0x18fd
 
+#define MIPI_DSI_DWC_VERSION_OS_G12A                    0x1c00
+#define MIPI_DSI_DWC_PWR_UP_OS_G12A                     0x1c01
+#define MIPI_DSI_DWC_CLKMGR_CFG_OS_G12A                 0x1c02
+#define MIPI_DSI_DWC_DPI_VCID_OS_G12A                   0x1c03
+#define MIPI_DSI_DWC_DPI_COLOR_CODING_OS_G12A           0x1c04
+#define MIPI_DSI_DWC_DPI_CFG_POL_OS_G12A                0x1c05
+#define MIPI_DSI_DWC_DPI_LP_CMD_TIM_OS_G12A             0x1c06
+#define MIPI_DSI_DWC_PCKHDL_CFG_OS_G12A                 0x1c0b
+#define MIPI_DSI_DWC_GEN_VCID_OS_G12A                   0x180c
+#define MIPI_DSI_DWC_MODE_CFG_OS_G12A                   0x1c0d
+#define MIPI_DSI_DWC_VID_MODE_CFG_OS_G12A               0x1c0e
+#define MIPI_DSI_DWC_VID_PKT_SIZE_OS_G12A               0x1c0f
+#define MIPI_DSI_DWC_VID_NUM_CHUNKS_OS_G12A             0x1c10
+#define MIPI_DSI_DWC_VID_NULL_SIZE_OS_G12A              0x1c11
+#define MIPI_DSI_DWC_VID_HSA_TIME_OS_G12A               0x1c12
+#define MIPI_DSI_DWC_VID_HBP_TIME_OS_G12A               0x1c13
+#define MIPI_DSI_DWC_VID_HLINE_TIME_OS_G12A             0x1c14
+#define MIPI_DSI_DWC_VID_VSA_LINES_OS_G12A              0x1c15
+#define MIPI_DSI_DWC_VID_VBP_LINES_OS_G12A              0x1c16
+#define MIPI_DSI_DWC_VID_VFP_LINES_OS_G12A              0x1c17
+#define MIPI_DSI_DWC_VID_VACTIVE_LINES_OS_G12A          0x1c18
+#define MIPI_DSI_DWC_EDPI_CMD_SIZE_OS_G12A              0x1c19
+#define MIPI_DSI_DWC_CMD_MODE_CFG_OS_G12A               0x1c1a
+#define MIPI_DSI_DWC_GEN_HDR_OS_G12A                    0x1c1b
+#define MIPI_DSI_DWC_GEN_PLD_DATA_OS_G12A               0x1c1c
+#define MIPI_DSI_DWC_CMD_PKT_STATUS_OS_G12A             0x1c1d
+#define MIPI_DSI_DWC_TO_CNT_CFG_OS_G12A                 0x1c1e
+#define MIPI_DSI_DWC_HS_RD_TO_CNT_OS_G12A               0x1c1f
+#define MIPI_DSI_DWC_LP_RD_TO_CNT_OS_G12A               0x1c20
+#define MIPI_DSI_DWC_HS_WR_TO_CNT_OS_G12A               0x1c21
+#define MIPI_DSI_DWC_LP_WR_TO_CNT_OS_G12A               0x1c22
+#define MIPI_DSI_DWC_BTA_TO_CNT_OS_G12A                 0x1c23
+#define MIPI_DSI_DWC_SDF_3D_OS_G12A                     0x1c24
+#define MIPI_DSI_DWC_LPCLK_CTRL_OS_G12A                 0x1c25
+#define MIPI_DSI_DWC_PHY_TMR_LPCLK_CFG_OS_G12A          0x1c26
+#define MIPI_DSI_DWC_PHY_TMR_CFG_OS_G12A                0x1c27
+#define MIPI_DSI_DWC_PHY_RSTZ_OS_G12A                   0x1c28
+#define MIPI_DSI_DWC_PHY_IF_CFG_OS_G12A                 0x1c29
+#define MIPI_DSI_DWC_PHY_ULPS_CTRL_OS_G12A              0x1c2a
+#define MIPI_DSI_DWC_PHY_TX_TRIGGERS_OS_G12A            0x1c2b
+#define MIPI_DSI_DWC_PHY_STATUS_OS_G12A                 0x1c2c
+#define MIPI_DSI_DWC_PHY_TST_CTRL0_OS_G12A              0x1c2d
+#define MIPI_DSI_DWC_PHY_TST_CTRL1_OS_G12A              0x1c2e
+#define MIPI_DSI_DWC_INT_ST0_OS_G12A                    0x1c2f
+#define MIPI_DSI_DWC_INT_ST1_OS_G12A                    0x1c30
+#define MIPI_DSI_DWC_INT_MSK0_OS_G12A                   0x1c31
+#define MIPI_DSI_DWC_INT_MSK1_OS_G12A                   0x1c32
+#define MIPI_DSI_TOP_SW_RESET_G12A                      0x1cf0
+#define MIPI_DSI_TOP_CLK_CNTL_G12A                      0x1cf1
+#define MIPI_DSI_TOP_CNTL_G12A                          0x1cf2
+#define MIPI_DSI_TOP_SUSPEND_CNTL_G12A                  0x1cf3
+#define MIPI_DSI_TOP_SUSPEND_LINE_G12A                  0x1cf4
+#define MIPI_DSI_TOP_SUSPEND_PIX_G12A                   0x1cf5
+#define MIPI_DSI_TOP_MEAS_CNTL_G12A                     0x1cf6
+#define MIPI_DSI_TOP_STAT_G12A                          0x1cf7
+#define MIPI_DSI_TOP_MEAS_STAT_TE0_G12A                 0x1cf8
+#define MIPI_DSI_TOP_MEAS_STAT_TE1_G12A                 0x1cf9
+#define MIPI_DSI_TOP_MEAS_STAT_VS0_G12A                 0x1cfa
+#define MIPI_DSI_TOP_MEAS_STAT_VS1_G12A                 0x1cfb
+#define MIPI_DSI_TOP_INTR_CNTL_STAT_G12A                0x1cfc
+#define MIPI_DSI_TOP_MEM_PD_G12A                        0x1cfd
 /* ***********************************************
  * DSI PHY register offset address define
  */
+#define MIPI_DSI_PHY_START      0xff640000
+#define MIPI_DSI_PHY_END        0xff641fff
 /* [31] soft reset for the phy.
  *		1: reset. 0: dessert the reset.
  * [30] clock lane soft reset.
@@ -1601,145 +1523,90 @@
 
 #define MIPI_DSI_TEST_CTRL1     0x10
 
-/*******************backlight***********************/
-#define VPU_VPU_PWM_V0                             0x2730
-#define VPU_VPU_PWM_V1                             0x2731
-#define VPU_VPU_PWM_V2                             0x2732
-#define VPU_VPU_PWM_V3                             0x2733
-
-#define VPU_VPU_PWM_V0_T7                          0x1ce0
-#define VPU_VPU_PWM_V1_T7                          0x1ce1
-#define VPU_VPU_PWM_V2_T7                          0x1ce2
-#define VPU_VPU_PWM_V3_T7                          0x1ce3
 /* ***********************************************
  * register access api
  */
 extern int lcd_reg_gxb[];
-extern int lcd_reg_g12a[];
+extern int lcd_reg_axg[];
 extern int lcd_reg_tl1[];
-extern int lcd_reg_t7[];
+extern int lcd_reg_t5[];
 
-int lcd_ioremap(struct aml_lcd_drv_s *pdrv, struct platform_device *pdev);
-unsigned int lcd_vcbus_read(unsigned int reg);
-void lcd_vcbus_write(unsigned int reg, unsigned int value);
-void lcd_vcbus_setb(unsigned int reg, unsigned int value,
-		    unsigned int start, unsigned int len);
-unsigned int lcd_vcbus_getb(unsigned int reg,
-			    unsigned int start, unsigned int len);
-void lcd_vcbus_set_mask(unsigned int reg, unsigned int mask);
-void lcd_vcbus_clr_mask(unsigned int reg, unsigned int mask);
+extern int lcd_ioremap(struct platform_device *pdev);
+extern unsigned int lcd_vcbus_read(unsigned int _reg);
+extern void lcd_vcbus_write(unsigned int _reg, unsigned int _value);
+extern void lcd_vcbus_setb(unsigned int reg, unsigned int value,
+		unsigned int _start, unsigned int _len);
+extern unsigned int lcd_vcbus_getb(unsigned int reg,
+		unsigned int _start, unsigned int _len);
+extern void lcd_vcbus_set_mask(unsigned int reg, unsigned int _mask);
+extern void lcd_vcbus_clr_mask(unsigned int reg, unsigned int _mask);
 
-unsigned int lcd_clk_read(unsigned int reg);
-void lcd_clk_write(unsigned int reg, unsigned int value);
-void lcd_clk_setb(unsigned int reg, unsigned int value,
-		  unsigned int start, unsigned int len);
-unsigned int lcd_clk_getb(unsigned int reg,
-			  unsigned int start, unsigned int len);
-void lcd_clk_set_mask(unsigned int reg, unsigned int mask);
-void lcd_clk_clr_mask(unsigned int reg, unsigned int mask);
+extern unsigned int lcd_hiu_read(unsigned int _reg);
+extern void lcd_hiu_write(unsigned int _reg, unsigned int _value);
+extern void lcd_hiu_setb(unsigned int _reg, unsigned int _value,
+		unsigned int _start, unsigned int _len);
+extern unsigned int lcd_hiu_getb(unsigned int _reg,
+		unsigned int _start, unsigned int _len);
+extern void lcd_hiu_set_mask(unsigned int _reg, unsigned int _mask);
+extern void lcd_hiu_clr_mask(unsigned int _reg, unsigned int _mask);
 
-unsigned int lcd_ana_read(unsigned int reg);
-void lcd_ana_write(unsigned int reg, unsigned int value);
-void lcd_ana_setb(unsigned int reg, unsigned int value,
-		  unsigned int start, unsigned int len);
-unsigned int lcd_ana_getb(unsigned int reg,
-			  unsigned int start, unsigned int len);
+unsigned int lcd_ana_read(unsigned int _reg);
+void lcd_ana_write(unsigned int _reg, unsigned int _value);
+void lcd_ana_setb(unsigned int _reg, unsigned int _value,
+		  unsigned int _start, unsigned int _len);
+unsigned int lcd_ana_getb(unsigned int _reg,
+			  unsigned int _start, unsigned int _len);
 
-unsigned int lcd_cbus_read(unsigned int reg);
-void lcd_cbus_write(unsigned int reg, unsigned int value);
-void lcd_cbus_setb(unsigned int reg, unsigned int value,
-		   unsigned int start, unsigned int len);
+extern unsigned int lcd_cbus_read(unsigned int _reg);
+extern void lcd_cbus_write(unsigned int _reg, unsigned int _value);
+extern void lcd_cbus_setb(unsigned int _reg, unsigned int _value,
+		unsigned int _start, unsigned int _len);
 
-unsigned int lcd_periphs_read(struct aml_lcd_drv_s *pdrv, unsigned int reg);
-void lcd_periphs_write(struct aml_lcd_drv_s *pdrv, unsigned int reg,
-		       unsigned int value);
-void lcd_pinmux_set_mask(struct aml_lcd_drv_s *pdrv, unsigned int reg,
-			 unsigned int mask);
-void lcd_pinmux_clr_mask(struct aml_lcd_drv_s *pdrv, unsigned int reg,
-			 unsigned int mask);
+extern unsigned int lcd_periphs_read(unsigned int _reg);
+extern void lcd_periphs_write(unsigned int _reg, unsigned int _value);
+unsigned int lcd_reset_read(unsigned int _reg);
+void lcd_reset_write(unsigned int _reg, unsigned int _value);
+void lcd_reset_setb(unsigned int _reg, unsigned int _value,
+		    unsigned int _start, unsigned int _len);
 
-unsigned int dsi_host_read(struct aml_lcd_drv_s *pdrv, unsigned int reg);
-void dsi_host_write(struct aml_lcd_drv_s *pdrv, unsigned int reg,
-		    unsigned int value);
-void dsi_host_setb(struct aml_lcd_drv_s *pdrv,
-		   unsigned int reg, unsigned int value,
-		   unsigned int start, unsigned int len);
-unsigned int dsi_host_getb(struct aml_lcd_drv_s *pdrv, unsigned int reg,
-			   unsigned int start, unsigned int len);
-void dsi_host_set_mask(struct aml_lcd_drv_s *pdrv, unsigned int reg,
-		       unsigned int mask);
-void dsi_host_clr_mask(struct aml_lcd_drv_s *pdrv, unsigned int reg,
-		       unsigned int mask);
-unsigned int dsi_phy_read(struct aml_lcd_drv_s *pdrv, unsigned int reg);
-void dsi_phy_write(struct aml_lcd_drv_s *pdrv, unsigned int reg,
-		   unsigned int value);
-void dsi_phy_setb(struct aml_lcd_drv_s *pdrv, unsigned int reg,
-		  unsigned int value,
-		  unsigned int start, unsigned int len);
-unsigned int dsi_phy_getb(struct aml_lcd_drv_s *pdrv, unsigned int reg,
-			  unsigned int start, unsigned int len);
-void dsi_phy_set_mask(struct aml_lcd_drv_s *pdrv, unsigned int reg,
-		      unsigned int mask);
-void dsi_phy_clr_mask(struct aml_lcd_drv_s *pdrv, unsigned int reg,
-		      unsigned int mask);
+extern unsigned int dsi_host_read(unsigned int _reg);
+extern void dsi_host_write(unsigned int _reg, unsigned int _value);
+extern void dsi_host_setb(unsigned int reg, unsigned int value,
+		unsigned int _start, unsigned int _len);
+extern unsigned int dsi_host_getb(unsigned int reg,
+		unsigned int _start, unsigned int _len);
+extern void dsi_host_set_mask(unsigned int reg, unsigned int _mask);
+extern void dsi_host_clr_mask(unsigned int reg, unsigned int _mask);
+extern unsigned int dsi_phy_read(unsigned int _reg);
+extern void dsi_phy_write(unsigned int _reg, unsigned int _value);
+extern void dsi_phy_setb(unsigned int reg, unsigned int value,
+		unsigned int _start, unsigned int _len);
+extern unsigned int dsi_phy_getb(unsigned int reg,
+		unsigned int _start, unsigned int _len);
+extern void dsi_phy_set_mask(unsigned int reg, unsigned int _mask);
+extern void dsi_phy_clr_mask(unsigned int reg, unsigned int _mask);
 
-unsigned int lcd_tcon_read(struct aml_lcd_drv_s *pdrv, unsigned int reg);
-void lcd_tcon_write(struct aml_lcd_drv_s *pdrv, unsigned int reg,
-		    unsigned int value);
-void lcd_tcon_setb(struct aml_lcd_drv_s *pdrv,
-		   unsigned int reg, unsigned int value,
-		   unsigned int start, unsigned int len);
-unsigned int lcd_tcon_getb(struct aml_lcd_drv_s *pdrv, unsigned int reg,
-			   unsigned int start, unsigned int len);
-void lcd_tcon_set_mask(struct aml_lcd_drv_s *pdrv, unsigned int reg,
-		       unsigned int mask);
-void lcd_tcon_clr_mask(struct aml_lcd_drv_s *pdrv, unsigned int reg,
-		       unsigned int mask);
-void lcd_tcon_update_bits(struct aml_lcd_drv_s *pdrv, unsigned int reg,
-			  unsigned int mask, unsigned int value);
-int lcd_tcon_check_bits(struct aml_lcd_drv_s *pdrv, unsigned int reg,
-			unsigned int mask, unsigned int value);
-unsigned char lcd_tcon_read_byte(struct aml_lcd_drv_s *pdrv, unsigned int reg);
-void lcd_tcon_write_byte(struct aml_lcd_drv_s *pdrv, unsigned int reg,
-			 unsigned char value);
-void lcd_tcon_setb_byte(struct aml_lcd_drv_s *pdrv, unsigned int reg,
-			unsigned char value,
-			unsigned int start, unsigned int len);
-unsigned char lcd_tcon_getb_byte(struct aml_lcd_drv_s *pdrv, unsigned int reg,
-				 unsigned int start, unsigned int len);
-void lcd_tcon_update_bits_byte(struct aml_lcd_drv_s *pdrv, unsigned int reg,
-			       unsigned char mask, unsigned char value);
-int lcd_tcon_check_bits_byte(struct aml_lcd_drv_s *pdrv, unsigned int reg,
-			     unsigned char mask, unsigned char value);
-
-unsigned int dptx_reg_read(struct aml_lcd_drv_s *pdrv, unsigned int reg);
-void dptx_reg_write(struct aml_lcd_drv_s *pdrv, unsigned int reg,
-		    unsigned int value);
-void dptx_reg_setb(struct aml_lcd_drv_s *pdrv, unsigned int reg,
-		   unsigned int value,
-		   unsigned int start, unsigned int len);
-unsigned int dptx_reg_getb(struct aml_lcd_drv_s *pdrv, unsigned int reg,
-			   unsigned int start, unsigned int len);
-
-unsigned int lcd_combo_dphy_read(struct aml_lcd_drv_s *pdrv, unsigned int reg);
-void lcd_combo_dphy_write(struct aml_lcd_drv_s *pdrv, unsigned int reg,
+extern unsigned int lcd_tcon_read(unsigned int _reg);
+extern void lcd_tcon_write(unsigned int _reg, unsigned int _value);
+extern void lcd_tcon_setb(unsigned int reg, unsigned int value,
+		unsigned int _start, unsigned int _len);
+extern unsigned int lcd_tcon_getb(unsigned int reg,
+		unsigned int _start, unsigned int _len);
+extern void lcd_tcon_set_mask(unsigned int reg, unsigned int _mask);
+extern void lcd_tcon_clr_mask(unsigned int reg, unsigned int _mask);
+void lcd_tcon_update_bits(unsigned int reg, unsigned int mask,
 			  unsigned int value);
-void lcd_combo_dphy_setb(struct aml_lcd_drv_s *pdrv, unsigned int reg,
-			 unsigned int value,
-			 unsigned int start, unsigned int len);
-unsigned int lcd_combo_dphy_getb(struct aml_lcd_drv_s *pdrv, unsigned int reg,
-				 unsigned int start, unsigned int len);
-unsigned int lcd_reset_read(struct aml_lcd_drv_s *pdrv, unsigned int reg);
-void lcd_reset_write(struct aml_lcd_drv_s *pdrv, unsigned int reg,
-		     unsigned int value);
-void lcd_reset_setb(struct aml_lcd_drv_s *pdrv, unsigned int reg,
-		    unsigned int value,
-		    unsigned int start, unsigned int len);
-unsigned int lcd_reset_getb(struct aml_lcd_drv_s *pdrv, unsigned int reg,
-			    unsigned int start, unsigned int len);
-void lcd_reset_set_mask(struct aml_lcd_drv_s *pdrv, unsigned int reg,
-			unsigned int mask);
-void lcd_reset_clr_mask(struct aml_lcd_drv_s *pdrv, unsigned int reg,
-			unsigned int mask);
+int lcd_tcon_check_bits(unsigned int reg, unsigned int mask,
+			unsigned int value);
+extern unsigned char lcd_tcon_read_byte(unsigned int _reg);
+extern void lcd_tcon_write_byte(unsigned int _reg, unsigned char _value);
+extern void lcd_tcon_setb_byte(unsigned int reg, unsigned char value,
+		unsigned int _start, unsigned int _len);
+extern unsigned char lcd_tcon_getb_byte(unsigned int reg,
+		unsigned int _start, unsigned int _len);
+void lcd_tcon_update_bits_byte(unsigned int reg, unsigned char mask,
+			       unsigned char value);
+int lcd_tcon_check_bits_byte(unsigned int reg, unsigned char mask,
+			     unsigned char value);
 #endif
 

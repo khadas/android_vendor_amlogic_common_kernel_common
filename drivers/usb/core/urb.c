@@ -1,8 +1,3 @@
-// SPDX-License-Identifier: GPL-2.0
-/*
- * Released under the GPLv2 only.
- */
-
 #include <linux/module.h>
 #include <linux/string.h>
 #include <linux/bitops.h>
@@ -71,8 +66,9 @@ struct urb *usb_alloc_urb(int iso_packets, gfp_t mem_flags)
 {
 	struct urb *urb;
 
-	urb = kmalloc(struct_size(urb, iso_frame_desc, iso_packets),
-		      mem_flags);
+	urb = kmalloc(sizeof(struct urb) +
+		iso_packets * sizeof(struct usb_iso_packet_descriptor),
+		mem_flags);
 	if (!urb)
 		return NULL;
 	usb_init_urb(urb);
@@ -438,17 +434,12 @@ int usb_submit_urb(struct urb *urb, gfp_t mem_flags)
 			max *= mult;
 		}
 
-		if (dev->speed == USB_SPEED_SUPER_PLUS &&
-		    USB_SS_SSP_ISOC_COMP(ep->ss_ep_comp.bmAttributes)) {
-			struct usb_ssp_isoc_ep_comp_descriptor *isoc_ep_comp;
-
-			isoc_ep_comp = &ep->ssp_isoc_ep_comp;
-			max = le32_to_cpu(isoc_ep_comp->dwBytesPerInterval);
-		}
-
 		/* "high bandwidth" mode, 1-3 packets/uframe? */
-		if (dev->speed == USB_SPEED_HIGH)
-			max *= usb_endpoint_maxp_mult(&ep->desc);
+		if (dev->speed == USB_SPEED_HIGH) {
+			int	mult = 1 + ((max >> 11) & 0x03);
+			max &= 0x07ff;
+			max *= mult;
+		}
 
 		if (urb->number_of_packets <= 0)
 			return -EINVAL;
@@ -492,6 +483,9 @@ int usb_submit_urb(struct urb *urb, gfp_t mem_flags)
 		if (is_out)
 			allowed |= URB_ZERO_PACKET;
 		/* FALLTHROUGH */
+	case USB_ENDPOINT_XFER_CONTROL:
+		allowed |= URB_NO_FSBR;	/* only affects UHCI */
+		/* FALLTHROUGH */
 	default:			/* all non-iso endpoints */
 		if (!is_out)
 			allowed |= URB_SHORT_NOT_OK;
@@ -524,7 +518,6 @@ int usb_submit_urb(struct urb *urb, gfp_t mem_flags)
 			if ((urb->interval < 6)
 				&& (xfertype == USB_ENDPOINT_XFER_INT))
 				return -EINVAL;
-			/* fall through */
 		default:
 			if (urb->interval <= 0)
 				return -EINVAL;

@@ -1,13 +1,24 @@
-/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * include/linux/amlogic/media/vout/hdmi_tx/hdmi_common.h
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
 #ifndef __HDMI_COMMON_H__
 #define __HDMI_COMMON_H__
 
 #include <linux/amlogic/media/vout/vinfo.h>
-#include <linux/amlogic/media/vout/hdmi_tx_ext.h>
 
 /* HDMI VIC definitions */
 
@@ -17,6 +28,7 @@
 #define HDMITX_VIC420_OFFSET	0x100
 #define HDMITX_VIC420_FAKE_OFFSET 0x200
 #define HDMITX_VESA_OFFSET	0x300
+
 
 #define HDMITX_VIC_MASK			0xff
 
@@ -44,13 +56,13 @@ enum hdmi_tf_type {
 	HDMI_HDR10P_DV_VSIF	= HDMI_HDR10P_TYPE | 1,
 };
 
-#define GET_OUI_BYTE0(oui)	((oui) & 0xff) /* Little Endian */
-#define GET_OUI_BYTE1(oui)	(((oui) >> 8) & 0xff)
-#define GET_OUI_BYTE2(oui)	(((oui) >> 16) & 0xff)
+#define GET_OUI_BYTE0(oui)	(oui & 0xff) /* Little Endian */
+#define GET_OUI_BYTE1(oui)	((oui >> 8) & 0xff)
+#define GET_OUI_BYTE2(oui)	((oui >> 16) & 0xff)
 
 enum hdmi_vic {
 	/* Refer to CEA 861-D */
-	HDMI_UNKNOWN = 0,
+	HDMI_Unknown = 0,
 	HDMI_640x480p60_4x3 = 1,
 	HDMI_720x480p60_4x3 = 2,
 	HDMI_720x480p60_16x9 = 3,
@@ -209,6 +221,7 @@ enum hdmi_vic {
 	HDMIV_1600x1200p60hz,
 	HDMIV_1680x1050p60hz,
 	HDMIV_1920x1200p60hz,
+	HDMIV_2048x1080p24hz,
 	HDMIV_2160x1200p90hz,
 	HDMIV_2560x1080p60hz,
 	HDMIV_2560x1440p60hz,
@@ -332,7 +345,7 @@ enum hdmi_3d_type {
 
 /* get hdmi cea timing */
 /* t: struct hdmi_cea_timing * */
-#define GET_TIMING(name)      (t->(name))
+#define GET_TIMING(name)      (t->name)
 
 struct hdmi_format_para {
 	enum hdmi_vic vic;
@@ -386,7 +399,7 @@ struct hdmi_csc_coef_table {
 	unsigned char color_depth;
 	unsigned char color_format; /* 0 for ITU601, 1 for ITU709 */
 	unsigned char coef_length;
-	const unsigned char *coef;
+	unsigned char *coef;
 };
 
 enum hdmi_audio_packet {
@@ -403,18 +416,15 @@ enum hdmi_aspect_ratio {
 	TV_ASPECT_RATIO_14_9 = 0xB,
 	TV_ASPECT_RATIO_MAX
 };
-
 struct vesa_standard_timing;
 
 struct hdmi_format_para *hdmi_get_fmt_paras(enum hdmi_vic vic);
 struct hdmi_format_para *hdmi_match_dtd_paras(struct dtd *t);
 void check_detail_fmt(void);
-unsigned int hdmi_get_csc_coef(unsigned int input_format,
-			       unsigned int output_format,
-			       unsigned int color_depth,
-			       unsigned int color_format,
-			       const unsigned char **coef_array,
-			       unsigned int *coef_length);
+unsigned int hdmi_get_csc_coef(
+	unsigned int input_format, unsigned int output_format,
+	unsigned int color_depth, unsigned int color_format,
+	unsigned char **coef_array, unsigned int *coef_length);
 struct hdmi_format_para *hdmi_get_fmt_name(char const *name, char const *attr);
 struct hdmi_format_para *hdmi_tst_fmt_name(char const *name, char const *attr);
 struct vinfo_s *hdmi_get_valid_vinfo(char *mode);
@@ -422,9 +432,53 @@ const char *hdmi_get_str_cd(struct hdmi_format_para *para);
 const char *hdmi_get_str_cs(struct hdmi_format_para *para);
 const char *hdmi_get_str_cr(struct hdmi_format_para *para);
 unsigned int hdmi_get_aud_n_paras(enum hdmi_audio_fs fs,
-				  enum hdmi_color_depth cd,
-				  unsigned int tmds_clk);
+	enum hdmi_color_depth cd, unsigned int tmds_clk);
 struct hdmi_format_para *hdmi_get_vesa_paras(struct vesa_standard_timing *t);
+
+
+/* HDMI Audio Parmeters */
+/* Refer to CEA-861-D Page 88 */
+#define DTS_HD_TYPE_MASK 0xff00
+#define DTS_HD_MA  (0X1 << 8)
+enum hdmi_audio_type {
+	CT_REFER_TO_STREAM = 0,
+	CT_PCM,
+	CT_AC_3, /* DD */
+	CT_MPEG1,
+	CT_MP3,
+	CT_MPEG2,
+	CT_AAC,
+	CT_DTS,
+	CT_ATRAC,
+	CT_ONE_BIT_AUDIO,
+	CT_DOLBY_D, /* DDP or DD+ */
+	CT_DTS_HD,
+	CT_MAT, /* TrueHD */
+	CT_DST,
+	CT_WMA,
+	CT_DTS_HD_MA = CT_DTS_HD + (DTS_HD_MA),
+	CT_MAX,
+};
+
+enum hdmi_audio_chnnum {
+	CC_REFER_TO_STREAM = 0,
+	CC_2CH,
+	CC_3CH,
+	CC_4CH,
+	CC_5CH,
+	CC_6CH,
+	CC_7CH,
+	CC_8CH,
+	CC_MAX_CH
+};
+
+enum hdmi_audio_format {
+	AF_SPDIF = 0, AF_I2S, AF_DSD, AF_HBR, AT_MAX
+};
+
+enum hdmi_audio_sampsize {
+	SS_REFER_TO_STREAM = 0, SS_16BITS, SS_20BITS, SS_24BITS, SS_MAX
+};
 
 struct size_map {
 	unsigned int sample_bits;
@@ -508,6 +562,26 @@ enum hdmi_rx_audio_state {
 	STATE_AUDIO__REQUEST_AUDIO = 1,
 	STATE_AUDIO__AUDIO_READY = 2,
 	STATE_AUDIO__ON = 3,
+};
+
+/* Sampling Freq Fs:
+ * 0 - Refer to Stream Header;
+ * 1 - 32KHz;
+ * 2 - 44.1KHz;
+ * 3 - 48KHz;
+ * 4 - 88.2KHz...
+ */
+enum hdmi_audio_fs {
+	FS_REFER_TO_STREAM = 0,
+	FS_32K = 1,
+	FS_44K1 = 2,
+	FS_48K = 3,
+	FS_88K2 = 4,
+	FS_96K = 5,
+	FS_176K4 = 6,
+	FS_192K = 7,
+	FS_768K = 8,
+	FS_MAX,
 };
 
 struct rate_map_fs {

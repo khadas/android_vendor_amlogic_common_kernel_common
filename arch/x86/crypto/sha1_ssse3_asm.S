@@ -1,4 +1,3 @@
-/* SPDX-License-Identifier: GPL-2.0-or-later */
 /*
  * This is a SIMD SHA-1 implementation. It requires the Intel(R) Supplemental
  * SSE3 instruction set extensions introduced in Intel Core Microarchitecture
@@ -22,6 +21,11 @@
  *
  * Converted to AT&T syntax and adapted for inclusion in the Linux kernel:
  *   Author: Mathias Krause <minipli@googlemail.com>
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
  */
 
 #include <linux/linkage.h>
@@ -33,7 +37,7 @@
 #define REG_A	%ecx
 #define REG_B	%esi
 #define REG_C	%edi
-#define REG_D	%r12d
+#define REG_D	%ebp
 #define REG_E	%edx
 
 #define REG_T1	%eax
@@ -70,10 +74,10 @@
 	ENTRY(\name)
 
 	push	%rbx
-	push	%r12
 	push	%rbp
-	mov	%rsp, %rbp
+	push	%r12
 
+	mov	%rsp, %r12
 	sub	$64, %rsp		# allocate workspace
 	and	$~15, %rsp		# align stack
 
@@ -92,12 +96,13 @@
 	# cleanup workspace
 	mov	$8, %ecx
 	mov	%rsp, %rdi
-	xor	%eax, %eax
+	xor	%rax, %rax
 	rep stosq
 
-	mov	%rbp, %rsp		# deallocate workspace
-	pop	%rbp
+	mov	%r12, %rsp		# deallocate workspace
+
 	pop	%r12
+	pop	%rbp
 	pop	%rbx
 	ret
 
@@ -457,13 +462,9 @@ W_PRECALC_SSSE3
 	movdqu	\a,\b
 .endm
 
-/*
- * SSSE3 optimized implementation:
- *
- * extern "C" void sha1_transform_ssse3(struct sha1_state *state,
- *					const u8 *data, int blocks);
- *
- * Note that struct sha1_state is assumed to begin with u32 state[5].
+/* SSSE3 optimized implementation:
+ *  extern "C" void sha1_transform_ssse3(u32 *digest, const char *data, u32 *ws,
+ *                                       unsigned int rounds);
  */
 SHA1_VECTOR_ASM     sha1_transform_ssse3
 
@@ -549,8 +550,8 @@ W_PRECALC_AVX
 
 
 /* AVX optimized implementation:
- *  extern "C" void sha1_transform_avx(struct sha1_state *state,
- *				       const u8 *data, int blocks);
+ *  extern "C" void sha1_transform_avx(u32 *digest, const char *data, u32 *ws,
+ *                                     unsigned int rounds);
  */
 SHA1_VECTOR_ASM     sha1_transform_avx
 

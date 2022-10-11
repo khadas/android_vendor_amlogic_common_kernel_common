@@ -1,6 +1,18 @@
-/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/amlogic/drm/meson_vpu_pipeline.h
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
 #ifndef __MESON_VPU_TOPOLOGY_H
@@ -93,7 +105,6 @@ struct meson_vpu_block_ops {
 	void (*dump_register)(struct meson_vpu_block *vblk,
 			      struct seq_file *seq);
 	void (*init)(struct meson_vpu_block *vblk);
-	void (*fini)(struct meson_vpu_block *vblk);
 };
 
 struct meson_vpu_block_link {
@@ -151,8 +162,6 @@ struct meson_vpu_osd_layer_info {
 	u32 dst_h;
 	int dst_x;
 	int dst_y;
-	u32 fb_w;
-	u32 fb_h;
 	u32 zorder;
 	u32 byte_stride;
 	u32 pixel_format;
@@ -163,11 +172,9 @@ struct meson_vpu_osd_layer_info {
 	u32 afbc_inter_format;
 	u32 afbc_en;
 	u32 fb_size;
-	u32 pixel_blend;
+	u32 premult_en;
 	u32 rotation;
 	u32 blend_bypass;
-	u32 global_alpha;
-	u32 scaling_filter;
 };
 
 struct meson_vpu_osd {
@@ -204,7 +211,7 @@ struct meson_vpu_osd_state {
 	int r_mode;
 	u32 plane_index;
 	u32 fb_size;
-	u32 pixel_blend;
+	u32 premult_en;
 	u32 afbc_en;
 	u32 rotation;
 	u32 blend_bypass;
@@ -226,8 +233,10 @@ struct meson_vpu_video_layer_info {
 	u32 plane_index;
 	u32 enable;
 	u32 ratio_x;/*input_w/output_w*/
+	u32 afbc_inter_format;
+	u32 afbc_en;
 	u32 fb_size[2];
-	u32 pixel_blend;
+	u32 premult_en;
 	struct vframe_s *vf;
 	bool is_uvm;
 };
@@ -274,7 +283,7 @@ struct meson_vpu_video_state {
 	int r_mode;
 	u32 plane_index;
 	u32 fb_size[2];
-	u32 pixel_blend;
+	u32 premult_en;
 	u32 afbc_en;
 	struct vframe_s *vf;
 	bool is_uvm;
@@ -313,7 +322,6 @@ struct meson_vpu_scaler_state {
 	u32 scan_mode_out;
 	u32 state_changed;
 	u32 free_scale_enable;
-	u32 scaler_filter_mode;
 };
 
 struct meson_vpu_scaler_param {
@@ -321,15 +329,8 @@ struct meson_vpu_scaler_param {
 	u32 input_height;
 	u32 output_width;
 	u32 output_height;
-
-	//u32 ratio_x;
-	//u32 ratio_y;
-
-	u32 ratio_w_num;
-	u32 ratio_w_den;
-	u32 ratio_h_num;
-	u32 ratio_h_den;
-
+	u32 ratio_x;
+	u32 ratio_y;
 	/*calc_done_mask:
 	 *bit0:ratio_x,
 	 *bit1:ratio_y
@@ -477,7 +478,6 @@ struct meson_vpu_pipeline_state {
 	u32 scaler_cnt[MAX_DIN_NUM];
 	struct meson_vpu_block *scale_blk[MESON_MAX_OSDS][MESON_MAX_SCALERS];
 	u32 dout_zorder[MAX_DOUT_NUM];
-	u32 global_afbc;
 };
 
 #define to_osd_block(x) container_of(x, struct meson_vpu_osd, base)
@@ -507,25 +507,12 @@ struct meson_vpu_pipeline_state {
 #define priv_to_pipeline_state(x) container_of(x, \
 		struct meson_vpu_pipeline_state, obj)
 
-int vpu_pipeline_video_check(struct meson_vpu_pipeline *pipeline,
-		       struct drm_atomic_state *state);
-int vpu_pipeline_video_update(struct meson_vpu_pipeline *pipeline,
-			struct drm_atomic_state *old_state);
-
-int vpu_pipeline_osd_check(struct meson_vpu_pipeline *pipeline,
-		       struct drm_atomic_state *state);
-int vpu_pipeline_osd_update(struct meson_vpu_pipeline *pipeline,
-			struct drm_atomic_state *old_state);
-
 int vpu_topology_init(struct platform_device *pdev, struct meson_drm *private);
 int vpu_pipeline_check(struct meson_vpu_pipeline *pipeline,
 		       struct drm_atomic_state *state);
-int vpu_video_plane_update(struct meson_vpu_pipeline *pipeline,
-			struct drm_atomic_state *old_state, int plane_index);
-int vpu_osd_pipeline_update(struct meson_vpu_pipeline *pipeline,
+int vpu_pipeline_update(struct meson_vpu_pipeline *pipeline,
 			struct drm_atomic_state *old_state);
 void vpu_pipeline_init(struct meson_vpu_pipeline *pipeline);
-void vpu_pipeline_fini(struct meson_vpu_pipeline *pipeline);
 
 /* meson_vpu_pipeline_private.c */
 struct meson_vpu_block_state *
@@ -537,7 +524,8 @@ meson_vpu_pipeline_get_state(struct meson_vpu_pipeline *pipeline,
 int meson_vpu_block_state_init(struct meson_drm *private,
 			       struct meson_vpu_pipeline *pipeline);
 #ifdef MESON_DRM_VERSION_V0
-void meson_vpu_pipeline_atomic_backup_state(struct meson_vpu_pipeline_state *mvps);
+void meson_vpu_pipeline_atomic_backup_state(
+	struct meson_vpu_pipeline_state *mvps);
 #endif
 
 int combination_traverse(struct meson_vpu_pipeline_state *mvps,
@@ -549,8 +537,6 @@ int vpu_pipeline_check_osdblend(u32 *out_port, int num_planes,
 					struct drm_atomic_state *state);
 int vpu_video_pipeline_check_block(struct meson_vpu_pipeline_state *mvps,
 				   struct drm_atomic_state *state);
-void vpu_pipeline_check_finish_reg(void);
-
 extern struct meson_vpu_block_ops video_ops;
 extern struct meson_vpu_block_ops osd_ops;
 extern struct meson_vpu_block_ops afbc_ops;
@@ -560,11 +546,9 @@ extern struct meson_vpu_block_ops hdr_ops;
 extern struct meson_vpu_block_ops dolby_ops;
 extern struct meson_vpu_block_ops postblend_ops;
 
-#ifdef CONFIG_DEBUG_FS
 extern u32 overwrite_reg[256];
 extern u32 overwrite_val[256];
 extern int overwrite_enable;
 extern int reg_num;
-#endif
 
-#endif
+ #endif

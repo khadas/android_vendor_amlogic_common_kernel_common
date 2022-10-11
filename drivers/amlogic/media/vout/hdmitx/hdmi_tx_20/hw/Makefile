@@ -1,17 +1,2 @@
-$(MEDIA_MODULE_NAME)-$(CONFIG_AMLOGIC_HDMITX) += vout/hdmitx/hdmi_tx_20/hw/hdmi_tx_hw.o
-$(MEDIA_MODULE_NAME)-$(CONFIG_AMLOGIC_HDMITX) += vout/hdmitx/hdmi_tx_20/hw/hdmi_tx_dump.o
-$(MEDIA_MODULE_NAME)-$(CONFIG_AMLOGIC_HDMITX) += vout/hdmitx/hdmi_tx_20/hw/reg_ops.o
-$(MEDIA_MODULE_NAME)-$(CONFIG_AMLOGIC_HDMITX) += vout/hdmitx/hdmi_tx_20/hw/enc_cfg_hw.o
-$(MEDIA_MODULE_NAME)-$(CONFIG_AMLOGIC_HDMITX) += vout/hdmitx/hdmi_tx_20/hw/hdmi_tx_ddc.o
-$(MEDIA_MODULE_NAME)-$(CONFIG_AMLOGIC_HDMITX) += vout/hdmitx/hdmi_tx_20/hw/checksha.o
-ifndef CONFIG_AMLOGIC_REMOVE_OLD
-$(MEDIA_MODULE_NAME)-$(CONFIG_AMLOGIC_HDMITX) += vout/hdmitx/hdmi_tx_20/hw/hw_gxbb.o
-$(MEDIA_MODULE_NAME)-$(CONFIG_AMLOGIC_HDMITX) += vout/hdmitx/hdmi_tx_20/hw/hw_gxtvbb.o
-$(MEDIA_MODULE_NAME)-$(CONFIG_AMLOGIC_HDMITX) += vout/hdmitx/hdmi_tx_20/hw/hw_gxl.o
-endif
-$(MEDIA_MODULE_NAME)-$(CONFIG_AMLOGIC_HDMITX) += vout/hdmitx/hdmi_tx_20/hw/hw_txlx.o
-$(MEDIA_MODULE_NAME)-$(CONFIG_AMLOGIC_HDMITX) += vout/hdmitx/hdmi_tx_20/hw/hw_clk.o
-$(MEDIA_MODULE_NAME)-$(CONFIG_AMLOGIC_HDMITX) += vout/hdmitx/hdmi_tx_20/hw/hw_g12a.o
-$(MEDIA_MODULE_NAME)-$(CONFIG_AMLOGIC_HDMITX) += vout/hdmitx/hdmi_tx_20/hw/hw_sm1.o
-$(MEDIA_MODULE_NAME)-$(CONFIG_AMLOGIC_HDMITX) += vout/hdmitx/hdmi_tx_20/hw/hw_tm2.o
-$(MEDIA_MODULE_NAME)-$(CONFIG_AMLOGIC_HDMITX) += vout/hdmitx/hdmi_tx_20/hw/hw_sc2.o
+obj-y	+= hdmi_tx_hw.o reg_ops.o enc_cfg_hw.o hdmi_tx_ddc.o hdmi_tx_dump.o checksha.o
+obj-y	+= hw_gxbb.o hw_gxtvbb.o hw_gxl.o hw_txlx.o hw_clk.o hw_g12a.o hw_sm1.o hw_tm2.o hw_sc2.o

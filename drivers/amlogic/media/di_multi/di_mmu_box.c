@@ -1,6 +1,18 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/amlogic/media/di_multi/di_mmu_box.c
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
 #include <linux/kernel.h>
@@ -113,8 +125,7 @@ void di_mmu_try_to_release_box(void *handle)
 
 	if (!is_keep) {
 		di_mmu_box_mgr_del_box(box);
-			codec_mm_scatter_mgt_delay_free_switch
-				(0, 0, 0, box->tvp_mode);
+		codec_mm_scatter_mgt_delay_free_swith(0, 0, 0, box->tvp_mode);
 		kfree(box);
 	}
 }
@@ -164,16 +175,17 @@ void *di_mmu_box_alloc_box(const char *name,
 	mutex_init(&box->mutex);
 	INIT_LIST_HEAD(&box->list);
 	di_mmu_box_mgr_add_box(box);
-	codec_mm_scatter_mgt_delay_free_switch(1, 2000,
-					       min_size_M, box->tvp_mode);
+	codec_mm_scatter_mgt_delay_free_swith(1, 2000,
+		min_size_M, box->tvp_mode);
 	return (void *)box;
 }
 
 //EXPORT_SYMBOL(decoder_mmu_box_alloc_box);
 
 //decoder_mmu_box_alloc_idx
-int di_mmu_box_alloc_idx(void *handle, int idx, int num_pages,
-			 unsigned int *mmu_index_adr)
+int di_mmu_box_alloc_idx(
+	void *handle, int idx, int num_pages,
+	unsigned int *mmu_index_adr)
 {
 	struct di_mmu_box *box = handle;
 	struct codec_mm_scatter *sc;
@@ -188,10 +200,10 @@ int di_mmu_box_alloc_idx(void *handle, int idx, int num_pages,
 	mutex_lock(&box->mutex);
 	sc = box->sc_list[idx];
 	if (sc) {
-		if (sc->page_max_cnt >= num_pages) {
+		if (sc->page_max_cnt >= num_pages)
 			ret = codec_mm_scatter_alloc_want_pages(sc,
 				num_pages);
-		} else {
+		else {
 			box->box_ref_cnt--;
 			codec_mm_scatter_dec_owner_user(sc, 0);
 			box->sc_list[idx] = NULL;
@@ -222,7 +234,9 @@ int di_mmu_box_alloc_idx(void *handle, int idx, int num_pages,
 //EXPORT_SYMBOL(decoder_mmu_box_alloc_idx);
 
 //decoder_mmu_box_free_idx_tail
-int di_mmu_box_free_idx_tail(void *handle, int idx, int start_release_index)
+int di_mmu_box_free_idx_tail(
+		void *handle, int idx,
+		int start_release_index)
 {
 	struct di_mmu_box *box = handle;
 	struct codec_mm_scatter *sc;
@@ -266,7 +280,7 @@ int di_mmu_box_free_idx(void *handle, int idx)
 	mutex_unlock(&box->mutex);
 
 	if (sc && box->box_ref_cnt == 0)
-		codec_mm_scatter_mgt_delay_free_switch(0, 0, 0, box->tvp_mode);
+		codec_mm_scatter_mgt_delay_free_swith(0, 0, 0, box->tvp_mode);
 
 	return 0;
 }
@@ -293,7 +307,7 @@ int di_mmu_box_free(void *handle)
 	}
 	mutex_unlock(&box->mutex);
 	di_mmu_box_mgr_del_box(box);
-		codec_mm_scatter_mgt_delay_free_switch(0, 0, 0, box->tvp_mode);
+	codec_mm_scatter_mgt_delay_free_swith(0, 0, 0, box->tvp_mode);
 	kfree(box);
 	return 0;
 }

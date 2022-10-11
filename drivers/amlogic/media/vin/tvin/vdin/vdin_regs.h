@@ -1,4 +1,3 @@
-/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
  * drivers/amlogic/media/vin/tvin/vdin/vdin_regs.h
  *
@@ -55,6 +54,7 @@
 #define VDIN1_WR_CTRL2 0x129f
 #define VDIN1_WR_CTRL 0x12a0
 #define VDIN_COM_CTRL1 0x1282
+
 
 /* #define VIU_SW_RESET 0x1a01 */
 /* #define P_VIU_SW_RESET          VCBUS_REG_ADDR(VIU_SW_RESET) */
@@ -259,7 +259,7 @@
 /* 12:0 lfifo_buf_size */
 #define VDIN_LFIFO_CTRL             ((0x121a))/* + 0xd0100000) */
 #define LFIFO_BUF_SIZE_BIT	0
-#define LFIFO_BUF_SIZE_WID	14
+#define LFIFO_BUF_SIZE_WID	12
 /* tm2 new add begin */
 #define CH0_OUT_EN_BIT	17
 #define CH1_OUT_EN_BIT	18
@@ -324,7 +324,7 @@
 /* Bit 26 vcp_nr_en. Only used in VDIN0. NOT used in VDIN1. */
 /* Bit 25 vcp_wr_en. Only used in VDIN0. NOT used in VDIN1. */
 /* Bit 24 vcp_in_en. Only used in VDIN0. NOT used in VDIN1. */
-/* Bit 23 vdin frame reset enable, if true,
+/* Bit 23 vdin frame reset enble, if true,
  * it will provide frame reset during go_field(vsync) to
  *  the modules after that
  */
@@ -911,24 +911,6 @@
 
 #define VDIN_RO_CRC	0x12ca
 
-/* t7 add */
-#define VDIN_WR_BADDR_LUMA	0x12cc
-#define VDIN_WR_BADDR_CHROMA	0x12cd
-#define VDIN_WR_STRIDE_LUMA	0x12ce
-#define VDIN_WR_STRIDE_CHROMA	0x12cf
-
-/* dolby descramble and scramble register */
-#define VDIN_DSC_CTRL		0x12d0
-#define VDIN_CFMT_CTRL		0x12d1
-#define VDIN_CFMT_W		0x12d2
-#define VDIN_SCB_CTRL0		0x12d3
-#define VDIN_SCB_CTRL1		0x12d4
-#define VDIN_DSC_HSIZE		0x12d5
-#define VDIN_DSC_DETUNNEL_SEL	0x12d6
-#define VDIN_DSC_TUNNEL_SEL	0x12d7
-
-#define VDIN_DSC2_HSIZE		0x12da
-
 /*tm2 new add begin*/
 #define VDIN_VSHRK_SIZE_M1	0x12d9
 #define VSHRK_IN_HSIZE_BIT	0
@@ -959,28 +941,18 @@
 #define HSK_COEF_14	0x12fe
 #define HSK_COEF_15	0x12ff
 
-#define VDIN2_WR_CTRL			0x4101
+#define VDIN2_WR_CTRL	0x4101
 #define VDIN2_WR_CVS_ADDR_BIT	0
 #define VDIN2_WR_CVS_ADDR_WID	8
-#define VDIN2_WR_CTRL2			0x4102
-#define VDIN2_WR_H_START_END		0x4103
-#define VDIN2_WR_V_START_END		0x4104
-#define VDIN2_DBG_AXI_CMD_CNT		0x4105
-#define VDIN2_DBG_AXI_DAT_CNT		0x4106
-#define VDIN2_WR_URGENT_CTRL		0x4107
-#define VDIN2_RO_WRMIF_STATUS		0x4108
 
-#define VDIN2_WR_BADDR_LUMA		0x4110
-#define VDIN2_WR_BADDR_CHROMA		0x4111
-#define VDIN2_WR_STRIDE_LUMA		0x4112
-#define VDIN2_WR_STRIDE_CHROMA		0x4113
+#define VDIN2_WR_CTRL2	0x4102
+#define VDIN2_WR_H_START_END	0x4103
+#define VDIN2_WR_V_START_END	0x4104
 
-#define VDIN_TOP_SECURE0_ST_RO		0x4109
-#define VDIN_TOP_SECURE_DUMMY		0x410a
 /*[15:0] vdin reorder sel
  *0:disable, 1:vdin0 normal, 2:vdin0 small, 3:vdin1 normal, 4:vdin1 small
  */
-#define VDIN_TOP_DOUBLE_CTRL		0x410b
+#define VDIN_TOP_DOUBLE_CTRL	0x410b
 #define VDIN_REORDER_SEL_WID	4
 /* [3:0] afbce sel */
 #define AFBCE_OUT_SEL_BIT	0
@@ -990,20 +962,20 @@
 #define MIF1_OUT_SEL_BIT	8
 /* [15:12] wr mif 2 sel */
 #define MIF2_OUT_SEL_BIT	12
-/* vdin 0 wr interrupt mask*/
-#define VDIN0_INT_MASK_BIT	20
-/* vdin 1 wr interrupt mask*/
-#define VDIN1_INT_MASK_BIT	24
 
-#define VDIN_TOP_SECURE1_ST_RO		0x410c
-#define VDIN_TOP_MISC			0x410d
-#define VDIN_TOP_SECURE_REG0		0x410e
-#define VDIN_TOP_SECURE_REG1		0x410f
+/*tm2 new add end*/
 
-#define VDIN_SECURE_RXIN_DW		0x4116
-#define VDIN_TOP_MEAS_RO_LINE		0x4117
-#define VDIN_TOP_MEAS_RO_PIXF		0x4118
-#define VDIN_TOP_MEAS_RO_PIXB		0x4119
+/* dolby de-scramble scramble register */
+#define VDIN_DSC_CTRL		0x12d0
+#define VDIN_CFMT_CTRL		0x12d1
+#define VDIN_CFMT_W		0x12d2
+#define VDIN_SCB_CTRL0		0x12d3
+#define VDIN_SCB_CTRL1		0x12d4
+#define VDIN_DSC_HSIZE		0x12d5
+#define VDIN_DSC_DETUNNEL_SEL	0x12d6
+#define VDIN_DSC_TUNNEL_SEL	0x12d7
+
+#define VDIN_TOP_MISC		0x410d
 
 /* used by other modules,indicates that MPEG input.
  *0: mpeg source to NR directly,
@@ -1042,8 +1014,8 @@
 #define COMMON_DATA_IN_EN_BIT           4
 #define COMMON_DATA_IN_EN_WID           1
 /* 1: MPEG, 2: 656, 3: TVFE, 4: CVD2, 5: HDMI_Rx,6: DVIN otherwise: NULL
- * 7: loopback from VIU1, 8: MIPI csi2 in meson6
- */
+*7: loopback from VIU1, 8: MIPI csi2 in meson6
+*/
 #define VDIN_SEL_BIT                    0
 #define VDIN_SEL_WID                    4
 /* #define VDIN_ACTIVE_MAX_PIX_CNT_STATUS             0x1203 */
@@ -1209,6 +1181,7 @@
 #define HSCL_BANK_LEN_BIT               0
 #define HSCL_BANK_LEN_WID               3
 
+
 /* #define VDIN_HSC_PHASE_STEP                     0x120c */
 #define HSCL_PHASE_STEP_INT_BIT         24
 #define HSCL_PHASE_STEP_INT_WID         5
@@ -1225,6 +1198,7 @@
 /* which one every some pixels is decimated */
 #define HSCL_INI_PHASE_BIT              0
 #define HSCL_INI_PHASE_WID              24
+
 
 /* #define VDIN_COM_STATUS2                           0x120e */
 /* Read only */
@@ -1760,6 +1734,7 @@
 #define MAX_COMP0_BIT                   0
 #define MAX_COMP0_WID                  10
 
+
 /* #define VDIN_MEAS_CTRL0                            0x125a */
  /* write 1 & then 0 to reset */
 #define MEAS_RST_BIT                    18
@@ -1782,6 +1757,8 @@
 #define MEAS_HS_INDEX_BIT               0
 #define MEAS_HS_INDEX_WID               3
 
+
+
 /* #define VDIN_MEAS_VS_COUNT_HI                      0x125b // read only */
 /* after every VDIN_MEAS_VS_SPAN number of VS pulses,
  * VDIN_MEAS_IND_TOTAL_COUNT_N++
@@ -1790,6 +1767,8 @@
 #define MEAS_IND_VS_TOTAL_CNT_N_WID     4
 #define MEAS_VS_TOTAL_CNT_HI_BIT        0  /* vsync_total_counter[47:32] */
 #define MEAS_VS_TOTAL_CNT_HI_WID        16
+
+
 
 /* #define VDIN_MEAS_VS_COUNT_LO                      0x125c // read only */
 #define MEAS_VS_TOTAL_CNT_LO_BIT        0  /* vsync_total_counter[31:0] */
@@ -1911,6 +1890,7 @@
 #define BLKBAR_RIGHT_POS_BIT            0
 #define BLKBAR_RIGHT_POS_WID            13
 
+
 /* #define VDIN_WIN_H_START_END                       0x126d */
 #define INPUT_WIN_H_START_BIT            16
 #define INPUT_WIN_H_START_WID            13
@@ -1945,5 +1925,6 @@
 #define VDIN1_VCP_WR_EN_WID	1
 #define VDIN1_DISABLE_CLOCKGATE_BIT	29
 #define VDIN1_DISABLE_CLOCKGATE_WID	1
+
 
 #endif /* __VDIN_REGS_H */

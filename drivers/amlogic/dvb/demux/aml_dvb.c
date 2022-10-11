@@ -1,6 +1,18 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/amlogic/dvb/demux/aml_dvb.c
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
 #include <linux/version.h>
@@ -47,7 +59,6 @@ static int debug_dvb = 1;
 module_param(debug_dvb, int, 0644);
 
 #define CARD_NAME "amlogic-dvb"
-#define DVB_VERSION "V2.02"
 
 DVB_DEFINE_MOD_OPT_ADAPTER_NR(adapter_nr);
 
@@ -158,6 +169,7 @@ int demux_get_stc(int demux_device_index, int index,
 
 	return 0;
 }
+
 EXPORT_SYMBOL(demux_get_stc);
 
 int demux_get_pcr(int demux_device_index, int index, u64 *pcr)
@@ -220,82 +232,18 @@ ssize_t tsn_source_store(struct class *class,
 	return count;
 }
 
-int tsn_set_double_out(int flag)
-{
-	int tsn_in_reg = 0;
-
-	if (tsn_out == flag)
-		return 0;
-
-	tsn_out = flag;
-
-	if (tsn_in == INPUT_DEMOD)
-		tsn_in_reg = 1;
-
-	tee_demux_config_pipeline(tsn_in_reg, tsn_out);
-	return 0;
-}
-
-ssize_t tso_source_show(struct class *class,
-			struct class_attribute *attr, char *buf)
-{
-	int r, total = 0;
-
-	r = sprintf(buf, "tso_source:ts1\n");
-
-	buf += r;
-	total += r;
-	return total;
-}
-
-ssize_t tso_source_store(struct class *class,
-			 struct class_attribute *attr,
-			 const char *buf, size_t count)
-{
-	struct aml_dvb *advb = aml_get_dvb_device();
-	int src = -1;
-
-	if (mutex_lock_interruptible(&advb->mutex))
-		return -ERESTARTSYS;
-
-	if (!strncmp("ts0", buf, 3))
-		src = 0;
-	else if (!strncmp("ts1", buf, 3))
-		src = 1;
-	else if (!strncmp("ts2", buf, 3))
-		src = 2;
-	else if (!strncmp("ts3", buf, 3))
-		src = 3;
-
-	tso_set(src);
-
-	mutex_unlock(&advb->mutex);
-	return count;
-}
-
-static CLASS_ATTR_RW(ts_setting);
-static CLASS_ATTR_RW(get_pcr);
-static CLASS_ATTR_RO(dmx_setting);
-static CLASS_ATTR_RO(dsc_setting);
-
-static CLASS_ATTR_RW(tsn_source);
-static CLASS_ATTR_RW(tso_source);
-
-static struct attribute *aml_stb_class_attrs[] = {
-	&class_attr_ts_setting.attr,
-	&class_attr_get_pcr.attr,
-	&class_attr_dmx_setting.attr,
-	&class_attr_dsc_setting.attr,
-	&class_attr_tsn_source.attr,
-	&class_attr_tso_source.attr,
-	NULL
+static struct class_attribute aml_dvb_class_attrs[] = {
+	__ATTR(ts_setting, 0664, ts_setting_show, ts_setting_store),
+	__ATTR(get_pcr, 0664, get_pcr_show, get_pcr_store),
+	__ATTR(dmx_setting, 0664, dmx_setting_show, NULL),
+	__ATTR(dsc_setting, 0664, dsc_setting_show, NULL),
+	__ATTR(tsn_source, 0664, tsn_source_show, tsn_source_store),
+	__ATTR_NULL
 };
 
-ATTRIBUTE_GROUPS(aml_stb_class);
-
-static struct class aml_stb_class = {
+static struct class aml_dvb_class = {
 	.name = "stb",
-	.class_groups = aml_stb_class_groups,
+	.class_attrs = aml_dvb_class_attrs,
 };
 
 int dmx_get_dev_num(struct platform_device *pdev)
@@ -348,12 +296,14 @@ struct aml_dvb *aml_get_dvb_device(void)
 {
 	return &aml_dvb_device;
 }
+
 EXPORT_SYMBOL(aml_get_dvb_device);
 
 struct dvb_adapter *aml_get_dvb_adapter(void)
 {
 	return &aml_dvb_device.dvb_adapter;
 }
+
 EXPORT_SYMBOL(aml_get_dvb_adapter);
 
 struct device *aml_get_device(void)
@@ -392,7 +342,7 @@ static int aml_dvb_remove(struct platform_device *pdev)
 
 	mutex_destroy(&advb->mutex);
 	dvb_unregister_adapter(&advb->dvb_adapter);
-	class_unregister(&aml_stb_class);
+	class_unregister(&aml_dvb_class);
 	dmx_unregist_dmx_class();
 
 	return 0;
@@ -437,7 +387,7 @@ static int aml_dvb_probe(struct platform_device *pdev)
 	int sid_num = 0;
 	int valid_ts = 0;
 
-	dprint("probe amlogic dvb driver [%s].\n", DVB_VERSION);
+	dprint("probe amlogic dvb driver\n");
 
 	advb = &aml_dvb_device;
 	memset(advb, 0, sizeof(aml_dvb_device));
@@ -515,7 +465,7 @@ static int aml_dvb_probe(struct platform_device *pdev)
 	frontend_config_ts_sid();
 	dmx_key_init();
 
-	class_register(&aml_stb_class);
+	class_register(&aml_dvb_class);
 	dmx_regist_dmx_class();
 
 	ret = tee_demux_get(TEE_DMX_GET_SECURITY_ENABLE,

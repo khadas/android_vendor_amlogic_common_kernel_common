@@ -1,4 +1,3 @@
-/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
  * drivers/amlogic/media/enhancement/amvecm/dnlp_algorithm/dnlp_alg.h
  *
@@ -140,7 +139,6 @@ struct dnlp_dbg_rw_param_s {
 	int *reg_mono_protect;
 	int *reg_trend_wht_expand_lut8;
 };
-
 struct dnlp_dbg_print_s {
 	int *dnlp_printk;
 };
@@ -148,14 +146,13 @@ struct dnlp_dbg_print_s {
 struct dnlp_alg_s {
 	void (*dnlp_algorithm_main)(unsigned int raw_hst_sum);
 	void (*dnlp_para_set)(struct dnlp_alg_output_param_s **dnlp_output,
-			      struct dnlp_alg_input_param_s **dnlp_input,
-			      struct dnlp_dbg_rw_param_s **rw_param,
-			      struct dnlp_dbg_ro_param_s **ro_param,
-			      struct param_for_dnlp_s **rw_node,
-			      struct dnlp_dbg_print_s **dbg_print);
+			struct dnlp_alg_input_param_s **dnlp_input,
+			struct dnlp_dbg_rw_param_s **rw_param,
+			struct dnlp_dbg_ro_param_s **ro_param,
+			struct param_for_dnlp_s **rw_node,
+			struct dnlp_dbg_print_s **dbg_print);
 	void (*dnlp3_param_refrsh)(void);
 };
-
-struct dnlp_alg_s *dnlp_alg_init(struct dnlp_alg_s **dnlp_alg);
+extern struct dnlp_alg_s *dnlp_alg_init(struct dnlp_alg_s **dnlp_alg);
 extern struct dnlp_alg_s *dnlp_alg_function;
 #endif

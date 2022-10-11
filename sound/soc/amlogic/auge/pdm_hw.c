@@ -1,6 +1,17 @@
-// SPDX-License-Identifier: GPL-2.0
 /*
- * Copyright (C) 2019 Amlogic, Inc. All rights reserved.
+ * sound/soc/amlogic/auge/pdm_hw.c
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
  *
  */
 
@@ -26,8 +37,8 @@ void pdm_enable(int is_enable)
 	if (is_enable) {
 		if (pdm_enable_cnt == 0)
 			aml_pdm_update_bits(PDM_CTRL,
-				0x1 << 31,
-				is_enable << 31);
+					    0x1 << 31,
+					    is_enable << 31);
 		pdm_enable_cnt++;
 	} else {
 		if (WARN_ON(pdm_enable_cnt == 0))
@@ -47,11 +58,13 @@ void pdm_fifo_reset(void)
 	/* PDM Asynchronous FIFO soft reset.
 	 * write 1 to soft reset AFIFO
 	 */
-	aml_pdm_update_bits(PDM_CTRL,
+	aml_pdm_update_bits(
+		PDM_CTRL,
 		0x1 << 16,
 		0 << 16);
 
-	aml_pdm_update_bits(PDM_CTRL,
+	aml_pdm_update_bits(
+		PDM_CTRL,
 		0x1 << 16,
 		0x1 << 16);
 }
@@ -150,29 +163,29 @@ void aml_pdm_ctrl(struct pdm_info *info)
 void aml_pdm_arb_config(struct aml_audio_controller *actrl)
 {
 	/* config ddr arb */
-	aml_audiobus_write(actrl, EE_AUDIO_ARB_CTRL, 1 << 31 | 0xff << 0);
+	aml_audiobus_write(actrl, EE_AUDIO_ARB_CTRL, 1<<31|0xff<<0);
 }
 
 /* config for hcic, lpf1,2,3, hpf */
 static void aml_pdm_filters_config(int pdm_gain_index, int osr,
 	int lpf1_len, int lpf2_len, int lpf3_len)
 {
-	s32 hcic_dn_rate;
-	s32 hcic_tap_num;
-	s32 hcic_gain;
-	s32 f1_tap_num;
-	s32 f2_tap_num;
-	s32 f3_tap_num;
-	s32 f1_rnd_mode;
-	s32 f2_rnd_mode;
-	s32 f3_rnd_mode;
-	s32 f1_ds_rate;
-	s32 f2_ds_rate;
-	s32 f3_ds_rate;
-	s32 hpf_en;
-	s32 hpf_shift_step;
-	s32 hpf_out_factor;
-	s32 pdm_out_mode;
+	int32_t hcic_dn_rate;
+	int32_t hcic_tap_num;
+	int32_t hcic_gain;
+	int32_t f1_tap_num;
+	int32_t f2_tap_num;
+	int32_t f3_tap_num;
+	int32_t f1_rnd_mode;
+	int32_t f2_rnd_mode;
+	int32_t f3_rnd_mode;
+	int32_t f1_ds_rate;
+	int32_t f2_ds_rate;
+	int32_t f3_ds_rate;
+	int32_t hpf_en;
+	int32_t hpf_shift_step;
+	int32_t hpf_out_factor;
+	int32_t pdm_out_mode;
 
 	switch (osr) {
 	case 32:
@@ -271,13 +284,14 @@ static void aml_pdm_filters_config(int pdm_gain_index, int osr,
 }
 
 /* coefficent for LPF1,2,3 */
-static void aml_pdm_LPF_coeff(int lpf1_len, const int *lpf1_coeff,
+static void aml_pdm_LPF_coeff(
+	int lpf1_len, const int *lpf1_coeff,
 	int lpf2_len, const int *lpf2_coeff,
 	int lpf3_len, const int *lpf3_coeff)
 {
 	int i;
-	s32 data;
-	s32 data_tmp;
+	int32_t data;
+	int32_t data_tmp;
 
 	aml_pdm_write(PDM_COEFF_ADDR, 0);
 	for (i = 0;
@@ -419,13 +433,15 @@ void aml_pdm_filter_ctrl(int pdm_gain_index, int osr, int mode)
 	}
 
 	/* config filter */
-	aml_pdm_filters_config(pdm_gain_index,
+	aml_pdm_filters_config(
+		pdm_gain_index,
 		osr,
 		lpf1_len,
 		lpf2_len,
 		lpf3_len);
 
-	aml_pdm_LPF_coeff(lpf1_len, lpf1_coeff,
+	aml_pdm_LPF_coeff(
+		lpf1_len, lpf1_coeff,
 		lpf2_len, lpf2_coeff,
 		lpf3_len, lpf3_coeff
 		);
@@ -511,17 +527,17 @@ int pdm_dclkidx2rate(int idx)
 	return rate;
 }
 
-int pdm_get_sample_count(int islowpower, int dclk_idx)
+int pdm_get_sample_count(int is_low_power, int dclk_idx)
 {
 	int count = 0;
 
-	if (islowpower) {
+	if (is_low_power)
 		count = 0;
-	} else if (dclk_idx == 1) {
+	else if (dclk_idx == 1)
 		count = 38;
-	} else if (dclk_idx  == 2) {
+	else if (dclk_idx  == 2)
 		count = 48;
-	} else {
+	else {
 		count = pdm_get_train_sample_count_from_dts();
 		if (count < 0)
 			count = 18;

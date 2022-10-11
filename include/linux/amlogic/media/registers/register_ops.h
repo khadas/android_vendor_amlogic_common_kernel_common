@@ -1,16 +1,32 @@
-/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * include/linux/amlogic/media/registers/register_ops.h
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
 #ifndef REGISTER_OPS_HEADER
 #define REGISTER_OPS_HEADER
 #include <linux/kernel.h>
+#include <linux/amlogic/iomap.h>
 #include <linux/io.h>
+#include <linux/amlogic/cpu_version.h>
+#include <linux/amlogic/media/old_cpu_version.h>
 #include <linux/types.h>
 #include <linux/init.h>
 
-enum amports_bus_type_e {
+enum
+	amports_bus_type_e {
 	IO_DOS_BUS = 0,
 	IO_AO_BUS,
 	IO_HHI_BUS,
@@ -34,45 +50,48 @@ enum amports_bus_type_e {
 struct chip_register_ops {
 	int bus_type;
 	int ext_offset;
-	int (*read)(unsigned int reg);
-	void (*write)(unsigned int reg, unsigned int val);
+	int (*read)(unsigned int);
+	void (*write)(unsigned int, unsigned int);
 	int r_cnt;
 	int w_cnt;
 };
 
 int codec_reg_read(u32 bus_type, unsigned int reg);
 void codec_reg_write(u32 bus_type, unsigned int reg, unsigned int val);
-void codec_reg_write_bits(u32 bus_type, unsigned int reg,
-			  u32 val, int start, int len);
-int register_reg_ops_per_cpu(struct chip_register_ops *sops,
-			     int ops_size);
-int register_reg_ops_mgr(struct chip_register_ops *sops_list,
-			 int ops_size);
-int register_reg_ex_ops_mgr(struct chip_register_ops *ex_ops_list,
-			    int ops_size);
+void codec_reg_write_bits(u32 bus_type, unsigned int reg, u32 val, int start,
+	int len);
+
+int register_reg_ops_per_cpu(int cputype, struct chip_register_ops *sops,
+	int ops_size);
+
+int register_reg_ops_mgr(int cputype[], struct chip_register_ops *sops_list,
+	int ops_size);
+int register_reg_ex_ops_mgr(int cputype[],
+	struct chip_register_ops *ex_ops_list, int ops_size);
 
 #define DEF_BUS_OPS(BUS_TYPE, name)\
 static inline void codec_##name##bus_write(unsigned int reg, u32 val)\
 {\
-	return codec_reg_write((BUS_TYPE), reg, val);\
+	return codec_reg_write(BUS_TYPE, reg, val);\
 } \
 static inline int codec_##name##bus_read(unsigned int reg)\
 {\
-	return codec_reg_read((BUS_TYPE), reg);\
+	return codec_reg_read(BUS_TYPE, reg);\
 } \
 static inline void codec_clear_##name##bus_mask(unsigned int r, u32 mask)\
 {\
-	codec_reg_write((BUS_TYPE), r, codec_reg_read(BUS_TYPE, r) & ~(mask));\
+	codec_reg_write(BUS_TYPE, r, codec_reg_read(BUS_TYPE, r) & ~(mask));\
 } \
 static inline void codec_set_##name##bus_mask(unsigned int r, u32 mask)\
 {\
-	codec_reg_write((BUS_TYPE), r, codec_reg_read(BUS_TYPE, r) | (mask));\
+	codec_reg_write(BUS_TYPE, r, codec_reg_read(BUS_TYPE, r) | (mask));\
 } \
 static inline void codec_set_##name##bus_bits(\
 				unsigned int reg, u32 val, int start, int len)\
 {\
-	codec_reg_write_bits((BUS_TYPE), reg, val, start, len);\
+	codec_reg_write_bits(BUS_TYPE, reg, val, start, len);\
 } \
+
 
 /*
  *sample:

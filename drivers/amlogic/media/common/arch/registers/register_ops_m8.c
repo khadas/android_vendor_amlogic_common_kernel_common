@@ -1,13 +1,57 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/amlogic/media/common/arch/registers/register_ops_m8.c
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
 #include <linux/amlogic/media/registers/register_ops.h>
 #include <linux/amlogic/media/registers/register_map.h>
-/* media module used media/registers/cpu_version.h since kernel 5.4 */
-#include <linux/amlogic/media/registers/cpu_version.h>
 #include <linux/amlogic/media/utils/log.h>
+
+#define REGISTER_FOR_CPU {\
+			MESON_CPU_MAJOR_ID_M8,\
+			MESON_CPU_MAJOR_ID_M8M2,\
+	MESON_CPU_MAJOR_ID_GXBB, \
+	MESON_CPU_MAJOR_ID_GXTVBB, \
+	MESON_CPU_MAJOR_ID_GXL, \
+	MESON_CPU_MAJOR_ID_GXM, \
+	MESON_CPU_MAJOR_ID_TXL, \
+	MESON_CPU_MAJOR_ID_TXLX, \
+	MESON_CPU_MAJOR_ID_AXG, \
+	MESON_CPU_MAJOR_ID_G12A, \
+	MESON_CPU_MAJOR_ID_G12B, \
+	MESON_CPU_MAJOR_ID_TL1, \
+	MESON_CPU_MAJOR_ID_SM1, \
+	MESON_CPU_MAJOR_ID_TM2, \
+	MESON_CPU_MAJOR_ID_SC2, \
+			0}
+#define REGISTER_FOR_GXCPU {\
+	MESON_CPU_MAJOR_ID_GXBB, \
+	MESON_CPU_MAJOR_ID_GXTVBB, \
+	MESON_CPU_MAJOR_ID_GXL, \
+	MESON_CPU_MAJOR_ID_GXM, \
+	MESON_CPU_MAJOR_ID_TXL, \
+	MESON_CPU_MAJOR_ID_TXLX, \
+	MESON_CPU_MAJOR_ID_AXG, \
+	MESON_CPU_MAJOR_ID_G12A, \
+	MESON_CPU_MAJOR_ID_G12B, \
+	MESON_CPU_MAJOR_ID_TL1, \
+	MESON_CPU_MAJOR_ID_SM1, \
+	MESON_CPU_MAJOR_ID_TM2, \
+	MESON_CPU_MAJOR_ID_SC2, \
+			0}
+
 static struct chip_register_ops m8_ops[] __initdata = {
 	{IO_DOS_BUS, 0, codecio_read_dosbus, codecio_write_dosbus},
 	{IO_VC_BUS, 0, codecio_read_vcbus, codecio_write_vcbus},
@@ -34,11 +78,11 @@ static struct chip_register_ops ex_gx_ops[] __initdata = {
 	{IO_DMC_BUS, 0, codecio_read_dmcbus, codecio_write_dmcbus},
 };
 
-int __init vdec_reg_ops_init(void)
+static int __init vdec_reg_ops_init(void)
 {
-#define NOT_T5_AND_T5D (t != MESON_CPU_MAJOR_ID_T5 && t != MESON_CPU_MAJOR_ID_T5D)
+	int cpus[] = REGISTER_FOR_CPU;
+	int gxcpus[] = REGISTER_FOR_GXCPU;
 	int  i = 0;
-	int  t = 0;
 
 	/*
 	 * because of register range of the parser ,demux
@@ -59,7 +103,8 @@ int __init vdec_reg_ops_init(void)
 	 * #define RESET0_REGISTER 0x0401
 	 * -0xd00 == (0x0401 - 0x1101)
 	 */
-	if (get_cpu_type() > MESON_CPU_MAJOR_ID_TXL) {
+	if (get_cpu_type() > MESON_CPU_MAJOR_ID_TXL &&
+	    get_cpu_type() != MESON_CPU_MAJOR_ID_GXLX) {
 		for (i = 0; i < ARRAY_SIZE(m8_ops); i++) {
 			switch (m8_ops[i].bus_type) {
 			case IO_PARSER_BUS:
@@ -75,8 +120,7 @@ int __init vdec_reg_ops_init(void)
 				break;
 
 			case IO_RESET_BUS:
-				t = get_cpu_type();
-				if (t >= MESON_CPU_MAJOR_ID_SC2 && NOT_T5_AND_T5D)
+				if (get_cpu_type() >= MESON_CPU_MAJOR_ID_SC2)
 					m8_ops[i].ext_offset = 0;
 				else
 					m8_ops[i].ext_offset = -0xd00;
@@ -84,12 +128,14 @@ int __init vdec_reg_ops_init(void)
 			}
 		}
 	}
-	register_reg_ops_mgr(m8_ops,
-			     sizeof(m8_ops) / sizeof(struct chip_register_ops));
 
-	register_reg_ex_ops_mgr(ex_gx_ops,
-				sizeof(ex_gx_ops) /
-				sizeof(struct chip_register_ops));
+	register_reg_ops_mgr(cpus, m8_ops,
+		sizeof(m8_ops) / sizeof(struct chip_register_ops));
+
+	register_reg_ex_ops_mgr(gxcpus, ex_gx_ops,
+		sizeof(ex_gx_ops) / sizeof(struct chip_register_ops));
+
 	return 0;
 }
 
+postcore_initcall(vdec_reg_ops_init);

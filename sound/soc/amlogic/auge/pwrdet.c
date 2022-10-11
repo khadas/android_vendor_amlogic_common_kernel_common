@@ -1,9 +1,19 @@
-// SPDX-License-Identifier: GPL-2.0
 /*
- * Copyright (C) 2019 Amlogic, Inc. All rights reserved.
+ * sound/soc/amlogic/auge/pwrdet.c
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
  *
  */
-
 #include <linux/module.h>
 #include <linux/platform_device.h>
 #include <linux/interrupt.h>
@@ -11,7 +21,7 @@
 #include <linux/of_device.h>
 #include <linux/pm_wakeirq.h>
 
-//#include <linux/amlogic/pm.h>
+#include <linux/amlogic/pm.h>
 
 #include <sound/pcm.h>
 
@@ -21,17 +31,21 @@
 
 #define DRV_NAME "power-detect"
 
+
 static struct aml_pwrdet *s_pwrdet;
 
 static irqreturn_t pwrdet_isr_handler(int irq, void *data)
 {
-	int det_val = audiobus_read
-		(EE_AUDIO_POW_DET_VALUE + s_pwrdet->chipinfo->address_shift);
+	int det_val = audiobus_read(EE_AUDIO_POW_DET_VALUE
+		+ s_pwrdet->chipinfo->address_shift);
 	int acc_data = det_val & 0x03ffffff;
 
 	pr_info("%s, Status:%d, acc_data:0x%x, status2:0x%x\n",
-		__func__, (det_val & 0x80000000) >> 31,
-		acc_data, audiobus_read(EE_AUDIO_TODDR_A_STATUS2));
+		__func__,
+		(det_val & 0x80000000) >> 31,
+		acc_data,
+		audiobus_read(EE_AUDIO_TODDR_A_STATUS2)
+		);
 
 	return IRQ_HANDLED;
 }
@@ -45,8 +59,12 @@ static int pwrdet_request_irq(struct aml_pwrdet *p_pwrdet)
 {
 	int ret;
 
-	ret = request_irq(p_pwrdet->irq, pwrdet_isr_handler,
-			  IRQF_SHARED, "power-detect", p_pwrdet);
+	ret = request_irq(p_pwrdet->irq,
+			pwrdet_isr_handler,
+			IRQF_SHARED,
+			"power-detect",
+			p_pwrdet);
+
 	if (ret) {
 		pr_err("failed to claim irq %u\n", p_pwrdet->irq);
 		return ret;
@@ -58,7 +76,7 @@ static int pwrdet_request_irq(struct aml_pwrdet *p_pwrdet)
 void pwrdet_set(bool enable)
 {
 	pwrdet_threshold(s_pwrdet->chipinfo->address_shift,
-			 s_pwrdet->hi_th, s_pwrdet->lo_th);
+		s_pwrdet->hi_th, s_pwrdet->lo_th);
 
 	pwrdet_downsample_ctrl(true, true, 3, 0x20);
 
@@ -71,7 +89,7 @@ void pwrdet_set(bool enable)
 }
 
 static ssize_t pwrdet_enable_show(struct class *cla,
-				  struct class_attribute *attr, char *buf)
+	struct class_attribute *attr, char *buf)
 {
 	int enable = 1;
 
@@ -85,6 +103,7 @@ static ssize_t pwrdet_enable_show(struct class *cla,
 
 static struct class_attribute pwrdet_attrs[] = {
 	__ATTR_RO(pwrdet_enable),
+
 	__ATTR_NULL
 };
 
@@ -125,8 +144,8 @@ static int aml_pwrdet_platform_probe(struct platform_device *pdev)
 	int ret;
 
 	p_pwrdet = devm_kzalloc(&pdev->dev,
-				sizeof(struct aml_pwrdet),
-				GFP_KERNEL);
+			sizeof(struct aml_pwrdet),
+			GFP_KERNEL);
 	if (!p_pwrdet) {
 		/*dev_err(&pdev->dev, "Can't allocate pcm_p\n");*/
 		ret = -ENOMEM;
@@ -137,7 +156,7 @@ static int aml_pwrdet_platform_probe(struct platform_device *pdev)
 	p_chipinfo = (struct pwrdet_chipinfo *)
 		of_device_get_match_data(dev);
 	if (!p_chipinfo)
-		dev_warn_once(dev, "check to update power detect chipinfo\n");
+		dev_warn_once(dev, "check whether to update power detect chipinfo\n");
 	p_pwrdet->chipinfo = p_chipinfo;
 
 	/* irq */
@@ -148,7 +167,7 @@ static int aml_pwrdet_platform_probe(struct platform_device *pdev)
 		goto fail;
 	}
 	ret = of_property_read_u32(node, "pwrdet_src",
-				   &p_pwrdet->det_src);
+		&p_pwrdet->det_src);
 	if (ret) {
 		pr_err("failed to get det_src\n");
 		ret = -EINVAL;
@@ -156,14 +175,14 @@ static int aml_pwrdet_platform_probe(struct platform_device *pdev)
 	}
 
 	ret = of_property_read_u32(node, "hi_th",
-				   &p_pwrdet->hi_th);
+		&p_pwrdet->hi_th);
 	if (ret) {
 		pr_err("failed to get hi_th\n");
 		ret = -EINVAL;
 		goto fail;
 	}
 	ret = of_property_read_u32(node, "lo_th",
-				   &p_pwrdet->lo_th);
+		&p_pwrdet->lo_th);
 	if (ret) {
 		pr_err("failed to get lo_th\n");
 		ret = -EINVAL;
@@ -189,6 +208,7 @@ static int aml_pwrdet_platform_probe(struct platform_device *pdev)
 
 fail:
 	return ret;
+
 }
 
 static int aml_pwrdet_platform_remove(struct platform_device *pdev)
@@ -197,7 +217,7 @@ static int aml_pwrdet_platform_remove(struct platform_device *pdev)
 }
 
 static int aml_pwrdet_platform_suspend(struct platform_device *pdev,
-				       pm_message_t state)
+	pm_message_t state)
 {
 	struct device *dev = &pdev->dev;
 	struct aml_pwrdet *p_pwrdet = dev_get_drvdata(dev);
@@ -245,22 +265,9 @@ struct platform_driver aml_pwrdet = {
 	.suspend = aml_pwrdet_platform_suspend,
 	.resume  = aml_pwrdet_platform_resume,
 };
+module_platform_driver(aml_pwrdet);
 
-int __init pwrdet_init(void)
-{
-	return platform_driver_register(&aml_pwrdet);
-}
-
-void __exit pwrdet_exit(void)
-{
-	platform_driver_unregister(&aml_pwrdet);
-}
-
-#ifndef MODULE
-module_init(pwrdet_init);
-module_exit(pwrdet_exit);
 /* Module information */
 MODULE_AUTHOR("Amlogic, Inc.");
 MODULE_DESCRIPTION("ALSA Soc Aml Audio Power detect");
 MODULE_LICENSE("GPL v2");
-#endif

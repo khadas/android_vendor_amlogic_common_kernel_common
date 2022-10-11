@@ -1,7 +1,17 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
+ * drivers/amlogic/media/vout/lcd/lcd_extern/ext_i2c_dev.c
  *
- * Copyright (C) 2019 Amlogic, Inc. All rights reserved.
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
  *
  */
 
@@ -10,6 +20,7 @@
 #include <linux/interrupt.h>
 #include <linux/platform_device.h>
 #include <linux/i2c.h>
+#include <linux/amlogic/i2c-amlogic.h>
 #include <linux/clk.h>
 #include <linux/delay.h>
 #include <linux/slab.h>
@@ -27,7 +38,7 @@ struct aml_lcd_extern_i2c_dev_s *lcd_extern_get_i2c_device(unsigned char addr)
 
 	/*pr_info("%s: addr=0x%02x\n", __func__, addr);*/
 	for (i = 0; i < i2c_dev_cnt; i++) {
-		if (!i2c_dev[i])
+		if (i2c_dev[i] == NULL)
 			break;
 		if (i2c_dev[i]->client->addr == addr) {
 			i2c_device = i2c_dev[i];
@@ -38,12 +49,12 @@ struct aml_lcd_extern_i2c_dev_s *lcd_extern_get_i2c_device(unsigned char addr)
 }
 
 int lcd_extern_i2c_write(struct i2c_client *i2client,
-			 unsigned char *buff, unsigned int len)
+		unsigned char *buff, unsigned int len)
 {
 	struct i2c_msg msg;
 	int ret = 0;
 
-	if (!i2client) {
+	if (i2client == NULL) {
 		EXTERR("i2client is null\n");
 		return -1;
 	}
@@ -61,12 +72,12 @@ int lcd_extern_i2c_write(struct i2c_client *i2client,
 }
 
 int lcd_extern_i2c_read(struct i2c_client *i2client,
-			unsigned char *buff, unsigned int len)
+		unsigned char *buff, unsigned int len)
 {
 	struct i2c_msg msgs[2];
 	int ret = 0;
 
-	if (!i2client) {
+	if (i2client == NULL) {
 		EXTERR("i2client is null\n");
 		return -1;
 	}
@@ -83,15 +94,14 @@ int lcd_extern_i2c_read(struct i2c_client *i2client,
 	ret = i2c_transfer(i2client->adapter, msgs, 2);
 	if (ret < 0) {
 		EXTERR("%s: i2c transfer failed [addr 0x%02x]\n",
-		       __func__, i2client->addr);
+			__func__, i2client->addr);
 	}
 
 	return ret;
 }
 
 static int lcd_extern_i2c_config_from_dts(struct device *dev,
-					  struct aml_lcd_extern_i2c_dev_s
-					  *i2c_device)
+		struct aml_lcd_extern_i2c_dev_s *i2c_device)
 {
 	int ret;
 	struct device_node *np = dev->of_node;
@@ -110,7 +120,7 @@ static int lcd_extern_i2c_config_from_dts(struct device *dev,
 }
 
 static int lcd_extern_i2c_dev_probe(struct i2c_client *client,
-				    const struct i2c_device_id *id)
+	const struct i2c_device_id *id)
 {
 	if (i2c_dev_cnt >= LCD_EXT_I2C_DEV_MAX) {
 		EXTERR("i2c_dev_cnt reach max\n");
@@ -122,7 +132,7 @@ static int lcd_extern_i2c_dev_probe(struct i2c_client *client,
 		return -ENODEV;
 	}
 
-	i2c_dev[i2c_dev_cnt] = kzalloc(sizeof(*i2c_dev[i2c_dev_cnt]),
+	i2c_dev[i2c_dev_cnt] = kzalloc(sizeof(struct aml_lcd_extern_i2c_dev_s),
 		GFP_KERNEL);
 	if (!i2c_dev[i2c_dev_cnt]) {
 		EXTERR("i2c0_dev %d driver malloc error\n", i2c_dev_cnt);
@@ -132,8 +142,8 @@ static int lcd_extern_i2c_dev_probe(struct i2c_client *client,
 	i2c_dev[i2c_dev_cnt]->client = client;
 	lcd_extern_i2c_config_from_dts(&client->dev, i2c_dev[i2c_dev_cnt]);
 	EXTPR("i2c_dev probe: %s address 0x%02x OK",
-	      i2c_dev[i2c_dev_cnt]->name,
-	      i2c_dev[i2c_dev_cnt]->client->addr);
+		i2c_dev[i2c_dev_cnt]->name,
+		i2c_dev[i2c_dev_cnt]->client->addr);
 
 	i2c_dev_cnt++;
 
@@ -183,7 +193,7 @@ static struct i2c_driver lcd_extern_i2c_dev_driver = {
 	},
 };
 
-int __init aml_lcd_extern_i2c_dev_init(void)
+static int __init aml_lcd_extern_i2c_dev_init(void)
 {
 	int ret;
 
@@ -201,12 +211,16 @@ int __init aml_lcd_extern_i2c_dev_init(void)
 	return ret;
 }
 
-void __exit aml_lcd_extern_i2c_dev_exit(void)
+static void __exit aml_lcd_extern_i2c_dev_exit(void)
 {
 	i2c_del_driver(&lcd_extern_i2c_dev_driver);
 }
 
-//MODULE_AUTHOR("AMLOGIC");
-//MODULE_DESCRIPTION("lcd extern i2c device driver");
-//MODULE_LICENSE("GPL");
+
+module_init(aml_lcd_extern_i2c_dev_init);
+module_exit(aml_lcd_extern_i2c_dev_exit);
+
+MODULE_AUTHOR("AMLOGIC");
+MODULE_DESCRIPTION("lcd extern i2c device driver");
+MODULE_LICENSE("GPL");
 

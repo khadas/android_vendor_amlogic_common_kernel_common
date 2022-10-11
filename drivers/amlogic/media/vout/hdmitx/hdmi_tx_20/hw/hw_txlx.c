@@ -1,14 +1,40 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/amlogic/media/vout/hdmitx/hdmi_tx_20/hw/hw_txlx.c
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
 #include <linux/printk.h>
-#include <linux/pinctrl/devinfo.h>
 #include <linux/amlogic/media/vout/hdmi_tx/hdmi_tx_module.h>
 #include "common.h"
 #include "reg_ops.h"
-#include "txlx_reg.h"
+#include "mach_reg.h"
+
+#ifdef P_RESET0_REGISTER
+#undef P_RESET0_REGISTER
+#endif
+#ifdef P_RESET2_REGISTER
+#undef P_RESET2_REGISTER
+#endif
+#ifdef P_ISA_DEBUG_REG0
+#undef P_ISA_DEBUG_REG0
+#endif
+
+#define P_RESET0_REGISTER RESET_CBUS_REG_ADDR(0x401)
+#define P_RESET2_REGISTER RESET_CBUS_REG_ADDR(0x403)
+#define P_ISA_DEBUG_REG0 CBUS_REG_ADDR(0x3c00)
+
 
 unsigned int hdmitx_get_format_txlx(void)
 {
@@ -46,17 +72,17 @@ int hdmitx_hpd_hw_op_txlx(enum hpd_op cmd)
 
 	struct hdmitx_dev *hdev = get_hdmitx_device();
 
-	if (!(hdev->pdev)) {
+	if (hdev->pdev == NULL) {
 		pr_info("exit for null device of hdmitx!\n");
 		return -ENODEV;
 	}
 
-	if (!(hdev->pdev->pins)) {
+	if (hdev->pdev->pins == NULL) {
 		pr_info("exit for null pins of hdmitx device!\n");
 		return -ENODEV;
 	}
 
-	if (!(hdev->pdev->pins->p)) {
+	if (hdev->pdev->pins->p == NULL) {
 		pr_info("exit for null pinctrl of hdmitx device pins!\n");
 		return -ENODEV;
 	}
@@ -66,14 +92,14 @@ int hdmitx_hpd_hw_op_txlx(enum hpd_op cmd)
 		break;
 	case HPD_INIT_SET_FILTER:
 		hdmitx_wr_reg(HDMITX_TOP_HPD_FILTER,
-			      ((0xa << 12) | (0xa0 << 0)));
+			((0xa << 12) | (0xa0 << 0)));
 		break;
 	case HPD_IS_HPD_MUXED:
 		ret = 1;
 		break;
 	case HPD_MUX_HPD:
 		pinctrl_select_state(hdev->pdev->pins->p,
-				     hdev->pinctrl_default);
+			hdev->pinctrl_default);
 		break;
 	case HPD_UNMUX_HPD:
 		pinctrl_select_state(hdev->pdev->pins->p, hdev->pinctrl_i2c);
@@ -98,17 +124,17 @@ int hdmitx_ddc_hw_op_txlx(enum ddc_op cmd)
 	int ret = 0;
 	struct hdmitx_dev *hdev = get_hdmitx_device();
 
-	if (!(hdev->pdev)) {
+	if (hdev->pdev == NULL) {
 		pr_info("exit for null device of hdmitx!\n");
 		return -ENODEV;
 	}
 
-	if (!(hdev->pdev->pins)) {
+	if (hdev->pdev->pins == NULL) {
 		pr_info("exit for null pins of hdmitx device!\n");
 		return -ENODEV;
 	}
 
-	if (!(hdev->pdev->pins->p)) {
+	if (hdev->pdev->pins->p == NULL) {
 		pr_info("exit for null pinctrl of hdmitx device pins!\n");
 		return -ENODEV;
 	}
@@ -118,7 +144,7 @@ int hdmitx_ddc_hw_op_txlx(enum ddc_op cmd)
 		break;
 	case DDC_MUX_DDC:
 		pinctrl_select_state(hdev->pdev->pins->p,
-				     hdev->pinctrl_default);
+			hdev->pinctrl_default);
 		break;
 	case DDC_UNMUX_DDC:
 		pinctrl_select_state(hdev->pdev->pins->p, hdev->pinctrl_i2c);

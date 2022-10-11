@@ -21,7 +21,6 @@
 #include "sdcardfs.h"
 #include <linux/fs_struct.h>
 #include <linux/ratelimit.h>
-#include <linux/sched/task.h>
 
 const struct cred *override_fsids(struct sdcardfs_sb_info *sbi,
 		struct sdcardfs_inode_data *data)
@@ -86,9 +85,6 @@ static int sdcardfs_create(struct inode *dir, struct dentry *dentry,
 	lower_dentry = lower_path.dentry;
 	lower_dentry_mnt = lower_path.mnt;
 	lower_parent_dentry = lock_parent(lower_dentry);
-
-	if (d_is_positive(lower_dentry))
-		return -EEXIST;
 
 	/* set last 16bytes of mode field to 0664 */
 	mode = (mode & S_IFMT) | 00664;
@@ -564,7 +560,6 @@ static int sdcardfs_permission(struct vfsmount *mnt, struct inode *inode, int ma
 
 	if (IS_ERR(mnt))
 		return PTR_ERR(mnt);
-
 	if (!top)
 		return -EINVAL;
 
@@ -600,7 +595,8 @@ static int sdcardfs_setattr_wrn(struct dentry *dentry, struct iattr *ia)
 
 #ifdef CONFIG_AMLOGIC_VMAP
 /* a save stack version */
-static int sdcardfs_setattr(struct vfsmount *mnt, struct dentry *dentry, struct iattr *ia)
+static int sdcardfs_setattr(struct vfsmount *mnt, struct dentry *dentry,
+			    struct iattr *ia)
 {
 	int err;
 	struct dentry *lower_dentry;
@@ -647,7 +643,7 @@ static int sdcardfs_setattr(struct vfsmount *mnt, struct dentry *dentry, struct 
 	tmp->i_uid = make_kuid(&init_user_ns, top->d_uid);
 	tmp->i_gid = make_kgid(&init_user_ns, get_gid(mnt, dentry->d_sb, top));
 	tmp->i_mode = (inode->i_mode & S_IFMT)
-			| get_mode(mnt, SDCARDFS_I(inode), top);
+		       | get_mode(mnt, SDCARDFS_I(inode), top);
 	tmp->i_size = i_size_read(inode);
 	data_put(top);
 	tmp->i_sb = inode->i_sb;
@@ -669,7 +665,8 @@ static int sdcardfs_setattr(struct vfsmount *mnt, struct dentry *dentry, struct 
 	if (!err) {
 		/* check the Android group ID */
 		parent = dget_parent(dentry);
-		if (!check_caller_access_to_name(d_inode(parent), &dentry->d_name))
+		if (!check_caller_access_to_name(d_inode(parent),
+						 &dentry->d_name))
 			err = -EACCES;
 		dput(parent);
 	}
@@ -681,7 +678,7 @@ static int sdcardfs_setattr(struct vfsmount *mnt, struct dentry *dentry, struct 
 	saved_cred = override_fsids(SDCARDFS_SB(dentry->d_sb),
 						SDCARDFS_I(inode)->data);
 	if (!saved_cred)
-		goto out_err;
+		return -ENOMEM;
 
 	sdcardfs_get_lower_path(dentry, &lower_path);
 	lower_dentry = lower_path.dentry;
@@ -722,7 +719,7 @@ static int sdcardfs_setattr(struct vfsmount *mnt, struct dentry *dentry, struct 
 	 * tries to open(), unlink(), then ftruncate() a file.
 	 */
 	inode_lock(d_inode(lower_dentry));
-	err = notify_change2(lower_mnt, lower_dentry, &lower_ia, /* note: lower_ia */
+	err = notify_change2(lower_mnt, lower_dentry, &lower_ia,
 			NULL);
 	inode_unlock(d_inode(lower_dentry));
 	if (err)
@@ -909,11 +906,10 @@ static int sdcardfs_fillattr(struct vfsmount *mnt, struct inode *inode,
 	data_put(top);
 	return 0;
 }
-static int sdcardfs_getattr(const struct path *path, struct kstat *stat,
-				u32 request_mask, unsigned int flags)
+
+static int sdcardfs_getattr(struct vfsmount *mnt, struct dentry *dentry,
+		 struct kstat *stat)
 {
-	struct vfsmount *mnt = path->mnt;
-	struct dentry *dentry = path->dentry;
 	struct kstat lower_stat;
 	struct path lower_path;
 	struct dentry *parent;
@@ -927,7 +923,7 @@ static int sdcardfs_getattr(const struct path *path, struct kstat *stat,
 	dput(parent);
 
 	sdcardfs_get_lower_path(dentry, &lower_path);
-	err = vfs_getattr(&lower_path, &lower_stat, request_mask, flags);
+	err = vfs_getattr(&lower_path, &lower_stat);
 	if (err)
 		goto out;
 	sdcardfs_copy_and_fix_attrs(d_inode(dentry),

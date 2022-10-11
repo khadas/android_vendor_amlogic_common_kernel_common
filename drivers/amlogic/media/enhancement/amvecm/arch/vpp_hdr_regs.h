@@ -1,4 +1,3 @@
-/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
  * drivers/amlogic/media/enhancement/amvecm/arch/vpp_hdr_regs.h
  *
@@ -169,74 +168,6 @@ extern struct am_regs_s r_lut_hdr_sdr_level3;
 #define VD2_HDR2_HIST_H_START_END          0x388e
 #define VD2_HDR2_HIST_V_START_END          0x388f
 
-// vd3 to do, use correct register addrss
-#define VD3_HDR2_CTRL                      0x5930
-#define VD3_HDR2_CLK_GATE                  0x5931
-#define VD3_HDR2_MATRIXI_COEF00_01         0x5932
-#define VD3_HDR2_MATRIXI_COEF02_10         0x5933
-#define VD3_HDR2_MATRIXI_COEF11_12         0x5934
-#define VD3_HDR2_MATRIXI_COEF20_21         0x5935
-#define VD3_HDR2_MATRIXI_COEF22            0x5936
-#define VD3_HDR2_MATRIXI_COEF30_31         0x5937
-#define VD3_HDR2_MATRIXI_COEF32_40         0x5938
-#define VD3_HDR2_MATRIXI_COEF41_42         0x5939
-#define VD3_HDR2_MATRIXI_OFFSET0_1         0x593a
-#define VD3_HDR2_MATRIXI_OFFSET2           0x593b
-#define VD3_HDR2_MATRIXI_PRE_OFFSET0_1     0x593c
-#define VD3_HDR2_MATRIXI_PRE_OFFSET2       0x593d
-#define VD3_HDR2_MATRIXO_COEF00_01         0x593e
-#define VD3_HDR2_MATRIXO_COEF02_10         0x593f
-#define VD3_HDR2_MATRIXO_COEF11_12         0x5940
-#define VD3_HDR2_MATRIXO_COEF20_21         0x5941
-#define VD3_HDR2_MATRIXO_COEF22            0x5942
-#define VD3_HDR2_MATRIXO_COEF30_31         0x5943
-#define VD3_HDR2_MATRIXO_COEF32_40         0x5944
-#define VD3_HDR2_MATRIXO_COEF41_42         0x5945
-#define VD3_HDR2_MATRIXO_OFFSET0_1         0x5946
-#define VD3_HDR2_MATRIXO_OFFSET2           0x5947
-#define VD3_HDR2_MATRIXO_PRE_OFFSET0_1     0x5948
-#define VD3_HDR2_MATRIXO_PRE_OFFSET2       0x5949
-#define VD3_HDR2_MATRIXI_CLIP              0x594a
-#define VD3_HDR2_MATRIXO_CLIP              0x594b
-#define VD3_HDR2_CGAIN_OFFT                0x594c
-#define VD3_HDR2_HIST_RD_2                 0x594d
-#define VD3_EOTF_LUT_ADDR_PORT             0x594e
-#define VD3_EOTF_LUT_DATA_PORT             0x594f
-#define VD3_OETF_LUT_ADDR_PORT             0x5950
-#define VD3_OETF_LUT_DATA_PORT             0x5951
-#define VD3_CGAIN_LUT_ADDR_PORT            0x5952
-#define VD3_CGAIN_LUT_DATA_PORT            0x5953
-#define VD3_HDR2_CGAIN_COEF0               0x5954
-#define VD3_HDR2_CGAIN_COEF1               0x5955
-#define VD3_OGAIN_LUT_ADDR_PORT            0x5956
-#define VD3_OGAIN_LUT_DATA_PORT            0x5957
-#define VD3_HDR2_ADPS_CTRL                 0x5958
-#define VD3_HDR2_ADPS_ALPHA0               0x5959
-#define VD3_HDR2_ADPS_ALPHA1               0x595a
-#define VD3_HDR2_ADPS_BETA0                0x595b
-#define VD3_HDR2_ADPS_BETA1                0x595c
-#define VD3_HDR2_ADPS_BETA2                0x595d
-#define VD3_HDR2_ADPS_COEF0                0x595e
-#define VD3_HDR2_ADPS_COEF1                0x595f
-#define VD3_HDR2_GMUT_CTRL                 0x5960
-#define VD3_HDR2_GMUT_COEF0                0x5961
-#define VD3_HDR2_GMUT_COEF1                0x5962
-#define VD3_HDR2_GMUT_COEF2                0x5963
-#define VD3_HDR2_GMUT_COEF3                0x5964
-#define VD3_HDR2_GMUT_COEF4                0x5965
-#define VD3_HDR2_PIPE_CTRL1                0x5966
-#define VD3_HDR2_PIPE_CTRL2                0x5967
-#define VD3_HDR2_PIPE_CTRL3                0x5968
-#define VD3_HDR2_PROC_WIN1                 0x5969
-#define VD3_HDR2_PROC_WIN2                 0x596a
-#define VD3_HDR2_MATRIXI_EN_CTRL           0x596b
-#define VD3_HDR2_MATRIXO_EN_CTRL           0x596c
-#define VD3_HDR2_HIST_CTRL                 0x596d
-#define VD3_HDR2_HIST_H_START_END          0x596e
-#define VD3_HDR2_HIST_V_START_END          0x596f
-
-// end of vd3 part for t7
-
 #define OSD1_HDR2_CTRL                      0x38a0
 #define OSD1_HDR2_CLK_GATE                  0x38a1
 #define OSD1_HDR2_MATRIXI_COEF00_01         0x38a2
@@ -300,74 +231,6 @@ extern struct am_regs_s r_lut_hdr_sdr_level3;
 #define OSD1_HDR2_HIST_CTRL                 0x38dd
 #define OSD1_HDR2_HIST_H_START_END          0x38de
 #define OSD1_HDR2_HIST_V_START_END          0x38df
-
-// for t7, osd1&0sd2 osd3 osd3
-// two hdr module for osd
-#define OSD2_HDR2_CTRL                             0x5b50
-#define OSD2_HDR2_CLK_GATE                         0x5b51
-#define OSD2_HDR2_MATRIXI_COEF00_01                0x5b52
-#define OSD2_HDR2_MATRIXI_COEF02_10                0x5b53
-#define OSD2_HDR2_MATRIXI_COEF11_12                0x5b54
-#define OSD2_HDR2_MATRIXI_COEF20_21                0x5b55
-#define OSD2_HDR2_MATRIXI_COEF22                   0x5b56
-#define OSD2_HDR2_MATRIXI_COEF30_31                0x5b57
-#define OSD2_HDR2_MATRIXI_COEF32_40                0x5b58
-#define OSD2_HDR2_MATRIXI_COEF41_42                0x5b59
-#define OSD2_HDR2_MATRIXI_OFFSET0_1                0x5b5a
-#define OSD2_HDR2_MATRIXI_OFFSET2                  0x5b5b
-#define OSD2_HDR2_MATRIXI_PRE_OFFSET0_1            0x5b5c
-#define OSD2_HDR2_MATRIXI_PRE_OFFSET2              0x5b5d
-#define OSD2_HDR2_MATRIXO_COEF00_01                0x5b5e
-#define OSD2_HDR2_MATRIXO_COEF02_10                0x5b5f
-#define OSD2_HDR2_MATRIXO_COEF11_12                0x5b60
-#define OSD2_HDR2_MATRIXO_COEF20_21                0x5b61
-#define OSD2_HDR2_MATRIXO_COEF22                   0x5b62
-#define OSD2_HDR2_MATRIXO_COEF30_31                0x5b63
-#define OSD2_HDR2_MATRIXO_COEF32_40                0x5b64
-#define OSD2_HDR2_MATRIXO_COEF41_42                0x5b65
-#define OSD2_HDR2_MATRIXO_OFFSET0_1                0x5b66
-#define OSD2_HDR2_MATRIXO_OFFSET2                  0x5b67
-#define OSD2_HDR2_MATRIXO_PRE_OFFSET0_1            0x5b68
-#define OSD2_HDR2_MATRIXO_PRE_OFFSET2              0x5b69
-#define OSD2_HDR2_MATRIXI_CLIP                     0x5b6a
-#define OSD2_HDR2_MATRIXO_CLIP                     0x5b6b
-#define OSD2_HDR2_CGAIN_OFFT                       0x5b6c
-#define OSD2_HDR2_HIST_RD                          0x5b6d
-#define OSD2_EOTF_LUT_ADDR_PORT                    0x5b6e
-#define OSD2_EOTF_LUT_DATA_PORT                    0x5b6f
-#define OSD2_OETF_LUT_ADDR_PORT                    0x5b70
-#define OSD2_OETF_LUT_DATA_PORT                    0x5b71
-#define OSD2_CGAIN_LUT_ADDR_PORT                   0x5b72
-#define OSD2_CGAIN_LUT_DATA_PORT                   0x5b73
-#define OSD2_HDR2_CGAIN_COEF0                      0x5b74
-#define OSD2_HDR2_CGAIN_COEF1                      0x5b75
-#define OSD2_OGAIN_LUT_ADDR_PORT                   0x5b76
-#define OSD2_OGAIN_LUT_DATA_PORT                   0x5b77
-#define OSD2_HDR2_ADPS_CTRL                        0x5b78
-#define OSD2_HDR2_ADPS_ALPHA0                      0x5b79
-#define OSD2_HDR2_ADPS_ALPHA1                      0x5b7a
-#define OSD2_HDR2_ADPS_BETA0                       0x5b7b
-#define OSD2_HDR2_ADPS_BETA1                       0x5b7c
-#define OSD2_HDR2_ADPS_BETA2                       0x5b7d
-#define OSD2_HDR2_ADPS_COEF0                       0x5b7e
-#define OSD2_HDR2_ADPS_COEF1                       0x5b7f
-#define OSD2_HDR2_GMUT_CTRL                        0x5b80
-#define OSD2_HDR2_GMUT_COEF0                       0x5b81
-#define OSD2_HDR2_GMUT_COEF1                       0x5b82
-#define OSD2_HDR2_GMUT_COEF2                       0x5b83
-#define OSD2_HDR2_GMUT_COEF3                       0x5b84
-#define OSD2_HDR2_GMUT_COEF4                       0x5b85
-#define OSD2_HDR2_PIPE_CTRL1                       0x5b86
-#define OSD2_HDR2_PIPE_CTRL2                       0x5b87
-#define OSD2_HDR2_PIPE_CTRL3                       0x5b88
-#define OSD2_HDR2_PROC_WIN1                        0x5b89
-#define OSD2_HDR2_PROC_WIN2                        0x5b8a
-#define OSD2_HDR2_MATRIXI_EN_CTRL                  0x5b8b
-#define OSD2_HDR2_MATRIXO_EN_CTRL                  0x5b8c
-#define OSD2_HDR2_HIST_CTRL                        0x5b8d
-#define OSD2_HDR2_HIST_H_START_END                 0x5b8e
-#define OSD2_HDR2_HIST_V_START_END                 0x5b8f
-//end of osd3
 
 #define DI_HDR2_CTRL                      0x3770
 #define DI_HDR2_CLK_GATE                  0x3771
@@ -556,5 +419,4 @@ extern struct am_regs_s r_lut_hdr_sdr_level3;
 #define VDIN1_HDR2_MATRIXO_EN_CTRL         0x13bc
 
 #define VPP_VD2_HDR_IN_SIZE                0x1df0
-#define VPP_VD3_HDR_IN_SIZE                0x1a59
 #endif

@@ -65,6 +65,5 @@ config AMLOGIC_MEDIA_FB_OSD2_CURSOR
 		This is the frame buffer device driver.
 		Select to enable OSD2 cursor.
 
-		This module used2 OSD2 as cursor,
-		otherwise we used OSD2 as normaly layer.
+		This module used2 OSD2 as cursor.
 endmenu

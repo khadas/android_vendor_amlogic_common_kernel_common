@@ -1,6 +1,18 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/amlogic/hifi4dsp/hifi4dsp_firmware.c
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
 //#define DEBUG
@@ -103,7 +115,7 @@ int hifi4dsp_dump_memory(const void *buf, unsigned int bytes, int col)
 
 	pdata = (u8 *)buf;
 	size = bytes;
-	memset(a_str, '\0', sizeof(a_str));
+	memset(str, '\0', sizeof(a_str));
 	memset(str, '\0', sizeof(str));
 	while (n < size) {
 		sprintf(a_str, "%p: ", pdata);
@@ -138,16 +150,24 @@ int hifi4dsp_fw_copy_to_ddr(const struct firmware *fw,
 	pr_debug("%s fw_src:0x%p, pdata_dst=0x%p, szie=%d bytes\n",
 		 __func__, fw_src, fw_dst, fw_bytes);
 	//memcpy(fw_dst, fw_src, fw_bytes);
+	pr_debug("firmware:%d bytes, map:%d bytes\n",
+		 fw_bytes, dsp_fw->dsp->regionsize);
+	if (fw_bytes > dsp_fw->dsp->regionsize) {
+		pr_info("sdram firmware:%d bytes > mapsize:%d bytes.. overflow\n",
+			fw_bytes, dsp_fw->dsp->regionsize);
+		return -EINVAL;
+	}
+
 	memcpy_toio(fw_dst, fw_src, fw_bytes);
 	//do memory barrier
 	//mb();
 
 	/*cache clean*/
-	if (strcmp(get_hifi_fw_mem_type(), "sram"))
-		dma_sync_single_for_device(dsp_fw->dsp->dev,
-				   dsp_fw->paddr,
-				   dsp_fw->size,
-				   DMA_TO_DEVICE);
+	dma_sync_single_for_device
+				(dsp_fw->dsp->dev,
+				 dsp_fw->paddr,
+				 dsp_fw->size,
+				 DMA_TO_DEVICE);
 	pr_info("\n after copy to ddr and clean cache:\n");
 	hifi4dsp_dump_memory(dsp_fw->buf, 32, 16);
 	hifi4dsp_dump_memory(dsp_fw->buf + dsp_fw->size - 32, 32, 16);
@@ -173,6 +193,13 @@ int hifi4dsp_fw_copy_to_sram(const struct firmware *fw,
 
 	/*copy firmware to sram*/
 	pr_info("\ncopy firmware from ddr to sram\n");
+	pr_debug("firmware:%d bytes, map:%d bytes\n", fw_bytes, boot_sram_size);
+	if (fw_bytes > boot_sram_size) {
+		pr_info("sram firmware:%d bytes > mapsize:%d bytes.. overflow\n",
+			fw_bytes, boot_sram_size);
+		return -EINVAL;
+	}
+
 	memcpy_toio(g_regbases.sram_base, fw_src, fw_bytes);
 
 	hifi4dsp_dump_memory(g_regbases.sram_base, 32, 16);

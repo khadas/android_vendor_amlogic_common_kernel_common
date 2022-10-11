@@ -1,4 +1,3 @@
-// SPDX-License-Identifier: GPL-2.0
 /*
  * ARMv7 Cortex-A8 and Cortex-A9 Performance Events handling code.
  *
@@ -28,6 +27,10 @@
 #include <linux/of.h>
 #include <linux/perf/arm_pmu.h>
 #include <linux/platform_device.h>
+
+#ifdef CONFIG_AMLOGIC_MODIFY
+#include <asm/perf_event.h>
+#endif
 
 /*
  * Common ARMv7 event types
@@ -609,6 +612,49 @@ ARMV7_EVENT_ATTR(inst_spec, ARMV7_PERFCTR_INSTR_SPEC);
 ARMV7_EVENT_ATTR(ttbr_write_retired, ARMV7_PERFCTR_TTBR_WRITE);
 ARMV7_EVENT_ATTR(bus_cycles, ARMV7_PERFCTR_BUS_CYCLES);
 
+#ifdef CONFIG_AMLOGIC_MODIFY
+/* a53/a55 common events */
+ARMV7_EVENT_ATTR(a5x_stall_frontend_cache, 0xe1);
+ARMV7_EVENT_ATTR(a5x_stall_frontend_tlb, 0xe2);
+ARMV7_EVENT_ATTR(a5x_stall_frontend_pderr, 0xe3);
+ARMV7_EVENT_ATTR(a5x_stall_backend_ilock_agu, 0xe5);
+ARMV7_EVENT_ATTR(a5x_stall_backend_ilock_fpu, 0xe6);
+ARMV7_EVENT_ATTR(a5x_stall_backend_ld, 0xe7);
+ARMV7_EVENT_ATTR(a5x_stall_backend_st, 0xe8);
+ARMV7_EVENT_ATTR(a5x_l2d_cache, 0x16);
+ARMV7_EVENT_ATTR(a5x_l2d_cache_refill, 0x17);
+
+/* a55 events */
+ARMV7_EVENT_ATTR(a55_stall_frontend, 0x23);
+ARMV7_EVENT_ATTR(a55_stall_backend, 0x24);
+ARMV7_EVENT_ATTR(a55_stall_backend_ilock, 0xe4);
+ARMV7_EVENT_ATTR(a55_l1d_cache_refill_inner, 0x44);
+ARMV7_EVENT_ATTR(a55_l1d_cache_refill_outer, 0x45);
+ARMV7_EVENT_ATTR(a55_l1d_cache_refill_prefetch, 0xc2);
+ARMV7_EVENT_ATTR(a55_l2d_cache_refill_prefetch, 0xc1);
+ARMV7_EVENT_ATTR(a55_l3d_cache_refill_prefetch, 0xc0);
+ARMV7_EVENT_ATTR(a55_stall_backend_ld_cache, 0xe9);
+ARMV7_EVENT_ATTR(a55_stall_backend_ld_tlb, 0xea);
+ARMV7_EVENT_ATTR(a55_stall_backend_st_stb, 0xeb);
+ARMV7_EVENT_ATTR(a55_stall_backend_st_tlb, 0xec);
+ARMV7_EVENT_ATTR(a55_l1d_cache_rd, 0x40);
+ARMV7_EVENT_ATTR(a55_l1d_cache_wr, 0x41);
+ARMV7_EVENT_ATTR(a55_l1d_cache_refill_rd, 0x42);
+ARMV7_EVENT_ATTR(a55_l1d_cache_refill_wr, 0x43);
+ARMV7_EVENT_ATTR(a55_l2d_cache_rd, 0x50);
+ARMV7_EVENT_ATTR(a55_l2d_cache_wr, 0x51);
+ARMV7_EVENT_ATTR(a55_l2d_cache_refill_rd, 0x52);
+ARMV7_EVENT_ATTR(a55_l2d_cache_refill_wr, 0x53);
+ARMV7_EVENT_ATTR(a55_l3d_cache_rd, 0xa0);
+ARMV7_EVENT_ATTR(a55_l3d_cache_refill_rd, 0xa2);
+
+/* a53 events */
+ARMV7_EVENT_ATTR(a53_cache_refill_prefetch, 0xc2);
+ARMV7_EVENT_ATTR(a53_scu_snooped, 0xc8);
+ARMV7_EVENT_ATTR(a53_stall_backend_st_stb, 0xc7);
+ARMV7_EVENT_ATTR(a53_stall_frontend_other, 0xe0);
+#endif
+
 static struct attribute *armv7_pmuv2_event_attrs[] = {
 	&armv7_event_attr_sw_incr.attr.attr,
 	&armv7_event_attr_l1i_cache_refill.attr.attr,
@@ -640,6 +686,46 @@ static struct attribute *armv7_pmuv2_event_attrs[] = {
 	&armv7_event_attr_inst_spec.attr.attr,
 	&armv7_event_attr_ttbr_write_retired.attr.attr,
 	&armv7_event_attr_bus_cycles.attr.attr,
+#ifdef CONFIG_AMLOGIC_MODIFY
+	/* a55/a53 common events */
+	&armv7_event_attr_a5x_stall_frontend_cache.attr.attr, //0xe1
+	&armv7_event_attr_a5x_stall_frontend_tlb.attr.attr, //0xe2
+	&armv7_event_attr_a5x_stall_frontend_pderr.attr.attr, //0xe3
+	&armv7_event_attr_a5x_stall_backend_ilock_agu.attr.attr, //0xe5
+	&armv7_event_attr_a5x_stall_backend_ilock_fpu.attr.attr, //0xe6
+	&armv7_event_attr_a5x_stall_backend_ld.attr.attr,  //0xe7
+	&armv7_event_attr_a5x_stall_backend_st.attr.attr,  //0xe8
+	&armv7_event_attr_a5x_l2d_cache.attr.attr, //0x16
+	&armv7_event_attr_a5x_l2d_cache_refill.attr.attr, //0x17
+	/* a55 events */
+	&armv7_event_attr_a55_stall_frontend.attr.attr, //0x23
+	&armv7_event_attr_a55_stall_backend.attr.attr,  //0x24
+	&armv7_event_attr_a55_stall_backend_ilock.attr.attr,  //0xe4
+	&armv7_event_attr_a55_stall_backend_ld_cache.attr.attr,  //0xe9
+	&armv7_event_attr_a55_stall_backend_ld_tlb.attr.attr,  //0xea
+	&armv7_event_attr_a55_stall_backend_st_stb.attr.attr,  //0xeb
+	&armv7_event_attr_a55_stall_backend_st_tlb.attr.attr,  //0xec
+	&armv7_event_attr_a55_l1d_cache_refill_inner.attr.attr,  //0x44
+	&armv7_event_attr_a55_l1d_cache_refill_outer.attr.attr,  //0x45
+	&armv7_event_attr_a55_l1d_cache_refill_prefetch.attr.attr,  //0xc2
+	&armv7_event_attr_a55_l2d_cache_refill_prefetch.attr.attr,  //0xc1
+	&armv7_event_attr_a55_l3d_cache_refill_prefetch.attr.attr,  //0xc0
+	&armv7_event_attr_a55_l1d_cache_rd.attr.attr, //0x40
+	&armv7_event_attr_a55_l1d_cache_wr.attr.attr, //0x41
+	&armv7_event_attr_a55_l1d_cache_refill_rd.attr.attr, //0x42
+	&armv7_event_attr_a55_l1d_cache_refill_wr.attr.attr, //0x43
+	&armv7_event_attr_a55_l2d_cache_rd.attr.attr, //0x50
+	&armv7_event_attr_a55_l2d_cache_wr.attr.attr, //0x51
+	&armv7_event_attr_a55_l2d_cache_refill_rd.attr.attr, //0x52
+	&armv7_event_attr_a55_l2d_cache_refill_wr.attr.attr, //0x53
+	&armv7_event_attr_a55_l3d_cache_rd.attr.attr, //0xa0
+	&armv7_event_attr_a55_l3d_cache_refill_rd.attr.attr, //0xa2
+	/* a53 events */
+	&armv7_event_attr_a53_cache_refill_prefetch.attr.attr, //0xc2
+	&armv7_event_attr_a53_scu_snooped.attr.attr, //0xc8
+	&armv7_event_attr_a53_stall_backend_st_stb.attr.attr, //0xc7
+	&armv7_event_attr_a53_stall_frontend_other.attr.attr, //0xe0
+#endif
 	NULL,
 };
 
@@ -697,9 +783,9 @@ static struct attribute_group armv7_pmuv2_events_attr_group = {
 /*
  * Event filters for PMUv2
  */
-#define	ARMV7_EXCLUDE_PL1	BIT(31)
-#define	ARMV7_EXCLUDE_USER	BIT(30)
-#define	ARMV7_INCLUDE_HYP	BIT(27)
+#define	ARMV7_EXCLUDE_PL1	(1 << 31)
+#define	ARMV7_EXCLUDE_USER	(1 << 30)
+#define	ARMV7_INCLUDE_HYP	(1 << 27)
 
 /*
  * Secure debug enable reg
@@ -743,7 +829,7 @@ static inline void armv7_pmnc_select_counter(int idx)
 	isb();
 }
 
-static inline u64 armv7pmu_read_counter(struct perf_event *event)
+static inline u32 armv7pmu_read_counter(struct perf_event *event)
 {
 	struct arm_pmu *cpu_pmu = to_arm_pmu(event->pmu);
 	struct hw_perf_event *hwc = &event->hw;
@@ -763,7 +849,7 @@ static inline u64 armv7pmu_read_counter(struct perf_event *event)
 	return value;
 }
 
-static inline void armv7pmu_write_counter(struct perf_event *event, u64 value)
+static inline void armv7pmu_write_counter(struct perf_event *event, u32 value)
 {
 	struct arm_pmu *cpu_pmu = to_arm_pmu(event->pmu);
 	struct hw_perf_event *hwc = &event->hw;
@@ -947,13 +1033,14 @@ static void armv7pmu_disable_event(struct perf_event *event)
 }
 
 #ifdef CONFIG_AMLOGIC_MODIFY
-static irqreturn_t armv7pmu_handle_irq(int irq_num, struct arm_pmu *cpu_pmu)
-#else
-static irqreturn_t armv7pmu_handle_irq(struct arm_pmu *cpu_pmu)
+#include <linux/perf/arm_pmu.h>
 #endif
+
+static irqreturn_t armv7pmu_handle_irq(int irq_num, void *dev)
 {
 	u32 pmnc;
 	struct perf_sample_data data;
+	struct arm_pmu *cpu_pmu = (struct arm_pmu *)dev;
 	struct pmu_hw_events *cpuc = this_cpu_ptr(cpu_pmu->hw_events);
 	struct pt_regs *regs;
 	int idx;
@@ -964,20 +1051,25 @@ static irqreturn_t armv7pmu_handle_irq(struct arm_pmu *cpu_pmu)
 	pmnc = armv7_pmnc_getreset_flags();
 
 #ifdef CONFIG_AMLOGIC_MODIFY
-	if (!amlpmu_ctx.private_interrupts) {
-		/* amlpmu have routed the interrupt already, so return IRQ_HANDLED */
-		amlpmu_handle_irq(cpu_pmu, irq_num,
+	if (amlpmu_ctx.private_interrupts) {
+		if (!armv7_pmnc_has_overflowed(pmnc))
+			return IRQ_NONE;
+	} else {
+		amlpmu_handle_irq(cpu_pmu,
+				  irq_num,
 				  armv7_pmnc_has_overflowed(pmnc));
 
+		/* amlpmu may routed the interrupt, so return IRQ_HANDLED */
 		if (!armv7_pmnc_has_overflowed(pmnc))
 			return IRQ_HANDLED;
 	}
-#endif
+#else
 	/*
 	 * Did an overflow occur?
 	 */
 	if (!armv7_pmnc_has_overflowed(pmnc))
 		return IRQ_NONE;
+#endif
 
 	/*
 	 * Handle the counter(s) overflow(s)
@@ -1070,12 +1162,6 @@ static int armv7pmu_get_event_idx(struct pmu_hw_events *cpuc,
 
 	/* The counters are all in use. */
 	return -EAGAIN;
-}
-
-static void armv7pmu_clear_event_idx(struct pmu_hw_events *cpuc,
-				     struct perf_event *event)
-{
-	clear_bit(event->hw.idx, cpuc->used_mask);
 }
 
 /*
@@ -1187,10 +1273,10 @@ static void armv7pmu_init(struct arm_pmu *cpu_pmu)
 	cpu_pmu->read_counter	= armv7pmu_read_counter;
 	cpu_pmu->write_counter	= armv7pmu_write_counter;
 	cpu_pmu->get_event_idx	= armv7pmu_get_event_idx;
-	cpu_pmu->clear_event_idx = armv7pmu_clear_event_idx;
 	cpu_pmu->start		= armv7pmu_start;
 	cpu_pmu->stop		= armv7pmu_stop;
 	cpu_pmu->reset		= armv7pmu_reset;
+	cpu_pmu->max_period	= (1LLU << 32) - 1;
 };
 
 static void armv7_read_num_pmnc_events(void *info)
@@ -1658,7 +1744,6 @@ static void krait_pmu_clear_event_idx(struct pmu_hw_events *cpuc,
 	bool venum_event = EVENT_VENUM(hwc->config_base);
 	bool krait_event = EVENT_CPU(hwc->config_base);
 
-	armv7pmu_clear_event_idx(cpuc, event);
 	if (venum_event || krait_event) {
 		bit = krait_event_to_bit(event, region, group);
 		clear_bit(bit, cpuc->used_mask);
@@ -1988,7 +2073,6 @@ static void scorpion_pmu_clear_event_idx(struct pmu_hw_events *cpuc,
 	bool venum_event = EVENT_VENUM(hwc->config_base);
 	bool scorpion_event = EVENT_CPU(hwc->config_base);
 
-	armv7pmu_clear_event_idx(cpuc, event);
 	if (venum_event || scorpion_event) {
 		bit = scorpion_event_to_bit(event, region, group);
 		clear_bit(bit, cpuc->used_mask);
@@ -2041,9 +2125,88 @@ static const struct pmu_probe_info armv7_pmu_probe_table[] = {
 	{ /* sentinel value */ }
 };
 
+#ifdef CONFIG_AMLOGIC_MODIFY
+#if 0
+static int read_pmuserenr(void)
+{
+	int val = -1;
+
+	asm volatile("mrc p15, 0, %0, c9, c14, 0" : "=r" (val):: "memory");
+	return val;
+}
+#endif
+
+void enable_pmuserenr(void)
+{
+	//pr_emerg("enable_pmuserenr() start, val = %d\n", read_pmuserenr());
+	asm volatile("mcr p15, 0, %0, c9, c14, 0" : : "r" (1) : "memory");
+	//pr_emerg("enable_pmuserenr() end, val = %d\n", read_pmuserenr());
+}
+
+static void enable_pmuserenr_single(void *info)
+{
+	enable_pmuserenr();
+}
+
+static void enable_pmuserenr_all(void)
+{
+	preempt_disable();
+
+	pr_info("enable_pmuserenr_all() start\n");
+	enable_pmuserenr_single(NULL);
+	smp_call_function_many(cpu_possible_mask,
+				enable_pmuserenr_single,
+				NULL,
+				1);
+	pr_info("enable_pmuserenr_all() end\n");
+
+	preempt_enable();
+}
+
+static int pmu_user_callback(struct notifier_block *nfb,
+			     unsigned long action,
+			     void *hcpu)
+{
+	switch (action) {
+	case CPU_ONLINE:
+	case CPU_ONLINE_FROZEN:
+		pr_debug("cpu online callback\n");
+		enable_pmuserenr();
+		break;
+	default:
+		break;
+	}
+	return NOTIFY_OK;
+}
+
+static struct notifier_block pmu_user_notify = {
+	&pmu_user_callback,
+	NULL,
+	0
+};
+
+static int armv7_pmu_resume(struct platform_device *pdev)
+{
+	pr_debug("armv7_pmu_resume()\n");
+	enable_pmuserenr();
+	return 0;
+}
+
+static int armv7_pmu_suspend(struct platform_device *pdev,
+	pm_message_t state)
+{
+	pr_debug("armv7_pmu_suspend()\n");
+	return 0;
+}
+#endif
 
 static int armv7_pmu_device_probe(struct platform_device *pdev)
 {
+#ifdef CONFIG_AMLOGIC_MODIFY
+		enable_pmuserenr_all();
+		__register_cpu_notifier(&pmu_user_notify);
+#endif
+
 	return arm_pmu_device_probe(pdev, armv7_pmu_of_device_ids,
 				    armv7_pmu_probe_table);
 }
@@ -2052,10 +2215,17 @@ static struct platform_driver armv7_pmu_driver = {
 	.driver		= {
 		.name	= "armv7-pmu",
 		.of_match_table = armv7_pmu_of_device_ids,
-		.suppress_bind_attrs = true,
 	},
 	.probe		= armv7_pmu_device_probe,
+#ifdef CONFIG_AMLOGIC_MODIFY
+	.suspend	= armv7_pmu_suspend,
+	.resume		= armv7_pmu_resume,
+#endif
 };
 
-builtin_platform_driver(armv7_pmu_driver);
+static int __init register_armv7_pmu_driver(void)
+{
+	return platform_driver_register(&armv7_pmu_driver);
+}
+device_initcall(register_armv7_pmu_driver);
 #endif	/* CONFIG_CPU_V7 */

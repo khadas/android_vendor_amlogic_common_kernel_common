@@ -44,7 +44,7 @@
 #include <linux/ioport.h>
 #include <linux/amlogic/usb-common.h>
 #include <linux/amlogic/usbtype.h>
-#include <linux/of_gpio.h>
+#include <linux/amlogic/aml_gpio_consumer.h>
 
 /**
  * @file
@@ -1060,7 +1060,7 @@ struct dwc_otg_core_if {
 
 	uint32_t phy_interface;
 
-	u32 phy_otg;
+	uint32_t phy_otg;
 
 	dwc_timer_t *device_connect_timer;
 

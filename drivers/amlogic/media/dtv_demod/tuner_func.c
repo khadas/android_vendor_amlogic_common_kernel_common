@@ -1,11 +1,23 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/amlogic/media/dtv_demod/tuner_func.c
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
 #include <linux/kernel.h>
 #include <linux/i2c.h>
-#include "aml_demod.h"
+#include <linux/dvb/aml_demod.h>
 #include "demod_func.h"
 /*#include "aml_fe.h"*/
 
@@ -15,10 +27,14 @@ void tuner_set_params(struct dvb_frontend *fe)
 {
 	int ret = -1;
 
+	PR_INFO("%s:\n", __func__);
+
 	if (fe->ops.tuner_ops.set_params)
 		ret = fe->ops.tuner_ops.set_params(fe);
 	else
-		PR_ERR("error: no tuner");
+		PR_ERR("error: no tuner\n");
+
+
 }
 
 int tuner_get_ch_power(struct dvb_frontend *fe)
@@ -43,6 +59,64 @@ int tuner_get_ch_power(struct dvb_frontend *fe)
 	return strength;
 }
 
+int tuner_get_ch_power2(void)
+{
+
+	int strength = 0;
+#ifdef CONFIG_AMLOGIC_DVB_COMPAT
+	s16 strengtha = 0;
+#endif
+	struct dvb_frontend *fe;
+
+	fe = aml_get_fe();
+#ifdef CONFIG_AMLOGIC_DVB_COMPAT
+	if (fe != NULL) {
+		if (fe->ops.tuner_ops.get_strength) {
+			fe->ops.tuner_ops.get_strength(fe, &strengtha);
+			//strength = strengtha - 256;
+			strength = (int)strengtha;
+		} else {
+			PR_INFO("no tuner get_strength\n");
+		}
+	}
+#endif
+
+	return strength;
+}
+
+u16 tuner_get_ch_power3(void)
+{
+
+	u16 strength = 0;
+#ifdef CONFIG_AMLOGIC_DVB_COMPAT
+	s16 strengtha = 0;
+#endif
+	struct dvb_frontend *fe;
+
+	fe = aml_get_fe();
+#ifdef CONFIG_AMLOGIC_DVB_COMPAT
+	if (fe != NULL) {
+
+		if (fe->ops.tuner_ops.get_strength) {
+			fe->ops.tuner_ops.get_strength(fe, &strengtha);
+			/*from negative to positive*/
+			if (strengtha < -100)
+				strength = 0;
+			else if (strengtha > -20)
+				strength = 100;
+			else
+				strength = (strengtha + 100) * 100 / 80;
+
+		} else {
+			PR_INFO("no tuner get_strength\n");
+		}
+	}
+#endif
+
+	return strength;
+}
+
+
 struct dvb_tuner_info *tuner_get_info(int type, int mode)
 {
 	/*type :  0-NULL, 1-DCT7070, 2-Maxliner, 3-FJ2207, 4-TD1316 */
@@ -51,33 +125,33 @@ struct dvb_tuner_info *tuner_get_info(int type, int mode)
 
 	static struct dvb_tuner_info tinfo_MXL5003S[2] = {
 		[1] = { /*DVBT*/ .name		= "Maxliner",
-				 .frequency_min_hz = 44000000,
-				 .frequency_max_hz = 885000000, }
+				 .frequency_min = 44000000,
+				 .frequency_max = 885000000, }
 	};
 	static struct dvb_tuner_info tinfo_FJ2207[2] = {
 		[0] = { /*DVBC*/ .name		= "FJ2207",
-				 .frequency_min_hz = 54000000,
-				 .frequency_max_hz = 870000000, },
+				 .frequency_min = 54000000,
+				 .frequency_max = 870000000, },
 		[1] = { /*DVBT*/ .name		= "FJ2207",
-				 .frequency_min_hz = 174000000,
-				 .frequency_max_hz = 864000000, },
+				 .frequency_min = 174000000,
+				 .frequency_max = 864000000, },
 	};
 	static struct dvb_tuner_info tinfo_DCT7070[2] = {
 		[0] = { /*DVBC*/ .name		= "DCT7070",
-				 .frequency_min_hz = 51000000,
-				 .frequency_max_hz = 860000000, }
+				 .frequency_min = 51000000,
+				 .frequency_max = 860000000, }
 	};
 	static struct dvb_tuner_info tinfo_TD1316[2] = {
 		[1] = { /*DVBT*/ .name		= "TD1316",
-				 .frequency_min_hz = 51000000,
-				 .frequency_max_hz = 858000000, }
+				 .frequency_min = 51000000,
+				 .frequency_max = 858000000, }
 	};
 	static struct dvb_tuner_info tinfo_SI2176[2] = {
 		[0] = { /*DVBC*/
 			/*#error please add SI2176 code*/
 			.name		= "SI2176",
-			.frequency_min_hz	= 51000000,
-			.frequency_max_hz	= 860000000,
+			.frequency_min	= 51000000,
+			.frequency_max	= 860000000,
 		}
 	};
 

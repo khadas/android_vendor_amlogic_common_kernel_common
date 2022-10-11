@@ -1,19 +1,31 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/amlogic/media/osd/osd_io.c
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
 /* Linux Headers */
 #include <linux/kernel.h>
 #include <linux/string.h>
-#include <linux/amlogic/media/registers/register_map.h>
+#include <linux/amlogic/iomap.h>
 #include <linux/io.h>
 
 /* Local Headers */
 #include "osd_log.h"
 #include "osd_backup.h"
 
-#define OSDBUS_REG_ADDR(reg) ((reg) << 2)
+#define OSDBUS_REG_ADDR(reg) (reg << 2)
 
 struct reg_map_s {
 	unsigned int phy_addr;
@@ -44,44 +56,44 @@ int osd_io_remap(int iomap)
 			pr_info("mapped phy: 0x%x\n", osd_reg_map.phy_addr);
 			ret = 1;
 		}
-	} else {
+	} else
 		ret = 1;
-	}
 	return ret;
 }
 
-u32 osd_cbus_read(u32 reg)
+uint32_t osd_cbus_read(uint32_t reg)
 {
-	u32 ret = 0;
+	uint32_t ret = 0;
 	unsigned int addr = 0;
 
 	if (osd_reg_map.flag) {
 		addr = OSDBUS_REG_ADDR(reg);
 		ret = readl(osd_reg_map.vir_addr + addr);
-	} else {
-		ret = (u32)aml_read_cbus(reg);
-	}
+
+	} else
+		ret = (uint32_t)aml_read_cbus(reg);
 	osd_log_dbg3(MODULE_BASE, "%s(0x%x)=0x%x\n", __func__, reg, ret);
 
 	return ret;
-}
+};
 
-void osd_cbus_write(u32 reg, const u32 val)
+void osd_cbus_write(uint32_t reg,
+				   const uint32_t val)
 {
 	unsigned int addr = 0;
 
 	if (osd_reg_map.flag) {
 		addr = OSDBUS_REG_ADDR(reg);
 		writel(val, osd_reg_map.vir_addr + addr);
-	} else {
+	} else
 		aml_write_cbus(reg, val);
-	}
 	osd_log_dbg3(MODULE_BASE, "%s(0x%x, 0x%x)\n", __func__, reg, val);
-}
+};
 
-u32 osd_reg_read(u32 reg)
+
+uint32_t osd_reg_read(uint32_t reg)
 {
-	u32 ret = 0;
+	uint32_t ret = 0;
 	unsigned int addr = 0;
 
 	/* if (get_backup_reg(reg, &ret) != 0) */
@@ -89,41 +101,44 @@ u32 osd_reg_read(u32 reg)
 	if (osd_reg_map.flag) {
 		addr = OSDBUS_REG_ADDR(reg);
 		ret = readl(osd_reg_map.vir_addr + addr);
-	} else {
-		ret = (u32)aml_read_vcbus(reg);
-	}
-	osd_log_dbg3(MODULE_BASE, "%s(0x%x)=0x%x\n", __func__, reg, ret);
-	return ret;
-}
 
-void osd_reg_write(u32 reg, const u32 val)
+	} else
+		ret = (uint32_t)aml_read_vcbus(reg);
+	osd_log_dbg3(MODULE_BASE, "%s(0x%x)=0x%x\n", __func__, reg, ret);
+
+	return ret;
+};
+
+void osd_reg_write(uint32_t reg,
+				 const uint32_t val)
 {
 	unsigned int addr = 0;
 
 	if (osd_reg_map.flag) {
 		addr = OSDBUS_REG_ADDR(reg);
 		writel(val, osd_reg_map.vir_addr + addr);
-	} else {
+	} else
 		aml_write_vcbus(reg, val);
-	}
 	update_backup_reg(reg, val);
 	osd_log_dbg3(MODULE_BASE, "%s(0x%x, 0x%x)\n", __func__, reg, val);
-}
+};
 
-void osd_reg_set_mask(u32 reg, const u32 mask)
+void osd_reg_set_mask(uint32_t reg,
+				    const uint32_t mask)
 {
 	osd_reg_write(reg, (osd_reg_read(reg) | (mask)));
 }
 
-void osd_reg_clr_mask(u32 reg, const u32 mask)
+void osd_reg_clr_mask(uint32_t reg,
+				    const uint32_t mask)
 {
 	osd_reg_write(reg, (osd_reg_read(reg) & (~(mask))));
 }
 
-void osd_reg_set_bits(u32 reg,
-		      const u32 value,
-		      const u32 start,
-		      const u32 len)
+void osd_reg_set_bits(uint32_t reg,
+				    const uint32_t value,
+				    const uint32_t start,
+				    const uint32_t len)
 {
 	osd_reg_write(reg, ((osd_reg_read(reg) &
 			     ~(((1L << (len)) - 1) << (start))) |

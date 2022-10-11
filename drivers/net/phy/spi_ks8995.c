@@ -1,4 +1,3 @@
-// SPDX-License-Identifier: GPL-2.0
 /*
  * SPI driver for Micrel/Kendin KS8995M and KSZ8864RMN ethernet switches
  *
@@ -6,6 +5,10 @@
  *
  * This file was based on: drivers/spi/at25.c
  *     Copyright (C) 2006 David Brownell
+ *
+ * This program is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 as published
+ * by the Free Software Foundation.
  */
 
 #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
@@ -422,7 +425,7 @@ static void ks8995_parse_dt(struct ks8995_switch *ks)
 static const struct bin_attribute ks8995_registers_attr = {
 	.attr = {
 		.name   = "registers",
-		.mode   = 0600,
+		.mode   = S_IRUSR | S_IWUSR,
 	},
 	.size   = KS8995_REGS_SIZE,
 	.read   = ks8995_registers_read,

@@ -1,1 +1,3 @@
-$(MEDIA_MODULE_NAME)-$(CONFIG_AMLOGIC_HDMITX) += vout/hdmitx/hdmi_common/hdmi_parameters.o
+obj-y		+= hdmi_common.o
+
+hdmi_common-objs := hdmi_parameters.o

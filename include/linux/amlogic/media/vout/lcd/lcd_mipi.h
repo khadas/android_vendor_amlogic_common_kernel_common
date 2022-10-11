@@ -1,13 +1,22 @@
-/* SPDX-License-Identifier: GPL-2.0+ */
 /*
+ * include/linux/amlogic/media/vout/lcd/lcd_mipi.h
  *
- * Copyright (C) 2019 Amlogic, Inc. All rights reserved.
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
  *
  */
 
 #ifndef _INC_LCD_MIPI_H
 #define _INC_LCD_MIPI_H
-#include <linux/amlogic/media/vout/lcd/lcd_vout.h>
 
 /* **********************************
  * mipi-dsi read/write api
@@ -29,7 +38,7 @@
 			DT_DCS_RD_0
  * Return:              command number
  */
-int dsi_write_cmd(struct aml_lcd_drv_s *pdrv, unsigned char *payload);
+extern int dsi_write_cmd(unsigned char *payload);
 
 /* *************************************************************
  * Function: dsi_read_single
@@ -38,7 +47,9 @@ int dsi_write_cmd(struct aml_lcd_drv_s *pdrv, unsigned char *payload);
  * Return:              data count
 			0 for not support
  */
-int dsi_read_single(struct aml_lcd_drv_s *pdrv, unsigned char *payload,
-		    unsigned char *rd_data, unsigned int rd_byte_len);
+extern int dsi_read_single(unsigned char *payload, unsigned char *rd_data,
+		unsigned int rd_byte_len);
+
+extern int dsi_set_operation_mode(unsigned char op_mode);
 
 #endif

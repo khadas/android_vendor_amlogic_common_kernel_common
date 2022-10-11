@@ -1,6 +1,18 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/amlogic/media/vin/tvin/vdin/vdin_v4l2_if.c
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
 #include <linux/types.h>
@@ -77,7 +89,7 @@
 /*give a default page size*/
 #define VDIN_IMG_SIZE		(1024 * 8)
 
-unsigned int vdin_v4l_debug;
+int vdin_v4l_debug;
 
 #define dprintk(level, fmt, arg...)				\
 	do {							\
@@ -128,10 +140,16 @@ int vdin_v4l2_if_isr(struct vdin_dev_s *pdev, struct vframe_s *vfp)
 					__func__, fd);
 				return -1;
 			}
-			dprintk(2, "vb2_buf idx:%d pl:%d dmabuf:0x%p fd:%d vf:(%d:0x%p)\n",
+			dprintk(2, "vb2bufidx:%d pl%d buf0x%p fd%d vf%d0x%p\n",
 				index, i, dmabuf, fd, vfp->index, vfp);
-			if (dmabuf_set_vframe(dmabuf, vfp, VF_SRC_VDIN))
+			#ifdef CONFIG_AMLOGIC_UVM
+			if (dmabuf_set_vframe(dmabuf, vfp, VF_PROCESS_VDIN))
 				dprintk(0, "set vf fail\n");
+			#else
+			dprintk(1, "uvm module cfg not enable\n");
+			spin_unlock(&pdev->qlock);
+			return 0;
+			#endif
 		}
 	}
 
@@ -162,23 +180,21 @@ char *vb2_buf_sts_to_str(uint32_t state)
 {
 	switch (state) {
 	case VB2_BUF_STATE_DEQUEUED:
-		return "VB2_BUF_STATE_DEQUEUED";
-	case VB2_BUF_STATE_IN_REQUEST:
-		return "VB2_BUF_STATE_IN_REQUEST";
+		return "VB2_BUF_STATE_DEQUEUED(0)";
 	case VB2_BUF_STATE_PREPARING:
-		return "VB2_BUF_STATE_PREPARING";
-	/*case VB2_BUF_STATE_PREPARED:*/
-	/*	return "VB2_BUF_STATE_PREPARED";*/
+		return "VB2_BUF_STATE_PREPARING(1)";
+	case VB2_BUF_STATE_PREPARED:
+		return "VB2_BUF_STATE_PREPARED(2)";
 	case VB2_BUF_STATE_QUEUED:
-		return "VB2_BUF_STATE_QUEUED";
-	/*case VB2_BUF_STATE_REQUEUEING:*/
-	/*	return "VB2_BUF_STATE_REQUEUEING";*/
+		return "VB2_BUF_STATE_QUEUED(3)";
+	case VB2_BUF_STATE_REQUEUEING:
+		return "VB2_BUF_STATE_REQUEUEING(4)";
 	case VB2_BUF_STATE_ACTIVE:
-		return "VB2_BUF_STATE_ACTIVE";
+		return "VB2_BUF_STATE_ACTIVE(5)";
 	case VB2_BUF_STATE_DONE:
-		return "VB2_BUF_STATE_DONE";
+		return "VB2_BUF_STATE_DONE(6)";
 	default:
-		return "VB2_BUF_STATE_ERROR";
+		return "VB2_BUF_STATE_ERROR(7)";
 	}
 }
 
@@ -305,7 +321,7 @@ static int vdin_vidioc_reqbufs(struct file *file, void *priv,
 	struct vdin_dev_s *pdev = video_drvdata(file);
 	unsigned int req_buffs_num = reqbufs->count;
 	unsigned int type = reqbufs->type;
-	unsigned int ret = 0;
+	int ret = 0;
 	unsigned int i = 0;
 	struct vb2_v4l2_buffer *vbbuf = NULL;
 	struct vdin_vb_buff *vdin_buf = NULL;
@@ -336,7 +352,7 @@ static int vdin_vidioc_reqbufs(struct file *file, void *priv,
 
 	/*check buffer*/
 	dprintk(1, "%s num_buffers %d -end\n", __func__,
-		pdev->vbqueue.num_buffers);
+		 pdev->vbqueue.num_buffers);
 	return ret;
 }
 
@@ -388,13 +404,14 @@ static int vdin_vidioc_querybuf(struct file *file, void *priv,
 	//		v4lbuf->index, vbque->num_buffers);
 	//	return -EFAULT;
 	//}
-	//dprintk("%s %d is_multiplanar:%d\n", __func__, v4lbuf->index, vbque->is_multiplanar);
+	//dprintk("%s %d is_multiplanar:%d\n", __func__,
+	//	v4lbuf->index, vbque->is_multiplanar);
 
 	//if (vbque->is_multiplanar && vb2buf->num_planes <= 2) {
 	//	for (i = 0; i < vb2buf->num_planes; i++) {
 	//		dma_addr = vb2_dma_contig_plane_dma_addr(vb2buf, i);
 	//		planes = &v4lbuf->m.planes[0];
-	//		dprintk("L%d:dma_addr:0x%x mem_offset=0x%x bytesused=0x%x\n",
+	//		dprintk("L%d:dma_addr:0x%x memoff=0x%x bytesus=0x%x\n",
 	//			i, dma_addr, planes->m.mem_offset,
 	//			planes->bytesused);
 	//	}
@@ -416,7 +433,7 @@ static int vdin_vidioc_qbuf(struct file *file, void *priv,
 			    struct v4l2_buffer *p)
 {
 	struct vdin_dev_s *pdev = video_drvdata(file);
-	unsigned int ret = 0;
+	int ret = 0;
 	struct dma_buf *dmabuf;
 	struct vb2_v4l2_buffer *vb = NULL;
 	struct vdin_vb_buff *vdin_buf = NULL;
@@ -437,7 +454,7 @@ static int vdin_vidioc_qbuf(struct file *file, void *priv,
 		dprintk(0, "%s err\n", __func__);
 
 	/* recycle buffer */
-	if (pdev->vbqueue.streaming && p->memory == V4L2_MEMORY_DMABUF) {
+	if (pdev->vbqueue.streaming && (p->memory == V4L2_MEMORY_DMABUF)) {
 		pdev->dbg_v4l_que_cnt++;
 		for (i = 0; i < planes; i++) {
 			fd = p->m.planes[i].m.fd;
@@ -453,7 +470,7 @@ static int vdin_vidioc_qbuf(struct file *file, void *priv,
 				dmabuf);
 			if (!IS_ERR(handle->vfp)) {
 				receiver_vf_put(handle->vfp, pdev->vfp);
-				dprintk(3, "vf idx:%d (0x%p) put back to pool\n",
+				dprintk(3, "vf idx:%d (0x%p) put back pool\n",
 					handle->vfp->index, handle->vfp);
 			} else {
 				dprintk(2, "err vf null\n");
@@ -505,14 +522,14 @@ static int vdin_vidioc_dqbuf(struct file *file, void *priv,
 	vb = to_vb2_v4l2_buffer(pdev->vbqueue.bufs[p->index]);
 	vdin_buf = to_vdin_vb_buf(vb);
 	planes = vb->vb2_buf.num_planes;
-	if (pdev->vbqueue.streaming && p->memory == V4L2_MEMORY_DMABUF) {
+	if ((pdev->vbqueue.streaming) && (p->memory == V4L2_MEMORY_DMABUF)) {
 		pdev->dbg_v4l_dque_cnt++;
 		for (i = 0; i < planes; i++) {
 			fd = p->m.planes[i].m.fd;
 			dmabuf = dma_buf_get(fd);
 			if (!IS_ERR(dmabuf)) {
 				handle = dmabuf->priv;
-				dprintk(3, "dQue idx:%d dmabuf fd:%d vf(%d:0x%p)\n",
+				dprintk(3, "dQ idx:%d dmafd:%d vf(%d:0x%p)\n",
 					p->index, fd, handle->vfp->index,
 					handle->vfp);
 			} else {
@@ -770,7 +787,7 @@ static int vdin_v4l2_release(struct file *file)
 }
 
 static unsigned int vdin_v4l2_poll(struct file *file,
-				   struct poll_table_struct *wait)
+				struct poll_table_struct *wait)
 {
 	/*struct vdin_dev_s *pdev = video_drvdata(file);*/
 	int ret;
@@ -877,7 +894,7 @@ static int vdin_vb2ops_buffer_prepare(struct vb2_buffer *vb)
 		return -EINVAL;
 
 	p_vbque = &pdev->vbqueue;
-	dprintk(1, "buf prepare idx:%d bufs:%d planes:%d quedcnt:%d, bufsts:%s\n",
+	dprintk(1, "buf prepare idx:%d buf:%d plane:%d quedcnt:%d, bufst:%s\n",
 		vb->index, p_vbque->num_buffers,
 		vb->num_planes, p_vbque->queued_count,
 		vb2_buf_sts_to_str(vb->state));
@@ -914,7 +931,7 @@ static void vdin_vb2ops_buffer_queue(struct vb2_buffer *vb)
 	unsigned long flags = 0;
 
 	dprintk(2, "%s buf:%d, state:%s\n", __func__, vb->index,
-		vb2_buf_sts_to_str(buf->vb.vb2_buf.state));
+		  vb2_buf_sts_to_str(buf->vb.vb2_buf.state));
 
 	spin_lock_irqsave(&pdev->qlock, flags);
 	list_add_tail(&buf->list, &pdev->buf_list);
@@ -939,7 +956,7 @@ static int vdin_vb2ops_start_streaming(struct vb2_queue *vq, unsigned int count)
 	struct vdin_dev_s *pdev = vb2_get_drv_priv(vq);
 	struct list_head *buf_head = NULL;
 	/*struct vb2_buffer *vb2_buf;*/
-	uint ret = 0;
+	int ret = 0;
 
 	if (IS_ERR_OR_NULL(pdev))
 		return -EINVAL;
@@ -952,13 +969,13 @@ static int vdin_vb2ops_start_streaming(struct vb2_queue *vq, unsigned int count)
 
 	pdev->frame_cnt = 0;
 
-	if (ret) {
+	/*if (ret) {*/
 		/*
 		 * In case of an error, return all active buffers to the
 		 * QUEUED state
 		 */
-		vdin_return_all_buffers(pdev, VB2_BUF_STATE_QUEUED);
-	}
+		/*vdin_return_all_buffers(pdev, VB2_BUF_STATE_QUEUED);*/
+	/*}*/
 	dprintk(2, "%s\n", __func__);
 	return ret;
 }
@@ -997,11 +1014,11 @@ static int vdin_vb2ops_buf_init(struct vb2_buffer *vb)
 	struct vdin_vb_buff *vdin_buf = NULL;
 
 	dprintk(1, "%s idx:%d, type:0x%x, memory:0x%x, num_planes:%d\n",
-		__func__,
-		vb->index, vb->type, vb->memory, vb->num_planes);
+		  __func__,
+		  vb->index, vb->type, vb->memory, vb->num_planes);
 
 	dprintk(2, "vb2q type:0x%x numbuff:%d request id:%d\n", vb2q->type,
-		vb2q->num_buffers, vb2q->queued_count);
+		  vb2q->num_buffers, vb2q->queued_count);
 
 	//for (i = 0; i < vb->num_planes; i++) {
 	//	phy_addr = vb2_dma_contig_plane_dma_addr(vb, i);
@@ -1182,11 +1199,13 @@ int vdin_v4l2_probe(struct platform_device *pldev,
 	video_dev->lock = &pvdindev->lock;
 	video_dev->queue = &pvdindev->vbqueue;
 	video_dev->v4l2_dev = &pvdindev->v4l2_dev;/*v4l2_device_register*/
-	video_dev->device_caps = V4L2_CAP_VIDEO_CAPTURE_MPLANE;//V4L2_CAP_VIDEO_CAPTURE;
+	//V4L2_CAP_VIDEO_CAPTURE;
+	video_dev->device_caps = V4L2_CAP_VIDEO_CAPTURE_MPLANE;
 
 	video_dev->vfl_type = VFL_TYPE_GRABBER;
 	video_dev->vfl_dir   = VFL_DIR_RX;
-	video_dev->dev_debug = (V4L2_DEV_DEBUG_IOCTL | V4L2_DEV_DEBUG_IOCTL_ARG);
+	video_dev->dev_debug = (V4L2_DEV_DEBUG_IOCTL |
+				V4L2_DEV_DEBUG_IOCTL_ARG);
 
 	/*
 	 * init the device node name, v4l2 will create
@@ -1238,7 +1257,6 @@ int vdin_v4l2_probe(struct platform_device *pldev,
 	return 0;
 
 video_register_device_fail:
-	video_device_release(video_dev);
 	v4l2_device_unregister(&pvdindev->v4l2_dev);
 
 v4l2_device_register_fail:

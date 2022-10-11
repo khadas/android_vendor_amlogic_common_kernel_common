@@ -1,6 +1,18 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/amlogic/media/common/vfm/vftrace.c
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
 #include <linux/kernel.h>
@@ -13,7 +25,6 @@
 #include <linux/cma.h>
 #include <linux/slab.h>
 #include <linux/time.h>
-#include <linux/amlogic/media/utils/am_com.h>
 #include "vftrace.h"
 
 struct trace_info {
@@ -31,7 +42,7 @@ struct vf_trace {
 	int w_index;
 	int num;
 	int get;
-	spinlock_t lock; /* vf trace lock */
+	spinlock_t lock;
 	int use_lock;
 	struct trace_info trace_buf[1];
 };
@@ -59,18 +70,14 @@ void vftrace_free_trace(void *handle)
 
 #define TRACE_LOCK(trace) \
 	do {\
-		struct vf_trace *ptemp; \
-		ptemp = (trace); \
-		if (ptemp->use_lock)\
-			spin_lock_irqsave(&ptemp->lock, flags);\
+		if (trace->use_lock)\
+			spin_lock_irqsave(&trace->lock, flags);\
 	} while (0)
 
 #define TRACE_UNLOCK(trace) \
 	do {\
-		struct vf_trace *ptemp; \
-		ptemp = (trace); \
-		if (ptemp->use_lock)\
-			spin_unlock_irqrestore(&ptemp->lock, flags);\
+		if (trace->use_lock)\
+			spin_unlock_irqrestore(&trace->lock, flags);\
 	} while (0)
 
 void vftrace_info_in(void *vhandle, struct vframe_s *vf)

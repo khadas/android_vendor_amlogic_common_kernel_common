@@ -1,6 +1,12 @@
-/* SPDX-License-Identifier: (GPL-2.0+ WITH Linux-syscall-note OR MIT) */
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * include/uapi/drm/meson_drm.h
+ *
+ * Copyright (C) 2016 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute  it and/or modify it
+ * under  the terms of  the GNU General  Public License as published by the
+ * Free Software Foundation;  either version 2 of the  License, or (at your
+ * option) any later version.
  */
 
 #ifndef _MESON_DRM_H
@@ -19,8 +25,8 @@
 #define MESON_USE_CAMERA_WRITE		(1ull << 13)
 #define MESON_USE_CAMERA_READ		(1ull << 14)
 #define MESON_USE_TEXTURE			(1ull << 17)
-#define MESON_USE_VIDEO_PLANE           (1ull << 18)
-#define MESON_USE_VIDEO_AFBC            (1ull << 19)
+#define MESON_USE_VIDEO_PLANE		(1ull << 18)
+#define MESON_USE_VIDEO_AFBC		(1ull << 19)
 
 /**
  * User-desired buffer creation information structure.
@@ -36,8 +42,9 @@ struct drm_meson_gem_create {
 	__u32 handle;
 };
 
-/*Memory related.*/
-#define DRM_IOCTL_MESON_GEM_CREATE	DRM_IOWR(DRM_COMMAND_BASE + \
-		0x00, struct drm_meson_gem_create)
+#define DRM_MESON_GEM_CREATE		0x00
+
+#define DRM_IOCTL_MESON_GEM_CREATE		DRM_IOWR(DRM_COMMAND_BASE + \
+		DRM_MESON_GEM_CREATE, struct drm_meson_gem_create)
 
 #endif /* _MESON_DRM_H */

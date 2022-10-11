@@ -1,7 +1,17 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
+ * drivers/amlogic/media/vout/lcd/lcd_unifykey.c
  *
- * Copyright (C) 2019 Amlogic, Inc. All rights reserved.
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
  *
  */
 
@@ -19,19 +29,17 @@
 #include <linux/amlogic/media/vout/lcd/lcd_unifykey.h>
 #include <linux/amlogic/media/vout/lcd/lcd_vout.h>
 
-#define LCDUKEY(fmt, args...)     pr_info("lcd ukey: " fmt "", ## args)
-#define LCDUKEYERR(fmt, args...)  \
-		pr_info("lcd ukey err: error: " fmt "", ## args)
+#define LCDUKEY(fmt, args...)     pr_info("lcd ukey: "fmt"", ## args)
+#define LCDUKEYERR(fmt, args...)  pr_info("lcd ukey err: error: "fmt"", ## args)
 
 #ifdef CONFIG_AMLOGIC_UNIFYKEY
-unsigned int cal_crc32(unsigned int crc, const unsigned char *buf,
-		       int buf_len)
+unsigned int cal_crc32(unsigned int crc, const unsigned char *buf, int buf_len)
 {
-	static unsigned int s_crc32[16] = {
+	unsigned int s_crc32[16] = {
 		0, 0x1db71064, 0x3b6e20c8, 0x26d930ac,
 		0x76dc4190, 0x6b6b51f4, 0x4db26158, 0x5005713c,
 		0xedb88320, 0xf00f9344, 0xd6d6a3e8, 0xcb61b38c,
-		0x9b64c2b0, 0x86d3d2d4, 0xa00ae278, 0xbdbdf21c,
+		0x9b64c2b0, 0x86d3d2d4, 0xa00ae278, 0xbdbdf21c
 	};
 	unsigned int crcu32 = crc;
 	unsigned char b;
@@ -44,8 +52,8 @@ unsigned int cal_crc32(unsigned int crc, const unsigned char *buf,
 	crcu32 = ~crcu32;
 	while (buf_len--) {
 		b = *buf++;
-		crcu32 = (crcu32 >> 4) ^ s_crc32[(crcu32 & 0xf) ^ (b & 0xf)];
-		crcu32 = (crcu32 >> 4) ^ s_crc32[(crcu32 & 0xf) ^ (b >> 4)];
+		crcu32 = (crcu32 >> 4) ^ s_crc32[(crcu32 & 0xF) ^ (b & 0xF)];
+		crcu32 = (crcu32 >> 4) ^ s_crc32[(crcu32 & 0xF) ^ (b >> 4)];
 	}
 
 	return ~crcu32;
@@ -55,14 +63,14 @@ int lcd_unifykey_len_check(int key_len, int len)
 {
 	if (key_len < len) {
 		LCDUKEYERR("invalid unifykey length %d, need %d\n",
-			   key_len, len);
+			key_len, len);
 		return -1;
 	}
 	return 0;
 }
 
 int lcd_unifykey_header_check(unsigned char *buf,
-			      struct aml_lcd_unifykey_header_s *header)
+		struct aml_lcd_unifykey_header_s *header)
 {
 	header->crc32 = (buf[0] | (buf[1] << 8) |
 			(buf[2] << 16) | (buf[3] << 24));
@@ -82,7 +90,7 @@ int lcd_unifykey_check(char *key_name)
 	unsigned int key_crc32;
 	int ret;
 
-	if (!key_name) {
+	if (key_name == NULL) {
 		LCDUKEYERR("%s: key_name is null\n", __func__);
 		return -1;
 	}
@@ -91,12 +99,12 @@ int lcd_unifykey_check(char *key_name)
 	key_len = 0;
 	ret = key_unify_query(get_ukdev(), key_name, &key_exist, &keypermit);
 	if (ret < 0) {
-		if (lcd_debug_print_flag & LCD_DBG_PR_NORMAL)
+		if (lcd_debug_print_flag)
 			LCDUKEYERR("%s query exist error\n", key_name);
 		return -1;
 	}
 	if (key_exist == 0) {
-		if (lcd_debug_print_flag & LCD_DBG_PR_NORMAL)
+		if (lcd_debug_print_flag)
 			LCDUKEYERR("%s is not exist\n", key_name);
 		return -1;
 	}
@@ -107,11 +115,11 @@ int lcd_unifykey_check(char *key_name)
 		return -1;
 	}
 	if (key_len == 0) {
-		if (lcd_debug_print_flag & LCD_DBG_PR_NORMAL)
+		if (lcd_debug_print_flag)
 			LCDUKEY("%s size is zero\n", key_name);
 		return -1;
 	}
-	if (lcd_debug_print_flag & LCD_DBG_PR_NORMAL)
+	if (lcd_debug_print_flag)
 		LCDUKEY("%s size: %d\n", key_name, key_len);
 
 	buf = kzalloc((sizeof(unsigned char) * key_len), GFP_KERNEL);
@@ -134,9 +142,9 @@ lcd_unifykey_check_read:
 	}
 	lcd_unifykey_header_check(buf, &key_header);
 	if (key_len != key_header.data_len) {  /* length check */
-		if (lcd_debug_print_flag & LCD_DBG_PR_NORMAL) {
+		if (lcd_debug_print_flag) {
 			LCDUKEYERR("data_len %d is not match key_len %d\n",
-				   key_header.data_len, key_len);
+				key_header.data_len, key_len);
 		}
 		if (retry_cnt < LCD_UKEY_RETRY_CNT_MAX) {
 			retry_cnt++;
@@ -147,13 +155,13 @@ lcd_unifykey_check_read:
 		goto lcd_unifykey_check_err;
 	}
 	key_crc32 = cal_crc32(0, &buf[4], (key_len - 4)); /* except crc32 */
-	if (lcd_debug_print_flag & LCD_DBG_PR_NORMAL) {
+	if (lcd_debug_print_flag) {
 		LCDUKEY("crc32: 0x%08x, header_crc32: 0x%08x\n",
 			key_crc32, key_header.crc32);
 	}
 	if (key_crc32 != key_header.crc32) {  /* crc32 check */
 		LCDUKEYERR("crc32 0x%08x is not match header_crc32 0x%08x\n",
-			   key_header.crc32, key_crc32);
+			key_header.crc32, key_crc32);
 		if (retry_cnt < LCD_UKEY_RETRY_CNT_MAX) {
 			retry_cnt++;
 			memset(buf, 0, key_len);
@@ -188,12 +196,12 @@ static int lcd_unifykey_check_tcon(char *key_name)
 	key_len = 0;
 	ret = key_unify_query(get_ukdev(), key_name, &key_exist, &keypermit);
 	if (ret < 0) {
-		if (lcd_debug_print_flag & LCD_DBG_PR_NORMAL)
+		if (lcd_debug_print_flag)
 			LCDUKEYERR("%s query exist error\n", key_name);
 		return -1;
 	}
 	if (key_exist == 0) {
-		if (lcd_debug_print_flag & LCD_DBG_PR_NORMAL)
+		if (lcd_debug_print_flag)
 			LCDUKEYERR("%s is not exist\n", key_name);
 		return -1;
 	}
@@ -204,11 +212,11 @@ static int lcd_unifykey_check_tcon(char *key_name)
 		return -1;
 	}
 	if (key_len == 0) {
-		if (lcd_debug_print_flag & LCD_DBG_PR_NORMAL)
+		if (lcd_debug_print_flag)
 			LCDUKEY("%s size is zero\n", key_name);
 		return -1;
 	}
-	if (lcd_debug_print_flag & LCD_DBG_PR_NORMAL)
+	if (lcd_debug_print_flag)
 		LCDUKEY("%s size: %d\n", key_name, key_len);
 
 	buf = kzalloc((sizeof(unsigned char) * key_len), GFP_KERNEL);
@@ -232,7 +240,7 @@ lcd_unifykey_check_tcon_read:
 	data_size = (buf[8] | (buf[9] << 8) |
 		     (buf[10] << 16) | (buf[11] << 24));
 	if (key_len != data_size) {  /* length check */
-		if (lcd_debug_print_flag & LCD_DBG_PR_NORMAL) {
+		if (lcd_debug_print_flag) {
 			LCDUKEYERR("data_len %d is not match key_len %d\n",
 				   data_size, key_len);
 		}
@@ -246,7 +254,7 @@ lcd_unifykey_check_tcon_read:
 	}
 	raw_crc32 = (buf[0] | (buf[1] << 8) | (buf[2] << 16) | (buf[3] << 24));
 	key_crc32 = cal_crc32(0, &buf[4], (key_len - 4)); /* except crc32 */
-	if (lcd_debug_print_flag & LCD_DBG_PR_NORMAL) {
+	if (lcd_debug_print_flag) {
 		LCDUKEY("crc32: 0x%08x, header_crc32: 0x%08x\n",
 			key_crc32, raw_crc32);
 	}
@@ -329,12 +337,12 @@ int lcd_unifykey_check_no_header(char *key_name)
 	key_len = 0;
 	ret = key_unify_query(get_ukdev(), key_name, &key_exist, &keypermit);
 	if (ret < 0) {
-		if (lcd_debug_print_flag & LCD_DBG_PR_NORMAL)
+		if (lcd_debug_print_flag)
 			LCDUKEYERR("%s query exist error\n", key_name);
 		return -1;
 	}
 	if (key_exist == 0) {
-		if (lcd_debug_print_flag & LCD_DBG_PR_NORMAL)
+		if (lcd_debug_print_flag)
 			LCDUKEYERR("%s is not exist\n", key_name);
 		return -1;
 	}
@@ -345,11 +353,11 @@ int lcd_unifykey_check_no_header(char *key_name)
 		return -1;
 	}
 	if (key_len == 0) {
-		if (lcd_debug_print_flag & LCD_DBG_PR_NORMAL)
+		if (lcd_debug_print_flag)
 			LCDUKEY("%s size is zero\n", key_name);
 		return -1;
 	}
-	if (lcd_debug_print_flag & LCD_DBG_PR_NORMAL)
+	if (lcd_debug_print_flag)
 		LCDUKEY("%s size: %d\n", key_name, key_len);
 
 	return 0;
@@ -367,7 +375,7 @@ int lcd_unifykey_get_no_header(char *key_name, unsigned char *buf, int *len)
 	ret = key_unify_size(get_ukdev(), key_name, &key_len);
 	if (key_len > *len) {
 		LCDUKEYERR("%s size(%d) is bigger than buf_size(%d)\n",
-			   key_name, key_len, *len);
+			key_name, key_len, *len);
 		return -1;
 	}
 	*len = key_len;
@@ -388,8 +396,8 @@ void lcd_unifykey_print(void)
 	int i, j;
 	int ret;
 
-	buf = kmalloc(600 * sizeof(unsigned char), GFP_KERNEL);
-	if (!buf) {
+	buf = kmalloc(600*sizeof(unsigned char), GFP_KERNEL);
+	if (buf == NULL) {
 		LCDUKEY("lcd_unifykey buf malloc error\n");
 		return;
 	}
@@ -403,8 +411,8 @@ void lcd_unifykey_print(void)
 	while (1) {
 		pr_info("0x%08x: ", (i * 16));
 		for (j = 0; j < 16; j++) {
-			if ((i * 16 + j) < key_len) {
-				pr_info("0x%02x ", buf[i * 16 + j]);
+			if ((i*16+j) < key_len) {
+				pr_info("0x%02x ", buf[i*16+j]);
 			} else {
 				pr_info("\n");
 				goto exit_print_lcd;
@@ -425,8 +433,8 @@ exit_print_lcd:
 	while (1) {
 		pr_info("0x%08x: ", (i * 16));
 		for (j = 0; j < 16; j++) {
-			if ((i * 16 + j) < key_len) {
-				pr_info("0x%02x ", buf[i * 16 + j]);
+			if ((i*16+j) < key_len) {
+				pr_info("0x%02x ", buf[i*16+j]);
 			} else {
 				pr_info("\n");
 				goto exit_print_lcd_ext;
@@ -447,8 +455,8 @@ exit_print_lcd_ext:
 	while (1) {
 		pr_info("0x%08x: ", (i * 16));
 		for (j = 0; j < 16; j++) {
-			if ((i * 16 + j) < key_len) {
-				pr_info("0x%02x ", buf[i * 16 + j]);
+			if ((i*16+j) < key_len) {
+				pr_info("0x%02x ", buf[i*16+j]);
 			} else {
 				pr_info("\n");
 				goto exit_print_backlight;
@@ -471,7 +479,7 @@ int lcd_unifykey_len_check(int key_len, int len)
 }
 
 int lcd_unifykey_header_check(unsigned char *buf,
-			      struct aml_lcd_unifykey_header_s *header)
+		struct aml_lcd_unifykey_header_s *header)
 {
 	LCDUKEYERR("Don't support unifykey\n");
 	return -1;

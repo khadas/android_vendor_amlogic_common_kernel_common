@@ -21,8 +21,8 @@
 
 #include <linux/amlogic/media/canvas/canvas_mgr.h>
 #include <linux/amlogic/media/vfm/vframe.h>
-#include "../di_local/di_local.h"
-//#include "di_local.h"
+//#include "../di_local/di_local.h"
+#include "di_local.h"
 //#include "deinterlace.h"
 
 /*--------------------------*/

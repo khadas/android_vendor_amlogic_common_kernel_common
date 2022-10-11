@@ -3,8 +3,9 @@
 #
 
 config AMLOGIC_UART
-	tristate "Serial support"
+	bool "Serial support"
 	select SERIAL_CORE
+	select SERIAL_EARLYCON
 	default n
     help
 	Add support for the Amlogic serial port.
@@ -14,9 +15,7 @@ config AMLOGIC_UART
 
 config AMLOGIC_SERIAL_MESON_CONSOLE
 	bool "Console on Amlogic Serial port"
-	depends on AMLOGIC_UART
 	select SERIAL_CORE_CONSOLE
-	select SERIAL_EARLYCON
 	default n
 	help
 		Support for running a console on the Amlogic serial
@@ -26,7 +25,7 @@ config AMLOGIC_SERIAL_MESON_CONSOLE
 
 config AMLOGIC_PRINTK_NOBLOCK_MODE
     bool "printk with no block"
-    select AMLOGIC_SERIAL_MESON_CONSOLE
+    depends on AMLOGIC_SERIAL_MESON_CONSOLE
     default n
     help
         printk with no block

@@ -1,4 +1,3 @@
-/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
  * drivers/amlogic/media/video_processor/video_composer/vframe_ge2d_composer.h
  *
@@ -61,7 +60,6 @@ struct ge2d_composer_para {
 	struct ge2d_context_s *context;
 	struct config_para_ex_s *ge2d_config;
 	int angle;
-	bool is_tvp;
 };
 
 struct src_data_para {
@@ -76,19 +74,6 @@ struct src_data_para {
 	struct canvas_config_s canvas1_config[3];
 	enum vframe_source_type_e source_type;
 	bool is_vframe;
-};
-
-struct dump_param {
-	u32 plane_num;
-	struct canvas_config_s canvas0_config[3];
-};
-
-enum buffer_data {
-	BLACK_BUFFER = 0,
-	SCR_BUFFER,
-	DST_EMPTY_BUFFER,
-	DST_BUFFER_DATA,
-	OTHER_BUFFER,
 };
 
 int init_ge2d_composer(struct ge2d_composer_para *ge2d_comp_para);

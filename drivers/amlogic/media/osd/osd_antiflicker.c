@@ -1,6 +1,18 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/amlogic/media/osd/osd_antiflicker.c
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
 /* Linux Headers */
@@ -15,6 +27,7 @@
 #include <linux/sched.h>
 
 /* Amlogic Headers */
+#include <linux/amlogic/cpu_version.h>
 #include <linux/amlogic/media/vout/vout_notify.h>
 #ifdef CONFIG_AMLOGIC_MEDIA_CANVAS
 #include <linux/amlogic/media/canvas/canvas.h>
@@ -29,6 +42,7 @@
 #include "osd_log.h"
 #include "osd_io.h"
 #include "osd_hw.h"
+
 
 #ifdef OSD_GE2D_ANTIFLICKER_SUPPORT
 struct osd_antiflicker_s {
@@ -53,9 +67,8 @@ static int osd_antiflicker_process(void)
 #ifdef CONFIG_AMLOGIC_MEDIA_CANVAS
 	struct canvas_s cs, cd;
 #endif
-	ulong cs_addr = 0, cd_addr = 0;
-	u32 cs_width = 0, cs_height = 0;
-	u32 cd_width = 0, cd_height = 0;
+	u32 cs_addr = 0, cs_width = 0, cs_height = 0;
+	u32 cd_addr = 0, cd_width = 0, cd_height = 0;
 	u32 x0 = 0;
 	u32 y0 = 0;
 	u32 y1 = 0;
@@ -68,7 +81,7 @@ static int osd_antiflicker_process(void)
 
 	mutex_lock(&osd_antiflicker_mutex);
 #ifdef CONFIG_AMLOGIC_MEDIA_CANVAS
-	if (osd_hw.osd_meson_dev.cpu_id != __MESON_CPU_MAJOR_ID_AXG) {
+	if (osd_hw.osd_meson_dev.cpu_id != MESON_CPU_MAJOR_ID_AXG) {
 		canvas_read(OSD1_CANVAS_INDEX, &cs);
 		canvas_read(OSD1_CANVAS_INDEX, &cd);
 		cs_addr = cs.addr;
@@ -79,15 +92,15 @@ static int osd_antiflicker_process(void)
 		cd_height = cd.height;
 	} else {
 		osd_get_info(OSD1, &cs_addr,
-			     &cs_width, &cs_height);
+			&cs_width, &cs_height);
 		osd_get_info(OSD2, &cs_addr,
-			     &cs_width, &cs_height);
+			&cs_width, &cs_height);
 	}
 #else
 	osd_get_info(OSD1, &cs_addr,
-		     &cs_width, &cs_height);
+		&cs_width, &cs_height);
 	osd_get_info(OSD2, &cs_addr,
-		     &cs_width, &cs_height);
+		&cs_width, &cs_height);
 #endif
 
 	if (ge2d_osd_antiflicker.yoffset > 0) {
@@ -160,6 +173,10 @@ void osd_antiflicker_update_pan(u32 yoffset, u32 yres)
 	ge2d_osd_antiflicker.yoffset = yoffset;
 	ge2d_osd_antiflicker.yres = yres;
 	mutex_unlock(&osd_antiflicker_mutex);
+#if 0
+	osd_antiflicker_process();
+	osd_antiflicker_process_2();
+#endif
 	ret = osd_antiflicker_process();
 
 	if (ret < 0)
@@ -175,11 +192,11 @@ int osd_antiflicker_task_start(void)
 
 	osd_log_info("osd_antiflicker_task start.\n");
 
-	if (!ge2d_osd_antiflicker.ge2d_context)
+	if (ge2d_osd_antiflicker.ge2d_context == NULL)
 		ge2d_osd_antiflicker.ge2d_context = create_ge2d_work_queue();
 
 	memset(&ge2d_osd_antiflicker.ge2d_config,
-	       0, sizeof(struct config_para_ex_s));
+			0, sizeof(struct config_para_ex_s));
 	ge2d_osd_antiflicker.inited = true;
 
 	return 0;
@@ -195,8 +212,7 @@ void osd_antiflicker_task_stop(void)
 	osd_log_info("osd_antiflicker_task stop.\n");
 
 	if (ge2d_osd_antiflicker.ge2d_context) {
-		if (destroy_ge2d_work_queue(ge2d_osd_antiflicker.ge2d_context))
-			osd_log_err("%s destroy_ge2d_work failed.\n", __func__);
+		destroy_ge2d_work_queue(ge2d_osd_antiflicker.ge2d_context);
 		ge2d_osd_antiflicker.ge2d_context = NULL;
 	}
 

@@ -1,4 +1,3 @@
-/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
  * drivers/amlogic/media/enhancement/amvecm/amcm.h
  *
@@ -18,6 +17,7 @@
 
 #ifndef __AM_LC_H
 #define __AM_LC_H
+
 
 #include <linux/amlogic/media/vfm/vframe.h>
 
@@ -83,6 +83,8 @@ extern int detect_signal_range_threshold_black;
 extern int detect_signal_range_threshold_white;
 extern int lc_en;
 extern int lc_demo_mode;
+extern int lc_curve_isr_defined;
+extern int use_lc_curve_isr;
 extern unsigned int lc_hist_vs;
 extern unsigned int lc_hist_ve;
 extern unsigned int lc_hist_hs;
@@ -116,13 +118,16 @@ extern struct ve_lc_curve_parm_s lc_curve_parm_load;
 extern struct lc_alg_param_s lc_alg_parm;
 extern struct lc_curve_tune_param_s lc_tune_curve;
 
-void lc_init(int bitdepth);
-void lc_process(struct vframe_s *vf,
-		unsigned int sps_h_en,
-		unsigned int sps_v_en,
-		unsigned int sps_w_in,
-		unsigned int sps_h_in);
-void lc_free(void);
+extern void lc_init(int bitdepth);
+extern void lc_process(struct vframe_s *vf,
+	unsigned int sps_h_en,
+	unsigned int sps_v_en,
+	unsigned int sps_w_in,
+	unsigned int sps_h_in);
+extern void lc_free(void);
+void lc_read_region(int blk_vnum, int blk_hnum);
 void lc_disable(void);
+bool lc_curve_ctrl_reg_set_flag(unsigned int addr);
+
 #endif
 

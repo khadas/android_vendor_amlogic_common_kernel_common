@@ -1,5 +1,5 @@
 #
-# Amlogic video Sink configuration
+# Amlogic video Sink configuation
 #
 
 menu "Amlogic Video Sink Driver Support"
@@ -19,7 +19,6 @@ config  AMLOGIC_MEDIA_VSYNC_RDMA
 	default n
     depends on AMLOGIC_MEDIA_RDMA
 	help
-		Amlogic Video Media RDMA support.
 		Select to enable VSYNC CBUS RDMA.
 
 endif
@@ -28,7 +27,6 @@ config AMLOGIC_MEDIA_VIDEOCAPTURE
     bool "Amlogic Video Capture support"
     default n
     help
-		Amlogic Video Media Capture support.
-		Internal Video Capture driver.
+		Internal Video Capture driver
 
 endmenu

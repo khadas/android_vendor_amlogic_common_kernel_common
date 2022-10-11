@@ -1,6 +1,18 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/amlogic/dvb/demux/sc2_demux/frontend.c
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
 #include <linux/version.h>
@@ -197,13 +209,6 @@ static void set_dvb_ts(struct platform_device *pdev,
 		advb->ts[i].mode = AM_TS_DISABLE;
 		advb->ts[i].pinctrl = NULL;
 	}
-
-	if (IS_ERR_OR_NULL(advb->ts[i].pinctrl))
-		dprint("ts%d:pinctrl:%p Fail.\n",
-				i, advb->ts[i].pinctrl);
-	else
-		dprint("ts%d:pinctrl:%p OK.\n",
-				i, advb->ts[i].pinctrl);
 }
 
 static void ts_process(struct platform_device *pdev)
@@ -222,7 +227,7 @@ static void ts_process(struct platform_device *pdev)
 		advb->ts[i].pinctrl = NULL;
 		advb->ts[i].header_len = 0;
 
-		memset(&advb->ts[i].header, 0, sizeof(advb->ts[i].header));
+		memset(advb->ts[i].header, 0, TS_HEADER_LEN);
 
 		memset(buf, 0, 32);
 		snprintf(buf, sizeof(buf), "ts%d_sid", i);
@@ -241,7 +246,8 @@ static void ts_process(struct platform_device *pdev)
 			snprintf(buf, sizeof(buf), "ts%d_header", i);
 			ret = of_property_read_u32_array(pdev->dev.of_node,
 							 buf, data,
-							 advb->ts[i].header_len);
+							 advb->
+							 ts[i].header_len);
 			if (!ret) {
 				for (j = 0; j < advb->ts[i].header_len; ++j)
 					advb->ts[i].header[j] = data[j];
@@ -294,8 +300,7 @@ int frontend_probe(struct platform_device *pdev)
 		ts_process(pdev);
 #endif
 
-#if (defined CONFIG_AMLOGIC_DVB_EXTERN ||\
-		defined CONFIG_AMLOGIC_DVB_EXTERN_MODULE)
+#if (defined CONFIG_AMLOGIC_DVB_EXTERN)
 	ret = dvb_extern_register_frontend(&advb->dvb_adapter);
 	if (ret) {
 		dprint_i("aml register dvb frontend failed.\n");
@@ -333,8 +338,7 @@ void frontend_config_ts_sid(void)
 
 int frontend_remove(void)
 {
-#if (defined CONFIG_AMLOGIC_DVB_EXTERN ||\
-		defined CONFIG_AMLOGIC_DVB_EXTERN_MODULE)
+#if (defined CONFIG_AMLOGIC_DVB_EXTERN)
 	dvb_extern_unregister_frontend();
 #endif
 

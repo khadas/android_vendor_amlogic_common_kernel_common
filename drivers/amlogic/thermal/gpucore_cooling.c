@@ -1,6 +1,18 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/amlogic/thermal/gpucore_cooling.c
+ *
+ * Copyright (C) 2016 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
 #include <linux/module.h>
@@ -142,9 +154,6 @@ static int gpucore_set_cur_state(struct thermal_cooling_device *cdev,
 	struct gpucore_cooling_device *gpucore_device = cdev->devdata;
 	int set_max_num;
 
-	if (WARN_ON(state >= gpucore_device->max_gpu_core_num))
-		return -EINVAL;
-
 	mutex_lock(&cooling_gpucore_lock);
 	if (gpucore_device->stop_flag) {
 		mutex_unlock(&cooling_gpucore_lock);
@@ -152,7 +161,7 @@ static int gpucore_set_cur_state(struct thermal_cooling_device *cdev,
 	}
 	if ((state & GPU_STOP) == GPU_STOP) {
 		gpucore_device->stop_flag = 1;
-		state = state & (~GPU_STOP);
+		state = state&(~GPU_STOP);
 	}
 	mutex_unlock(&cooling_gpucore_lock);
 	set_max_num = gpucore_device->max_gpu_core_num - state;
@@ -196,6 +205,38 @@ static int gpucore_power2state(struct thermal_cooling_device *cdev,
 	return 0;
 }
 
+static int gpucore_notify_state(struct thermal_cooling_device *cdev,
+				struct thermal_zone_device *tz,
+				enum thermal_trip_type type)
+{
+	unsigned long ins_upper;
+	long cur_state;
+	long upper = -1;
+	int i;
+
+	switch (type) {
+	case THERMAL_TRIP_HOT:
+		for (i = 0; i < tz->trips; i++) {
+			ins_upper = thermal_get_upper(tz, cdev, i);
+			if (ins_upper > upper)
+				upper = ins_upper;
+		}
+		cur_state = tz->hot_step;
+		/* do not exceed levels */
+		if (upper != -1 && cur_state > upper)
+			cur_state = upper;
+		if (cur_state < 0)
+			cur_state = 0;
+		pr_debug("%s, cur_state:%ld, upper:%ld, step:%d\n",
+			 __func__, cur_state, upper, tz->hot_step);
+		cdev->ops->set_cur_state(cdev, cur_state);
+		break;
+	default:
+		break;
+	}
+	return 0;
+}
+
 /* Bind gpucore callbacks to thermal cooling device ops */
 static struct thermal_cooling_device_ops const gpucore_cooling_ops = {
 	.get_max_state = gpucore_get_max_state,
@@ -203,6 +244,7 @@ static struct thermal_cooling_device_ops const gpucore_cooling_ops = {
 	.set_cur_state = gpucore_set_cur_state,
 	.state2power   = gpucore_state2power,
 	.power2state   = gpucore_power2state,
+	.notify_state  = gpucore_notify_state,
 	.get_requested_power = gpucore_get_requested_power,
 };
 
@@ -221,7 +263,7 @@ struct gpucore_cooling_device *gpucore_cooling_alloc(void)
 {
 	struct gpucore_cooling_device *gcdev;
 
-	gcdev = kzalloc(sizeof(*gcdev), GFP_KERNEL);
+	gcdev = kzalloc(sizeof(struct gpucore_cooling_device), GFP_KERNEL);
 	if (!gcdev)
 		return ERR_PTR(-ENOMEM);
 	memset(gcdev, 0, sizeof(*gcdev));
@@ -248,9 +290,7 @@ int gpucore_cooling_register(struct gpucore_cooling_device *gpucore_dev)
 
 	gpucore_dev->gpucore_state = 0;
 	cool_dev = thermal_of_cooling_device_register(gpucore_dev->np,
-						      dev_name,
-						      gpucore_dev,
-						      &gpucore_cooling_ops);
+			dev_name, gpucore_dev, &gpucore_cooling_ops);
 	if (!cool_dev) {
 		release_idr(&gpucore_idr, gpucore_dev->id);
 		kfree(gpucore_dev);

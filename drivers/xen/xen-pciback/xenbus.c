@@ -1,4 +1,3 @@
-// SPDX-License-Identifier: GPL-2.0
 /*
  * PCI Backend Xenbus Setup - handles setup with frontend and xend
  *
@@ -358,13 +357,12 @@ out:
 	return err;
 }
 
-static int xen_pcibk_reconfigure(struct xen_pcibk_device *pdev,
-				 enum xenbus_state state)
+static int xen_pcibk_reconfigure(struct xen_pcibk_device *pdev)
 {
 	int err = 0;
 	int num_devs;
 	int domain, bus, slot, func;
-	unsigned int substate;
+	int substate;
 	int i, len;
 	char state_str[64];
 	char dev_str[64];
@@ -373,7 +371,9 @@ static int xen_pcibk_reconfigure(struct xen_pcibk_device *pdev,
 	dev_dbg(&pdev->xdev->dev, "Reconfiguring device ...\n");
 
 	mutex_lock(&pdev->dev_lock);
-	if (xenbus_read_driver_state(pdev->xdev->nodename) != state)
+	/* Make sure we only reconfigure once */
+	if (xenbus_read_driver_state(pdev->xdev->nodename) !=
+	    XenbusStateReconfiguring)
 		goto out;
 
 	err = xenbus_scanf(XBT_NIL, pdev->xdev->nodename, "num_devs", "%d",
@@ -395,8 +395,10 @@ static int xen_pcibk_reconfigure(struct xen_pcibk_device *pdev,
 					 "configuration");
 			goto out;
 		}
-		substate = xenbus_read_unsigned(pdev->xdev->nodename, state_str,
-						XenbusStateUnknown);
+		err = xenbus_scanf(XBT_NIL, pdev->xdev->nodename, state_str,
+				   "%d", &substate);
+		if (err != 1)
+			substate = XenbusStateUnknown;
 
 		switch (substate) {
 		case XenbusStateInitialising:
@@ -498,10 +500,6 @@ static int xen_pcibk_reconfigure(struct xen_pcibk_device *pdev,
 		}
 	}
 
-	if (state != XenbusStateReconfiguring)
-		/* Make sure we only reconfigure once. */
-		goto out;
-
 	err = xenbus_switch_state(pdev->xdev, XenbusStateReconfigured);
 	if (err) {
 		xenbus_dev_fatal(pdev->xdev, err,
@@ -527,7 +525,7 @@ static void xen_pcibk_frontend_changed(struct xenbus_device *xdev,
 		break;
 
 	case XenbusStateReconfiguring:
-		xen_pcibk_reconfigure(pdev, XenbusStateReconfiguring);
+		xen_pcibk_reconfigure(pdev);
 		break;
 
 	case XenbusStateConnected:
@@ -547,7 +545,7 @@ static void xen_pcibk_frontend_changed(struct xenbus_device *xdev,
 		xenbus_switch_state(xdev, XenbusStateClosed);
 		if (xenbus_dev_is_online(xdev))
 			break;
-		/* fall through - if not online */
+		/* fall through if not online */
 	case XenbusStateUnknown:
 		dev_dbg(&xdev->dev, "frontend is gone! unregister device\n");
 		device_unregister(&xdev->dev);
@@ -656,7 +654,7 @@ out:
 }
 
 static void xen_pcibk_be_watch(struct xenbus_watch *watch,
-			       const char *path, const char *token)
+			     const char **vec, unsigned int len)
 {
 	struct xen_pcibk_device *pdev =
 	    container_of(watch, struct xen_pcibk_device, be_watch);
@@ -664,15 +662,6 @@ static void xen_pcibk_be_watch(struct xenbus_watch *watch,
 	switch (xenbus_read_driver_state(pdev->xdev->nodename)) {
 	case XenbusStateInitWait:
 		xen_pcibk_setup_backend(pdev);
-		break;
-
-	case XenbusStateInitialised:
-		/*
-		 * We typically move to Initialised when the first device was
-		 * added. Hence subsequent devices getting added may need
-		 * reconfiguring.
-		 */
-		xen_pcibk_reconfigure(pdev, XenbusStateInitialised);
 		break;
 
 	default:
@@ -709,7 +698,7 @@ static int xen_pcibk_xenbus_probe(struct xenbus_device *dev,
 	/* We need to force a call to our callback here in case
 	 * xend already configured us!
 	 */
-	xen_pcibk_be_watch(&pdev->be_watch, NULL, NULL);
+	xen_pcibk_be_watch(&pdev->be_watch, NULL, 0);
 
 out:
 	return err;

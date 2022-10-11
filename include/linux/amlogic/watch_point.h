@@ -1,4 +1,3 @@
-/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
  * include/linux/amlogic/watch_point.h
  *
@@ -26,18 +25,18 @@
 #define MAX_WATCH_POINTS	16
 
 #ifdef CONFIG_ARM64
-u64 read_wb_reg(int reg, int n);
+extern u64 read_wb_reg(int reg, int n);
 #else
-u32 read_wb_reg(int n);
+extern u32 read_wb_reg(int n);
 #endif
 
 #ifdef CONFIG_HAVE_HW_BREAKPOINT
-int aml_watch_point_register(unsigned long addr,
-			     unsigned int len,
-			     unsigned int type,
-			     perf_overflow_handler_t handle);
+extern int aml_watch_point_register(unsigned long addr,
+				    unsigned int len,
+				    unsigned int type,
+				    perf_overflow_handler_t handle);
 
-void aml_watch_point_remove(unsigned long addr);
+extern void aml_watch_point_remove(unsigned long addr);
 #else
 static inline int aml_watch_point_register(unsigned long addr,
 					   unsigned int len,
@@ -49,6 +48,7 @@ static inline int aml_watch_point_register(unsigned long addr,
 
 static inline void aml_watch_point_remove(unsigned long addr)
 {
+
 }
 #endif
 

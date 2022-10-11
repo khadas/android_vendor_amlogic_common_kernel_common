@@ -1,9 +1,12 @@
-/* SPDX-License-Identifier: GPL-2.0-only */
 /*
  *  arch/arm/include/asm/memory.h
  *
  *  Copyright (C) 2000-2002 Russell King
  *  modification for nommu, Hyok S. Choi, 2004
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
  *
  *  Note: this file should not be included by non-asm/.h files
  */
@@ -19,29 +22,37 @@
 #include <mach/memory.h>
 #endif
 
-#ifdef CONFIG_AMLOGIC_VMAP
-#define SIZE_VSTACK		(48 * 1024 * 1024)
-#else
-#define SIZE_VSTACK		(0)
-#endif
-
-#include <asm/kasan_def.h>
+/*
+ * Allow for constants defined here to be used from assembly code
+ * by prepending the UL suffix only with actual C code compilation.
+ */
+#define UL(x) _AC(x, UL)
 
 /* PAGE_OFFSET - the virtual address of the start of the kernel image */
 #define PAGE_OFFSET		UL(CONFIG_PAGE_OFFSET)
 
 #ifdef CONFIG_MMU
 
+#ifdef CONFIG_AMLOGIC_KASAN32
+/*
+ * if open AMLOGIC_KASAN32, PAGE_OFFSET is set to 0xD0000000
+ * we config 0xB8000000 as shadow memory start. so vmalloc
+ * can be 0xC0000000 and total 256mb space for vmalloc
+ */
+#define VMALLOC_START		(UL(CONFIG_PAGE_OFFSET) - UL(SZ_256M))
+#define KMEM_END		(0xffa00000UL)
+#define TASK_SIZE		(VMALLOC_START - UL(SZ_128M))
+#else /* CONFIG_AMLOGIC_KASAN32 */
 /*
  * TASK_SIZE - the maximum size of a user space task.
  * TASK_UNMAPPED_BASE - the lower boundary of the mmap VM area
  */
-
-#ifndef CONFIG_KASAN
-#define TASK_SIZE		(UL(CONFIG_PAGE_OFFSET) - UL(SZ_16M) - SIZE_VSTACK)
+#ifdef CONFIG_AMLOGIC_VMAP
+#define TASK_SIZE		(UL(CONFIG_PAGE_OFFSET) - UL(SZ_64M))
 #else
-#define TASK_SIZE		(KASAN_SHADOW_START)
-#endif /* CONFIG_KASAN */
+#define TASK_SIZE		(UL(CONFIG_PAGE_OFFSET) - UL(SZ_16M))
+#endif /* CONFIG_AMLOGIC_VMAP */
+#endif
 #define TASK_UNMAPPED_BASE	ALIGN(TASK_SIZE / 3, SZ_16M)
 
 /*
@@ -49,20 +60,29 @@
  */
 #define TASK_SIZE_26		(UL(1) << 26)
 
+#ifdef CONFIG_AMLOGIC_KASAN32
+#define MODULES_VADDR		(PAGE_OFFSET - SZ_16M + SZ_4M + SZ_2M)
+#elif defined(CONFIG_AMLOGIC_VMAP)
+#define MODULES_VADDR		(PAGE_OFFSET - SZ_64M)
+#else
 /*
  * The module space lives between the addresses given by TASK_SIZE
  * and PAGE_OFFSET - it must be within 32MB of the kernel text.
  */
-#if defined(CONFIG_AMLOGIC_VMAP)
-#define MODULES_VADDR		(PAGE_OFFSET - SZ_64M)
-#else
 #ifndef CONFIG_THUMB2_KERNEL
+/*
+ * to fix module link problem
+ */
 #define MODULES_VADDR		(PAGE_OFFSET - SZ_16M)
 #else
 /* smaller range for Thumb-2 symbols relocation (2^24)*/
 #define MODULES_VADDR		(PAGE_OFFSET - SZ_8M)
 #endif
 #endif	/* CONFIG_AMLOGIC_VMAP */
+
+#ifdef CONFIG_AMLOGIC_KASAN32
+#define VMALLOC_END		(MODULES_VADDR - SZ_2M)
+#endif
 
 #if TASK_SIZE > MODULES_VADDR
 #error Top of user space clashes with start of module space
@@ -71,10 +91,14 @@
 /*
  * The highmem pkmap virtual space shares the end of the module area.
  */
+#ifdef CONFIG_AMLOGIC_KASAN32
+#define MODULES_END		(PAGE_OFFSET)
+#else
 #ifdef CONFIG_HIGHMEM
 #define MODULES_END		(PAGE_OFFSET - PMD_SIZE)
 #else
 #define MODULES_END		(PAGE_OFFSET)
+#endif
 #endif
 
 /*
@@ -84,10 +108,6 @@
  */
 #define XIP_VIRT_ADDR(physaddr)  (MODULES_VADDR + ((physaddr) & 0x000fffff))
 
-#define FDT_FIXED_BASE		UL(0xff800000)
-#define FDT_FIXED_SIZE		(2 * SECTION_SIZE)
-#define FDT_VIRT_BASE(physbase)	((void *)(FDT_FIXED_BASE | (physbase) % SECTION_SIZE))
-
 #if !defined(CONFIG_SMP) && !defined(CONFIG_ARM_LPAE)
 /*
  * Allow 16MB-aligned ioremap pages
@@ -95,15 +115,7 @@
 #define IOREMAP_MAX_ORDER	24
 #endif
 
-#define VECTORS_BASE		UL(0xffff0000)
-
 #else /* CONFIG_MMU */
-
-#ifndef __ASSEMBLY__
-extern unsigned long setup_vectors_base(void);
-extern unsigned long vectors_base;
-#define VECTORS_BASE		vectors_base
-#endif
 
 /*
  * The limitation of user task size can grow up to the end of free ram region.
@@ -128,16 +140,8 @@ extern unsigned long vectors_base;
 #define MODULES_VADDR		PAGE_OFFSET
 
 #define XIP_VIRT_ADDR(physaddr)  (physaddr)
-#define FDT_VIRT_BASE(physbase)  ((void *)(physbase))
 
 #endif /* !CONFIG_MMU */
-
-#ifdef CONFIG_XIP_KERNEL
-#define KERNEL_START		_sdata
-#else
-#define KERNEL_START		_stext
-#endif
-#define KERNEL_END		_end
 
 /*
  * We fix the TCM memories max 32 KiB ITCM resp DTCM at these
@@ -234,7 +238,7 @@ extern const void *__pv_table_begin, *__pv_table_end;
 	: "r" (x), "I" (__PV_BITS_31_24)		\
 	: "cc")
 
-static inline phys_addr_t __virt_to_phys_nodebug(unsigned long x)
+static inline phys_addr_t __virt_to_phys(unsigned long x)
 {
 	phys_addr_t t;
 
@@ -266,30 +270,40 @@ static inline unsigned long __phys_to_virt(phys_addr_t x)
 #define PHYS_OFFSET	PLAT_PHYS_OFFSET
 #define PHYS_PFN_OFFSET	((unsigned long)(PHYS_OFFSET >> PAGE_SHIFT))
 
-static inline phys_addr_t __virt_to_phys_nodebug(unsigned long x)
+#ifdef CONFIG_AMLOGIC_MODIFY
+extern unsigned long phys_check(phys_addr_t x);
+extern unsigned long virt_check(unsigned long x);
+extern int scheduler_running;
+#endif
+static inline phys_addr_t __virt_to_phys(unsigned long x)
 {
+#ifdef CONFIG_AMLOGIC_MODIFY
+	return virt_check(x);
+#else
 	return (phys_addr_t)x - PAGE_OFFSET + PHYS_OFFSET;
+#endif
 }
 
 static inline unsigned long __phys_to_virt(phys_addr_t x)
 {
+#ifdef CONFIG_AMLOGIC_MODIFY
+	return phys_check(x);
+#else
 	return x - PHYS_OFFSET + PAGE_OFFSET;
+#endif
 }
 
 #endif
 
+#ifdef CONFIG_AMLOGIC_MODIFY
+#define virt_to_pfn(kaddr) \
+	({virt_check((unsigned long)kaddr); \
+	 ((((unsigned long)(kaddr) - PAGE_OFFSET) >> PAGE_SHIFT) + \
+	 PHYS_PFN_OFFSET); })
+#else
 #define virt_to_pfn(kaddr) \
 	((((unsigned long)(kaddr) - PAGE_OFFSET) >> PAGE_SHIFT) + \
 	 PHYS_PFN_OFFSET)
-
-#define __pa_symbol_nodebug(x)	__virt_to_phys_nodebug((x))
-
-#ifdef CONFIG_DEBUG_VIRTUAL
-extern phys_addr_t __virt_to_phys(unsigned long x);
-extern phys_addr_t __phys_addr_symbol(unsigned long x);
-#else
-#define __virt_to_phys(x)	__virt_to_phys_nodebug(x)
-#define __phys_addr_symbol(x)	__pa_symbol_nodebug(x)
 #endif
 
 /*
@@ -314,7 +328,6 @@ static inline void *phys_to_virt(phys_addr_t x)
  * Drivers should NOT use these either.
  */
 #define __pa(x)			__virt_to_phys((unsigned long)(x))
-#define __pa_symbol(x)		__phys_addr_symbol(RELOC_HIDE((unsigned long)(x), 0))
 #define __va(x)			((void *)__phys_to_virt((phys_addr_t)(x)))
 #define pfn_to_kaddr(pfn)	__va((phys_addr_t)(pfn) << PAGE_SHIFT)
 

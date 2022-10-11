@@ -1,6 +1,18 @@
-/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/amlogic/media/dtv_demod/include/demod_func.h
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
 #ifndef __DEMOD_FUNC_H__
@@ -9,7 +21,8 @@
 
 #include <linux/types.h>
 
-#include "aml_demod.h"
+#include <linux/dvb/aml_demod.h>
+/*#include "aml_fe.h"*/
 #include "dvb_frontend.h" /**/
 #include "amlfrontend.h"
 #include "addr_dtmb_top.h"
@@ -36,11 +49,28 @@
 #define DEMOD_CFG_BASE			(0xC00)	/* is offset */
 
 /* adc */
+#define D_HHI_DADC_CNTL				(0x27 << 2)
+#define D_HHI_DADC_CNTL2			(0x28 << 2)
 #define D_HHI_DADC_RDBK0_I			(0x29 << 2)
+#define D_HHI_DADC_CNTL3			(0x2a << 2)
 #define D_HHI_DADC_CNTL4			(0x2b << 2)
 
+#define D_HHI_VDAC_CNTL0			(0xbd << 2)
+
+/* PLL */
+#define D_HHI_ADC_PLL_CNTL5			(0x9e << 2)
+#define D_HHI_ADC_PLL_CNTL6			(0x9f << 2)
+#define D_HHI_ADC_PLL_CNTL			(0xaa << 2)
+#define D_HHI_ADC_PLL_CNTL2			(0xab << 2)
+#define D_HHI_ADC_PLL_CNTL3			(0xac << 2)
+#define D_HHI_ADC_PLL_CNTL4			(0xad << 2)
+#define D_HHI_ADC_PLL_CNTL1			(0xaf << 2)
+
+/**/
+#define D_HHI_HDMI_CLK_CNTL			(0x73 << 2)
+#define D_HHI_DEMOD_CLK_CNTL			(0x74 << 2)
 /*redefine*/
-#define HHI_DEMOD_MEM_PD_REG		(0x43)
+#define HHI_DEMOD_MEM_PD_REG		(0x43 << 2)
 /*redefine*/
 #define RESET_RESET0_LEVEL			(0x80)
 
@@ -82,16 +112,8 @@ extern int aml_demod_debug;
 #define DBG_DVBT	BIT(6)
 #define DBG_DVBS	BIT(7)
 #define DBG_ISDBT	BIT(8)
-#define DBG_TIME	BIT(9)
 
 #define PR_INFO(fmt, args ...)	printk("dtv_dmd:"fmt, ##args)
-
-#define PR_TIME(fmt, args ...) \
-	do { \
-		if (aml_demod_debug & DBG_TIME) { \
-			printk("dtv_dmd:" fmt, ##args); \
-		} \
-	} while (0)
 
 #define PR_DBG(fmt, args ...) \
 	do { \
@@ -198,6 +220,13 @@ enum {
 	DTMB_FEC_READY = 10
 };
 
+enum {
+	REG_M_DEMOD = 0,
+	/*REG_M_TVAFE,*/
+	REG_M_HIU,
+	REG_M_NONE
+};
+
 enum dtv_demod_reg_access_mode_e {
 	ACCESS_WORD,
 	ACCESS_BITS,
@@ -221,20 +250,23 @@ struct stchip_register_t {
 };
 
 void st_dvbs2_init(void);
+struct dvb_frontend *aml_get_fe(void);
 void tuner_set_params(struct dvb_frontend *fe);
 int tuner_get_ch_power(struct dvb_frontend *fe);
+int tuner_get_ch_power2(void);
+
+u16 tuner_get_ch_power3(void);
 
 int dtmb_get_power_strength(int agc_gain);
-int dvbc_get_power_strength(int agc_gain, int tuner_strength);
-int j83b_get_power_strength(int agc_gain, int tuner_strength);
-int atsc_get_power_strength(int agc_gain, int tuner_strength);
+
+extern int dvbc_get_power_strength(int agc_gain, int tuner_strength);
+extern int j83b_get_power_strength(int agc_gain, int tuner_strength);
+extern int atsc_get_power_strength(int agc_gain, int tuner_strength);
 
 /* dvbt */
-int dvbt_isdbt_set_ch(struct aml_dtvdemod *demod,
-		struct aml_demod_dvbt *demod_dvbt);
-unsigned int dvbt_set_ch(struct aml_dtvdemod *demod,
-		struct aml_demod_dvbt *demod_dvbt, struct dvb_frontend *fe);
-int dvbt2_set_ch(struct aml_dtvdemod *demod, struct dvb_frontend *fe);
+int dvbt_isdbt_set_ch(struct aml_demod_sta *demod_sta, struct aml_demod_dvbt *demod_dvbt);
+unsigned int dvbt_set_ch(struct aml_demod_sta *demod_sta, struct aml_demod_dvbt *demod_dvbt);
+int dvbt2_set_ch(struct amldtvdemod_device_s *devp);
 
 struct demod_status_ops {
 	int (*get_status)(void);
@@ -248,37 +280,38 @@ struct demod_status_ops *dvbt_get_status_ops(void);
 
 /* dvbc */
 
-int dvbc_set_ch(struct aml_dtvdemod *demod, struct aml_demod_dvbc *demod_dvbc,
-		struct dvb_frontend *fe);
-int dvbc_status(struct aml_dtvdemod *demod, struct aml_demod_sts *demod_sts,
-		struct seq_file *seq);
+int dvbc_set_ch(struct aml_demod_sta *demod_sta, struct aml_demod_dvbc *demod_dvbc);
+int dvbc_status(struct amldtvdemod_device_s *devp,
+		struct aml_demod_sts *demod_sts, struct seq_file *seq);
 int dvbc_isr_islock(void);
 void dvbc_isr(struct aml_demod_sta *demod_sta);
 u32 dvbc_set_qam_mode(unsigned char mode);
-u32 dvbc_get_status(struct aml_dtvdemod *demod);
-u32 dvbc_set_auto_symtrack(struct aml_dtvdemod *demod);
+u32 dvbc_get_status(void);
+u32 dvbc_set_auto_symtrack(void);
 int dvbc_timer_init(void);
 void dvbc_timer_exit(void);
 int dvbc_cci_task(void *data);
-int dvbc_get_cci_task(struct aml_dtvdemod *demod);
-void dvbc_create_cci_task(struct aml_dtvdemod *demod);
-void dvbc_kill_cci_task(struct aml_dtvdemod *demod);
+int dvbc_get_cci_task(void);
+void dvbc_create_cci_task(void);
+void dvbc_kill_cci_task(void);
 
 /* DVBC */
 /*gxtvbb*/
 
-void dvbc_reg_initial_old(struct aml_dtvdemod *demod);
+extern void dvbc_reg_initial_old(struct aml_demod_sta *demod_sta);
 
 /*txlx*/
-void dvbc_reg_initial(struct aml_dtvdemod *demod, struct dvb_frontend *fe);
-void demod_dvbc_set_qam(struct aml_dtvdemod *demod, unsigned int qam);
-void dvbc_init_reg_ext(struct aml_dtvdemod *demod);
-u32 dvbc_get_ch_sts(struct aml_dtvdemod *demod);
-u32 dvbc_get_qam_mode(struct aml_dtvdemod *demod);
+extern void dvbc_reg_initial(struct aml_demod_sta *demod_sta);
+extern void demod_dvbc_set_qam(unsigned int qam);
+extern void dvbc_init_reg_ext(void);
+extern u32 dvbc_get_ch_sts(void);
+extern u32 dvbc_get_qam_mode(void);
+
 
 /* dtmb */
 
-int dtmb_set_ch(struct aml_dtvdemod *demod,
+int dtmb_set_ch(struct aml_demod_sta *demod_sta,
+		/*struct aml_demod_i2c *demod_i2c,*/
 		struct aml_demod_dtmb *demod_atsc);
 
 void dtmb_reset(void);
@@ -288,7 +321,6 @@ int dtmb_check_status_txl(struct dvb_frontend *fe);
 int dtmb_bch_check(void);
 void dtmb_write_reg(int reg_addr, int reg_data);
 unsigned int dtmb_read_reg(unsigned int reg_addr);
-void dtmb_write_reg_bits(u32 addr, const u32 data, const u32 start, const u32 len);
 void dtmb_register_reset(void);
 
 /*
@@ -303,17 +335,18 @@ enum REG_DTMB_D9 {
 	DTMB_D9_ALL,
 };
 
-void dtmb_set_mem_st(int mem_start);
-int dtmb_read_agc(enum REG_DTMB_D9 type, unsigned int *buf);
-unsigned int dtmb_reg_r_che_snr(void);
-unsigned int dtmb_reg_r_fec_lock(void);
-unsigned int dtmb_reg_r_bch(void);
-int check_dtmb_fec_lock(void);
-int dtmb_constell_check(void);
+extern void dtmb_set_mem_st(int mem_start);
+extern int dtmb_read_agc(enum REG_DTMB_D9 type, unsigned int *buf);
+extern unsigned int dtmb_reg_r_che_snr(void);
+extern unsigned int dtmb_reg_r_fec_lock(void);
+extern unsigned int dtmb_reg_r_bch(void);
+extern int check_dtmb_fec_lock(void);
+extern int dtmb_constell_check(void);
 
-void dtmb_no_signal_check_v3(struct aml_dtvdemod *demod);
-void dtmb_no_signal_check_finishi_v3(struct aml_dtvdemod *demod);
-unsigned int dtmb_detect_first(void);
+extern void dtmb_no_signal_check_v3(void);
+extern void dtmb_no_signal_check_finishi_v3(void);
+extern unsigned int dtmb_detect_first(void);
+
 
 /* demod functions */
 unsigned long apb_read_reg_collect(unsigned long addr);
@@ -327,7 +360,7 @@ int app_apb_read_reg(int addr);
 void demod_set_cbus_reg(unsigned int data, unsigned int addr);
 unsigned int demod_read_cbus_reg(unsigned int addr);
 void demod_set_demod_reg(unsigned int data, unsigned int addr);
-void demod_set_tvfe_reg(unsigned int data, unsigned int addr);
+extern void demod_set_tvfe_reg(unsigned int data, unsigned int addr);
 unsigned int demod_read_demod_reg(unsigned int addr);
 
 /* extern int clk_measure(char index); */
@@ -344,12 +377,13 @@ void ofdm_initial(int bandwidth,
 		  /* 0: Unsigned, 1:TC */);
 
 /*no use void monitor_isdbt(void);*/
-void demod_set_reg(struct aml_dtvdemod *demod, struct aml_demod_reg *demod_reg);
-void demod_get_reg(struct aml_dtvdemod *demod, struct aml_demod_reg *demod_reg);
+void demod_set_reg(struct aml_demod_reg *demod_reg);
+void demod_get_reg(struct aml_demod_reg *demod_reg);
 
 /* void demod_calc_clk(struct aml_demod_sta *demod_sta); */
-int demod_set_sys(struct aml_dtvdemod *demod, struct aml_demod_sys *demod_sys);
-void set_j83b_filter_reg_v4(struct aml_dtvdemod *demod);
+int demod_set_sys(struct amldtvdemod_device_s *devp, struct aml_demod_sta *demod_sta,
+		  struct aml_demod_sys *demod_sys);
+extern void set_j83b_filter_reg_v4(void);
 
 
 /* for g9tv */
@@ -564,14 +598,12 @@ void calculate_cordic_para(void);
 /*extern int aml_fe_analog_set_frontend(struct dvb_frontend *fe);*/
 int get_dtvpll_init_flag(void);
 void demod_set_mode_ts(enum fe_delivery_system delsys);
-void qam_write_reg(struct aml_dtvdemod *demod,
-		unsigned int reg_addr, unsigned int reg_data);
-unsigned int qam_read_reg(struct aml_dtvdemod *demod, unsigned int reg_addr);
-void qam_write_bits(struct aml_dtvdemod *demod,
-		u32 reg_addr, const u32 reg_data,
-		const u32 start, const u32 len);
-void dvbc_write_reg(unsigned int addr, unsigned int data);
-unsigned int dvbc_read_reg(unsigned int addr);
+void qam_write_reg(unsigned int reg_addr, unsigned int reg_data);
+unsigned int qam_read_reg(unsigned int reg_addr);
+void qam_write_bits(u32 reg_addr, const u32 reg_data,
+		    const u32 start, const u32 len);
+extern void dvbc_write_reg(unsigned int addr, unsigned int data);
+extern unsigned int dvbc_read_reg(unsigned int addr);
 void demod_top_write_reg(unsigned int addr, unsigned int data);
 void demod_top_write_bits(u32 reg_addr, const u32 reg_data, const u32 start, const u32 len);
 unsigned int demod_top_read_reg(unsigned int addr);
@@ -580,21 +612,25 @@ void front_write_reg(unsigned int addr, unsigned int data);
 void front_write_bits(u32 reg_addr, const u32 reg_data,
 		    const u32 start, const u32 len);
 unsigned int front_read_reg(unsigned int addr);
-unsigned int isdbt_read_reg_v4(unsigned int addr);
-void  isdbt_write_reg_v4(unsigned int addr, unsigned int data);
-int dd_hiu_reg_write(unsigned int reg, unsigned int val);
-unsigned int dd_hiu_reg_read(unsigned int addr);
+extern unsigned int isdbt_read_reg_v4(unsigned int addr);
+extern void  isdbt_write_reg_v4(unsigned int addr, unsigned int data);
+extern int dd_tvafe_hiu_reg_write(unsigned int reg, unsigned int val);
+extern unsigned int dd_tvafe_hiu_reg_read(unsigned int addr);
 void dtvdemod_dmc_reg_write(unsigned int reg, unsigned int val);
 unsigned int dtvdemod_dmc_reg_read(unsigned int addr);
 void dtvdemod_ddr_reg_write(unsigned int reg, unsigned int val);
 unsigned int dtvdemod_ddr_reg_read(unsigned int addr);
-int reset_reg_write(unsigned int reg, unsigned int val);
-unsigned int reset_reg_read(unsigned int addr);
+extern int reset_reg_write(unsigned int reg, unsigned int val);
+extern unsigned int reset_reg_read(unsigned int addr);
 
-void clocks_set_sys_defaults(struct aml_dtvdemod *demod, unsigned int adc_clk);
-void demod_set_demod_default(void);
-unsigned int demod_get_adc_clk(struct aml_dtvdemod *demod);
-unsigned int demod_get_sys_clk(struct aml_dtvdemod *demod);
+
+void clocks_set_sys_defaults(struct dvb_frontend *fe, struct aml_demod_sta *demod_sta,
+				unsigned int adc_clk);
+extern void demod_set_demod_default(void);
+extern unsigned int demod_get_adc_clk(void);
+extern unsigned int demod_get_sys_clk(void);
+extern void debug_adc_pll(void);
+extern void debug_check_reg_val(unsigned int reg_mode, unsigned int reg);
 
 /*register access api new*/
 void dvbt_isdbt_wr_reg(unsigned int addr, unsigned int data);
@@ -617,7 +653,6 @@ char dvbs_rd_byte(unsigned int addr);
 int aml_demod_init(void);
 void aml_demod_exit(void);
 unsigned int write_riscv_ram(void);
+void dvbs2_reg_initial(unsigned int symb_rate);
 unsigned int dvbs_get_quality(void);
-void dvbs2_reg_initial(unsigned int symb_rate, unsigned int is_blind_scan);
-int dvbs_get_signal_strength_off(void);
 #endif

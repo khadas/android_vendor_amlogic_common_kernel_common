@@ -1,6 +1,18 @@
-/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/amlogic/media/video_processor/video_dev/amlvideo.h
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
 #ifndef AMLVIDEO_H_
@@ -54,8 +66,8 @@ struct vivi_dev {
 	struct list_head vivi_devlist;
 	struct v4l2_device v4l2_dev;
 
-	spinlock_t slock; /* */
-	struct mutex mutex; /* */
+	spinlock_t slock;
+	struct mutex mutex;
 	int users;
 
 	/* various device info */
@@ -70,7 +82,7 @@ struct vivi_dev {
 	struct vframe_s *vf;
 	struct vframe_s *amlvideo_pool_ready[AMLVIDEO_POOL_SIZE + 1];
 	int index;
-	struct mutex vf_mutex; /* */
+	struct mutex vf_mutex;
 	int amlvideo_v4l_num;
 	char vf_receiver_name[AMLVIDEO_VF_NAME_SIZE];
 	char vf_provider_name[AMLVIDEO_VF_NAME_SIZE];
@@ -96,6 +108,6 @@ struct vivi_fh {
 
 extern bool video_inuse;
 extern bool omx_secret_mode;
-void get_ppmgr_buf_info(char **start, unsigned int *size);
+extern void get_ppmgr_buf_info(char **start, unsigned int *size);
 
 #endif /* AMLVIDEO_H_ */

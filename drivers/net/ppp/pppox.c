@@ -1,9 +1,9 @@
-// SPDX-License-Identifier: GPL-2.0-or-later
 /** -*- linux-c -*- ***********************************************************
  * Linux PPP over X/Ethernet (PPPoX/PPPoE) Sockets
  *
  * PPPoX --- Generic PPP encapsulation socket family
  * PPPoE --- PPP over Ethernet (RFC 2516)
+ *
  *
  * Version:	0.5.2
  *
@@ -12,6 +12,11 @@
  * 051000 :	Initialization cleanup
  *
  * License:
+ *		This program is free software; you can redistribute it and/or
+ *		modify it under the terms of the GNU General Public License
+ *		as published by the Free Software Foundation; either version
+ *		2 of the License, or (at your option) any later version.
+ *
  */
 
 #include <linux/string.h>
@@ -30,7 +35,7 @@
 
 #include <net/sock.h>
 
-#include <linux/uaccess.h>
+#include <asm/uaccess.h>
 
 static const struct pppox_proto *pppox_protos[PX_MAX_PROTO + 1];
 

@@ -1,9 +1,19 @@
-// SPDX-License-Identifier: GPL-2.0
 /*
- * Copyright (C) 2019 Amlogic, Inc. All rights reserved.
+ * sound/soc/amlogic/auge/frhdmirx_hw.c
+ *
+ * Copyright (C) 2018 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
  *
  */
-
 #include <linux/types.h>
 #include <linux/kernel.h>
 #include <linux/amlogic/iomap.h>
@@ -24,20 +34,24 @@ void frhdmirx_afifo_reset(void)
 	}
 }
 
-void frhdmirx_enable(bool enable, int version)
+void frhdmirx_enable(bool enable)
 {
 	if (enable) {
-		audiobus_update_bits(EE_AUDIO_FRHDMIRX_CTRL0, 0x1 << 29, 0x1 << 29);
-		audiobus_update_bits(EE_AUDIO_FRHDMIRX_CTRL0, 0x1 << 28, 0x1 << 28);
-	} else {
-		audiobus_update_bits(EE_AUDIO_FRHDMIRX_CTRL0, 0x3 << 28, 0x0 << 28);
-	}
+		audiobus_update_bits(EE_AUDIO_FRHDMIRX_CTRL0,
+			0x1 << 29,
+			0x1 << 29);
+		audiobus_update_bits(EE_AUDIO_FRHDMIRX_CTRL0,
+			0x1 << 28,
+			0x1 << 28);
+	} else
+		audiobus_update_bits(EE_AUDIO_FRHDMIRX_CTRL0,
+			0x3 << 28,
+			0x0 << 28);
 
 	audiobus_update_bits(EE_AUDIO_FRHDMIRX_CTRL0, 0x1 << 31, enable << 31);
 
 	/* from tm2 revb, need enable pao separately */
-	if (version != T7_FRHDMIRX)
-		audiobus_update_bits(EE_AUDIO_FRHDMIRX_CTRL0, 0x1 << 19, enable << 19);
+	audiobus_update_bits(EE_AUDIO_FRHDMIRX_CTRL0, 0x1 << 19, enable << 19);
 }
 
 /* source select
@@ -51,13 +65,14 @@ void frhdmirx_src_select(int src)
 		(bool)src << 23);
 }
 
-static void frhdmirx_enable_irq_bits(int channels, int src, int version)
+static void frhdmirx_enable_irq_bits(int channels, int src)
 {
 	unsigned int int_bits = 0;
 
 	/* interrupt bits */
 	if (src) { /* PAO mode */
-		int_bits = (0x1 << INT_PAO_PAPB_MASK | /* find papb */
+		int_bits = (
+			0x1 << INT_PAO_PAPB_MASK | /* find papb */
 			0x1 << INT_PAO_PCPD_MASK   /* find pcpd changed */
 			);
 	} else { /* SPDIF Lane */
@@ -76,31 +91,19 @@ static void frhdmirx_enable_irq_bits(int channels, int src, int version)
 			int_bits |= (lane_irq_bits << 8 * i);
 	}
 
-	if (version != T7_FRHDMIRX) {
-		int_bits |= audiobus_read(EE_AUDIO_FRHDMIRX_CTRL2);
-		audiobus_write(EE_AUDIO_FRHDMIRX_CTRL2, int_bits);
-	} else {
-		/* only 1 lane on t7 version */
-		int_bits = (int_bits << 20) & (0xff << 20);
-		int_bits |= audiobus_read(EE_AUDIO_FRHDMIRX_CTRL1);
-		audiobus_write(EE_AUDIO_FRHDMIRX_CTRL1, int_bits);
-	}
+	int_bits |= audiobus_read(EE_AUDIO_FRHDMIRX_CTRL2);
+	audiobus_write(EE_AUDIO_FRHDMIRX_CTRL2, int_bits);
 }
 
-void frhdmirx_clr_all_irq_bits(int version)
+void frhdmirx_clr_all_irq_bits(void)
 {
-	if (version != T7_FRHDMIRX) {
-		audiobus_write(EE_AUDIO_FRHDMIRX_CTRL3, 0xffffffff);
-		audiobus_write(EE_AUDIO_FRHDMIRX_CTRL3, 0x0);
-		audiobus_write(EE_AUDIO_FRHDMIRX_CTRL4, 0xffffffff);
-		audiobus_write(EE_AUDIO_FRHDMIRX_CTRL4, 0x0);
-	} else {
-		audiobus_update_bits(EE_AUDIO_FRHDMIRX_CTRL6, 0xffff << 16, 0xffff << 16);
-		audiobus_update_bits(EE_AUDIO_FRHDMIRX_CTRL6, 0xffff << 16, 0 << 16);
-	}
+	audiobus_write(EE_AUDIO_FRHDMIRX_CTRL3, 0xffffffff);
+	audiobus_write(EE_AUDIO_FRHDMIRX_CTRL3, 0x0);
+	audiobus_write(EE_AUDIO_FRHDMIRX_CTRL4, 0xffffffff);
+	audiobus_write(EE_AUDIO_FRHDMIRX_CTRL4, 0x0);
 }
 
-void frhdmirx_ctrl(int channels, int src, int version)
+void frhdmirx_ctrl(int channels, int src)
 {
 	int lane, lane_mask = 0, i;
 
@@ -109,7 +112,7 @@ void frhdmirx_ctrl(int channels, int src, int version)
 		lane_mask |= (1 << i);
 
 	/* PAO mode */
-	if (src && version != T7_FRHDMIRX) {
+	if (src) {
 		audiobus_write(EE_AUDIO_FRHDMIRX_CTRL0,
 			lane_mask << 24 | /* chnum_sel */
 			0x1 << 22 | /* capture input by fall edge*/
@@ -118,39 +121,23 @@ void frhdmirx_ctrl(int channels, int src, int version)
 			0x4 << 4    /* chan status sel: pao pc/pd value */
 			);
 	} else {
-		if (version == T7_FRHDMIRX) {
-			audiobus_update_bits(EE_AUDIO_FRHDMIRX_CTRL0,
-				0x1 << 24 |
-				0x1 << 25 |
-				0x1 << 26 |
-				0x7 << 8,
-				0x1 << 24 | /* clk_inv */
-				0x1 << 25 | /* start detect PAPB */
-				0x1 << 26 | /* add channel num*/
-				0x6 << 8    /* channel status*/
-				);
-		} else {
-			audiobus_update_bits(EE_AUDIO_FRHDMIRX_CTRL0,
-				0x1 << 30 | 0xf << 24 | 0x1 << 22 |
-				0x3 << 11 | 0x1 << 8 | 0x1 << 7 | 0x7 << 0,
-				0x1 << 30 | /* chnum_sel */
-				lane_mask << 24 | /* chnum_sel */
-				0x1 << 22 | /* clk_inv */
-				0x0 << 11 | /* req_sel, Sync 4 spdifin by which */
-				0x1 << 8  | /* start detect PAPB */
-				0x1 << 7  | /* add channel num*/
-				0x6 << 0    /* channel status*/
-				);
-		}
+		audiobus_update_bits(EE_AUDIO_FRHDMIRX_CTRL0,
+			0x1 << 30 | 0xf << 24 | 0x1 << 22 |
+			0x3 << 11 | 0x1 << 8 | 0x1 << 7 | 0x7 << 0,
+			0x1 << 30 | /* chnum_sel */
+			lane_mask << 24 | /* chnum_sel */
+			0x1 << 22 | /* clk_inv */
+			0x0 << 11 | /* req_sel, Sync 4 spdifin by which */
+			0x1 << 8  | /* start detect PAPB */
+			0x1 << 7  | /* add channel num*/
+			0x6 << 0    /* channel status*/
+			);
 	}
 	/* nonpcm2pcm_th */
-	if (version == T7_FRHDMIRX)
-		audiobus_update_bits(EE_AUDIO_FRHDMIRX_CTRL0, 0xff << 12, 0xff << 12);
-	else
-		audiobus_write(EE_AUDIO_FRHDMIRX_CTRL1, 0xff << 20);
+	audiobus_write(EE_AUDIO_FRHDMIRX_CTRL1, 0xff << 20);
 
 	/* enable irq bits */
-	frhdmirx_enable_irq_bits(channels, src, version);
+	frhdmirx_enable_irq_bits(channels, src);
 }
 
 void frhdmirx_clr_PAO_irq_bits(void)
@@ -181,32 +168,15 @@ void frhdmirx_clr_SPDIF_irq_bits(void)
 	for (i = 0; i < 1; i++) {
 		/*nonpcm2pcm irq, clear papb/pcpd/nonpcm*/
 		if (value & (0x20 << 8 * i)) {
-			audiobus_update_bits(EE_AUDIO_FRHDMIRX_CTRL3,
+			audiobus_update_bits(
+				EE_AUDIO_FRHDMIRX_CTRL3,
 				0xf << 8 * i, 0xf << 8 * i);
-			audiobus_update_bits(EE_AUDIO_FRHDMIRX_CTRL3,
+			audiobus_update_bits(
+				EE_AUDIO_FRHDMIRX_CTRL3,
 				0xf << 8 * i, 0x0 << 8 * i);
 			pr_info("raw to pcm change: irq status:%x, lane: %d\n",
 				value, i);
 		}
-	}
-}
-
-void frhdmirx_clr_SPDIF_irq_bits_for_t7_version(void)
-{
-	unsigned int value = audiobus_read(EE_AUDIO_FRHDMIRX_STAT0) & 0xff;
-	unsigned int clr_mask = (audiobus_read(EE_AUDIO_FRHDMIRX_CTRL6) >> 16) & 0xff;
-	unsigned int reg = 0;
-
-	reg = clr_mask | value;
-	audiobus_update_bits(EE_AUDIO_FRHDMIRX_CTRL6, 0xff << 16, reg << 16);
-
-	reg = clr_mask & (~value);
-	audiobus_update_bits(EE_AUDIO_FRHDMIRX_CTRL6, 0xff << 16, reg << 16);
-
-	if (value & 0x20) {
-		audiobus_update_bits(EE_AUDIO_FRHDMIRX_CTRL6, 0xf << 24, 0xf << 24);
-		audiobus_update_bits(EE_AUDIO_FRHDMIRX_CTRL6, 0xf << 24, 0 << 24);
-		pr_info("t7 raw to pcm change: irq status:%x\n", value);
 	}
 }
 
@@ -235,45 +205,40 @@ static void frhdmirx_set_reg_status_sel(uint32_t sel)
  * 5: ch_status[191:160];
  * 6: pc[15:0],pd[15:0];
  */
-static void frhdmirx_spdif_channel_status_sel(u32 sel, int version)
+static void frhdmirx_spdif_channel_status_sel(uint32_t sel)
 {
 	/* alway select chanel A */
-	if (version == T7_FRHDMIRX)
-		audiobus_update_bits(EE_AUDIO_FRHDMIRX_CTRL0, 0xf << 8, sel << 8);
-	else
-		audiobus_update_bits(EE_AUDIO_FRHDMIRX_CTRL0, 0xf, sel);
+	audiobus_update_bits(EE_AUDIO_FRHDMIRX_CTRL0, 0xf, sel);
 }
 
 static DEFINE_SPINLOCK(frhdmirx_lock);
 
-unsigned int frhdmirx_get_ch_status(int num, int version)
+unsigned int frhdmirx_get_ch_status(int num)
 {
 	unsigned int val;
 	unsigned long flags = 0;
 
 	spin_lock_irqsave(&frhdmirx_lock, flags);
 	/* default spdif lane 0, channal A */
-	if (version != T7_FRHDMIRX)
-		frhdmirx_set_reg_status_sel(0);
-	frhdmirx_spdif_channel_status_sel(num, version);
+	frhdmirx_set_reg_status_sel(0);
+	frhdmirx_spdif_channel_status_sel(num);
 	val = audiobus_read(EE_AUDIO_FRHDMIRX_STAT1);
 	spin_unlock_irqrestore(&frhdmirx_lock, flags);
 
 	return val;
 }
 
-unsigned int frhdmirx_get_chan_status_pc(enum hdmirx_mode mode, int version)
+unsigned int frhdmirx_get_chan_status_pc(enum hdmirx_mode mode)
 {
 	unsigned int val;
 	unsigned long flags = 0;
 
 	spin_lock_irqsave(&frhdmirx_lock, flags);
-	if (mode == HDMIRX_MODE_PAO && version != T7_FRHDMIRX) {
+	if (mode == HDMIRX_MODE_PAO) {
 		frhdmirx_set_reg_status_sel(4);
 	} else if (mode == HDMIRX_MODE_SPDIFIN) {
-		if (version != T7_FRHDMIRX)
-			frhdmirx_set_reg_status_sel(0);
-		frhdmirx_spdif_channel_status_sel(6, version);
+		frhdmirx_set_reg_status_sel(0);
+		frhdmirx_spdif_channel_status_sel(6);
 	}
 
 	val = audiobus_read(EE_AUDIO_FRHDMIRX_STAT1);

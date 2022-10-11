@@ -1,4 +1,3 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
  * drivers/amlogic/memory_ext/aml_cma.c
  *
@@ -31,14 +30,12 @@
 #include <linux/page-isolation.h>
 #include <linux/spinlock_types.h>
 #include <linux/amlogic/aml_cma.h>
-#include <linux/sched/signal.h>
 #include <linux/hugetlb.h>
 #include <linux/proc_fs.h>
 #include <linux/platform_device.h>
 #include <linux/oom.h>
 #include <linux/of.h>
 #include <linux/shrinker.h>
-#include <linux/vmalloc.h>
 #include <asm/system_misc.h>
 #include <trace/events/page_isolation.h>
 #ifdef CONFIG_AMLOGIC_PAGE_TRACE
@@ -58,7 +55,7 @@ struct cma_pcp {
 	struct list_head list;
 	struct completion start;
 	struct completion end;
-	spinlock_t  list_lock;		/* protect job list */
+	spinlock_t  list_lock;
 	int cpu;
 };
 
@@ -69,16 +66,6 @@ int cma_debug_level;
 
 DEFINE_SPINLOCK(cma_iso_lock);
 static atomic_t cma_allocate;
-
-/*
- * We insert a none-mapping vm area to vmalloc space
- * and dynamic adjust it's size according nr_cma_allocated.
- * Just in order to let all driver allocated cma size counted
- * into KernelUsed item for dumpsys meminfo command on Android
- * layer
- */
-unsigned long ion_cma_allocated;
-EXPORT_SYMBOL(ion_cma_allocated);
 
 int cma_alloc_ref(void)
 {
@@ -122,23 +109,6 @@ EXPORT_SYMBOL(cma_page_count_update);
 #define ANON_RATIO	60
 bool cma_first_wm_low __read_mostly;
 
-static int __init early_cma_first_wm_low_param(char *buf)
-{
-	if (!buf)
-		return -EINVAL;
-
-	if (strcmp(buf, "off") == 0)
-		cma_first_wm_low = false;
-	else if (strcmp(buf, "on") == 0)
-		cma_first_wm_low = true;
-
-	pr_info("cma_first_wm_low %sabled\n", cma_first_wm_low ? "en" : "dis");
-
-	return 0;
-}
-
-early_param("cma_first_wm_low", early_cma_first_wm_low_param);
-
 bool can_use_cma(gfp_t gfp_flags)
 {
 #if RESTRIC_ANON
@@ -151,9 +121,6 @@ bool can_use_cma(gfp_t gfp_flags)
 	if (cma_forbidden_mask(gfp_flags))
 		return false;
 
-	if (cma_alloc_ref())
-		return false;
-
 	if (task_nice(current) > 0)
 		return false;
 
@@ -162,8 +129,8 @@ bool can_use_cma(gfp_t gfp_flags)
 	 * calculate if there are enough space for anon_cma
 	 */
 	if (!(gfp_flags & __GFP_COLD)) {
-		anon_cma = global_zone_page_state(NR_INACTIVE_ANON_CMA) +
-			   global_zone_page_state(NR_ACTIVE_ANON_CMA);
+		anon_cma = global_page_state(NR_INACTIVE_ANON_CMA) +
+			   global_page_state(NR_ACTIVE_ANON_CMA);
 		if (anon_cma * 100 > total_cma_pages * ANON_RATIO)
 			return false;
 	}
@@ -181,12 +148,13 @@ bool cma_page(struct page *page)
 		return false;
 	migrate_type = get_pageblock_migratetype(page);
 	if (is_migrate_cma(migrate_type) ||
-	    is_migrate_isolate(migrate_type)) {
+	   is_migrate_isolate(migrate_type)) {
 		return true;
 	}
 	return false;
 }
 EXPORT_SYMBOL(cma_page);
+
 
 #ifdef CONFIG_AMLOGIC_PAGE_TRACE
 static void update_cma_page_trace(struct page *page, unsigned long cnt)
@@ -194,15 +162,15 @@ static void update_cma_page_trace(struct page *page, unsigned long cnt)
 	long i;
 	unsigned long fun;
 
-	if (!page)
+	if (page == NULL)
 		return;
 
 	fun = find_back_trace();
 	if (cma_alloc_trace)
-		pr_info("%s alloc page:%lx, count:%ld, func:%ps\n", __func__,
+		pr_info("%s alloc page:%lx, count:%ld, func:%pf\n", __func__,
 			page_to_pfn(page), cnt, (void *)fun);
 	for (i = 0; i < cnt; i++) {
-		set_page_trace(page, 0, __GFP_NO_CMA, (void *)fun);
+		set_page_trace(page, 0, __GFP_BDEV, (void *)fun);
 		page++;
 	}
 }
@@ -236,7 +204,7 @@ void aml_cma_release_hook(int count, struct page *pages)
 {
 #ifdef CONFIG_AMLOGIC_PAGE_TRACE
 	if (cma_alloc_trace)
-		pr_info("%s free page:%lx, count:%d, func:%ps\n", __func__,
+		pr_info("%s free page:%lx, count:%d, func:%pf\n", __func__,
 			page_to_pfn(pages), count, (void *)find_back_trace());
 #endif /* CONFIG_AMLOGIC_PAGE_TRACE */
 	atomic_long_sub(count, &nr_cma_allocated);
@@ -255,9 +223,10 @@ static unsigned long get_align_pfn_high(unsigned long pfn)
 				pageblock_nr_pages));
 }
 
-static struct page *get_migrate_page(struct page *page, unsigned long private)
+static struct page *get_migrate_page(struct page *page, unsigned long private,
+				  int **resultp)
 {
-	gfp_t gfp_mask = GFP_USER | __GFP_MOVABLE | __GFP_NO_CMA;
+	gfp_t gfp_mask = GFP_USER | __GFP_MOVABLE;
 	struct page *new = NULL;
 #ifdef CONFIG_AMLOGIC_PAGE_TRACE
 	struct page_trace *old_trace, *new_trace;
@@ -270,16 +239,14 @@ static struct page *get_migrate_page(struct page *page, unsigned long private)
 	 */
 	if (PageHuge(page)) {
 		new = alloc_huge_page_node(page_hstate(compound_head(page)),
-					   next_node_in(page_to_nid(page),
-							node_online_map));
+					    next_node_in(page_to_nid(page),
+							 node_online_map));
 	#ifdef CONFIG_AMLOGIC_PAGE_TRACE
-	#ifdef CONFIG_HUGETLB_PAGE
 		if (new) {
 			old_trace = find_page_base(page);
 			new_trace = find_page_base(new);
 			*new_trace = *old_trace;
 		}
-	#endif
 	#endif
 		return new;
 	}
@@ -333,11 +300,11 @@ static int aml_alloc_contig_migrate_range(struct compact_control *cc,
 		}
 
 		nr_reclaimed = reclaim_clean_pages_from_list(cc->zone,
-							     &cc->migratepages);
+							&cc->migratepages);
 		cc->nr_migratepages -= nr_reclaimed;
 
 		ret = migrate_pages(&cc->migratepages, get_migrate_page,
-				    NULL, 0, cc->mode, MR_CONTIG_RANGE);
+				    NULL, 0, cc->mode, MR_CMA);
 	}
 	if (ret < 0) {
 		putback_movable_pages(&cc->migratepages);
@@ -345,6 +312,7 @@ static int aml_alloc_contig_migrate_range(struct compact_control *cc,
 	}
 	return 0;
 }
+
 
 static int cma_boost_work_func(void *cma_data)
 {
@@ -357,10 +325,8 @@ static int cma_boost_work_func(void *cma_data)
 		.nr_migratepages = 0,
 		.order = -1,
 		.mode = MIGRATE_SYNC,
-		.ignore_skip_hint = true,
-		.no_set_skip_hint = true,
-		.gfp_mask = GFP_KERNEL,
 		.page_type = COMPACT_CMA,
+		.ignore_skip_hint = true,
 	};
 
 	c_work  = (struct cma_pcp *)cma_data;
@@ -368,14 +334,14 @@ static int cma_boost_work_func(void *cma_data)
 		ret = wait_for_completion_interruptible(&c_work->start);
 		if (ret < 0) {
 			pr_err("%s wait for task %d is %d\n",
-			       __func__, c_work->cpu, ret);
+				__func__, c_work->cpu, ret);
 			continue;
 		}
 		this_cpu = get_cpu();
 		put_cpu();
 		if (this_cpu != c_work->cpu) {
 			pr_err("%s, cpu %d is not work cpu:%d\n",
-			       __func__, this_cpu, c_work->cpu);
+				__func__, this_cpu, c_work->cpu);
 		}
 		spin_lock(&c_work->list_lock);
 		if (list_empty(&c_work->list)) {
@@ -499,7 +465,7 @@ int cma_alloc_contig_boost(unsigned long start_pfn, unsigned long count)
 
 	if (ret < 0 && ret != -EBUSY) {
 		pr_err("%s, failed, ret:%d, ok:%d\n",
-		       __func__, ret, atomic_read(&ok));
+			__func__, ret, atomic_read(&ok));
 	}
 
 	return ret;
@@ -507,7 +473,8 @@ int cma_alloc_contig_boost(unsigned long start_pfn, unsigned long count)
 
 static int __aml_check_pageblock_isolate(unsigned long pfn,
 					 unsigned long end_pfn,
-					 bool skip_hwpoisoned_pages)
+					 bool skip_hwpoisoned_pages,
+					 struct list_head *list)
 {
 	struct page *page;
 
@@ -543,23 +510,21 @@ check_page_valid(unsigned long pfn, unsigned long nr_pages)
 {
 	int i;
 
-	for (i = 0; i < nr_pages; i++) {
-		struct page *page;
-
-		page = pfn_to_online_page(pfn + i);
-		if (!page)
-			continue;
-		return page;
-	}
-	return NULL;
+	for (i = 0; i < nr_pages; i++)
+		if (pfn_valid_within(pfn + i))
+			break;
+	if (unlikely(i == nr_pages))
+		return NULL;
+	return pfn_to_page(pfn + i);
 }
 
 int aml_check_pages_isolated(unsigned long start_pfn, unsigned long end_pfn,
-			     bool skip_hwpoisoned_pages)
+			bool skip_hwpoisoned_pages)
 {
 	unsigned long pfn, flags;
 	struct page *page;
 	struct zone *zone;
+	struct list_head free_list;
 
 	/*
 	 * Note: pageblock_nr_pages != MAX_ORDER. Then, chunks of free pages
@@ -572,19 +537,27 @@ int aml_check_pages_isolated(unsigned long start_pfn, unsigned long end_pfn,
 			break;
 	}
 	page = check_page_valid(start_pfn, end_pfn - start_pfn);
-	if (pfn < end_pfn || !page)
+	if ((pfn < end_pfn) || !page)
 		return -EBUSY;
 	/* Check all pages are free or marked as ISOLATED */
 	zone = page_zone(page);
+	INIT_LIST_HEAD(&free_list);
 	spin_lock_irqsave(&zone->lock, flags);
 	pfn = __aml_check_pageblock_isolate(start_pfn, end_pfn,
-					    skip_hwpoisoned_pages);
+					    skip_hwpoisoned_pages,
+					    &free_list);
 	spin_unlock_irqrestore(&zone->lock, flags);
 
 	trace_test_pages_isolated(start_pfn, end_pfn, pfn);
 
+	free_hot_cold_page_list(&free_list, 1);
+	/* page may in kswap ? */
+	if (pfn < end_pfn && zone->zone_pgdat)
+		wake_up_interruptible(&zone->zone_pgdat->kswapd_wait);
+
 	return pfn < end_pfn ? -EBUSY : 0;
 }
+
 
 int aml_cma_alloc_range(unsigned long start, unsigned long end)
 {
@@ -598,10 +571,9 @@ int aml_cma_alloc_range(unsigned long start, unsigned long end)
 		.order = -1,
 		.zone = page_zone(pfn_to_page(start)),
 		.mode = MIGRATE_SYNC,
-		.ignore_skip_hint = true,
-		.no_set_skip_hint = true,
-		.gfp_mask = GFP_KERNEL,
 		.page_type = COMPACT_CMA,
+		.ignore_skip_hint = true,
+		.contended = false,
 	};
 	INIT_LIST_HEAD(&cc.migratepages);
 
@@ -609,7 +581,7 @@ int aml_cma_alloc_range(unsigned long start, unsigned long end)
 	ret = start_isolate_page_range(get_align_pfn_low(start),
 				       get_align_pfn_high(end), MIGRATE_CMA,
 				       false);
-	if (ret < 0) {
+	if (ret) {
 		cma_debug(1, NULL, "ret:%d\n", ret);
 		return ret;
 	}
@@ -619,14 +591,13 @@ try_again:
 	 * try to use more cpu to do this job when alloc count is large
 	 */
 	if ((num_online_cpus() > 1) && can_boost &&
-	    ((end - start) >= pageblock_nr_pages / 2)) {
+		((end - start) >= pageblock_nr_pages / 2)) {
 		get_online_cpus();
 		ret = cma_alloc_contig_boost(start, end - start);
 		put_online_cpus();
 		boost_ok = !ret ? 1 : 0;
-	} else {
+	} else
 		ret = aml_alloc_contig_migrate_range(&cc, start, end, 0);
-	}
 
 	if (ret && ret != -EBUSY) {
 		cma_debug(1, NULL, "ret:%d\n", ret);
@@ -675,7 +646,11 @@ try_again:
 	/* Grab isolated pages from freelists. */
 	outer_end = isolate_freepages_range(&cc, outer_start, end);
 	if (!outer_end) {
-		ret = -EBUSY;
+		if (cc.contended) {
+			ret = -EINTR;
+			pr_info("cma_alloc [%lx-%lx] aborted\n", start, end);
+		} else
+			ret = -EBUSY;
 		cma_debug(1, NULL, "iso free range(%lx, %lx) failed\n",
 			  outer_start, end);
 		goto done;
@@ -752,8 +727,8 @@ void aml_cma_free(unsigned long pfn, unsigned int nr_pages)
 			break;
 		__free_pages(page, start_order);
 		pr_debug("pages:%4d, free:%2d, start:%2d, batch:%4d, pfn:%lx\n",
-			 nr_pages, free_order,
-			 start_order, batch, pfn);
+			nr_pages, free_order,
+			start_order, batch, pfn);
 		nr_pages -= batch;
 		pfn += batch;
 	}
@@ -761,15 +736,15 @@ void aml_cma_free(unsigned long pfn, unsigned int nr_pages)
 }
 EXPORT_SYMBOL(aml_cma_free);
 
-static bool cma_vma_show(struct page *page, struct vm_area_struct *vma,
-			 unsigned long addr, void *arg)
+static int cma_vma_show(struct page *page, struct vm_area_struct *vma,
+			unsigned long addr, void *arg)
 {
 #ifdef CONFIG_AMLOGIC_USER_FAULT
 	struct mm_struct *mm = vma->vm_mm;
 
 	show_vma(mm, addr);
 #endif
-	return true; /* keep loop */
+	return SWAP_AGAIN;
 }
 
 void rmap_walk_vma(struct page *page)
@@ -798,10 +773,10 @@ void show_page(struct page *page)
 #endif
 	if (page->mapping && !((unsigned long)page->mapping & 0x3))
 		map_flag = page->mapping->flags;
-	pr_info("page:%lx, map:%lx, mf:%lx, pf:%lx, m:%d, c:%d, o:%lx, pt:%lx, f:%ps\n",
-		page_to_pfn(page), (unsigned long)page->mapping, map_flag,
+	pr_info("page:%lx, map:%p, mf:%lx, pf:%lx, m:%d, c:%d, f:%pf\n",
+		page_to_pfn(page), page->mapping, map_flag,
 		page->flags & 0xffffffff,
-		page_mapcount(page), page_count(page), page->private, page->index,
+		page_mapcount(page), page_count(page),
 		(void *)trace);
 	if (cma_debug_level > 4)
 		rmap_walk_vma(page);
@@ -814,7 +789,7 @@ static int cma_debug_show(struct seq_file *m, void *arg)
 }
 
 static ssize_t cma_debug_write(struct file *file, const char __user *buffer,
-			       size_t count, loff_t *ppos)
+			      size_t count, loff_t *ppos)
 {
 	int arg = 0;
 
@@ -851,6 +826,7 @@ static int __init aml_cma_init(void)
 		pr_err("%s, create sysfs failed\n", __func__);
 		return -1;
 	}
+
 	return 0;
 }
 arch_initcall(aml_cma_init);
@@ -886,7 +862,7 @@ static void show_task_adj(void)
 		return;
 
 	cs->foreground_timeout = jiffies + HZ * 5;
-	show_mem(0, NULL);
+	show_mem(0);
 	pr_emerg("Foreground task killed, show all Candidates\n");
 	for_each_process(tsk) {
 		struct task_struct *p;
@@ -942,7 +918,7 @@ static unsigned long cma_shrinker_scan(struct shrinker *s,
 	int minfree = 0;
 	int selected_tasksize = 0;
 	short selected_oom_score_adj;
-	int other_free = global_zone_page_state(NR_FREE_PAGES) - totalreserve_pages;
+	int other_free = global_page_state(NR_FREE_PAGES) - totalreserve_pages;
 	int other_file = global_node_page_state(NR_FILE_PAGES) -
 			 global_node_page_state(NR_SHMEM) -
 			 global_node_page_state(NR_UNEVICTABLE) -
@@ -959,9 +935,9 @@ static unsigned long cma_shrinker_scan(struct shrinker *s,
 	    !swap_low)
 		return 0;
 
-	free_cma    = global_zone_page_state(NR_FREE_CMA_PAGES);
-	file_cma    = global_zone_page_state(NR_INACTIVE_FILE_CMA) +
-		      global_zone_page_state(NR_ACTIVE_FILE_CMA);
+	free_cma    = global_page_state(NR_FREE_CMA_PAGES);
+	file_cma    = global_page_state(NR_INACTIVE_FILE_CMA) +
+		      global_page_state(NR_ACTIVE_FILE_CMA);
 	other_free -= free_cma;
 	other_file -= file_cma;
 
@@ -974,7 +950,7 @@ static unsigned long cma_shrinker_scan(struct shrinker *s,
 		}
 	}
 
-	pr_debug("%s %lu, %x, ofree %d %d, ma %hd\n", __func__,
+	pr_debug("cma_shrinker_scan %lu, %x, ofree %d %d, ma %hd\n",
 		 sc->nr_to_scan, sc->gfp_mask, other_free,
 		 other_file, min_score_adj);
 
@@ -1038,18 +1014,13 @@ retry:
 			    tasksize <= selected_tasksize)
 				continue;
 		}
-		if (!strcmp(p->comm, "k.glbenchmark27") ||
-			!strcmp(p->comm, "ten.setupwraith") ||
-			!strcmp(p->comm, "atom:lmk_victim") ||
-			!strcmp(p->comm, "rapps.simpleapp"))
+		if (!strcmp(p->comm, "s.device.statsd") ||
+		    !strcmp(p->comm, "rapps.simpleapp"))
 			continue;
-
-		if (oom_score_adj <= 0) {
-			pr_debug("ignore top app:'%s' (%d), adj %hd, size %d, to kill\n",
-				p->comm, p->pid, oom_score_adj, tasksize);
+		if (p->parent &&
+		   (!strcmp(p->parent->comm, "s.device.statsd") ||
+		    !strcmp(p->parent->comm, "rapps.simpleapp")))
 			continue;
-		}
-
 		selected = p;
 		selected_taskswap = taskswap;
 		selected_tasksize = tasksize;
@@ -1105,13 +1076,13 @@ retry:
 		pr_info("   Free cma:%ldkB, file cma:%ldkB, Global free:%ldkB\n",
 			free_cma * (long)(PAGE_SIZE / 1024),
 			file_cma * (long)(PAGE_SIZE / 1024),
-			global_zone_page_state(NR_FREE_PAGES));
+			global_page_state(NR_FREE_PAGES));
 		rem += selected_tasksize;
 		if (!selected_oom_score_adj) /* forgeround task killed */
 			show_task_adj();
 	}
 
-	pr_debug("%s %lu, %x, return %lu\n", __func__,
+	pr_debug("cma_shrinker_scan %lu, %x, return %lu\n",
 		 sc->nr_to_scan, sc->gfp_mask, rem);
 	rcu_read_unlock();
 	return rem;
@@ -1183,20 +1154,15 @@ static ssize_t free_show(struct class *cla,
 	return sz;
 }
 
-static CLASS_ATTR_RW(adj);
-static CLASS_ATTR_RW(free);
-
-static struct attribute *cma_shrinker_attrs[] = {
-	&class_attr_adj.attr,
-	&class_attr_free.attr,
-	NULL
+static struct class_attribute cma_shrinker_attr[] = {
+	__ATTR(adj,  0664, adj_show,  adj_store),
+	__ATTR(free, 0664, free_show, free_store),
+	__ATTR_NULL
 };
 
-ATTRIBUTE_GROUPS(cma_shrinker);
-
 static struct class cma_shrinker_class = {
-		.name = "cma_shrinker",
-		.class_groups = cma_shrinker_groups,
+	.name = "cma_shrinker",
+	.class_attrs = cma_shrinker_attr,
 };
 
 static int cma_shrinker_probe(struct platform_device *pdev)

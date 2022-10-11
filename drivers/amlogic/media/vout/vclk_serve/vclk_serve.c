@@ -1,6 +1,18 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/amlogic/media/vout/vclk_serve/vclk_serve.c
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
 #include <linux/version.h>
@@ -16,7 +28,6 @@
 #include <linux/of_device.h>
 #include <linux/amlogic/iomap.h>
 #include <linux/amlogic/media/vout/vclk_serve.h>
-#include <linux/amlogic/gki_module.h>
 
 #define VCLKPR(fmt, args...)     pr_info("vclk: " fmt "", ## args)
 #define VCLKERR(fmt, args...)    pr_err("vclk: error: " fmt "", ## args)
@@ -41,7 +52,7 @@ static spinlock_t vclk_clk_lock;
 static int vclk_reg_table[] = {
 	VCLK_MAP_ANA,
 	VCLK_MAP_CLK,
-	VCLK_MAP_MAX
+	VCLK_MAP_MAX,
 };
 
 struct vclk_reg_map_s {
@@ -99,25 +110,6 @@ static int vclk_ioremap(struct platform_device *pdev)
 	}
 
 	return 0;
-}
-
-static void vclk_iounmap(struct platform_device *pdev)
-{
-	int *table;
-	int i;
-
-	if (!vclk_reg_map)
-		return;
-
-	table = vclk_reg_table;
-	for (i = 0; i < VCLK_MAP_MAX; i++) {
-		if (table[i] == VCLK_MAP_MAX)
-			break;
-		devm_iounmap(&pdev->dev, vclk_reg_map[table[i]].p);
-	}
-
-	kfree(vclk_reg_map);
-	vclk_reg_map = NULL;
 }
 
 static int check_vclk_ioremap(int n)
@@ -393,7 +385,6 @@ static int aml_vclk_probe(struct platform_device *pdev)
 
 static int aml_vclk_remove(struct platform_device *pdev)
 {
-	vclk_iounmap(pdev);
 	return 0;
 }
 
@@ -406,7 +397,7 @@ static struct platform_driver aml_vclk_driver = {
 	},
 };
 
-int __init aml_vclk_init_module(void)
+static int __init aml_vclk_init_module(void)
 {
 	int ret = 0;
 
@@ -421,11 +412,14 @@ int __init aml_vclk_init_module(void)
 	return ret;
 }
 
-__exit void aml_vclk_exit_module(void)
+static __exit void aml_vclk_exit_module(void)
 {
 	platform_driver_unregister(&aml_vclk_driver);
 }
 
-//MODULE_AUTHOR("Evoke Zhang <evoke.zhang@amlogic.com>");
-//MODULE_DESCRIPTION("VCLK Server Module");
-//MODULE_LICENSE("GPL");
+postcore_initcall(aml_vclk_init_module);
+module_exit(aml_vclk_exit_module);
+
+MODULE_AUTHOR("Evoke Zhang <evoke.zhang@amlogic.com>");
+MODULE_DESCRIPTION("VCLK Server Module");
+MODULE_LICENSE("GPL");

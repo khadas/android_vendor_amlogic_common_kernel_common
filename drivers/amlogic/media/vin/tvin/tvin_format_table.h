@@ -1,4 +1,3 @@
-/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
  * drivers/amlogic/media/vin/tvin/tvin_format_table.h
  *
@@ -22,9 +21,8 @@
 #include <linux/amlogic/media/frame_provider/tvin/tvin.h>
 
 #include "tvin_global.h"
-
-const char *tvin_sig_fmt_str(enum tvin_sig_fmt_e fmt);
-const struct tvin_format_s *tvin_get_fmt_info(enum tvin_sig_fmt_e fmt);
+extern const char *tvin_sig_fmt_str(enum tvin_sig_fmt_e fmt);
+extern const struct tvin_format_s *tvin_get_fmt_info(enum tvin_sig_fmt_e fmt);
 
 extern const struct tvin_format_s tvin_hdmi_fmt_tbl[TVIN_SIG_FMT_HDMI_MAX -
 	TVIN_SIG_FMT_HDMI_640X480P_60HZ + 1];
@@ -50,9 +48,12 @@ extern const unsigned int cvbs_acd_table_tm2_b[TVIN_SIG_FMT_CVBS_NTSC_50 -
 extern const unsigned int rf_acd_table_tm2_b[TVIN_SIG_FMT_CVBS_NTSC_50 -
 	TVIN_SIG_FMT_CVBS_NTSC_M + 1][ACD_REG_NUM + 1];
 
+
 extern const unsigned char cvd_yc_reg_0x00_0x03[TVIN_SIG_FMT_CVBS_NTSC_50 -
 	TVIN_SIG_FMT_CVBS_NTSC_M + 1][4];
 extern const unsigned char cvd_yc_reg_0x18_0x1f[TVIN_SIG_FMT_CVBS_NTSC_50 -
 	TVIN_SIG_FMT_CVBS_NTSC_M + 1][8];
 
+
 #endif
+

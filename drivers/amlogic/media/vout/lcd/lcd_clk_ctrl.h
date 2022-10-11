@@ -1,7 +1,17 @@
-/* SPDX-License-Identifier: GPL-2.0+ */
 /*
+ * drivers/amlogic/media/vout/lcd/lcd_clk_ctrl.h
  *
- * Copyright (C) 2019 Amlogic, Inc. All rights reserved.
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
  *
  */
 
@@ -22,6 +32,118 @@
 #define PLL_FREF_MIN                (5 * 1000)
 #define PLL_FREF_MAX                (25 * 1000)
 
+/* **********************************
+ * GXL
+ * **********************************
+ */
+/* ******** register bit ******** */
+/* PLL_CNTL 0x10c8 */
+#define LCD_PLL_LOCK_GXL            31
+#define LCD_PLL_EN_GXL              30
+#define LCD_PLL_RST_GXL             28
+#define LCD_PLL_N_GXL               9
+#define LCD_PLL_M_GXL               0
+
+#define LCD_PLL_OD3_GXL             19
+#define LCD_PLL_OD2_GXL             23
+#define LCD_PLL_OD1_GXL             21
+
+/* ******** frequency limit (unit: kHz) ******** */
+#define PLL_OD_FB_GXL               1
+#define PLL_FRAC_RANGE_GXL          (1 << 10)
+#define PLL_FRAC_SIGN_BIT_GXL       11
+#define PLL_OD_SEL_MAX_GXL          3
+#define PLL_VCO_MIN_GXL             (3000 * 1000)
+#define PLL_VCO_MAX_GXL             (6000 * 1000)
+
+/* video */
+#define CLK_DIV_IN_MAX_GXL          (3100 * 1000)
+#define CRT_VID_CLK_IN_MAX_GXL      (3100 * 1000)
+#define ENCL_CLK_IN_MAX_GXL         (620 * 1000)
+
+/* **********************************
+ * TXL
+ * **********************************
+ */
+/* ******** register bit ******** */
+/* PLL_CNTL 0x10c8 */
+#define LCD_PLL_LOCK_TXL            31
+#define LCD_PLL_EN_TXL              30
+#define LCD_PLL_RST_TXL             28
+#define LCD_PLL_N_TXL               9
+#define LCD_PLL_M_TXL               0
+
+#define LCD_PLL_OD3_TXL             19
+#define LCD_PLL_OD2_TXL             23
+#define LCD_PLL_OD1_TXL             21
+
+/* ******** frequency limit (unit: kHz) ******** */
+#define PLL_OD_FB_TXL               1 /* update od_fb to 1 for ss width */
+#define PLL_FRAC_RANGE_TXL          (1 << 10)
+#define PLL_FRAC_SIGN_BIT_TXL       11
+#define PLL_OD_SEL_MAX_TXL          3
+#define PLL_VCO_MIN_TXL             (2950 * 1000)
+#define PLL_VCO_MAX_TXL             (5900 * 1000)
+
+/* video */
+#define CLK_DIV_IN_MAX_TXL          (3100 * 1000)
+#define CRT_VID_CLK_IN_MAX_TXL      (3100 * 1000)
+#define ENCL_CLK_IN_MAX_TXL         (620 * 1000)
+
+/* **********************************
+ * TXLX
+ * **********************************
+ */
+/* ******** register bit ******** */
+/* PLL_CNTL 0x10c8 */
+#define LCD_PLL_LOCK_TXLX            31
+#define LCD_PLL_EN_TXLX              30
+#define LCD_PLL_RST_TXLX             28
+#define LCD_PLL_N_TXLX               9
+#define LCD_PLL_M_TXLX               0
+
+#define LCD_PLL_OD3_TXLX             19
+#define LCD_PLL_OD2_TXLX             23
+#define LCD_PLL_OD1_TXLX             21
+
+/* ******** frequency limit (unit: kHz) ******** */
+#define PLL_OD_FB_TXLX               0
+#define PLL_FRAC_RANGE_TXLX          (1 << 10)
+#define PLL_FRAC_SIGN_BIT_TXLX       11
+#define PLL_OD_SEL_MAX_TXLX          3
+#define PLL_VCO_MIN_TXLX             (3000 * 1000)
+#define PLL_VCO_MAX_TXLX             (6000 * 1000)
+
+/* video */
+#define CLK_DIV_IN_MAX_TXLX          (3100 * 1000)
+#define CRT_VID_CLK_IN_MAX_TXLX      (3100 * 1000)
+#define ENCL_CLK_IN_MAX_TXLX         (620 * 1000)
+
+/* **********************************
+ * AXG
+ * **********************************
+ */
+/* ******** register bit ******** */
+/* PLL_CNTL */
+#define LCD_PLL_LOCK_AXG            31
+#define LCD_PLL_EN_AXG              30
+#define LCD_PLL_RST_AXG             29
+#define LCD_PLL_OD_AXG              16
+#define LCD_PLL_N_AXG               9
+#define LCD_PLL_M_AXG               0
+
+/* ******** frequency limit (unit: kHz) ******** */
+#define PLL_OD_FB_AXG               0
+#define PLL_FRAC_RANGE_AXG          (1 << 10)
+#define PLL_FRAC_SIGN_BIT_AXG       11
+#define PLL_OD_SEL_MAX_AXG          3
+#define PLL_VCO_MIN_AXG             (960 * 1000)
+#define PLL_VCO_MAX_AXG             (1920 * 1000)
+
+/* video */
+#define CRT_VID_CLK_IN_MAX_AXG      (1920 * 1000)
+#define ENCL_CLK_IN_MAX_AXG         (200 * 1000)
+
 /* G12A */
 /* ******** register bit ******** */
 /* PLL_CNTL bit: GP0 */
@@ -34,7 +156,7 @@
 
 /* ******** frequency limit (unit: kHz) ******** */
 #define PLL_OD_FB_GP0_G12A          0
-#define PLL_FRAC_RANGE_GP0_G12A     BIT(17)
+#define PLL_FRAC_RANGE_GP0_G12A     (1 << 17)
 #define PLL_FRAC_SIGN_BIT_GP0_G12A  18
 #define PLL_OD_SEL_MAX_GP0_G12A     5
 #define PLL_VCO_MIN_GP0_G12A        (3000 * 1000)
@@ -53,7 +175,7 @@
 
 /* ******** frequency limit (unit: kHz) ******** */
 #define PLL_OD_FB_HPLL_G12A         0
-#define PLL_FRAC_RANGE_HPLL_G12A    BIT(17)
+#define PLL_FRAC_RANGE_HPLL_G12A    (1 << 17)
 #define PLL_FRAC_SIGN_BIT_HPLL_G12A 18
 #define PLL_OD_SEL_MAX_HPLL_G12A    3
 #define PLL_VCO_MIN_HPLL_G12A       (3000 * 1000)
@@ -81,7 +203,7 @@
 
 /* ******** frequency limit (unit: kHz) ******** */
 #define PLL_OD_FB_TL1               0
-#define PLL_FRAC_RANGE_TL1          BIT(17)
+#define PLL_FRAC_RANGE_TL1          (1 << 17)
 #define PLL_FRAC_SIGN_BIT_TL1       18
 #define PLL_OD_SEL_MAX_TL1          3
 #define PLL_VCO_MIN_TL1             (3384 * 1000)
@@ -100,7 +222,7 @@
 #define PLL_VCO_MAX_TM2             (6000 * 1000)
 
 /* **********************************
- * T5D
+ * TM2
  * **********************************
  */
 /* video */
@@ -108,20 +230,28 @@
 #define CRT_VID_CLK_IN_MAX_T5D      (3100 * 1000)
 #define ENCL_CLK_IN_MAX_T5D         (400 * 1000)
 
-/* **********************************
- * T7
- * **********************************
- */
-#define LCD_PLL_OD3_T7               23
-#define LCD_PLL_OD2_T7               21
-#define LCD_PLL_OD1_T7               19
-#define LCD_PLL_LOCK_T7              31
 
 /* **********************************
  * Spread Spectrum
  * **********************************
  */
-#define LCD_SS_STEP_BASE            500 /* ppm */
+
+static char *lcd_ss_level_table_txl[] = {
+	"0, disable",
+	"1, +/-0.3%",
+	"2, +/-0.4%",
+	"3, +/-0.9%",
+	"4, +/-1.2%",
+};
+
+static char *lcd_ss_level_table_txlx[] = {
+	"0, disable",
+	"1, +/-0.3%",
+	"2, +/-0.5%",
+	"3, +/-1.0%",
+	"4, +/-1.6%",
+	"5, +/-3.0%",
+};
 
 static char *lcd_ss_level_table_tl1[] = {
 	"0, disable",
@@ -173,8 +303,43 @@ static char *lcd_ss_mode_table_tl1[] = {
 	"2, down ss",
 };
 
+
+static unsigned int pll_ss_reg_txl[][2] = {
+	/* cntl3                    cntl4 */
+	{                        0,          0}, /* disable */
+	{((1 << 14) | (0xc << 10)),          0}, /* 1: +/-0.3% */
+	{((1 << 14) | (0x8 << 10)), (0x1 << 2)}, /* 2: +/-0.4% */
+	{((1 << 14) | (0xc << 10)), (0x2 << 2)}, /* 3: +/-0.9% */
+	{((1 << 14) | (0xc << 10)), (0x3 << 2)}, /* 4: +/-1.2% */
+};
+
+static unsigned int pll_ss_reg_txlx[][3] = {
+	/* cntl3                    cntl4       cntl5 */
+	{                        0,          0,           0}, /* disable */
+	{((1 << 14) | (0x6 << 10)), (0x1 << 2),           0}, /* 1: +/-0.3% */
+	{((1 << 14) | (0xa << 10)), (0x1 << 2),           0}, /* 2: +/-0.5% */
+	{((1 << 14) | (0xa << 10)), (0x3 << 2),           0}, /* 3: +/-1.0% */
+	{((1 << 14) | (0x8 << 10)), (0x3 << 2), (0x1 << 30)}, /* 4: +/-1.6% */
+	{((1 << 14) | (0xa << 10)), (0x3 << 2), (0x2 << 30)}, /* 5: +/-3.0% */
+};
+
 static unsigned int pll_ss_reg_tl1[][2] = {
 	/* dep_sel,  str_m  */
+#if 0
+	{ 0,          0}, /* 0: disable */
+	{10,          1}, /* 1: +/-0.25% */
+	{10,          2}, /* 2: +/-0.50% */
+	{10,          3}, /* 3: +/-0.75% */
+	{10,          4}, /* 4: +/-1.00% */
+	{10,          5}, /* 5: +/-1.25% */
+	{10,          6}, /* 6: +/-1.50% */
+	{10,          7}, /* 7: +/-1.75% */
+	{10,          8}, /* 8: +/-2.00% */
+	{10,          9}, /* 9: +/-2.25% */
+	{10,         10}, /* 10: +/-2.50% */
+	{11,         10}, /* 11: +/-2.75% */
+	{12,         10}, /* 12: +/-3.00% */
+#else
 	{ 0,          0}, /* 0: disable */
 	{ 4,          1}, /* 1: +/-0.1% */
 	{ 4,          2}, /* 2: +/-0.2% */
@@ -206,28 +371,47 @@ static unsigned int pll_ss_reg_tl1[][2] = {
 	{ 11,        10}, /* 28: +/-2.75% */
 	{ 11,        10}, /* 29: +/-2.75% */
 	{ 12,        10}, /* 30: +/-3.0% */
+#endif
 };
 
 /* **********************************
  * pll control
  * **********************************
  */
+struct lcd_clk_ctrl_s pll_ctrl_table_txl[] = {
+	/* flag             reg                 bit              len*/
+	{LCD_CLK_CTRL_EN,   HHI_HDMI_PLL_CNTL,  LCD_PLL_EN_TXL,   1},
+	{LCD_CLK_CTRL_RST,  HHI_HDMI_PLL_CNTL,  LCD_PLL_RST_TXL,  1},
+	{LCD_CLK_CTRL_M,    HHI_HDMI_PLL_CNTL,  LCD_PLL_M_TXL,    9},
+	{LCD_CLK_CTRL_FRAC, HHI_HDMI_PLL_CNTL2,               0, 12},
+	{LCD_CLK_CTRL_END,  LCD_CLK_REG_END,                  0,  0},
+};
+
+struct lcd_clk_ctrl_s pll_ctrl_table_axg[] = {
+	/* flag             reg                   bit              len*/
+	{LCD_CLK_CTRL_EN,   HHI_GP0_PLL_CNTL_AXG, LCD_PLL_EN_AXG,   1},
+	{LCD_CLK_CTRL_RST,  HHI_GP0_PLL_CNTL_AXG, LCD_PLL_RST_AXG,  1},
+	{LCD_CLK_CTRL_M,    HHI_GP0_PLL_CNTL_AXG, LCD_PLL_M_AXG,    9},
+	{LCD_CLK_CTRL_FRAC, HHI_GP0_PLL_CNTL1_AXG,              0, 12},
+	{LCD_CLK_CTRL_END,  LCD_CLK_REG_END,                    0,  0},
+};
+
 struct lcd_clk_ctrl_s pll_ctrl_table_g12a_path0[] = {
-	/* flag             reg                  bit                    len*/
-	{LCD_CLK_CTRL_EN,   HHI_HDMI_PLL_CNTL0,  LCD_PLL_EN_HPLL_G12A,   1},
-	{LCD_CLK_CTRL_RST,  HHI_HDMI_PLL_CNTL0,  LCD_PLL_RST_HPLL_G12A,  1},
-	{LCD_CLK_CTRL_M,    HHI_HDMI_PLL_CNTL0,  LCD_PLL_M_HPLL_G12A,    8},
-	{LCD_CLK_CTRL_FRAC, HHI_HDMI_PLL_CNTL1,                      0, 19},
-	{LCD_CLK_CTRL_END,  LCD_CLK_REG_END,                         0,  0},
+	/* flag             reg                 bit                    len*/
+	{LCD_CLK_CTRL_EN,   HHI_HDMI_PLL_CNTL,  LCD_PLL_EN_HPLL_G12A,   1},
+	{LCD_CLK_CTRL_RST,  HHI_HDMI_PLL_CNTL,  LCD_PLL_RST_HPLL_G12A,  1},
+	{LCD_CLK_CTRL_M,    HHI_HDMI_PLL_CNTL,  LCD_PLL_M_HPLL_G12A,    8},
+	{LCD_CLK_CTRL_FRAC, HHI_HDMI_PLL_CNTL2,                     0, 19},
+	{LCD_CLK_CTRL_END,  LCD_CLK_REG_END,                        0,  0},
 };
 
 struct lcd_clk_ctrl_s pll_ctrl_table_g12a_path1[] = {
-	/* flag             reg                bit                   len*/
-	{LCD_CLK_CTRL_EN,   HHI_GP0_PLL_CNTL0, LCD_PLL_EN_GP0_G12A,   1},
-	{LCD_CLK_CTRL_RST,  HHI_GP0_PLL_CNTL0, LCD_PLL_RST_GP0_G12A,  1},
-	{LCD_CLK_CTRL_M,    HHI_GP0_PLL_CNTL0, LCD_PLL_M_GP0_G12A,    8},
-	{LCD_CLK_CTRL_FRAC, HHI_GP0_PLL_CNTL1,                    0, 19},
-	{LCD_CLK_CTRL_END,  LCD_CLK_REG_END,                      0,  0},
+	/* flag             reg                     bit                   len*/
+	{LCD_CLK_CTRL_EN,   HHI_GP0_PLL_CNTL0_G12A, LCD_PLL_EN_GP0_G12A,   1},
+	{LCD_CLK_CTRL_RST,  HHI_GP0_PLL_CNTL0_G12A, LCD_PLL_RST_GP0_G12A,  1},
+	{LCD_CLK_CTRL_M,    HHI_GP0_PLL_CNTL0_G12A, LCD_PLL_M_GP0_G12A,    8},
+	{LCD_CLK_CTRL_FRAC, HHI_GP0_PLL_CNTL1_G12A,                    0, 19},
+	{LCD_CLK_CTRL_END,  LCD_CLK_REG_END,                           0,  0},
 };
 
 struct lcd_clk_ctrl_s pll_ctrl_table_tl1[] = {
@@ -235,17 +419,8 @@ struct lcd_clk_ctrl_s pll_ctrl_table_tl1[] = {
 	{LCD_CLK_CTRL_EN,   HHI_TCON_PLL_CNTL0, LCD_PLL_EN_TL1,   1},
 	{LCD_CLK_CTRL_RST,  HHI_TCON_PLL_CNTL0, LCD_PLL_RST_TL1,  1},
 	{LCD_CLK_CTRL_M,    HHI_TCON_PLL_CNTL0, LCD_PLL_M_TL1,    8},
-	{LCD_CLK_CTRL_FRAC, HHI_TCON_PLL_CNTL1,               0, 17},
+	{LCD_CLK_CTRL_FRAC, HHI_TCON_PLL_CNTL1,               0, 19},
 	{LCD_CLK_CTRL_END,  LCD_CLK_REG_END,                  0,  0},
-};
-
-struct lcd_clk_ctrl_s pll_ctrl_table_t7[] = {
-	/* flag             reg                      bit              len*/
-	{LCD_CLK_CTRL_EN,   ANACTRL_TCON_PLL0_CNTL0, LCD_PLL_EN_TL1,   1},
-	{LCD_CLK_CTRL_RST,  ANACTRL_TCON_PLL0_CNTL0, LCD_PLL_RST_TL1,  1},
-	{LCD_CLK_CTRL_M,    ANACTRL_TCON_PLL0_CNTL0, LCD_PLL_M_TL1,    8},
-	{LCD_CLK_CTRL_FRAC, ANACTRL_TCON_PLL0_CNTL1,               0, 17},
-	{LCD_CLK_CTRL_END,  LCD_CLK_REG_END,                       0,  0},
 };
 
 /* **********************************
@@ -263,29 +438,13 @@ struct lcd_clk_ctrl_s pll_ctrl_table_t7[] = {
 /* divider */
 #define CRT_VID_DIV_MAX             255
 
-#define DIV_PRE_SEL_MAX             6
-#define EDP_DIV0_SEL_MAX            15
-#define EDP_DIV1_SEL_MAX            8
-
 static const unsigned int od_fb_table[2] = {1, 2};
-static const unsigned int od_table[6] = {1, 2, 4, 8, 16, 32};
+
+static const unsigned int od_table[6] = {
+	1, 2, 4, 8, 16, 32
+};
+
 static const unsigned int tcon_div_table[5] = {1, 2, 4, 8, 16};
-static unsigned int tcon_div[5][3] = {
-	/* div_mux, div2/4_sel, div4_bypass */
-	{1, 0, 1},  /* div1 */
-	{0, 0, 1},  /* div2 */
-	{0, 1, 1},  /* div4 */
-	{0, 0, 0},  /* div8 */
-	{0, 1, 0},  /* div16 */
-};
-
-static unsigned int edp_div0_table[15] = {
-	1, 2, 3, 4, 5, 7, 8, 9, 11, 13, 17, 19, 23, 29, 31
-};
-
-static unsigned int edp_div1_table[10] = {
-	1, 2, 3, 4, 5, 6, 7, 8, 9, 13
-};
 
 static char *lcd_clk_div_sel_table[] = {
 	"1",

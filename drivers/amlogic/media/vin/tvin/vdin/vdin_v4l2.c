@@ -1,4 +1,3 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
  * drivers/amlogic/media/vin/tvin/vdin/vdin_v4l2.c
  *
@@ -60,11 +59,14 @@ EXPORT_SYMBOL(v4l2_vdin_ops_init);
 
 struct vdin_v4l2_ops_s *get_vdin_v4l2_ops()
 {
-	if (ops.start_tvin_service &&
-	    ops.stop_tvin_service)
+	if ((ops.start_tvin_service != NULL) && (ops.stop_tvin_service != NULL))
 		return &ops;
-	else
+	else {
+		/* pr_err("[vdin..]%s: vdin v4l2 operation
+		 * haven't registered.",__func__);
+		 */
 		return NULL;
+	}
 }
 EXPORT_SYMBOL(get_vdin_v4l2_ops);
 

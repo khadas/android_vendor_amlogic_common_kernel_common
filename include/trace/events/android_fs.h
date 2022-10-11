@@ -4,7 +4,6 @@
 #if !defined(_TRACE_ANDROID_FS_H) || defined(TRACE_HEADER_MULTI_READ)
 #define _TRACE_ANDROID_FS_H
 
-#include <linux/fs.h>
 #include <linux/tracepoint.h>
 #include <trace/events/android_fs_template.h>
 
@@ -64,10 +63,9 @@ android_fstrace_get_pathname(char *buf, int buflen, struct inode *inode)
 	return path;
 }
 #endif
-
 #ifdef CONFIG_AMLOGIC_VMAP
-void trace_android_fs_datawrite_wrap(struct inode *inode,
-				     loff_t pos, unsigned int len);
-void trace_android_fs_dataread_wrap(struct inode *inode,
-				    loff_t pos, unsigned int len);
+extern void trace_android_fs_datawrite_wrap(struct inode *inode,
+					loff_t pos, unsigned int len);
+extern void trace_android_fs_dataread_wrap(struct inode *inode,
+					loff_t pos, unsigned int len);
 #endif

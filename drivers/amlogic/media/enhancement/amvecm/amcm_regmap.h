@@ -1,4 +1,3 @@
-/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
  * drivers/amlogic/media/enhancement/amvecm/amcm_regmap.h
  *
@@ -201,7 +200,6 @@ static struct am_regs_s cmreg_lever1 = {
 	{0}
 	}
 };
-
 static struct am_regs_s cmreg_lever2 = {
 	172,
 	{
@@ -381,7 +379,6 @@ static struct am_regs_s cmreg_lever2 = {
 	{0}
 	}
 };
-
 static struct am_regs_s cmreg_lever3 = {
 	172,
 	{
@@ -741,7 +738,6 @@ static struct am_regs_s cmreg_optimize = {
 	{0}
 	}
 };
-
 static struct am_regs_s cmreg_enhancement = {
 	172,
 	{

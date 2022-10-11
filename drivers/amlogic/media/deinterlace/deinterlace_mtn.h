@@ -1,4 +1,3 @@
-/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
  * drivers/amlogic/media/deinterlace/deinterlace_mtn.h
  *
@@ -15,7 +14,6 @@
  * more details.
  *
  */
-
 #ifndef _DI_MTN_H
 #define _DI_MTN_H
 #include <linux/amlogic/media/vfm/vframe.h>

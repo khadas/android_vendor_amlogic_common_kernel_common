@@ -1,8 +1,19 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * sound/soc/amlogic/common/spdif_info.c
+ *
+ * Copyright (C) 2018 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
-
 #define DEBUG
 #undef pr_fmt
 #define pr_fmt(fmt) "iec_info: " fmt
@@ -10,8 +21,8 @@
 #include <sound/asoundef.h>
 
 #include <linux/amlogic/media/sound/aout_notify.h>
-#include "iec_info.h"
-#include <linux/amlogic/media/vout/hdmi_tx_ext.h>
+#include <linux/amlogic/media/sound/iec_info.h>
+#include <linux/amlogic/media/vout/hdmi_tx/hdmi_tx_ext.h>
 
 const struct soc_enum audio_coding_type_enum =
 	SOC_ENUM_SINGLE(SND_SOC_NOPM, 0, ARRAY_SIZE(audio_coding_type_names),
@@ -254,67 +265,8 @@ bool raw_is_4x_clk(enum aud_codec_types codec_type)
 	return is_4x;
 }
 
-bool raw_is_hbr_audio(enum aud_codec_types codec_type)
-{
-	if (codec_type == AUD_CODEC_TYPE_TRUEHD ||
-	    codec_type == AUD_CODEC_TYPE_DTS_HD_MA)
-		return true;
-
-	return false;
-}
-
-/**
- * TDM, SPDIF and EARC keep same mpll clk frequency(491.52M)
- * to prevent long time drift. This is to calc multiplier
- * to the desired clk frequency according to codec type.
- * As driver has done multiplier to sysclk by raw_is_4x_clk() before.
- * NOTE: HBR alsa config samplerate is 192000 while DD and DDP config 48000.
- */
-unsigned int mpll2sys_clk_ratio_by_type(enum aud_codec_types codec_type)
-{
-	/* pcm format mpll clk ratio: 491520000/6144000/EARC_DMAC_MUTIPLIER */
-	unsigned int ratio = 16;
-
-	if (raw_is_4x_clk(codec_type)) {
-		if (raw_is_hbr_audio(codec_type))
-			ratio = 1;
-		else
-			ratio = 4;
-	}
-
-	return ratio * EARC_DMAC_MUTIPLIER;
-}
-
-unsigned int mpll2dmac_clk_ratio_by_type(enum audio_coding_types coding_type)
-{
-	/* pcm format mpll clk ratio: 491520000/(6144000*EARC_DMAC_MUTIPLIER)*/
-	unsigned int ratio;
-
-	switch (coding_type) {
-	case AUDIO_CODING_TYPE_MULTICH_16CH_LPCM:
-		ratio = 2;
-		break;
-	case AUDIO_CODING_TYPE_MULTICH_8CH_LPCM:
-		ratio = 4;
-		break;
-	case AUDIO_CODING_TYPE_EAC3:
-	case AUDIO_CODING_TYPE_DTS_HD:
-	case AUDIO_CODING_TYPE_AC3_LAYOUT_B:
-		ratio = 4;
-		break;
-	case AUDIO_CODING_TYPE_DTS_HD_MA:
-	case AUDIO_CODING_TYPE_MLP:
-	case AUDIO_CODING_TYPE_MULTICH_32CH_LPCM:
-		ratio = 1;
-		break;
-	default:
-		ratio = 16;
-	}
-
-	return ratio;
-}
-
-void iec_get_channel_status_info(struct iec958_chsts *chsts,
+void iec_get_channel_status_info(
+	struct iec958_chsts *chsts,
 	enum aud_codec_types codec_type,
 	unsigned int rate)
 {
@@ -392,37 +344,34 @@ void iec_get_channel_status_info(struct iec958_chsts *chsts,
 void spdif_notify_to_hdmitx(struct snd_pcm_substream *substream,
 			    enum aud_codec_types codec_type)
 {
-	struct aud_para aud_param;
-
-	memset(&aud_param, 0, sizeof(aud_param));
-
-	aud_param.rate = substream->runtime->rate;
-	aud_param.size = substream->runtime->sample_bits;
-	aud_param.chs  = substream->runtime->channels;
-
 	if (codec_type == AUD_CODEC_TYPE_AC3) {
-		aout_notifier_call_chain(AOUT_EVENT_RAWDATA_AC_3,
-					 &aud_param);
+		aout_notifier_call_chain(
+			AOUT_EVENT_RAWDATA_AC_3,
+			substream);
 	} else if (codec_type == AUD_CODEC_TYPE_DTS) {
-		aout_notifier_call_chain(AOUT_EVENT_RAWDATA_DTS,
-					 &aud_param);
+		aout_notifier_call_chain(
+			AOUT_EVENT_RAWDATA_DTS,
+			substream);
 	} else if (codec_type == AUD_CODEC_TYPE_EAC3) {
-		aout_notifier_call_chain(AOUT_EVENT_RAWDATA_DOBLY_DIGITAL_PLUS,
-					 &aud_param);
+		aout_notifier_call_chain(
+			AOUT_EVENT_RAWDATA_DOBLY_DIGITAL_PLUS,
+			substream);
 	} else if (codec_type == AUD_CODEC_TYPE_DTS_HD) {
-		aud_param.fifo_rst = 1;
-		aout_notifier_call_chain(AOUT_EVENT_RAWDATA_DTS_HD,
-					 &aud_param);
+		aout_notifier_call_chain(
+			AOUT_EVENT_RAWDATA_DTS_HD,
+			substream);
 	} else if (codec_type == AUD_CODEC_TYPE_TRUEHD) {
-		aud_param.fifo_rst = 1;
-		aout_notifier_call_chain(AOUT_EVENT_RAWDATA_MAT_MLP,
-					 &aud_param);
+		aout_notifier_call_chain(
+			AOUT_EVENT_RAWDATA_MAT_MLP,
+			substream);
 	} else if (codec_type == AUD_CODEC_TYPE_DTS_HD_MA) {
-		aout_notifier_call_chain(AOUT_EVENT_RAWDATA_DTS_HD_MA,
-					 &aud_param);
+		aout_notifier_call_chain(
+			AOUT_EVENT_RAWDATA_DTS_HD_MA,
+			substream);
 	} else {
-		aout_notifier_call_chain(AOUT_EVENT_IEC_60958_PCM,
-					 &aud_param);
+		aout_notifier_call_chain(
+			AOUT_EVENT_IEC_60958_PCM,
+			substream);
 	}
 }
 

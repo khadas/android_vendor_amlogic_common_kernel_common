@@ -1,5 +1,5 @@
 #
-# Amlogic ionvideo device configuration
+# Amlogic ionvideo device configuation
 #
 
 menu "Amlogic ion video support"
@@ -13,7 +13,7 @@ config AMLOGIC_VIDEOBUF2_ION
 	depends on DMA_SHARED_BUFFER
 	default n
 
-	help
+	---help---
 		capture ion video to user
 		select to enable capture ion video to user
 		enabled by default
@@ -25,10 +25,7 @@ config AMLOGIC_IONVIDEO
 	depends on AMLOGIC_VIDEOBUF2_ION
 	default n
 
-	help
-		capture ion video to user
-		select to enable capture ion video to user
-		enabled by default
-		good luck
+	---help---
+	capture ion video to user
 
 endmenu

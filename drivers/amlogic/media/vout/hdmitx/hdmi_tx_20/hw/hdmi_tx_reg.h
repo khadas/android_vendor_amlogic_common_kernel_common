@@ -1,10 +1,38 @@
-/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/amlogic/media/vout/hdmitx/hdmi_tx_20/hw/hdmi_tx_reg.h
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
 #ifndef _HDMI_TX_REG_H
 #define _HDMI_TX_REG_H
+
+/* Use the following functions to access the on-chip HDMITX modules
+ * by default
+ */
+void hdmitx_wr_reg(unsigned int addr, unsigned int data);
+void hdmitx_poll_reg(unsigned int addr, unsigned int val,
+	unsigned long timeout);
+void hdmitx_set_reg_bits(unsigned int addr, unsigned int value,
+	unsigned int offset, unsigned int len);
+unsigned int hdmitx_rd_reg(unsigned int addr);
+unsigned int hdmitx_rd_check_reg(unsigned int addr, unsigned int exp_data,
+	unsigned int mask);
+bool hdmitx_get_bit(unsigned int addr, unsigned int bit_nr);
+unsigned long aocec_rd_reg(unsigned long addr);
+void aocec_wr_reg(unsigned long addr, unsigned long data);
+int hdmitx_hdcp_opr(unsigned int val);
 
 /* TOP-level wrapper registers addresses
  * bit24: 1 means secure access
@@ -162,7 +190,7 @@
 #define HDMITX_TOP_I2C_BUSY_CNT_STAT            (TOP_OFFSET_MASK + 0x029)
 #define HDMITX_TOP_HDCP22_BSOD                  (TOP_SEC_OFFSET_MASK + 0x02A)
 #define HDMITX_TOP_DDC_CNTL                     (TOP_OFFSET_MASK + 0x02B)
-#define HDMITX_TOP_DISABLE_NULL                 (TOP_OFFSET_MASK + 0x030)
+#define HDMITX_TOP_DISABLE_NULL                     (TOP_OFFSET_MASK + 0x030)
 #define HDMITX_TOP_HDCP14_UNENCRYPT             (TOP_OFFSET_MASK + 0x031)
 #define HDMITX_TOP_MISC_CNTL                    (TOP_OFFSET_MASK + 0x032)
 #define HDMITX_TOP_HDCP22_MIN_SIZE		(TOP_OFFSET_MASK + 0x035)
@@ -963,6 +991,7 @@
 #define HDMITX_DWC_HDCP22REG_MASK               (DWC_OFFSET_MASK + 0x790C)
 #define HDMITX_DWC_HDCP22REG_STAT               (DWC_OFFSET_MASK + 0x790D)
 #define HDMITX_DWC_HDCP22REG_MUTE               (DWC_OFFSET_MASK + 0x790E)
+
 
 /* ********** CEC related ********** */
 

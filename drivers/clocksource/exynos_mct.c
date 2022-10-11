@@ -1,18 +1,23 @@
-// SPDX-License-Identifier: GPL-2.0-only
 /* linux/arch/arm/mach-exynos4/mct.c
  *
  * Copyright (c) 2011 Samsung Electronics Co., Ltd.
  *		http://www.samsung.com
  *
  * EXYNOS4 MCT(Multi-Core Timer) support
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
 */
 
+#include <linux/sched.h>
 #include <linux/interrupt.h>
 #include <linux/irq.h>
 #include <linux/err.h>
 #include <linux/clk.h>
 #include <linux/clockchips.h>
 #include <linux/cpu.h>
+#include <linux/platform_device.h>
 #include <linux/delay.h>
 #include <linux/percpu.h>
 #include <linux/of.h>
@@ -178,7 +183,7 @@ static u64 exynos4_read_count_64(void)
 		hi2 = readl_relaxed(reg_base + EXYNOS4_MCT_G_CNT_U);
 	} while (hi != hi2);
 
-	return ((u64)hi << 32) | lo;
+	return ((cycle_t)hi << 32) | lo;
 }
 
 /**
@@ -194,7 +199,7 @@ static u32 notrace exynos4_read_count_32(void)
 	return readl_relaxed(reg_base + EXYNOS4_MCT_G_CNT_L);
 }
 
-static u64 exynos4_frc_read(struct clocksource *cs)
+static cycle_t exynos4_frc_read(struct clocksource *cs)
 {
 	return exynos4_read_count_32();
 }
@@ -261,7 +266,7 @@ static void exynos4_mct_comp0_stop(void)
 static void exynos4_mct_comp0_start(bool periodic, unsigned long cycles)
 {
 	unsigned int tcon;
-	u64 comp_cycle;
+	cycle_t comp_cycle;
 
 	tcon = readl_relaxed(reg_base + EXYNOS4_MCT_G_TCON);
 
@@ -503,12 +508,13 @@ static int __init exynos4_timer_resources(struct device_node *np, void __iomem *
 	int err, cpu;
 	struct clk *mct_clk, *tick_clk;
 
-	tick_clk = of_clk_get_by_name(np, "fin_pll");
+	tick_clk = np ? of_clk_get_by_name(np, "fin_pll") :
+				clk_get(NULL, "fin_pll");
 	if (IS_ERR(tick_clk))
 		panic("%s: unable to determine tick clock rate\n", __func__);
 	clk_rate = clk_get_rate(tick_clk);
 
-	mct_clk = of_clk_get_by_name(np, "mct");
+	mct_clk = np ? of_clk_get_by_name(np, "mct") : clk_get(NULL, "mct");
 	if (IS_ERR(mct_clk))
 		panic("%s: unable to retrieve mct clock instance\n", __func__);
 	clk_prepare_enable(mct_clk);
@@ -548,7 +554,7 @@ static int __init exynos4_timer_resources(struct device_node *np, void __iomem *
 
 	/* Install hotplug callbacks which configure the timer on this CPU */
 	err = cpuhp_setup_state(CPUHP_AP_EXYNOS4_MCT_TIMER_STARTING,
-				"clockevents/exynos4/mct_timer:starting",
+				"AP_EXYNOS4_MCT_TIMER_STARTING",
 				exynos4_mct_starting_cpu,
 				exynos4_mct_dying_cpu);
 	if (err)
@@ -588,7 +594,11 @@ static int __init mct_init_dt(struct device_node *np, unsigned int int_type)
 	 * timer irqs are specified after the four global timer
 	 * irqs are specified.
 	 */
+#ifdef CONFIG_OF
 	nr_irqs = of_irq_count(np);
+#else
+	nr_irqs = 0;
+#endif
 	for (i = MCT_L0_IRQ; i < nr_irqs; i++)
 		mct_irqs[i] = irq_of_parse_and_map(np, i);
 
@@ -613,5 +623,5 @@ static int __init mct_init_ppi(struct device_node *np)
 {
 	return mct_init_dt(np, MCT_INT_PPI);
 }
-TIMER_OF_DECLARE(exynos4210, "samsung,exynos4210-mct", mct_init_spi);
-TIMER_OF_DECLARE(exynos4412, "samsung,exynos4412-mct", mct_init_ppi);
+CLOCKSOURCE_OF_DECLARE(exynos4210, "samsung,exynos4210-mct", mct_init_spi);
+CLOCKSOURCE_OF_DECLARE(exynos4412, "samsung,exynos4412-mct", mct_init_ppi);

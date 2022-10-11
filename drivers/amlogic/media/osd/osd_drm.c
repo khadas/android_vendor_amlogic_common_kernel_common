@@ -1,6 +1,18 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/amlogic/media/osd/osd_hw.c
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
 /* Linux Headers */
@@ -22,6 +34,7 @@
 #include <linux/ctype.h>
 
 /* Android Headers */
+#include <linux/amlogic/cpu_version.h>
 #include "osd_drm.h"
 #include "osd_hw.h"
 #include "osd_io.h"
@@ -53,8 +66,8 @@ static int parse_para(const char *para, int para_num, int *result)
 			token = strsep(&params, " ");
 			if (!token)
 				break;
-			while (token && (isspace(*token) ||
-					 !isgraph(*token)) && len) {
+			while (token && (isspace(*token)
+					|| !isgraph(*token)) && len) {
 				token++;
 				len--;
 			}
@@ -74,7 +87,7 @@ static int parse_para(const char *para, int para_num, int *result)
 }
 
 static ssize_t loglevel_read_file(struct file *file, char __user *userbuf,
-				  size_t count, loff_t *ppos)
+				 size_t count, loff_t *ppos)
 {
 	char buf[128];
 	ssize_t len;
@@ -83,15 +96,15 @@ static ssize_t loglevel_read_file(struct file *file, char __user *userbuf,
 	return simple_read_from_buffer(userbuf, count, ppos, buf, len);
 }
 
-static ssize_t loglevel_write_file(struct file *file,
-				   const char __user *userbuf,
-				   size_t count, loff_t *ppos)
+static ssize_t loglevel_write_file(
+	struct file *file, const char __user *userbuf,
+	size_t count, loff_t *ppos)
 {
 	unsigned int log_level;
 	char buf[128];
 	int ret = 0;
 
-	count = min_t(size_t, count, (sizeof(buf) - 1));
+	count = min_t(size_t, count, (sizeof(buf)-1));
 	if (copy_from_user(buf, userbuf, count))
 		return -EFAULT;
 	buf[count] = 0;
@@ -102,7 +115,7 @@ static ssize_t loglevel_write_file(struct file *file,
 }
 
 static ssize_t logmodule_read_file(struct file *file, char __user *userbuf,
-				   size_t count, loff_t *ppos)
+				 size_t count, loff_t *ppos)
 {
 	char buf[128];
 	ssize_t len;
@@ -111,9 +124,9 @@ static ssize_t logmodule_read_file(struct file *file, char __user *userbuf,
 	return simple_read_from_buffer(userbuf, count, ppos, buf, len);
 }
 
-static ssize_t logmodule_write_file(struct file *file,
-				    const char __user *userbuf,
-				    size_t count, loff_t *ppos)
+static ssize_t logmodule_write_file(
+	struct file *file, const char __user *userbuf,
+	size_t count, loff_t *ppos)
 {
 	unsigned int log_module;
 	char *buf = NULL;
@@ -138,9 +151,9 @@ static ssize_t logmodule_write_file(struct file *file,
 }
 
 static ssize_t debug_read_file(struct file *file, char __user *userbuf,
-			       size_t count, loff_t *ppos)
+				 size_t count, loff_t *ppos)
 {
-	char buf[384];
+	char buf[1024];
 	char *help;
 	ssize_t len;
 
@@ -150,21 +163,21 @@ static ssize_t debug_read_file(struct file *file, char __user *userbuf,
 }
 
 static ssize_t debug_write_file(struct file *file, const char __user *userbuf,
-				size_t count, loff_t *ppos)
+				   size_t count, loff_t *ppos)
 {
 	char buf[128];
 
-	count = min_t(size_t, count, (sizeof(buf) - 1));
+	count = min_t(size_t, count, (sizeof(buf)-1));
 	if (copy_from_user(buf, userbuf, count))
 		return -EFAULT;
 	buf[count] = 0;
-	osd_set_debug_hw(VIU1, buf);
+	osd_set_debug_hw(buf);
 	return count;
 }
 
 static ssize_t osd_display_debug_read_file(struct file *file,
-					   char __user *userbuf,
-					   size_t count, loff_t *ppos)
+				char __user *userbuf,
+				size_t count, loff_t *ppos)
 {
 	struct seq_file *s = file->private_data;
 	int osd_id = *(int *)s;
@@ -178,8 +191,8 @@ static ssize_t osd_display_debug_read_file(struct file *file,
 }
 
 static ssize_t osd_display_debug_write_file(struct file *file,
-					    const char __user *userbuf,
-					    size_t count, loff_t *ppos)
+				const char __user *userbuf,
+				size_t count, loff_t *ppos)
 {
 	struct seq_file *s = file->private_data;
 	int osd_id = *(int *)s;
@@ -201,7 +214,7 @@ static ssize_t osd_display_debug_write_file(struct file *file,
 }
 
 static ssize_t reset_status_read_file(struct file *file, char __user *userbuf,
-				      size_t count, loff_t *ppos)
+				 size_t count, loff_t *ppos)
 {
 	char buf[128];
 	ssize_t len;
@@ -213,7 +226,7 @@ static ssize_t reset_status_read_file(struct file *file, char __user *userbuf,
 }
 
 static ssize_t blank_read_file(struct file *file, char __user *userbuf,
-			       size_t count, loff_t *ppos)
+				 size_t count, loff_t *ppos)
 {
 	char buf[128];
 	ssize_t len;
@@ -225,7 +238,7 @@ static ssize_t blank_read_file(struct file *file, char __user *userbuf,
 }
 
 static ssize_t blank_write_file(struct file *file, const char __user *userbuf,
-				size_t count, loff_t *ppos)
+				   size_t count, loff_t *ppos)
 {
 	char *buf = NULL;
 	struct seq_file *s = file->private_data;
@@ -246,7 +259,7 @@ static ssize_t blank_write_file(struct file *file, const char __user *userbuf,
 }
 
 static ssize_t free_scale_read_file(struct file *file, char __user *userbuf,
-				    size_t count, loff_t *ppos)
+				 size_t count, loff_t *ppos)
 {
 	char buf[128];
 	ssize_t len;
@@ -256,13 +269,13 @@ static ssize_t free_scale_read_file(struct file *file, char __user *userbuf,
 
 	osd_get_free_scale_enable_hw(osd_id, &free_scale_enable);
 	len = snprintf(buf, 128, "free_scale_enable:[0x%x]\n",
-		       free_scale_enable);
+			free_scale_enable);
 	return simple_read_from_buffer(userbuf, count, ppos, buf, len);
 }
 
 static ssize_t free_scale_write_file(struct file *file,
-				     const char __user *userbuf,
-				     size_t count, loff_t *ppos)
+				const char __user *userbuf,
+				size_t count, loff_t *ppos)
 {
 	char *buf = NULL;
 	struct seq_file *s = file->private_data;
@@ -284,8 +297,8 @@ static ssize_t free_scale_write_file(struct file *file,
 }
 
 static ssize_t free_scale_axis_read_file(struct file *file,
-					 char __user *userbuf,
-					 size_t count, loff_t *ppos)
+				char __user *userbuf,
+				size_t count, loff_t *ppos)
 {
 	char buf[128];
 	ssize_t len;
@@ -299,8 +312,8 @@ static ssize_t free_scale_axis_read_file(struct file *file,
 }
 
 static ssize_t free_scale_axis_write_file(struct file *file,
-					  const char __user *userbuf,
-					  size_t count, loff_t *ppos)
+				const char __user *userbuf,
+				size_t count, loff_t *ppos)
 {
 	char *buf = NULL;
 	struct seq_file *s = file->private_data;
@@ -317,8 +330,7 @@ static ssize_t free_scale_axis_write_file(struct file *file,
 	buf[count] = 0;
 	if (likely(parse_para(buf, 4, parsed) == 4))
 		osd_set_free_scale_axis_hw(osd_id,
-					   parsed[0], parsed[1],
-					   parsed[2], parsed[3]);
+			parsed[0], parsed[1], parsed[2], parsed[3]);
 	else
 		osd_log_err("set free scale axis error\n");
 	kfree(buf);
@@ -326,8 +338,8 @@ static ssize_t free_scale_axis_write_file(struct file *file,
 }
 
 static ssize_t window_axis_read_file(struct file *file,
-				     char __user *userbuf,
-				     size_t count, loff_t *ppos)
+				char __user *userbuf,
+				size_t count, loff_t *ppos)
 {
 	char buf[128];
 	ssize_t len;
@@ -337,13 +349,13 @@ static ssize_t window_axis_read_file(struct file *file,
 
 	osd_get_window_axis_hw(osd_id, &x0, &y0, &x1, &y1);
 	len = snprintf(buf, 128, "%d %d %d %d\n",
-		       x0, y0, x1, y1);
+		x0, y0, x1, y1);
 	return simple_read_from_buffer(userbuf, count, ppos, buf, len);
 }
 
 static ssize_t window_axis_write_file(struct file *file,
-				      const char __user *userbuf,
-				      size_t count, loff_t *ppos)
+				const char __user *userbuf,
+				size_t count, loff_t *ppos)
 {
 	char *buf = NULL;
 	struct seq_file *s = file->private_data;
@@ -360,8 +372,7 @@ static ssize_t window_axis_write_file(struct file *file,
 	buf[count] = 0;
 	if (likely(parse_para(buf, 4, parsed) == 4))
 		osd_set_window_axis_hw(osd_id,
-				       parsed[0], parsed[1],
-				       parsed[2], parsed[3]);
+			parsed[0], parsed[1], parsed[2], parsed[3]);
 	else
 		osd_log_err("set window axis error\n");
 	kfree(buf);
@@ -369,8 +380,8 @@ static ssize_t window_axis_write_file(struct file *file,
 }
 
 static ssize_t osd_reverse_read_file(struct file *file,
-				     char __user *userbuf,
-				     size_t count, loff_t *ppos)
+				char __user *userbuf,
+				size_t count, loff_t *ppos)
 {
 	char buf[128];
 	ssize_t len;
@@ -383,13 +394,13 @@ static ssize_t osd_reverse_read_file(struct file *file,
 	if (osd_reverse >= REVERSE_MAX)
 		osd_reverse = REVERSE_FALSE;
 	len = snprintf(buf, 128, "osd_reverse:[%s]\n",
-		       str[osd_reverse]);
+			str[osd_reverse]);
 	return simple_read_from_buffer(userbuf, count, ppos, buf, len);
 }
 
 static ssize_t osd_reverse_write_file(struct file *file,
-				      const char __user *userbuf,
-				      size_t count, loff_t *ppos)
+				const char __user *userbuf,
+				size_t count, loff_t *ppos)
 {
 	char *buf = NULL;
 	struct seq_file *s = file->private_data;
@@ -413,8 +424,8 @@ static ssize_t osd_reverse_write_file(struct file *file,
 }
 
 static ssize_t osd_order_read_file(struct file *file,
-				   char __user *userbuf,
-				   size_t count, loff_t *ppos)
+				char __user *userbuf,
+				size_t count, loff_t *ppos)
 {
 	char buf[128];
 	ssize_t len;
@@ -428,8 +439,8 @@ static ssize_t osd_order_read_file(struct file *file,
 }
 
 static ssize_t osd_order_write_file(struct file *file,
-				    const char __user *userbuf,
-				    size_t count, loff_t *ppos)
+				const char __user *userbuf,
+				size_t count, loff_t *ppos)
 {
 	char *buf = NULL;
 	struct seq_file *s = file->private_data;
@@ -451,8 +462,8 @@ static ssize_t osd_order_write_file(struct file *file,
 }
 
 static ssize_t osd_afbcd_read_file(struct file *file,
-				   char __user *userbuf,
-				   size_t count, loff_t *ppos)
+				char __user *userbuf,
+				size_t count, loff_t *ppos)
 {
 	struct seq_file *s = file->private_data;
 	int osd_id = *(int *)s;
@@ -466,8 +477,8 @@ static ssize_t osd_afbcd_read_file(struct file *file,
 }
 
 static ssize_t osd_afbcd_write_file(struct file *file,
-				    const char __user *userbuf,
-				    size_t count, loff_t *ppos)
+				const char __user *userbuf,
+				size_t count, loff_t *ppos)
 {
 	struct seq_file *s = file->private_data;
 	int osd_id = *(int *)s;
@@ -490,8 +501,8 @@ static ssize_t osd_afbcd_write_file(struct file *file,
 }
 
 static ssize_t osd_clear_write_file(struct file *file,
-				    const char __user *userbuf,
-				    size_t count, loff_t *ppos)
+				const char __user *userbuf,
+				size_t count, loff_t *ppos)
 {
 	char *buf = NULL;
 	struct seq_file *s = file->private_data;
@@ -514,8 +525,8 @@ static ssize_t osd_clear_write_file(struct file *file,
 }
 
 static ssize_t osd_dump_read_file(struct file *file,
-				  char __user *userbuf,
-				  size_t count, loff_t *ppos)
+				char __user *userbuf,
+				size_t count, loff_t *ppos)
 {
 	u8 __iomem *buf = NULL;
 	struct seq_file *s = file->private_data;
@@ -530,16 +541,17 @@ static ssize_t osd_dump_read_file(struct file *file,
 }
 
 static ssize_t osd_dump_write_file(struct file *file,
-				   const char __user *userbuf,
-				   size_t count, loff_t *ppos)
+				const char __user *userbuf,
+				size_t count, loff_t *ppos)
 {
+#if 1
 	return 0;
-	/*
-	 * struct seq_file *s = file->private_data;
-	 * int osd_id = *(int *)s;
-	 *
-	 * return dd_vmap_write(osd_id,  userbuf, count, ppos);
-	 */
+#else
+	struct seq_file *s = file->private_data;
+	int osd_id = *(int *)s;
+
+	return dd_vmap_write(osd_id,  userbuf, count, ppos);
+#endif
 }
 
 static void parse_param(char *buf_orig, char **parm)
@@ -553,7 +565,7 @@ static void parse_param(char *buf_orig, char **parm)
 	strcat(delim1, delim2);
 	while (1) {
 		token = strsep(&ps, delim1);
-		if (!token)
+		if (token == NULL)
 			break;
 		if (*token == '\0')
 			continue;
@@ -562,15 +574,15 @@ static void parse_param(char *buf_orig, char **parm)
 }
 
 static ssize_t osd_reg_write_file(struct file *file,
-				  const char __user *userbuf,
-				  size_t count, loff_t *ppos)
+				const char __user *userbuf,
+				size_t count, loff_t *ppos)
 {
 	char buf[128];
 	char *buf_orig, *parm[8] = {NULL};
 	long val = 0;
 	unsigned int reg_addr, reg_val;
 
-	count = min_t(size_t, count, (sizeof(buf) - 1));
+	count = min_t(size_t, count, (sizeof(buf)-1));
 	if (copy_from_user(buf, userbuf, count))
 		return -EFAULT;
 	buf[count] = 0;
@@ -595,8 +607,8 @@ static ssize_t osd_reg_write_file(struct file *file,
 }
 
 static ssize_t osd_hwc_enable_read_file(struct file *file,
-					char __user *userbuf,
-					size_t count, loff_t *ppos)
+				char __user *userbuf,
+				size_t count, loff_t *ppos)
 {
 	struct seq_file *s = file->private_data;
 	int osd_id = *(int *)s;
@@ -610,8 +622,8 @@ static ssize_t osd_hwc_enable_read_file(struct file *file,
 }
 
 static ssize_t osd_hwc_enable_write_file(struct file *file,
-					 const char __user *userbuf,
-					 size_t count, loff_t *ppos)
+				const char __user *userbuf,
+				size_t count, loff_t *ppos)
 {
 	struct seq_file *s = file->private_data;
 	int osd_id = *(int *)s;
@@ -634,8 +646,8 @@ static ssize_t osd_hwc_enable_write_file(struct file *file,
 }
 
 static ssize_t osd_do_hwc_write_file(struct file *file,
-				     const char __user *userbuf,
-				     size_t count, loff_t *ppos)
+				const char __user *userbuf,
+				size_t count, loff_t *ppos)
 {
 	struct seq_file *s = file->private_data;
 	int osd_id = *(int *)s;
@@ -783,9 +795,10 @@ static struct osd_drm_debugfs_files_s osd_drm_debugfs_files[] = {
 
 };
 
-void osd_drm_debugfs_add(struct dentry **plane_debugfs_dir,
-			 char *name,
-			 int osd_id)
+void osd_drm_debugfs_add(
+	struct dentry **plane_debugfs_dir,
+	char *name,
+	int osd_id)
 {
 	struct dentry *ent;
 	int i;
@@ -800,13 +813,13 @@ void osd_drm_debugfs_add(struct dentry **plane_debugfs_dir,
 	}
 	for (i = 0; i < ARRAY_SIZE(osd_drm_debugfs_files); i++) {
 		ent = debugfs_create_file(osd_drm_debugfs_files[i].name,
-					  osd_drm_debugfs_files[i].mode,
-					  *plane_debugfs_dir,
-					  &plane_osd_id[osd_id],
+			osd_drm_debugfs_files[i].mode,
+			*plane_debugfs_dir, &plane_osd_id[osd_id],
 			osd_drm_debugfs_files[i].fops);
 		if (!ent)
 			osd_log_info("debugfs create failed\n");
 	}
+
 }
 EXPORT_SYMBOL(osd_drm_debugfs_add);
 
@@ -828,19 +841,20 @@ EXPORT_SYMBOL(osd_drm_debugfs_exit);
 
 void osd_drm_vsync_isr_handler(void)
 {
+
 	if (!osd_hw.hw_rdma_en) {
 		osd_update_vsync_timestamp();
 		osd_update_scan_mode();
 		/* go through update list */
 		walk_through_update_list();
 		osd_update_3d_mode();
-		osd_mali_afbc_start(VIU1);
+		osd_mali_afbc_start();
 		osd_update_vsync_hit();
-		osd_hw_reset(VIU1);
+		osd_hw_reset();
 	} else {
 		if (osd_hw.osd_meson_dev.cpu_id != __MESON_CPU_MAJOR_ID_AXG) {
 			osd_update_vsync_timestamp();
-			osd_rdma_interrupt_done_clear(VPU_VPP0);
+			osd_rdma_interrupt_done_clear();
 		} else {
 			osd_update_vsync_timestamp();
 			osd_update_scan_mode();
@@ -848,7 +862,7 @@ void osd_drm_vsync_isr_handler(void)
 			walk_through_update_list();
 			osd_update_3d_mode();
 			osd_update_vsync_hit();
-			osd_hw_reset(VIU1);
+			osd_hw_reset();
 		}
 	}
 }

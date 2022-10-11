@@ -1,6 +1,18 @@
-/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/amlogic/media/common/resource_mgr/resourcemanage.h
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
 #ifndef _RESOURCE_MANAGE_H_
@@ -52,10 +64,6 @@ enum RESMAN_ID {
 	RESMAN_ID_TSPARSER,
 	RESMAN_ID_CODEC_MM,
 	RESMAN_ID_ADC_PLL,
-	RESMAN_ID_DECODER,
-	RESMAN_ID_DMX,
-	RESMAN_ID_DI,
-	RESMAN_ID_HWC,
 	RESMAN_ID_MAX,
 };
 
@@ -82,7 +90,5 @@ enum RESMAN_EVENT {
 	RESMAN_EVENT_UNREGISTER,
 	RESMAN_EVENT_PREEMPT
 };
-
-int resman_init(void);
 
 #endif/*_RESOURCE_MANAGE_H_*/

@@ -1,6 +1,18 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/amlogic/media/common/ge2d/ge2d_hw.c
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
 /* Linux Headers */
@@ -8,7 +20,6 @@
 
 /* Amlogic Headers */
 #include <linux/amlogic/media/ge2d/ge2d.h>
-#include <linux/amlogic/media/canvas/canvas.h>
 
 /* Local Headers */
 #include "ge2d_log.h"
@@ -236,8 +247,7 @@ static const    unsigned int filt_coef2[] = { /* 3 point triangle */
 	0x1b4c1900,
 	0x1a4c1a00
 };
-
-static const unsigned int filt_coef3[] = { /* 3 point triangle */
+static const        unsigned int filt_coef3[] = { /* 3 point triangle */
 	0x20402000,
 	0x00,
 	0x00,
@@ -273,11 +283,11 @@ static const unsigned int filt_coef3[] = { /* 3 point triangle */
 	0x00
 };
 
-void ge2d_canv_config(u32 index, ulong *addr, u32 *stride, u32 *stride_mode)
+void ge2d_canv_config(u32 index, u32 *addr, u32 *stride)
 {
 	int i;
 
-	ge2d_log_dbg("%s:index=%d,addr=%lx,stride=%d\n",
+	ge2d_log_dbg("%s:index=%d,addr=%x,stride=%d\n",
 		     __func__, index, addr[0], stride[0]);
 	if (ge2d_meson_dev.canvas_status == 1) {
 		if (index <= 2) {
@@ -288,9 +298,6 @@ void ge2d_canv_config(u32 index, ulong *addr, u32 *stride, u32 *stride_mode)
 		}
 	} else if (ge2d_meson_dev.canvas_status == 2) {
 		if (index <= 2) {
-			if (!ge2d_meson_dev.blk_stride_mode)
-				memset(stride_mode, 0, sizeof(u32) * MAX_PLANE);
-
 			switch (index) {
 			case GE2D_SRC1_INDEX:
 				for (i = 0; i < 3; i++) {
@@ -301,16 +308,14 @@ void ge2d_canv_config(u32 index, ulong *addr, u32 *stride, u32 *stride_mode)
 					 ((addr[i] + 7) >> 3));
 					ge2d_reg_write
 					(GE2D_C1_SRC1_STRIDE_CTRL_Y + i * 2,
-					 ((stride[i] + 7) >> 3) |
-					 (stride_mode[i] << 17));
+					 ((stride[i] + 7) >> 3));
 				}
 				break;
 			case GE2D_SRC2_INDEX:
 				ge2d_reg_write(GE2D_C1_SRC2_BADDR_CTRL,
 					       ((addr[0] + 7) >> 3));
 				ge2d_reg_write(GE2D_C1_SRC2_STRIDE_CTRL,
-					       ((stride[0] + 7) >> 3) |
-					       (stride_mode[0] << 17));
+					       ((stride[0] + 7) >> 3));
 				break;
 			case GE2D_DST1_INDEX:
 				for (i = 0; i < 2; i++) {
@@ -321,33 +326,10 @@ void ge2d_canv_config(u32 index, ulong *addr, u32 *stride, u32 *stride_mode)
 					 ((addr[i] + 7) >> 3));
 					ge2d_reg_write
 					(GE2D_C1_DST1_STRIDE_CTRL + i * 2,
-					 ((stride[i] + 7) >> 3) |
-					 (stride_mode[i] << 17));
+					 ((stride[i] + 7) >> 3));
 				}
 				break;
 			}
-		}
-	}
-}
-
-static void get_canvas_info(u32 canvas_index, ulong *addr, u32 *stride,
-			    u32 *stride_mode)
-{
-	struct canvas_s canvas;
-	int i, tmp_index = 0;
-
-	if (!addr || !stride || !stride_mode) {
-		ge2d_log_err("get canvas info error\n");
-		return;
-	}
-
-	for (i = 0; i < 3 ; i++) {
-		tmp_index = (canvas_index >> (i * 8)) & 0xff;
-		if (tmp_index) {
-			canvas_read(tmp_index, &canvas);
-			addr[i] = canvas.addr;
-			stride[i] = canvas.width;
-			stride_mode[i] = canvas.blkmode;
 		}
 	}
 }
@@ -361,23 +343,18 @@ void ge2d_set_src1_data(struct ge2d_src1_data_s *cfg)
 	ge2d_reg_set_bits(GE2D_GEN_CTRL1, cfg->ddr_burst_size_cr, 16, 2);
 
 	if (ge2d_meson_dev.canvas_status) {
-		/* if virtual canvas is used, get info from it */
-		if (cfg->canaddr)
-			get_canvas_info(cfg->canaddr, cfg->phy_addr,
-					cfg->stride, cfg->stride_mode);
 		ge2d_canv_config(GE2D_SRC1_INDEX,
-				 cfg->phy_addr,
-				 cfg->stride,
-				 cfg->stride_mode);
+			cfg->phy_addr,
+			cfg->stride);
 	} else {
 		ge2d_reg_write(GE2D_SRC1_CANVAS,
-			       ((cfg->canaddr & 0xff) << 24) |
-			       (((cfg->canaddr >> 8) & 0xff) << 16) |
-			       (((cfg->canaddr >> 16) & 0xff) << 8));
+				((cfg->canaddr & 0xff) << 24) |
+				(((cfg->canaddr >> 8) & 0xff) << 16) |
+				(((cfg->canaddr >> 16) & 0xff) << 8));
 	}
 
 	ge2d_reg_set_bits(GE2D_GEN_CTRL0,
-			  ((cfg->x_yc_ratio << 1) | cfg->y_yc_ratio),
+			((cfg->x_yc_ratio << 1) | cfg->y_yc_ratio),
 			   10, 2);
 	ge2d_reg_set_bits(GE2D_GEN_CTRL0, cfg->sep_en, 0, 1);
 	ge2d_reg_set_bits(GE2D_GEN_CTRL2, cfg->endian, 7, 1);
@@ -411,35 +388,35 @@ void ge2d_set_src1_data(struct ge2d_src1_data_s *cfg)
 }
 
 void ge2d_set_src1_scale_coef(unsigned int v_filt_type,
-			      unsigned int h_filt_type)
+	unsigned int h_filt_type)
 {
 	int i;
 
 	/* write vert filter coefs */
 	ge2d_reg_write(GE2D_SCALE_COEF_IDX, 0x0000);
-	if (v_filt_type == FILTER_TYPE_GAU0 ||
-	    v_filt_type == FILTER_TYPE_GAU0_BOT ||
-	    v_filt_type == FILTER_TYPE_GAU1 ||
-	    h_filt_type == FILTER_TYPE_GAU0 ||
-	    h_filt_type == FILTER_TYPE_GAU0_BOT ||
-	    h_filt_type == FILTER_TYPE_GAU1)
+	if ((v_filt_type == FILTER_TYPE_GAU0) ||
+		(v_filt_type == FILTER_TYPE_GAU0_BOT) ||
+		(v_filt_type == FILTER_TYPE_GAU1) ||
+		(h_filt_type == FILTER_TYPE_GAU0) ||
+		(h_filt_type == FILTER_TYPE_GAU0_BOT) ||
+		(h_filt_type == FILTER_TYPE_GAU1))
 		gaul_filter_used = 1;
 	else
 		gaul_filter_used = 0;
 	for (i = 0; i < 33; i++) {
-		if (v_filt_type == FILTER_TYPE_BICUBIC) {
+		if (v_filt_type == FILTER_TYPE_BICUBIC)
 			ge2d_reg_write(GE2D_SCALE_COEF, filt_coef0[i]);
-		} else if (v_filt_type == FILTER_TYPE_BILINEAR) {
+		else if (v_filt_type == FILTER_TYPE_BILINEAR)
 			ge2d_reg_write(GE2D_SCALE_COEF, filt_coef1[i]);
-		} else if (v_filt_type == FILTER_TYPE_TRIANGLE) {
+		else if (v_filt_type == FILTER_TYPE_TRIANGLE)
 			ge2d_reg_write(GE2D_SCALE_COEF, filt_coef2[i]);
-		} else if (v_filt_type == FILTER_TYPE_GAU0) {
+		else if (v_filt_type == FILTER_TYPE_GAU0)
 			ge2d_reg_write(GE2D_SCALE_COEF, filt_coef_gau0[i]);
-		} else if (v_filt_type == FILTER_TYPE_GAU0_BOT) {
+		else if (v_filt_type == FILTER_TYPE_GAU0_BOT)
 			ge2d_reg_write(GE2D_SCALE_COEF, filt_coef_gau0_bot[i]);
-		} else if (v_filt_type == FILTER_TYPE_GAU1) {
+		else if (v_filt_type == FILTER_TYPE_GAU1)
 			ge2d_reg_write(GE2D_SCALE_COEF, filt_coef_gau1[i]);
-		} else {
+		else {
 			/* TODO */
 			ge2d_reg_write(GE2D_SCALE_COEF, filt_coef3[i]);
 		}
@@ -448,47 +425,48 @@ void ge2d_set_src1_scale_coef(unsigned int v_filt_type,
 	/* write horz filter coefs */
 	ge2d_reg_write(GE2D_SCALE_COEF_IDX, 0x0100);
 	for (i = 0; i < 33; i++) {
-		if (h_filt_type == FILTER_TYPE_BICUBIC) {
+		if (h_filt_type == FILTER_TYPE_BICUBIC)
 			ge2d_reg_write(GE2D_SCALE_COEF, filt_coef0[i]);
-		} else if (h_filt_type == FILTER_TYPE_BILINEAR) {
+		else if (h_filt_type == FILTER_TYPE_BILINEAR)
 			ge2d_reg_write(GE2D_SCALE_COEF, filt_coef1[i]);
-		} else if (h_filt_type == FILTER_TYPE_TRIANGLE) {
+		else if (h_filt_type == FILTER_TYPE_TRIANGLE)
 			ge2d_reg_write(GE2D_SCALE_COEF, filt_coef2[i]);
-		} else if (h_filt_type == FILTER_TYPE_GAU0) {
+		else if (h_filt_type == FILTER_TYPE_GAU0)
 			ge2d_reg_write(GE2D_SCALE_COEF, filt_coef_gau0[i]);
-		} else if (h_filt_type == FILTER_TYPE_GAU0_BOT) {
+		else if (h_filt_type == FILTER_TYPE_GAU0_BOT)
 			ge2d_reg_write(GE2D_SCALE_COEF, filt_coef_gau0_bot[i]);
-		} else if (h_filt_type == FILTER_TYPE_GAU1) {
+		else if (h_filt_type == FILTER_TYPE_GAU1)
 			ge2d_reg_write(GE2D_SCALE_COEF, filt_coef_gau1[i]);
-		} else {
+		else {
 			/* TODO */
 			ge2d_reg_write(GE2D_SCALE_COEF, filt_coef3[i]);
 		}
 	}
+
 }
 
 void ge2d_set_src1_gen(struct ge2d_src1_gen_s *cfg)
 {
 	ge2d_reg_write(GE2D_SRC1_CLIPX_START_END,
-		       (cfg->clipx_start_ex << 31) |
-		       (cfg->clipx_start << 16) |
-		       (cfg->clipx_end_ex << 15) |
-		       (cfg->clipx_end << 0)
+			(cfg->clipx_start_ex << 31) |
+			(cfg->clipx_start << 16) |
+			(cfg->clipx_end_ex << 15) |
+			(cfg->clipx_end << 0)
 		       );
 
 	ge2d_reg_write(GE2D_SRC1_CLIPY_START_END,
-		       (cfg->clipy_start_ex << 31) |
-		       (cfg->clipy_start << 16) |
-		       (cfg->clipy_end_ex << 15) |
-		       (cfg->clipy_end << 0)
+			(cfg->clipy_start_ex << 31) |
+			(cfg->clipy_start << 16) |
+			(cfg->clipy_end_ex << 15) |
+			(cfg->clipy_end << 0)
 		       );
 
 	ge2d_reg_set_bits(GE2D_GEN_CTRL0, cfg->pic_struct, 1, 2);
 	ge2d_reg_set_bits(GE2D_GEN_CTRL0, (cfg->fill_mode & 0x1), 4, 1);
 
 	ge2d_reg_set_bits(GE2D_SRC_OUTSIDE_ALPHA,
-			  ((cfg->fill_mode & 0x2) << 7) |
-			  cfg->outside_alpha, 0, 9);
+			   ((cfg->fill_mode & 0x2) << 7) |
+			   cfg->outside_alpha, 0, 9);
 
 	ge2d_reg_set_bits(GE2D_SRC1_FMT_CTRL, cfg->chfmt_rpt_pix, 19, 1);
 	ge2d_reg_set_bits(GE2D_SRC1_FMT_CTRL, cfg->cvfmt_rpt_pix, 17, 1);
@@ -500,29 +478,18 @@ void ge2d_set_src2_dst_data(struct ge2d_src2_dst_data_s *cfg)
 	ge2d_reg_set_bits(GE2D_GEN_CTRL1, cfg->ddr_burst_size, 22, 2);
 
 	if (ge2d_meson_dev.canvas_status) {
-		/* if virtual canvas is used, get info from it */
-		if (cfg->src2_canaddr)
-			get_canvas_info(cfg->src2_canaddr, cfg->src2_phyaddr,
-					cfg->src2_stride,
-					cfg->src2_stride_mode);
-		if (cfg->dst_canaddr)
-			get_canvas_info(cfg->dst_canaddr, cfg->dst_phyaddr,
-					cfg->dst_stride, cfg->dst_stride_mode);
-
 		ge2d_canv_config(GE2D_SRC2_INDEX,
-				 cfg->src2_phyaddr,
-				 cfg->src2_stride,
-				 cfg->src2_stride_mode);
+			cfg->src2_phyaddr,
+			cfg->src2_stride);
 		ge2d_canv_config(GE2D_DST1_INDEX,
-				 cfg->dst_phyaddr,
-				 cfg->dst_stride,
-				 cfg->dst_stride_mode);
+			cfg->dst_phyaddr,
+			cfg->dst_stride);
 	} else {
 		/* only for m6 and later chips. */
 		ge2d_reg_write(GE2D_SRC2_DST_CANVAS, (cfg->src2_canaddr << 8) |
 				((cfg->dst_canaddr & 0xff) << 0) |
 				((cfg->dst_canaddr & 0xff00) << 8)
-				);
+			       );
 	}
 
 	ge2d_reg_set_bits(GE2D_GEN_CTRL2, cfg->src2_endian, 15, 1);
@@ -533,9 +500,6 @@ void ge2d_set_src2_dst_data(struct ge2d_src2_dst_data_s *cfg)
 	ge2d_reg_set_bits(GE2D_GEN_CTRL2, cfg->dst_format, 16, 2);
 	ge2d_reg_set_bits(GE2D_GEN_CTRL0, cfg->src2_mode_8b_sel, 15, 2);
 	ge2d_reg_set_bits(GE2D_GEN_CTRL0, cfg->dst_mode_8b_sel, 24, 2);
-
-	if (ge2d_meson_dev.dst_repeat)
-		ge2d_reg_set_bits(GE2D_GEN_CTRL0, cfg->dst_rpt, 17, 6);
 
 	ge2d_reg_set_bits(GE2D_GEN_CTRL3, cfg->dst2_pixel_byte_width, 16, 2);
 	ge2d_reg_set_bits(GE2D_GEN_CTRL3, cfg->dst2_color_map, 19, 4);
@@ -584,17 +548,17 @@ void ge2d_set_src2_dst_gen(struct ge2d_src2_dst_gen_s *cfg,
 	ge2d_reg_set_bits(GE2D_GEN_CTRL0, (cfg->src2_fill_mode & 0x1), 14, 1);
 
 	ge2d_reg_set_bits(GE2D_SRC_OUTSIDE_ALPHA,
-			  ((cfg->src2_fill_mode & 0x2) << 7) |
-			  cfg->src2_outside_alpha, 16, 9);
+			   ((cfg->src2_fill_mode & 0x2) << 7) |
+			   cfg->src2_outside_alpha, 16, 9);
 
 	ge2d_reg_write(GE2D_DST_CLIPX_START_END,
-		       (cfg->dst_clipx_start << 16) |
-		       (cfg->dst_clipx_end << 0)
+			(cfg->dst_clipx_start << 16) |
+			(cfg->dst_clipx_end << 0)
 		       );
 
 	ge2d_reg_write(GE2D_DST_CLIPY_START_END,
-		       (cfg->dst_clipy_start << 16) |
-		       (cfg->dst_clipy_end << 0)
+			(cfg->dst_clipy_start << 16) |
+			(cfg->dst_clipy_end << 0)
 		       );
 
 	ge2d_reg_set_bits(GE2D_GEN_CTRL0, cfg->dst_clip_mode,  23, 1);
@@ -657,89 +621,81 @@ void ge2d_set_dp_gen(struct ge2d_config_s *config)
 	cfg->src1_vsc_bank_length = 4;
 	cfg->src1_hsc_bank_length = 4;
 	ge2d_reg_set_bits(GE2D_SC_MISC_CTRL,
-			  ((cfg->src1_hsc_rpt_ctrl << 9) |
-			  (cfg->src1_vsc_rpt_ctrl << 8) |
-			  (cfg->src1_vsc_phase0_always_en << 7) |
-			  (cfg->src1_vsc_bank_length << 4) |
-			  (cfg->src1_hsc_phase0_always_en << 3) |
-			  (cfg->src1_hsc_bank_length << 0)),  0, 10);
+			   ((cfg->src1_hsc_rpt_ctrl << 9) |
+			    (cfg->src1_vsc_rpt_ctrl << 8) |
+			    (cfg->src1_vsc_phase0_always_en << 7) |
+			    (cfg->src1_vsc_bank_length << 4) |
+			    (cfg->src1_hsc_phase0_always_en << 3) |
+			    (cfg->src1_hsc_bank_length << 0)),  0, 10);
 
 	ge2d_reg_set_bits(GE2D_SC_MISC_CTRL,
-			  ((cfg->src1_vsc_nearest_en << 1) |
-			  (cfg->src1_hsc_nearest_en << 0)), 29, 2);
+			((cfg->src1_vsc_nearest_en << 1) |
+			(cfg->src1_hsc_nearest_en << 0)), 29, 2);
 	if (cfg->antiflick_en == 1) {
 		/* Wr(GE2D_ANTIFLICK_CTRL0, 0x81000100); */
 		ge2d_reg_write(GE2D_ANTIFLICK_CTRL0, 0x80000000);
-		ge2d_reg_write
-			(GE2D_ANTIFLICK_CTRL1,
-			 (cfg->antiflick_ycbcr_rgb_sel << 25) |
-			 (cfg->antiflick_cbcr_en << 24) |
-			 ((cfg->antiflick_r_coef & 0xff) << 16) |
-			 ((cfg->antiflick_g_coef & 0xff) << 8) |
-			 ((cfg->antiflick_b_coef & 0xff) << 0)
-			 );
+		ge2d_reg_write(GE2D_ANTIFLICK_CTRL1,
+			(cfg->antiflick_ycbcr_rgb_sel << 25) |
+			(cfg->antiflick_cbcr_en << 24) |
+			((cfg->antiflick_r_coef & 0xff) << 16) |
+			((cfg->antiflick_g_coef & 0xff) << 8) |
+			((cfg->antiflick_b_coef & 0xff) << 0)
+			);
 
-		ge2d_reg_write
-			(GE2D_ANTIFLICK_COLOR_FILT0,
-			 ((cfg->antiflick_color_filter_th[0] & 0xff) << 24) |
-			 ((cfg->antiflick_color_filter_n3[0] & 0xff) << 16) |
-			 ((cfg->antiflick_color_filter_n2[0] & 0xff) << 8) |
-			 ((cfg->antiflick_color_filter_n1[0] & 0xff) << 0)
-			 );
+		ge2d_reg_write(GE2D_ANTIFLICK_COLOR_FILT0,
+			((cfg->antiflick_color_filter_th[0] & 0xff) << 24) |
+			((cfg->antiflick_color_filter_n3[0] & 0xff) << 16) |
+			((cfg->antiflick_color_filter_n2[0] & 0xff) << 8) |
+			((cfg->antiflick_color_filter_n1[0] & 0xff) << 0)
+			);
 
-		ge2d_reg_write
-			(GE2D_ANTIFLICK_COLOR_FILT1,
-			 ((cfg->antiflick_color_filter_th[1] & 0xff) << 24) |
-			 ((cfg->antiflick_color_filter_n3[1] & 0xff) << 16) |
-			 ((cfg->antiflick_color_filter_n2[1] & 0xff) << 8) |
-			 ((cfg->antiflick_color_filter_n1[1] & 0xff) << 0)
-			 );
+		ge2d_reg_write(GE2D_ANTIFLICK_COLOR_FILT1,
+			((cfg->antiflick_color_filter_th[1] & 0xff) << 24) |
+			((cfg->antiflick_color_filter_n3[1] & 0xff) << 16) |
+			((cfg->antiflick_color_filter_n2[1] & 0xff) << 8) |
+			((cfg->antiflick_color_filter_n1[1] & 0xff) << 0)
+			);
 
-		ge2d_reg_write
-			(GE2D_ANTIFLICK_COLOR_FILT2,
-			 ((cfg->antiflick_color_filter_th[2] & 0xff) << 24) |
-			 ((cfg->antiflick_color_filter_n3[2] & 0xff) << 16) |
-			 ((cfg->antiflick_color_filter_n2[2] & 0xff) << 8) |
-			 ((cfg->antiflick_color_filter_n1[2] & 0xff) << 0)
-			 );
+		ge2d_reg_write(GE2D_ANTIFLICK_COLOR_FILT2,
+			((cfg->antiflick_color_filter_th[2] & 0xff) << 24) |
+			((cfg->antiflick_color_filter_n3[2] & 0xff) << 16) |
+			((cfg->antiflick_color_filter_n2[2] & 0xff) << 8) |
+			((cfg->antiflick_color_filter_n1[2] & 0xff) << 0)
+			);
 
-		ge2d_reg_write
-			(GE2D_ANTIFLICK_COLOR_FILT3,
-			 ((cfg->antiflick_color_filter_n3[3] & 0xff) << 16) |
-			 ((cfg->antiflick_color_filter_n2[3] & 0xff) << 8) |
-			 ((cfg->antiflick_color_filter_n1[3] & 0xff) << 0)
-			 );
+		ge2d_reg_write(GE2D_ANTIFLICK_COLOR_FILT3,
+			((cfg->antiflick_color_filter_n3[3] & 0xff) << 16) |
+			((cfg->antiflick_color_filter_n2[3] & 0xff) << 8) |
+			((cfg->antiflick_color_filter_n1[3] & 0xff) << 0)
+			);
 
-		ge2d_reg_write
-			(GE2D_ANTIFLICK_ALPHA_FILT0,
-			 ((cfg->antiflick_alpha_filter_th[0] & 0xff) << 24) |
-			 ((cfg->antiflick_alpha_filter_n3[0] & 0xff) << 16) |
-			 ((cfg->antiflick_alpha_filter_n2[0] & 0xff) << 8) |
-			 ((cfg->antiflick_alpha_filter_n1[0] & 0xff) << 0)
-			 );
 
-		ge2d_reg_write
-			(GE2D_ANTIFLICK_ALPHA_FILT1,
-			 ((cfg->antiflick_alpha_filter_th[1] & 0xff) << 24) |
-			 ((cfg->antiflick_alpha_filter_n3[1] & 0xff) << 16) |
-			 ((cfg->antiflick_alpha_filter_n2[1] & 0xff) << 8) |
-			 ((cfg->antiflick_alpha_filter_n1[1] & 0xff) << 0)
-			 );
+		ge2d_reg_write(GE2D_ANTIFLICK_ALPHA_FILT0,
+			((cfg->antiflick_alpha_filter_th[0] & 0xff) << 24) |
+			((cfg->antiflick_alpha_filter_n3[0] & 0xff) << 16) |
+			((cfg->antiflick_alpha_filter_n2[0] & 0xff) << 8) |
+			((cfg->antiflick_alpha_filter_n1[0] & 0xff) << 0)
+			);
 
-		ge2d_reg_write
-			(GE2D_ANTIFLICK_ALPHA_FILT2,
-			 ((cfg->antiflick_alpha_filter_th[2] & 0xff) << 24) |
-			 ((cfg->antiflick_alpha_filter_n3[2] & 0xff) << 16) |
-			 ((cfg->antiflick_alpha_filter_n2[2] & 0xff) << 8) |
-			 ((cfg->antiflick_alpha_filter_n1[2] & 0xff) << 0)
-			 );
+		ge2d_reg_write(GE2D_ANTIFLICK_ALPHA_FILT1,
+			((cfg->antiflick_alpha_filter_th[1] & 0xff) << 24) |
+			((cfg->antiflick_alpha_filter_n3[1] & 0xff) << 16) |
+			((cfg->antiflick_alpha_filter_n2[1] & 0xff) << 8) |
+			((cfg->antiflick_alpha_filter_n1[1] & 0xff) << 0)
+			);
 
-		ge2d_reg_write
-			(GE2D_ANTIFLICK_ALPHA_FILT3,
-			 ((cfg->antiflick_alpha_filter_n3[3] & 0xff) << 16) |
-			 ((cfg->antiflick_alpha_filter_n2[3] & 0xff) << 8) |
-			 ((cfg->antiflick_alpha_filter_n1[3] & 0xff) << 0)
-			 );
+		ge2d_reg_write(GE2D_ANTIFLICK_ALPHA_FILT2,
+			((cfg->antiflick_alpha_filter_th[2] & 0xff) << 24) |
+			((cfg->antiflick_alpha_filter_n3[2] & 0xff) << 16) |
+			((cfg->antiflick_alpha_filter_n2[2] & 0xff) << 8) |
+			((cfg->antiflick_alpha_filter_n1[2] & 0xff) << 0)
+			);
+
+		ge2d_reg_write(GE2D_ANTIFLICK_ALPHA_FILT3,
+			((cfg->antiflick_alpha_filter_n3[3] & 0xff) << 16) |
+			((cfg->antiflick_alpha_filter_n2[3] & 0xff) << 8) |
+			((cfg->antiflick_alpha_filter_n1[3] & 0xff) << 0)
+			);
 	} else {
 		ge2d_reg_set_bits(GE2D_ANTIFLICK_CTRL0, 0, 31, 1);
 	}
@@ -887,22 +843,6 @@ void ge2d_set_dp_gen(struct ge2d_config_s *config)
 				cfg->matrix_sat_in_en = 0;
 				cfg->matrix_minus_16_ctrl = 0;
 				cfg->matrix_sign_ctrl = 0;
-			} else if (matrix_using & MATRIX_SIGNED) {
-				cfg->matrix_coef[0] = 0x400;
-				cfg->matrix_coef[1] = 0;
-				cfg->matrix_coef[2] = 0;
-				cfg->matrix_coef[3] = 0;
-				cfg->matrix_coef[4] = 0x400;
-				cfg->matrix_coef[5] = 0;
-				cfg->matrix_coef[6] = 0;
-				cfg->matrix_coef[7] = 0;
-				cfg->matrix_coef[8] = 0x400;
-				cfg->matrix_offset[0] = 384; /* -128 */
-				cfg->matrix_offset[1] = 384; /* -128 */
-				cfg->matrix_offset[2] = 384; /* -128 */
-				cfg->matrix_sat_in_en = 0;
-				cfg->matrix_minus_16_ctrl = 0;
-				cfg->matrix_sign_ctrl = 0;
 			}
 
 			if (cfg->matrix_minus_16_ctrl)
@@ -952,18 +892,14 @@ void ge2d_set_dp_gen(struct ge2d_config_s *config)
 			       );
 	}
 
-	if (ge2d_meson_dev.dst_sign_mode && cfg->conv_matrix_en_dst)
-		ge2d_reg_set_bits(GE2D_MATRIX3_COEF22_CTRL,
-				  cfg->dst_signed_mode, 6, 1);
-
 	ge2d_reg_set_bits(GE2D_GEN_CTRL1, cfg->src1_gb_alpha, 0, 8);
 	ge2d_reg_set_bits(GE2D_GEN_CTRL2,
-			  cfg->src1_gb_alpha_en, 29, 1);
+		cfg->src1_gb_alpha_en, 29, 1);
 #ifdef CONFIG_GE2D_SRC2
 	if (ge2d_meson_dev.src2_alp == 1) {
 		ge2d_reg_set_bits(GE2D_GEN_CTRL5, cfg->src2_gb_alpha, 0, 8);
 		ge2d_reg_set_bits(GE2D_GEN_CTRL5,
-				  cfg->src2_gb_alpha_en, 8, 1);
+			cfg->src2_gb_alpha_en, 8, 1);
 	}
 #endif
 	ge2d_reg_write(GE2D_ALU_CONST_COLOR, cfg->alu_const_color);
@@ -976,12 +912,12 @@ void ge2d_set_dp_gen(struct ge2d_config_s *config)
 	ge2d_reg_write(GE2D_DST_BITMASK, cfg->bitmask);
 
 	ge2d_reg_set_bits(GE2D_GEN_CTRL0,
-			  ((cfg->bytemask_only << 5) |
-			  (cfg->bitmask_en << 4) |
-			  (cfg->src2_key_en << 3) |
-			  (cfg->src2_key_mode << 2) |
-			  (cfg->src1_key_en << 1) |
-			  (cfg->src1_key_mode << 0)), 26, 6);
+			   ((cfg->bytemask_only << 5) |
+			    (cfg->bitmask_en << 4) |
+			    (cfg->src2_key_en << 3) |
+			    (cfg->src2_key_mode << 2) |
+			    (cfg->src1_key_en << 1) |
+			    (cfg->src1_key_mode << 0)), 26, 6);
 }
 
 int ge2d_cmd_fifo_full(void)
@@ -1003,8 +939,6 @@ void ge2d_set_cmd(struct ge2d_cmd_s *cfg)
 	int rate_w = 10, rate_h = 10;
 	/* expand src region with one line. */
 	unsigned int src1_y_end = cfg->src1_y_end + 1;
-	struct ge2d_queue_item_s *queue_item = NULL;
-	unsigned int mem_secure = 0;
 
 	while ((ge2d_reg_read(GE2D_STATUS0) & (1 << 1)))
 		;
@@ -1014,7 +948,7 @@ void ge2d_set_cmd(struct ge2d_cmd_s *cfg)
 
 	/* src:yuv , dst: rgb */
 	if ((cfg->src1_fmt & GE2D_FORMAT_YUV) &&
-	    ((cfg->dst_fmt & GE2D_FORMAT_YUV) == 0)) {
+		((cfg->dst_fmt & GE2D_FORMAT_YUV) == 0)) {
 		if (x_yc_ratio) {
 			if ((cfg->src1_x_rev + cfg->dst_x_rev) == 1) {
 				x_extra_bit_start = 3;
@@ -1063,17 +997,17 @@ void ge2d_set_cmd(struct ge2d_cmd_s *cfg)
 		}
 	}
 	ge2d_reg_write(GE2D_SRC1_X_START_END,
-		       (x_extra_bit_start << 30) |  /* x start extra */
-		       ((cfg->src1_x_start & 0x3fff) << 16) |
-		       (x_extra_bit_end << 14) |    /* x end extra */
-		       ((cfg->src1_x_end & 0x3fff) << 0)
+			(x_extra_bit_start << 30) |  /* x start extra */
+			((cfg->src1_x_start & 0x3fff) << 16) |
+			(x_extra_bit_end << 14) |    /* x end extra */
+			((cfg->src1_x_end & 0x3fff) << 0)
 		       );
 
 	ge2d_reg_write(GE2D_SRC1_Y_START_END,
-		       (y_extra_bit_start << 30) |  /* y start extra */
-		       ((cfg->src1_y_start & 0x3fff) << 16) |
-		       (y_extra_bit_end << 14) |    /* y end extra */
-		       ((src1_y_end & 0x3fff) << 0)
+			(y_extra_bit_start << 30) |  /* y start extra */
+			((cfg->src1_y_start & 0x3fff) << 16) |
+			(y_extra_bit_end << 14) |    /* y end extra */
+			((src1_y_end & 0x3fff) << 0)
 		       );
 
 	ge2d_reg_set_bits(GE2D_SRC1_FMT_CTRL, x_chr_phase, 8, 8);
@@ -1100,16 +1034,16 @@ void ge2d_set_cmd(struct ge2d_cmd_s *cfg)
 	sc_prehsc_en = (widthi > widtho * 2) ? 1 : 0;
 	sc_prevsc_en = (heighti > heighto * 2) ? 1 : 0;
 
-	tmp_widthi = sc_prehsc_en ? ((widthi + 1) >> 1) : widthi;
+	tmp_widthi  = sc_prehsc_en ? ((widthi + 1) >> 1) : widthi;
 	tmp_heighti = sc_prevsc_en ? ((heighti + 1) >> 1) : heighti;
 
 	if (cfg->hsc_phase_step == 0)
 		cfg->hsc_phase_step = ((tmp_widthi << 18) / widtho) <<
-					6; /* width no more than 8192 */
+				      6; /* width no more than 8192 */
 
 	if (cfg->vsc_phase_step == 0)
 		cfg->vsc_phase_step = ((tmp_heighti << 18) / heighto) <<
-					6;/* height no more than 8192 */
+				      6;/* height no more than 8192 */
 
 	if (cfg->sc_hsc_en && cfg->hsc_div_en) {
 		unsigned int hsc_div_length;
@@ -1140,14 +1074,14 @@ void ge2d_set_cmd(struct ge2d_cmd_s *cfg)
 			/* not scaler case */
 			cfg->vsc_ini_phase = 0;
 			ge2d_reg_set_bits(GE2D_SC_MISC_CTRL,
-					  ((0 << 1) | (0 << 0)), 8, 2);
+				((0 << 1) | (0 << 0)), 8, 2);
 		} else if (rate_h < 10) {
 			/* scaler down case */
 			cfg->sc_vsc_en = 1;
 			cfg->vsc_rpt_l0_num = 1;
 			if (rate_h != 0)
 				cfg->vsc_ini_phase =
-					0x5000000 / rate_h - 0x800000;
+					0x5000000/rate_h - 0x800000;
 			else
 				cfg->vsc_ini_phase = 0x5000000;
 		} else {
@@ -1155,21 +1089,21 @@ void ge2d_set_cmd(struct ge2d_cmd_s *cfg)
 			cfg->sc_vsc_en = 1;
 			cfg->vsc_rpt_l0_num = 2;
 			cfg->vsc_ini_phase =
-				0x800000 + 0x5000000 / rate_h;
+				0x800000 + 0x5000000/rate_h;
 		}
 
 		if (rate_w == 10) {
 			/* not scaler case */
 			cfg->hsc_ini_phase = 0;
 			ge2d_reg_set_bits(GE2D_SC_MISC_CTRL,
-					  ((0 << 1) | (0 << 0)), 8, 2);
+				((0 << 1) | (0 << 0)), 8, 2);
 		} else if (rate_w < 10) {
 			/* scaler down case */
 			cfg->sc_hsc_en = 1;
 			cfg->hsc_rpt_p0_num = 1;
 			if (rate_w != 0)
 				cfg->hsc_ini_phase =
-					0x5000000 / rate_w - 0x800000;
+					0x5000000/rate_w - 0x800000;
 			else
 				cfg->hsc_ini_phase = 0x5000000;
 		} else {
@@ -1177,7 +1111,7 @@ void ge2d_set_cmd(struct ge2d_cmd_s *cfg)
 			cfg->sc_hsc_en = 1;
 			cfg->hsc_rpt_p0_num = 2;
 			cfg->hsc_ini_phase =
-				0x800000 + 0x5000000 / rate_w;
+				0x800000 + 0x5000000/rate_w;
 		}
 		/* expand src1/src2 color with 1 */
 		ge2d_reg_set_bits(GE2D_GEN_CTRL2, 1, 27, 1);
@@ -1185,12 +1119,12 @@ void ge2d_set_cmd(struct ge2d_cmd_s *cfg)
 	}
 	ge2d_log_dbg("rate_w=%d,rate_h=%d\n", rate_w, rate_h);
 	ge2d_reg_set_bits(GE2D_SC_MISC_CTRL,
-			  ((cfg->hsc_div_en << 17) |
-			  (cfg->hsc_div_length << 4) |
-			  (sc_prehsc_en << 3) |
-			  (sc_prevsc_en << 2) |
-			  (cfg->sc_vsc_en << 1) |
-			  (cfg->sc_hsc_en << 0)), 11, 18);
+			   ((cfg->hsc_div_en << 17) |
+			    (cfg->hsc_div_length << 4) |
+			    (sc_prehsc_en << 3) |
+			    (sc_prevsc_en << 2) |
+			    (cfg->sc_vsc_en << 1) |
+			    (cfg->sc_hsc_en << 0)), 11, 18);
 
 	ge2d_reg_write(GE2D_HSC_START_PHASE_STEP, cfg->hsc_phase_step);
 
@@ -1198,26 +1132,26 @@ void ge2d_set_cmd(struct ge2d_cmd_s *cfg)
 
 #ifdef CONFIG_GE2D_ADV_NUM
 	ge2d_reg_write(GE2D_HSC_ADV_CTRL,
-		       (cfg->hsc_adv_num << 24) |
-		       (cfg->hsc_adv_phase << 0)
+			(cfg->hsc_adv_num << 24) |
+			(cfg->hsc_adv_phase << 0)
 		       );
 	if (cfg->hsc_adv_num > 255)
 		cfg->hsc_adv_num = cfg->hsc_adv_num >> 8;
 	else
 		cfg->hsc_adv_num = 0;
 	ge2d_reg_write(GE2D_HSC_INI_CTRL,
-		       (cfg->hsc_rpt_p0_num << 29) |
-		       (cfg->hsc_adv_num << 24) |
-		       ((cfg->hsc_ini_phase & 0xffffff) << 0)
+			(cfg->hsc_rpt_p0_num << 29) |
+			(cfg->hsc_adv_num << 24) |
+			((cfg->hsc_ini_phase & 0xffffff) << 0)
 		       );
 #else
 	ge2d_reg_write(GE2D_HSC_ADV_CTRL,
-		       (cfg->hsc_adv_num << 24) |
-		       (cfg->hsc_adv_phase << 0)
+			(cfg->hsc_adv_num << 24) |
+			(cfg->hsc_adv_phase << 0)
 		       );
 	ge2d_reg_write(GE2D_HSC_INI_CTRL,
-		       (cfg->hsc_rpt_p0_num << 29) |
-		       ((cfg->hsc_ini_phase & 0xffffff) << 0)
+			(cfg->hsc_rpt_p0_num << 29) |
+			((cfg->hsc_ini_phase & 0xffffff) << 0)
 		       );
 #endif
 
@@ -1226,8 +1160,8 @@ void ge2d_set_cmd(struct ge2d_cmd_s *cfg)
 	ge2d_reg_write(GE2D_VSC_PHASE_SLOPE, cfg->vsc_phase_slope);
 
 	ge2d_reg_write(GE2D_VSC_INI_CTRL,
-		       (cfg->vsc_rpt_l0_num << 29) |
-		       (cfg->vsc_ini_phase << 0)
+			(cfg->vsc_rpt_l0_num << 29) |
+			(cfg->vsc_ini_phase << 0)
 		       );
 
 	/* src2 scaler setting, just support 2^n repeat (n = 0, 1, 2 or 3) */
@@ -1331,36 +1265,34 @@ void ge2d_set_cmd(struct ge2d_cmd_s *cfg)
 #ifdef CONFIG_GE2D_SRC2
 	if (ge2d_meson_dev.src2_alp == 1)
 		ge2d_reg_write(GE2D_ALU_OP_CTRL,
-			       (cfg->src2_cmult_ad << 27) |
-			       (cfg->src1_cmult_asel << 25) |
-			       (cfg->src2_cmult_asel << 23) |
-			       (cfg->color_blend_mode << 20) |
-			       (cfg->color_src_blend_factor << 16) |
-			       (((cfg->color_blend_mode == 5) ?
-			       cfg->color_logic_op :
-			       cfg->color_dst_blend_factor) << 12) |
-			       (cfg->alpha_blend_mode << 8) |
-			       (cfg->alpha_src_blend_factor << 4) |
-			       (((cfg->alpha_blend_mode == 5) ?
-			       cfg->alpha_logic_op :
-			       cfg->alpha_dst_blend_factor) << 0)
+				(cfg->src2_cmult_ad << 27) |
+				(cfg->src1_cmult_asel << 25) |
+				(cfg->src2_cmult_asel << 23) |
+				(cfg->color_blend_mode << 20) |
+				(cfg->color_src_blend_factor << 16) |
+				(((cfg->color_blend_mode == 5) ?
+				cfg->color_logic_op :
+				  cfg->color_dst_blend_factor) << 12) |
+				(cfg->alpha_blend_mode << 8) |
+				(cfg->alpha_src_blend_factor << 4) |
+				(((cfg->alpha_blend_mode == 5) ?
+				cfg->alpha_logic_op :
+				  cfg->alpha_dst_blend_factor) << 0)
 			       );
 	else
 #endif
 		ge2d_reg_write(GE2D_ALU_OP_CTRL,
-			       (cfg->src1_cmult_asel << 25) |
-			       (cfg->src2_cmult_asel << 24) |
-			       (cfg->color_blend_mode << 20) |
-			       (cfg->color_src_blend_factor << 16) |
-			       (((cfg->color_blend_mode == 5) ?
-			       cfg->color_logic_op :
-			       cfg->color_dst_blend_factor) << 12) |
-			       (cfg->alpha_blend_mode << 8) |
-			       (cfg->alpha_src_blend_factor << 4) |
-			       (((cfg->alpha_blend_mode == 5) ?
-			       cfg->alpha_logic_op :
-			       cfg->alpha_dst_blend_factor) << 0)
-			       );
+			(cfg->src1_cmult_asel << 25) |
+			(cfg->src2_cmult_asel << 24) |
+			(cfg->color_blend_mode << 20) |
+			(cfg->color_src_blend_factor << 16) |
+			(((cfg->color_blend_mode == 5) ? cfg->color_logic_op :
+			  cfg->color_dst_blend_factor) << 12) |
+			(cfg->alpha_blend_mode << 8) |
+			(cfg->alpha_src_blend_factor << 4) |
+			(((cfg->alpha_blend_mode == 5) ? cfg->alpha_logic_op :
+			  cfg->alpha_dst_blend_factor) << 0)
+		       );
 
 	/* if true, disable bug fix about the dp_out_done/
 	 * scale_out_done(test1823) hang issue when
@@ -1368,29 +1300,21 @@ void ge2d_set_cmd(struct ge2d_cmd_s *cfg)
 	 */
 	if (ge2d_meson_dev.hang_flag == 1)
 		ge2d_reg_set_bits(GE2D_GEN_CTRL4, cfg->hang_flag, 0, 1);
-
-	/* memory security setting */
-	queue_item = container_of(cfg, struct ge2d_queue_item_s, cmd);
-	if (ge2d_meson_dev.chip_type >= MESON_CPU_MAJOR_ID_SC2)
-		mem_secure = queue_item->config.mem_sec;
-	ge2d_log_dbg("secure mode:%d\n", mem_secure);
-
-	ge2d_reg_write(GE2D_CMD_CTRL,
-		       (mem_secure << 28) |
-		       (src2_x_interp_ctrl << 14) |
-		       (src2_x_repeat << 12) |
-		       (src2_y_repeat << 10) |
-		       (cfg->src2_fill_color_en << 9) |
-		       (cfg->src1_fill_color_en << 8) |
-		       (cfg->dst_xy_swap << 7) |
-		       (cfg->dst_x_rev << 6) |
-		       (cfg->dst_y_rev << 5) |
-		       (cfg->src2_x_rev << 4) |
-		       (cfg->src2_y_rev << 3) |
-		       (cfg->src1_x_rev << 2) |
-		       (cfg->src1_y_rev << 1) |
-		       1  << 0 /* start cmd */
-		       );
+	ge2d_reg_set_bits(GE2D_CMD_CTRL,
+			  (src2_x_interp_ctrl << 14) |
+			  (src2_x_repeat << 12) |
+			  (src2_y_repeat << 10) |
+			  (cfg->src2_fill_color_en << 9) |
+			  (cfg->src1_fill_color_en << 8) |
+			  (cfg->dst_xy_swap << 7) |
+			  (cfg->dst_x_rev << 6) |
+			  (cfg->dst_y_rev << 5) |
+			  (cfg->src2_x_rev << 4) |
+			  (cfg->src2_y_rev << 3) |
+			  (cfg->src1_x_rev << 2) |
+			  (cfg->src1_y_rev << 1) |
+			  1 << 0, /* start cmd */
+			  0, 16);
 	cfg->release_flag |= START_FLAG;
 }
 
@@ -1419,21 +1343,20 @@ void ge2d_set_gen(struct ge2d_gen_s *cfg)
 	ge2d_reg_set_bits(GE2D_GEN_CTRL1, cfg->interrupt_ctrl, 24, 2);
 
 	ge2d_reg_write(GE2D_DP_ONOFF_CTRL,
-		       (cfg->dp_onoff_mode << 31) |
-		       (cfg->dp_on_cnt << 16) |
-		       (cfg->vfmt_onoff_en << 15) |
-		       (cfg->dp_off_cnt << 0)
+			(cfg->dp_onoff_mode << 31) |
+			(cfg->dp_on_cnt << 16) |
+			(cfg->vfmt_onoff_en << 15) |
+			(cfg->dp_off_cnt << 0)
 		       );
 	if (ge2d_meson_dev.fifo == 1) {
 		ge2d_reg_set_bits(GE2D_GEN_CTRL4,
-				  (cfg->bytes_per_burst << 12) |
-				  (cfg->fifo_size << 10) |
-				  (cfg->fifo_size << 8) |
-				  (cfg->fifo_size << 6) |
-				  (cfg->fifo_size << 4) |
-				  (cfg->burst_ctrl << 2) |
-				  (cfg->burst_ctrl),
-				  16, 13);
+			(cfg->fifo_size << 26) |
+			(cfg->fifo_size << 24) |
+			(cfg->fifo_size << 22) |
+			(cfg->fifo_size << 20) |
+			(cfg->burst_ctrl << 18) |
+			(cfg->burst_ctrl << 16),
+		       16, 12);
 	}
 }
 

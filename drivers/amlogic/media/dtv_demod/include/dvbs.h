@@ -1,6 +1,18 @@
-/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/amlogic/media/dtv_demod/include/dvbs.h
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
 #ifndef __DVBS_FUNC_H__
@@ -9,9 +21,6 @@
 
 #define CNR_HIGH	0xcae
 #define CNR_LOW		0xcad
-#define AUTOSR_REG   0x922
-#define AUTOSR_OFF 0xcc
-#define AUTOSR_ON  0xdc
 
 enum diseq_irq_flag {
 	DISEQ_IRQGAPBURST = 0x01,
@@ -25,7 +34,7 @@ enum diseq_irq_flag {
 
 struct fe_lla_lookpoint_t {
 	s32 realval;	//real value
-	s32 regval;	//binary value
+	s32 regval; //binary value
 };
 
 struct fe_lla_lookup_t {
@@ -71,7 +80,7 @@ struct fe_lla_lookup_t {
 
 #define DVBS_REG_DISIRQCFG	0x300
 #define DVBS_REG_DISIRQSTAT	0x301
-#define DVBS_REG_DISTXCFG	0x302
+#define DVBS_REG_DISTXCFG	0X302
 #define DVBS_REG_DISTXSTATUS	0x303
 #define DVBS_REG_DISTXBYTES	0x304
 #define DVBS_REG_DISTXFIFO	0x305
@@ -103,11 +112,6 @@ struct fe_lla_lookup_t {
 
 #define DSTATUS		0x934
 
-/* carrier offset */
-#define	CFR12	0x9cf
-#define	CFR11	0x9d0
-#define	CFR10	0x9d1
-
 void dvbs2_diseqc_send_msg(unsigned int len, unsigned char *msg);
 void dvbs2_diseqc_read_msg(unsigned int *len, unsigned char *msg);
 unsigned int dvbs2_diseqc_irq_check(void);
@@ -115,6 +119,5 @@ void dvbs2_diseqc_irq_en(unsigned int onoff);
 void dvbs2_diseqc_init(void);
 void dvbs2_diseqc_continuous_tone(unsigned int onoff);
 void dvbs_check_status(struct seq_file *seq);
-unsigned int dvbs_get_freq_offset(unsigned int *polarity);
 
 #endif

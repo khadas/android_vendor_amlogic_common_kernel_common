@@ -1,6 +1,18 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/amlogic/media/frame_sync/timestamp.c
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
 #define DEBUG
@@ -12,6 +24,7 @@
 #include <linux/amlogic/media/vout/vout_notify.h>
 #define KERNEL_ATRACE_TAG KERNEL_ATRACE_TAG_TSYNC
 #include <trace/events/meson_atrace.h>
+
 
 u32 acc_apts_inc;
 u32 acc_apts_dec;
@@ -27,7 +40,7 @@ static u32 first_vpts;
 static u32 first_checkin_vpts;
 static u32 first_checkin_apts;
 static u32 first_apts;
-static u32 pcrscr_lantcy = 200 * 90;
+static u32 pcrscr_lantcy = 200*90;
 static u32 video_pts;
 static u64 video_pts_u64;
 static u32 audio_pts;
@@ -130,7 +143,7 @@ EXPORT_SYMBOL(timestamp_apts_inc);
 void timestamp_apts_enable(u32 enable)
 {
 	audio_pts_up = enable;
-	pr_info("%s enable:%x,\n", __func__, enable);
+	pr_info("timestamp_apts_enable enable:%x,\n", enable);
 }
 EXPORT_SYMBOL(timestamp_apts_enable);
 
@@ -156,20 +169,20 @@ u32 timestamp_pcrscr_get(void)
 	if (tsync_get_demux_pcrscr_valid()) {
 		if (tsync_pcr_demux_pcr_used() == 0) {
 			return system_time;
-		} else {
+			}
+		else {
 			if (tsync_get_demux_pcr(&tmp_pcr)) {
 				if (tmp_pcr > pcrscr_lantcy)
 					return
 					tmp_pcr - pcrscr_lantcy;
 				else
 					return 0;
-			} else {
-				return system_time;
 			}
+			else
+				return system_time;
 		}
-	} else {
-		return system_time;
-	}
+	} else
+	return system_time;
 }
 EXPORT_SYMBOL(timestamp_pcrscr_get);
 
@@ -223,12 +236,12 @@ void timestamp_clac_pts_latency(u8 type, u32 pts)
 
 	if (tsync_get_mode() != TSYNC_MODE_PCRMASTER)
 		return;
-	if (tsync_get_demux_pcrscr_valid() &&
-		tsync_pcr_demux_pcr_used()) {
+	if (tsync_get_demux_pcrscr_valid()
+		&& tsync_pcr_demux_pcr_used()) {
 		if (tsync_get_demux_pcr(&demux_pcr) == 0)
 			return;
 		if (demux_pcr == 0 ||
-		    demux_pcr == 0xffffffff) {
+			demux_pcr == 0xffffffff) {
 			last_apts_gap = 0;
 			last_vpts_gap = 0;
 			return;
@@ -433,10 +446,9 @@ void timestamp_pcrscr_set_adj_pcr(s32 inc)
 	if (inc != 0) {
 		system_time_inc_adj =
 			900 * info->sync_duration_den /
-			(info->sync_duration_num * inc);
-	} else {
+			(info->sync_duration_num*inc);
+	} else
 		system_time_inc_adj = 0;
-	}
 }
 EXPORT_SYMBOL(timestamp_pcrscr_set_adj_pcr);
 
@@ -452,6 +464,6 @@ u32 timestamp_pcrscr_enable_state(void)
 }
 EXPORT_SYMBOL(timestamp_pcrscr_enable_state);
 
-//MODULE_DESCRIPTION("AMLOGIC time sync management driver");
-//MODULE_LICENSE("GPL");
-//MODULE_AUTHOR("Tim Yao <timyao@amlogic.com>");
+MODULE_DESCRIPTION("AMLOGIC time sync management driver");
+MODULE_LICENSE("GPL");
+MODULE_AUTHOR("Tim Yao <timyao@amlogic.com>");

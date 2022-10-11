@@ -1,9 +1,19 @@
-// SPDX-License-Identifier: GPL-2.0
 /*
- * Copyright (C) 2019 Amlogic, Inc. All rights reserved.
+ * sound/soc/amlogic/auge/effects_v2.c
+ *
+ * Copyright (C) 2018 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
  *
  */
-
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/of.h>
@@ -90,7 +100,7 @@ int check_aed_version(void)
 {
 	struct audioeffect *p_effect = get_audioeffects();
 
-	if (!p_effect || !p_effect->chipinfo)
+	if ((!p_effect) || (!p_effect->chipinfo))
 		return -1;
 
 	return p_effect->chipinfo->version;
@@ -100,7 +110,7 @@ bool is_aed_reserve_frddr(void)
 {
 	struct audioeffect *p_effect = get_audioeffects();
 
-	if (!p_effect || !p_effect->chipinfo)
+	if ((!p_effect) || (!p_effect->chipinfo))
 		return false;
 
 	return p_effect->chipinfo->reserved_frddr;
@@ -205,7 +215,7 @@ static int str2int(char *str, unsigned int *data, int size)
 		} else if ((*ptr >= 'a') && (*ptr <= 'f')) {
 			temp = temp * 16 + (*ptr - 'a' + 10);
 		} else if (*ptr == ' ') {
-			*(val + num) = temp;
+			*(val+num) = temp;
 			temp = 0;
 			num++;
 		}
@@ -239,21 +249,21 @@ static int mixer_set_EQ_params(struct snd_kcontrol *kcontrol,
 	}
 
 	p_data = &tmp_data[1];
-	p = &EQ_COEFF[band_id * FILTER_PARAM_SIZE];
+	p = &EQ_COEFF[band_id*FILTER_PARAM_SIZE];
 	for (i = 0; i < FILTER_PARAM_SIZE; i++, p++, p_data++) {
 		*p = *p_data;
 		*(p + EQ_FILTER_SIZE_CH) = *p_data;
 	}
 
 	version = check_aed_version();
-	p = &EQ_COEFF[band_id * FILTER_PARAM_SIZE];
+	p = &EQ_COEFF[band_id*FILTER_PARAM_SIZE];
 	aed_set_ram_coeff(version, (EQ_FILTER_RAM_ADD +
-		band_id * FILTER_PARAM_SIZE),
+		band_id*FILTER_PARAM_SIZE),
 		FILTER_PARAM_SIZE, p);
 
-	p = &EQ_COEFF[band_id * FILTER_PARAM_SIZE + EQ_FILTER_SIZE_CH];
+	p = &EQ_COEFF[band_id*FILTER_PARAM_SIZE + EQ_FILTER_SIZE_CH];
 	aed_set_ram_coeff(version, (EQ_FILTER_RAM_ADD +
-		EQ_FILTER_SIZE_CH + band_id * FILTER_PARAM_SIZE),
+		EQ_FILTER_SIZE_CH + band_id*FILTER_PARAM_SIZE),
 		FILTER_PARAM_SIZE, p);
 
 	return 0;
@@ -299,13 +309,13 @@ static int mixer_set_crossover_params(struct snd_kcontrol *kcontrol,
 	}
 
 	p_data = &tmp_data[1];
-	p = &CROSSOVER_COEFF[band_id * FILTER_PARAM_SIZE];
+	p = &CROSSOVER_COEFF[band_id*FILTER_PARAM_SIZE];
 	for (i = 0; i < FILTER_PARAM_SIZE; i++)
 		*p++ = *p_data++;
 
-	p = &CROSSOVER_COEFF[band_id * FILTER_PARAM_SIZE];
+	p = &CROSSOVER_COEFF[band_id*FILTER_PARAM_SIZE];
 	aed_set_ram_coeff(check_aed_version(), (CROSSOVER_FILTER_RAM_ADD +
-		band_id * FILTER_PARAM_SIZE),
+		band_id*FILTER_PARAM_SIZE),
 		FILTER_PARAM_SIZE, p);
 
 	return 0;
@@ -353,10 +363,9 @@ static int mixer_set_multiband_DRC_params(struct snd_kcontrol *kcontrol,
 		return 0;
 	}
 
-    /*Don't update offset and gain*/
 	p_data = &tmp_data[1];
-	p = &multiband_drc_coeff[band_id * AED_SINGLE_BAND_DRC_SIZE];
-	for (i = 0; i < (AED_SINGLE_BAND_DRC_SIZE - 2) ; i++)
+	p = &multiband_drc_coeff[band_id*AED_SINGLE_BAND_DRC_SIZE];
+	for (i = 0; i < AED_SINGLE_BAND_DRC_SIZE; i++)
 		*p++ = *p_data++;
 
 	p = &multiband_drc_coeff[0];
@@ -405,11 +414,11 @@ static int mixer_set_fullband_DRC_params(struct snd_kcontrol *kcontrol,
 	}
 
 	p_data = &tmp_data[1];
-	p = &fullband_drc_coeff[band_id * AED_FULLBAND_DRC_OFFSET];
+	p = &fullband_drc_coeff[band_id*AED_FULLBAND_DRC_OFFSET];
 	for (i = 0; i < AED_FULLBAND_DRC_OFFSET; i++)
 		*p++ = *p_data++;
 
-	p = &fullband_drc_coeff[band_id * AED_FULLBAND_DRC_OFFSET];
+	p = &fullband_drc_coeff[band_id*AED_FULLBAND_DRC_OFFSET];
 	aed_set_fullband_drc_coeff(band_id, p);
 
 	return 0;
@@ -440,6 +449,7 @@ static void aed_set_drc_data(void)
 	for (i = 0; i < AED_MULTIBAND_DRC_BANDS; i++)
 		aed_set_multiband_drc_coeff(i, p);
 
+
 	/*set FDRC default value*/
 	p = &fullband_drc_coeff[0];
 	for (i = 0; i < AED_FULLBAND_DRC_GROUP_SIZE; i++) {
@@ -452,60 +462,61 @@ static const DECLARE_TLV_DB_SCALE(master_vol_tlv, -12276, 12, 1);
 static const DECLARE_TLV_DB_SCALE(lr_vol_tlv, -12750, 50, 1);
 
 static const struct snd_kcontrol_new snd_effect_controls[] = {
+
 	SOC_SINGLE_EXT("AED DC cut enable",
-		       AED_DC_EN, 0, 0x1, 0,
-		       mixer_aed_read, mixer_aed_write),
+		AED_DC_EN, 0, 0x1, 0,
+		mixer_aed_read, mixer_aed_write),
 
 	SOC_SINGLE_EXT("AED Noise Detect enable",
-		       AED_ND_CNTL, 0, 0x1, 0,
-		       mixer_aed_read, mixer_aed_write),
+		AED_ND_CNTL, 0, 0x1, 0,
+		mixer_aed_read, mixer_aed_write),
 
 	SOC_SINGLE_EXT("AED EQ enable",
-		       AED_EQ_EN, 0, 0x1, 0,
-		       mixer_aed_read, mixer_aed_write),
+		AED_EQ_EN, 0, 0x1, 0,
+		mixer_aed_read, mixer_aed_write),
 
 	SND_SOC_BYTES_EXT("AED EQ Parameters",
-			  (EQ_FILTER_SIZE_CH * 4),
-			  mixer_get_EQ_params,
-			  mixer_set_EQ_params),
+		(EQ_FILTER_SIZE_CH * 4),
+		mixer_get_EQ_params,
+		mixer_set_EQ_params),
 
 	SOC_SINGLE_EXT("AED Multi-band DRC enable",
-		       AED_MDRC_CNTL, 8, 0x1, 0,
-		       mixer_aed_read, mixer_aed_write),
+		AED_MDRC_CNTL, 8, 0x1, 0,
+		mixer_aed_read, mixer_aed_write),
 
 	SND_SOC_BYTES_EXT("AED Crossover Filter Parameters",
-			  (CROSSOVER_FILTER_SIZE * 4),
-			  mixer_get_crossover_params,
-			  mixer_set_crossover_params),
+		(CROSSOVER_FILTER_SIZE * 4),
+		mixer_get_crossover_params,
+		mixer_set_crossover_params),
 
 	SND_SOC_BYTES_EXT("AED Multi-band DRC Parameters",
-			  (AED_MULTIBAND_DRC_SIZE * 4),
-			  mixer_get_multiband_DRC_params,
-			  mixer_set_multiband_DRC_params),
+		(AED_MULTIBAND_DRC_SIZE * 4),
+		mixer_get_multiband_DRC_params,
+		mixer_set_multiband_DRC_params),
 
 	SOC_SINGLE_EXT("AED Full-band DRC enable",
-		       AED_DRC_CNTL, 0, 0x1, 0,
-		       mixer_aed_read, mixer_aed_write),
+		AED_DRC_CNTL, 0, 0x1, 0,
+		mixer_aed_read, mixer_aed_write),
 
 	SND_SOC_BYTES_EXT("AED Full-band DRC Parameters",
-			  AED_FULLBAND_DRC_BYTES,
-			  mixer_get_fullband_DRC_params,
-			  mixer_set_fullband_DRC_params),
+		AED_FULLBAND_DRC_BYTES,
+		mixer_get_fullband_DRC_params,
+		mixer_set_fullband_DRC_params),
 
 	SOC_SINGLE_EXT_TLV("AED Lch volume",
-			   AED_EQ_VOLUME, 0, 0xFF, 1,
-			   mixer_aed_read, mixer_aed_write,
-			   lr_vol_tlv),
+		AED_EQ_VOLUME, 0, 0xFF, 1,
+		mixer_aed_read, mixer_aed_write,
+		lr_vol_tlv),
 
 	SOC_SINGLE_EXT_TLV("AED Rch volume",
-			   AED_EQ_VOLUME, 8, 0xFF, 1,
-			   mixer_aed_read, mixer_aed_write,
-			   lr_vol_tlv),
+		AED_EQ_VOLUME, 8, 0xFF, 1,
+		mixer_aed_read, mixer_aed_write,
+		lr_vol_tlv),
 
 	SOC_SINGLE_EXT_TLV("AED master volume",
-			   AED_EQ_VOLUME, 16, 0x3FF, 1,
-			   mixer_aed_read, mixer_aed_write,
-			   master_vol_tlv),
+		AED_EQ_VOLUME, 16, 0x3FF, 1,
+		mixer_aed_read, mixer_aed_write,
+		master_vol_tlv),
 
 	SOC_SINGLE_EXT("AED Clip THD",
 		       AED_CLIP_THD, 0, 0x7FFFFF, 0,
@@ -727,22 +738,9 @@ static struct platform_driver effect_platform_driver = {
 	},
 	.probe  = effect_platform_probe,
 };
+module_platform_driver(effect_platform_driver);
 
-int __init effect_platform_init(void)
-{
-	return platform_driver_register(&(effect_platform_driver));
-}
-
-void __exit effect_platform_exit(void)
-{
-	platform_driver_unregister(&effect_platform_driver);
-}
-
-#ifndef MODULE
-module_init(effect_platform_init);
-module_exit(effect_platform_exit);
 MODULE_AUTHOR("AMLogic, Inc.");
 MODULE_DESCRIPTION("Amlogic Audio Effects driver");
 MODULE_LICENSE("GPL");
 MODULE_ALIAS("platform:" DRV_NAME);
-#endif

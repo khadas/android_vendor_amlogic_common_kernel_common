@@ -1,4 +1,3 @@
-/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
  * include/linux/amlogic/media/video_sink/video_prot.h
  *
@@ -71,9 +70,9 @@ struct video_prot_s {
 void video_prot_init(struct video_prot_s *video_prot, struct vframe_s *vf);
 void video_prot_clear(struct video_prot_s *video_prot);
 void video_prot_set_angle(struct video_prot_s *video_prot,
-			  u32 angle_orientation);
+	u32 angle_orientation);
 void video_prot_revert_vframe(struct video_prot_s *video_prot,
-			      struct vframe_s *vf);
+	struct vframe_s *vf);
 void video_prot_set_canvas(struct vframe_s *vf);
 void video_prot_gate_on(void);
 void video_prot_gate_off(void);
@@ -81,5 +80,5 @@ u32 get_video_angle(void);
 u32 get_prot_status(void);
 void set_video_angle(u32 s_value);
 void video_prot_axis(struct video_prot_s *video_prot, u32 hd_start, u32 hd_end,
-		     u32 vd_start, u32 vd_end);
+	u32 vd_start, u32 vd_end);
 #endif

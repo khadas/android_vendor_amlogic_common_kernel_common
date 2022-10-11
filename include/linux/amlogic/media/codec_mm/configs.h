@@ -1,6 +1,18 @@
-/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * include/linux/amlogic/media/codec_mm/configs.h
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
 #ifndef AMLOGIC_MEDIA_CONFIG_HEADER__
@@ -69,7 +81,6 @@ struct mconfig_node {
 	struct list_head list;
 	int son_node_num;
 	struct list_head son_node_list;
-	/* mutex lock */
 	struct mutex lock;
 	int configs_num;
 	struct mconfig *configs;
@@ -124,13 +135,14 @@ struct mconfig_node {
 	{.type = CONFIG_TYPE_FUN, .item_name = (n),\
 	.f_get = (fget), .f_set = (fset), .id = (cid)}
 
+
 #define REG_CONFIGS(node, configs) \
 	configs_register_configs(node, configs,\
-	sizeof(configs) / sizeof(struct mconfig))
+	sizeof(configs)/sizeof(struct mconfig))
 
 #define REG_PATH_CONFIGS(path, configs) \
 		configs_register_path_configs(path, configs,\
-		sizeof(configs) / sizeof(struct mconfig))
+		sizeof(configs)/sizeof(struct mconfig))
 
 #define INIT_REG_NODE_CONFIGS(prefix, node, name, config, rw)\
 	do {\
@@ -142,76 +154,99 @@ struct mconfig_node {
 int configs_inc_node_ref(struct mconfig_node *node);
 int configs_dec_node_ref(struct mconfig_node *node);
 
-int configs_init_new_node(struct mconfig_node *node, const char *name,
-			  int rw_flags);
+int configs_init_new_node(
+	struct mconfig_node *node, const char *name,
+	int rw_flags);
 
-int configs_register_node(struct mconfig_node *parent,
-			  struct mconfig_node *new_node);
-int configs_register_path_node(const char *path, struct mconfig_node *new_node);
+int configs_register_node(
+	struct mconfig_node *parent,
+	struct mconfig_node *new_node);
+int configs_register_path_node(
+	const char *path, struct mconfig_node *new_node);
 
-int configs_register_configs(struct mconfig_node *node, struct mconfig *configs,
-			     int num);
-int configs_register_path_configs(const char *path, struct mconfig *configs,
-				  int num);
+int configs_register_configs(
+	struct mconfig_node *node, struct mconfig *configs,
+	int num);
+int configs_register_path_configs(
+	const char *path, struct mconfig *configs,
+	int num);
 
-int configs_del_endnode(struct mconfig_node *parent, struct mconfig_node *node);
-int configs_get_node_path_u32(struct mconfig_node *topnode, const char *path,
-			      u32 *val);
-int configs_get_node_path_u64(struct mconfig_node *topnode, const char *path,
-			      u64 *val);
-int configs_get_node_path_2u32(struct mconfig_node *topnode, const char *path,
-			       u32 *val);
-int configs_get_node_path_buf(struct mconfig_node *topnode, const char *path,
-			      char *buf, int size);
-int configs_set_node_path_u32(struct mconfig_node *topnode, const char *path,
-			      u32 val);
-int configs_set_node_path_u64(struct mconfig_node *topnode, const char *path,
-			      u64 val);
-int configs_set_node_path_2u32(struct mconfig_node *topnode, const char *path,
-			       u32 val1, u32 val2);
+int configs_del_endnode(
+	struct mconfig_node *parent, struct mconfig_node *node);
+int configs_get_node_path_u32(
+	struct mconfig_node *topnode, const char *path,
+	u32 *val);
+int configs_get_node_path_u64(
+	struct mconfig_node *topnode, const char *path,
+	u64 *val);
+int configs_get_node_path_2u32(
+	struct mconfig_node *topnode, const char *path,
+	u32 *val);
+int configs_get_node_path_buf(
+	struct mconfig_node *topnode, const char *path,
+	char *buf, int size);
+int configs_set_node_path_u32(
+	struct mconfig_node *topnode, const char *path,
+	u32 val);
+int configs_set_node_path_u64(
+	struct mconfig_node *topnode, const char *path,
+	u64 val);
+int configs_set_node_path_2u32(
+	struct mconfig_node *topnode, const char *path,
+	u32 val1, u32 val2);
 
-int configs_set_node_path_str(struct mconfig_node *topnode, const char *path,
-			      const char *val);
-int configs_set_node_path_valonpath(struct mconfig_node *topnode,
-				    const char *path);
+int configs_set_node_path_str(
+	struct mconfig_node *topnode, const char *path,
+	const char *val);
+int configs_set_node_path_valonpath(
+	struct mconfig_node *topnode,
+	const char *path);
 
-static inline int configs_set_path_str(const char *path, const char *val)
+static inline int configs_set_path_str(
+	const char *path, const char *val)
 {
 	return configs_set_node_path_str(NULL, path, val);
 }
 
-int configs_set_node_path_str(struct mconfig_node *topnode, const char *path,
-			      const char *val);
+int configs_set_node_path_str(
+	struct mconfig_node *topnode, const char *path,
+	const char *val);
 
-int configs_set_node_nodepath_str(struct mconfig_node *topnode,
-				  const char *path, const char *val);
+int configs_set_node_nodepath_str(
+	struct mconfig_node *topnode,
+	const char *path, const char *val);
 
-static inline int configs_set_path_valonpath(const char *path)
+static inline int configs_set_path_valonpath(
+	const char *path)
 {
 	return configs_set_node_path_valonpath(NULL, path);
 }
 
-int configs_set_prefix_path_valonpath(const char *prfix, const char *pathval);
-int configs_set_prefix_path_str(const char *prfix, const char *path,
-				const char *str);
+int configs_set_prefix_path_valonpath(
+	const char *prfix, const char *pathval);
+int configs_set_prefix_path_str(
+	const char *prfix, const char *path,
+	const char *str);
 
-int configs_get_node_path_str(struct mconfig_node *topnode, const char *path,
-			      char *buf, int size);
+int configs_get_node_path_str(
+	struct mconfig_node *topnode, const char *path,
+	char *buf, int size);
 
-int configs_get_node_nodepath_str(struct mconfig_node *topnode,
-				  const char *path, char *buf, int size);
+int configs_get_node_nodepath_str(
+	struct mconfig_node *topnode,
+	const char *path, char *buf, int size);
 
 #define LIST_MODE_LIST_RD			(CONFIG_FOR_R)
 #define LIST_MODE_LIST_WD			(CONFIG_FOR_W)
 #define LIST_MODE_LIST_RW (LIST_MODE_LIST_RD | LIST_MODE_LIST_WD)
-#define LIST_MODE_VAL				BIT(8)
-#define LIST_MODE_CONFIGS			BIT(9)
+#define LIST_MODE_VAL				(1<<8)
+#define LIST_MODE_CONFIGS			(1<<9)
 #define LIST_MODE_CONFIGS_VAL	(LIST_MODE_VAL | LIST_MODE_CONFIGS)
-#define LIST_MODE_NODE_INFO		BIT(10)
-#define LIST_MODE_PATH_NODE		BIT(11)
-#define LIST_MODE_PATH_PREFIX	BIT(12)
-#define LIST_MODE_PATH_FULLPREFIX   BIT(13)
-#define LIST_MODE_SUB_NODES		BIT(15)
+#define LIST_MODE_NODE_INFO		(1<<10)
+#define LIST_MODE_PATH_NODE		(1<<11)
+#define LIST_MODE_PATH_PREFIX	(1<<12)
+#define LIST_MODE_PATH_FULLPREFIX   (1<<13)
+#define LIST_MODE_SUB_NODES		(1<<15)
 
 #define LIST_MODE_NODE_PATH_CONFIGS \
 	(LIST_MODE_LIST_RW | LIST_MODE_PATH_PREFIX | LIST_MODE_CONFIGS)
@@ -227,9 +262,9 @@ int configs_get_node_nodepath_str(struct mconfig_node *topnode,
 	(LIST_MODE_FULL_CMA_ALL | LIST_MODE_VAL)
 
 int configs_list_node_configs(struct mconfig_node *node, char *buf, int size,
-			      int mode);
+							  int mode);
 int configs_list_nodes(struct mconfig_node *node, char *buf, int size,
-		       int mode);
+					   int mode);
 int configs_list_path_nodes(const char *prefix, char *buf, int size, int mode);
 
 #endif

@@ -1,7 +1,18 @@
-config AMLOGIC_DRM
-	tristate "DRM Support for Amlogic new Display Controller"
+menuconfig AMLOGIC_DRM
+	bool "Amlogic drm support"
+	depends on AMLOGIC_DRIVER && DRM
 	default n
-	depends on AMLOGIC_DRIVER && DRM && OF && (ARM || ARM64)
+	help
+		amlogic drm driver provide drm support on Amlogic
+		SOC chips.
+choice
+	prompt "meson drm driver type"
+	depends on AMLOGIC_DRM
+	default DRM_MESON
+
+config DRM_MESON
+	tristate "DRM Support for Amlogic new Display Controller"
+	depends on DRM && OF && (ARM || ARM64)
 	select DRM_KMS_HELPER
 	select DRM_KMS_CMA_HELPER
 	select DRM_GEM_CMA_HELPER
@@ -11,10 +22,25 @@ config AMLOGIC_DRM
 		amlogic new soc display controller
 		use the pipeline and modularized
 
+config DRM_MESON_V0
+	tristate "DRM Support for Amlogic old Display Controller"
+	depends on DRM && OF && (ARM || ARM64)
+	select DRM_KMS_HELPER
+	select DRM_KMS_CMA_HELPER
+	select DRM_GEM_CMA_HELPER
+	select VIDEOMODE_HELPERS
+	select REGMAP_MMIO
+	help
+		amlogic old soc display controller
+		use the osd driver
+endchoice
+
+if DRM_MESON
+
 config DRM_MESON_VPU
-	bool "support drm vpu function for meson drm display."
+	tristate "support drm vpu function for meson drm display."
 	default n
-	depends on AMLOGIC_DRM
+	depends on DRM_MESON
 	help
 		add drm vpu support.
 		Choose this option if you have a aMLOGIC soc chipset.
@@ -22,9 +48,9 @@ config DRM_MESON_VPU
 		This driver also provides crtcs and planes management.
 
 config DRM_MESON_HDMI
-	bool "support drm hdmi function for meson drm display."
+	tristate "support drm hdmi function for meson drm display."
 	default n
-	depends on AMLOGIC_DRM
+	depends on DRM_MESON
 	depends on AMLOGIC_HDMITX
 	help
 		add drm hdmi support.
@@ -33,9 +59,9 @@ config DRM_MESON_HDMI
 		DRM_MESON_HDMI is selected.
 
 config DRM_MESON_CVBS
-	bool "support drm cvbs function for meson drm display."
+	tristate "support drm cvbs function for meson drm display."
 	default n
-	depends on AMLOGIC_DRM
+	depends on DRM_MESON
 	depends on AMLOGIC_CVBS_OUTPUT
 	help
 		add drm cvbs support.
@@ -44,9 +70,9 @@ config DRM_MESON_CVBS
 		DRM_MESON_CVBS is selected.
 
 config DRM_MESON_PANEL
-	bool "support drm panel function for meson drm display."
+	tristate "support drm panel function for meson drm display."
 	default n
-	depends on AMLOGIC_DRM
+	depends on DRM_MESON
 	depends on AMLOGIC_LCD
 	select DRM_PANEL
 	select DRM_MIPI_DSI
@@ -59,7 +85,7 @@ config DRM_MESON_PANEL
 config DRM_MESON_USE_ION
 	bool "gem use ion to alloc/free graphic buffer."
 	default n
-	depends on AMLOGIC_DRM
+	depends on DRM_MESON
 	help
 		MESON DRM use CMA HELPER to manage framebuffer.
 		It need reserve memory in CMA pool.
@@ -71,10 +97,9 @@ config DRM_MESON_USE_ION
 config DRM_MESON_EMULATE_FBDEV
 	bool "emulate framebuffer dev by drm."
 	default n
-	depends on AMLOGIC_DRM && DRM_MESON_USE_ION
+	depends on DRM_MESON && DRM_MESON_USE_ION
 	help
-		Emulate framebuffer device for device
-		which need use fbdev api.
+		Emulate framebuffer device for device which need use fbdev api.
 
 config DRM_MESON_FBDEV_UI_W
 	int "fbdev ui size width"
@@ -91,3 +116,10 @@ config DRM_MESON_FBDEV_UI_H
 	help
 		UI size height
 
+endif
+
+if DRM_MESON_V0
+
+source "drivers/amlogic/drm/drm-v0/Kconfig"
+
+endif

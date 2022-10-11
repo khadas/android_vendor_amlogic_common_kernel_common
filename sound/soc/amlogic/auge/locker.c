@@ -1,10 +1,21 @@
-// SPDX-License-Identifier: GPL-2.0
 /*
- * Copyright (C) 2019 Amlogic, Inc. All rights reserved.
+ * sound/soc/amlogic/auge/locker.c
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
  *
  */
-
 #define DEBUG
+
 
 #include <linux/kernel.h>
 #include <linux/module.h>
@@ -46,31 +57,33 @@ static int audiolocker_pll_config(struct audiolocker *p_audiolocker)
 
 	/* mpll1 --> mclk_d */
 	audiobus_write(EE_AUDIO_MCLK_D_CTRL,
-		       1 << 31 | 1 << 24 | (49 - 1) << 0);
+		1 << 31 | 1 << 24 | (49 - 1) << 0);
 
 	/* mpll2 --> mclk_e */
 	audiobus_write(EE_AUDIO_MCLK_E_CTRL,
-		       1 << 31 | 2 << 24 | (49 - 1) << 0);
+		1 << 31 | 2 << 24 | (49 - 1) << 0);
 
 	/* lockin select mclk_d, lockout select mclk_e */
 	audiobus_write(EE_AUDIO_CLK_LOCKER_CTRL,
-		       1 << 31 | /* lockout enable */
-		       4 << 24 | /*lock_out_clk, 3:mst_d_mclk, 27~24*/
-		       0 << 16 | /*clk_div, 23~16*/
-		       1 << 15 | /* locker in enable */
-		       3 << 8  | /*lock_in_clk, 4:mst_e_mclk, 11~8*/
-		       0 << 0    /*clk_div, 7~0*/
-	);
+		1 << 31 | /* lockout enable */
+		4 << 24 | /*lock_out_clk, 3:mst_d_mclk, 27~24*/
+		0 << 16 | /*clk_div, 23~16*/
+		1 << 15 | /* locker in enable */
+		3 << 8  | /*lock_in_clk, 4:mst_e_mclk, 11~8*/
+		0 << 0    /*clk_div, 7~0*/
+		);
 #else
 	int ret;
 
-	clk_set_rate(p_audiolocker->out_calc, p_audiolocker->expected_freq);
-	clk_set_rate(p_audiolocker->in_ref, p_audiolocker->expected_freq);
+	clk_set_rate(p_audiolocker->out_calc,
+		p_audiolocker->expected_freq);
+	clk_set_rate(p_audiolocker->in_ref,
+		p_audiolocker->expected_freq);
 
 	clk_set_rate(p_audiolocker->out_src,
-		     p_audiolocker->expected_freq / p_audiolocker->dividor);
+		p_audiolocker->expected_freq / p_audiolocker->dividor);
 	clk_set_rate(p_audiolocker->in_src,
-		     p_audiolocker->expected_freq / p_audiolocker->dividor);
+		p_audiolocker->expected_freq / p_audiolocker->dividor);
 
 	ret = clk_prepare_enable(p_audiolocker->in_ref);
 	if (ret) {
@@ -117,32 +130,32 @@ static void audiolocker_init(struct audiolocker *p_audiolocker)
 
 		/* audiolocker irq*/
 		audiolocker_irq_config();
-	} else {
+	} else
 		audiolocker_disable();
-	}
 }
 
 static irqreturn_t locker_isr_handler(int irq, void *data)
 {
 	struct audiolocker *p_audiolocker = (struct audiolocker *)data;
 
-	audiolocker_update_clks(p_audiolocker->out_calc,
-				p_audiolocker->in_ref);
+	audiolocker_update_clks(
+		p_audiolocker->out_calc,
+		p_audiolocker->in_ref);
 
 	return IRQ_HANDLED;
 }
 
 static ssize_t locker_enable_show(struct device *dev,
-				  struct device_attribute *attr, char *buf)
+			       struct device_attribute *attr, char *buf)
 {
 	struct audiolocker *p_audiolocker = dev_get_drvdata(dev);
 
 	return sprintf(buf, "%d\n", p_audiolocker->enable);
 }
 
-static ssize_t locker_enable_store(struct device *dev,
-				   struct device_attribute *attr,
-				   const char *buf, size_t count)
+static ssize_t locker_enable_set(struct device *dev,
+			      struct device_attribute *attr,
+			      const char *buf, size_t count)
 {
 	struct audiolocker *p_audiolocker = dev_get_drvdata(dev);
 	int target, ret;
@@ -163,7 +176,9 @@ static ssize_t locker_enable_store(struct device *dev,
 	return count;
 }
 
-static DEVICE_ATTR_RW(locker_enable);
+static DEVICE_ATTR(locker_enable, 0644,
+	locker_enable_show,
+	locker_enable_set);
 
 void audio_locker_set(int enable)
 {
@@ -190,8 +205,8 @@ static int audiolocker_platform_probe(struct platform_device *pdev)
 	pr_info("%s\n", __func__);
 
 	p_audiolocker = devm_kzalloc(&pdev->dev,
-				     sizeof(struct audiolocker),
-				     GFP_KERNEL);
+			sizeof(struct audiolocker),
+			GFP_KERNEL);
 	if (!p_audiolocker) {
 		/*dev_err(&pdev->dev, "Can't allocate for audiolocker\n");*/
 		return -ENOMEM;
@@ -241,7 +256,7 @@ static int audiolocker_platform_probe(struct platform_device *pdev)
 	}
 
 	ret = clk_set_parent(p_audiolocker->lock_in,
-			     p_audiolocker->in_src);
+		p_audiolocker->in_src);
 	if (ret) {
 		dev_err(&pdev->dev,
 			"Can't set lock_in parent clock\n");
@@ -250,7 +265,7 @@ static int audiolocker_platform_probe(struct platform_device *pdev)
 	}
 
 	ret = clk_set_parent(p_audiolocker->lock_out,
-			     p_audiolocker->out_src);
+		p_audiolocker->out_src);
 	if (ret) {
 		dev_err(&pdev->dev,
 			"Can't set lock_out parent clock\n");
@@ -259,7 +274,7 @@ static int audiolocker_platform_probe(struct platform_device *pdev)
 	}
 
 	ret = clk_set_parent(p_audiolocker->in_src,
-			     p_audiolocker->in_ref);
+		p_audiolocker->in_ref);
 	if (ret) {
 		dev_err(&pdev->dev,
 			"Can't set in_src parent clock\n");
@@ -268,7 +283,7 @@ static int audiolocker_platform_probe(struct platform_device *pdev)
 	}
 
 	ret = clk_set_parent(p_audiolocker->out_src,
-			     p_audiolocker->out_calc);
+		p_audiolocker->out_calc);
 	if (ret) {
 		dev_err(&pdev->dev,
 			"Can't set out_src parent clock\n");
@@ -277,10 +292,10 @@ static int audiolocker_platform_probe(struct platform_device *pdev)
 	}
 
 	of_property_read_u32(pdev->dev.of_node, "frequency",
-			     &p_audiolocker->expected_freq);
+			&p_audiolocker->expected_freq);
 
 	of_property_read_u32(pdev->dev.of_node, "dividor",
-			     &p_audiolocker->dividor);
+			&p_audiolocker->dividor);
 	if (!p_audiolocker->dividor)
 		p_audiolocker->dividor = 1;
 
@@ -293,10 +308,10 @@ static int audiolocker_platform_probe(struct platform_device *pdev)
 	}
 
 	ret = request_irq(p_audiolocker->irq,
-			  locker_isr_handler,
-			  IRQF_SHARED,
-			  "audiolocker",
-			  p_audiolocker);
+			locker_isr_handler,
+			IRQF_SHARED,
+			"audiolocker",
+			p_audiolocker);
 	if (ret < 0) {
 		dev_err(&pdev->dev,
 			"audio audiolocker irq register fail\n");
@@ -333,18 +348,4 @@ static struct platform_driver audiolocker_platform_driver = {
 	},
 	.probe  = audiolocker_platform_probe,
 };
-
-int __init audio_locker_init(void)
-{
-	return platform_driver_register(&(audiolocker_platform_driver));
-}
-
-void __exit audio_locker_exit(void)
-{
-	platform_driver_unregister(&audiolocker_platform_driver);
-}
-
-#ifndef MODULE
-module_init(audio_locker_init);
-module_exit(audio_locker_exit);
-#endif
+module_platform_driver(audiolocker_platform_driver);

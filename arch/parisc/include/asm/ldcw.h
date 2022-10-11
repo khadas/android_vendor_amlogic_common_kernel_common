@@ -1,4 +1,3 @@
-/* SPDX-License-Identifier: GPL-2.0 */
 #ifndef __PARISC_LDCW_H
 #define __PARISC_LDCW_H
 
@@ -52,7 +51,7 @@
 })
 
 #ifdef CONFIG_SMP
-# define __lock_aligned __section(.data..lock_aligned)
+# define __lock_aligned __attribute__((__section__(".data..lock_aligned")))
 #endif
 
 #endif /* __PARISC_LDCW_H */

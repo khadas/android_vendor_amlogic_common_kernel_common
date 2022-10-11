@@ -1,8 +1,15 @@
-// SPDX-License-Identifier: GPL-2.0
 /*
- * ALSA SoC ad82584f codec driver
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
  *
- * Copyright (C) 2019 Amlogic,inc
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
  *
  */
 
@@ -20,8 +27,6 @@
 #include <linux/amlogic/aml_gpio_consumer.h>
 
 #include "ad82584f.h"
-
-#define DRV_NAME "ad82584f"
 
 #ifdef CONFIG_HAS_EARLYSUSPEND
 #include <linux/earlysuspend.h>
@@ -45,6 +50,10 @@ static void ad82584f_late_resume(struct early_suspend *h);
 
 static const DECLARE_TLV_DB_SCALE(mvol_tlv, -10300, 50, 1);
 static const DECLARE_TLV_DB_SCALE(chvol_tlv, -10300, 50, 1);
+
+static int ad82584f_reg_init(struct snd_soc_codec *codec);
+static int ad82584f_set_eq_drc(struct snd_soc_codec *codec,
+			       int ram_id, char *ram_ptr);
 static int ad82584f_get_ram_param(struct snd_kcontrol *kcontrol,
 				  unsigned int __user *bytes,
 				  unsigned int size);
@@ -60,11 +69,11 @@ static int ad82584f_set_reg(struct snd_kcontrol *kcontrol,
 
 static const struct snd_kcontrol_new ad82584f_snd_controls[] = {
 	SOC_SINGLE_TLV("Master Volume", MVOL, 0,
-		0xff, 1, mvol_tlv),
+				0xff, 1, mvol_tlv),
 	SOC_SINGLE_TLV("Ch1 Volume", C1VOL, 0,
-		0xff, 1, chvol_tlv),
+				0xff, 1, chvol_tlv),
 	SOC_SINGLE_TLV("Ch2 Volume", C2VOL, 0,
-		0xff, 1, chvol_tlv),
+			0xff, 1, chvol_tlv),
 
 	SOC_SINGLE("Ch1 Switch", MUTE, 5, 1, 1),
 	SOC_SINGLE("Ch2 Switch", MUTE, 4, 1, 1),
@@ -617,11 +626,10 @@ static char m_ram2_tab[AD82584F_RAM_TABLE_COUNT][4] = {
 	{0x7e, 0x00, 0x00, 0x00},//##Reserve
 	{0x7f, 0x00, 0x00, 0x00},//##Reserve
 };
-
 /* codec private data */
 struct ad82584f_priv {
 	struct regmap *regmap;
-	struct snd_soc_component *component;
+	struct snd_soc_codec *codec;
 	struct ad82584f_platform_data *pdata;
 
 	unsigned char Ch1_vol;
@@ -639,7 +647,7 @@ struct ad82584f_priv {
 };
 
 static int ad82584f_set_dai_sysclk(struct snd_soc_dai *codec_dai,
-	int clk_id, unsigned int freq, int dir)
+				  int clk_id, unsigned int freq, int dir)
 {
 	return 0;
 }
@@ -674,8 +682,40 @@ static int ad82584f_set_dai_fmt(struct snd_soc_dai *codec_dai, unsigned int fmt)
 	return 0;
 }
 
-static int ad82584f_set_bias_level(struct snd_soc_component *component,
-	enum snd_soc_bias_level level)
+static int ad82584f_hw_params(struct snd_pcm_substream *substream,
+			     struct snd_pcm_hw_params *params,
+			     struct snd_soc_dai *dai)
+{
+	unsigned int rate;
+
+	rate = params_rate(params);
+	pr_debug("rate: %u\n", rate);
+
+	switch (params_format(params)) {
+	case SNDRV_PCM_FORMAT_S24_LE:
+	case SNDRV_PCM_FORMAT_S24_BE:
+		pr_debug("24bit\n");
+	/* fall through */
+	case SNDRV_PCM_FORMAT_S32_LE:
+	case SNDRV_PCM_FORMAT_S20_3LE:
+	case SNDRV_PCM_FORMAT_S20_3BE:
+		pr_debug("20bit\n");
+
+		break;
+	case SNDRV_PCM_FORMAT_S16_LE:
+	case SNDRV_PCM_FORMAT_S16_BE:
+		pr_debug("16bit\n");
+
+		break;
+	default:
+		return -EINVAL;
+	}
+
+	return 0;
+}
+
+static int ad82584f_set_bias_level(struct snd_soc_codec *codec,
+				  enum snd_soc_bias_level level)
 {
 	pr_debug("level = %d\n", level);
 
@@ -694,43 +734,64 @@ static int ad82584f_set_bias_level(struct snd_soc_component *component,
 		/* The chip runs through the power down sequence for us. */
 		break;
 	}
-	component->dapm.bias_level = level;
+	codec->component.dapm.bias_level = level;
 
 	return 0;
 }
 
+static int ad82584f_prepare(struct snd_pcm_substream *substream,
+				struct snd_soc_dai *dai)
+{
+#if 0
+	struct snd_soc_codec *codec = dai->codec;
+
+	reset_ad82584f(codec);
+	ad82584f_reg_init(codec);
+
+	/*eq and drc*/
+	ad82584f_set_eq_drc(codec);
+
+	/*unmute,default power-on is mute.*/
+	snd_soc_write(codec, 0x02, 0x00);
+#endif
+	return 0;
+
+}
 static const struct snd_soc_dai_ops ad82584f_dai_ops = {
+	.hw_params = ad82584f_hw_params,
 	.set_sysclk = ad82584f_set_dai_sysclk,
-	.set_fmt    = ad82584f_set_dai_fmt,
+	.set_fmt = ad82584f_set_dai_fmt,
+	.prepare = ad82584f_prepare,
 };
 
 static struct snd_soc_dai_driver ad82584f_dai = {
-	.name     = DRV_NAME,
+	.name = "ad82584f",
 	.playback = {
-		.stream_name  = "HIFI Playback",
+		.stream_name = "HIFI Playback",
 		.channels_min = 2,
 		.channels_max = 16,
-		.rates        = AD82584F_RATES,
-		.formats      = AD82584F_FORMATS,
+		.rates = AD82584F_RATES,
+		.formats = AD82584F_FORMATS,
 	},
-	.ops      = &ad82584f_dai_ops,
+	.ops = &ad82584f_dai_ops,
 };
 
-static int ad82584f_set_eq_drc(struct snd_soc_component *component,
+
+static int ad82584f_set_eq_drc(struct snd_soc_codec *codec,
 			       int ram_id, char *ram_ptr)
 {
 	int i;
 	char *ptr = ram_ptr;
 
 	for (i = 0; i < AD82584F_RAM_TABLE_COUNT; i++) {
-		snd_soc_component_write(component, CFADDR, *ptr++);
-		snd_soc_component_write(component, A1CF1, *ptr++);
-		snd_soc_component_write(component, A1CF2, *ptr++);
-		snd_soc_component_write(component, A1CF3, *ptr++);
+		snd_soc_write(codec, CFADDR, *ptr++);
+		snd_soc_write(codec, A1CF1, *ptr++);
+		snd_soc_write(codec, A1CF2, *ptr++);
+		snd_soc_write(codec, A1CF3, *ptr++);
 		if (ram_id == 1)
-			snd_soc_component_write(component, CFUD, 0x1);
+			snd_soc_write(codec, CFUD, 0x1);
 		else if (ram_id == 2)
-			snd_soc_component_write(component, CFUD, 0x41);
+			snd_soc_write(codec, CFUD, 0x41);
 	}
 
 	return 0;
@@ -741,7 +802,8 @@ static int ad82584f_set_ram_param(struct snd_kcontrol *kcontrol,
 				  unsigned int size)
 {
 	struct snd_soc_component *component = snd_kcontrol_chip(kcontrol);
-	struct ad82584f_priv *ad82584f = snd_soc_component_get_drvdata(component);
+	struct snd_soc_codec *codec = snd_soc_component_to_codec(component);
+	struct ad82584f_priv *ad82584f = snd_soc_codec_get_drvdata(codec);
 	struct snd_ctl_tlv *tlv;
 	char *val = (char *)bytes + sizeof(*tlv);
 	char *p1 = ad82584f->m_ram1_tab;
@@ -757,8 +819,8 @@ static int ad82584f_set_ram_param(struct snd_kcontrol *kcontrol,
 	if (res)
 		return -EFAULT;
 
-	ad82584f_set_eq_drc(component, 1, p1);
-	ad82584f_set_eq_drc(component, 2, p2);
+	ad82584f_set_eq_drc(codec, 1, p1);
+	ad82584f_set_eq_drc(codec, 2, p2);
 
 	return 0;
 }
@@ -768,7 +830,8 @@ static int ad82584f_get_ram_param(struct snd_kcontrol *kcontrol,
 				  unsigned int size)
 {
 	struct snd_soc_component *component = snd_kcontrol_chip(kcontrol);
-	struct ad82584f_priv *ad82584f = snd_soc_component_get_drvdata(component);
+	struct snd_soc_codec *codec = snd_soc_component_to_codec(component);
+	struct ad82584f_priv *ad82584f = snd_soc_codec_get_drvdata(codec);
 	struct snd_ctl_tlv *tlv;
 	char *val = (char *)bytes + sizeof(*tlv);
 	char *p1 = ad82584f->m_ram1_tab;
@@ -792,7 +855,8 @@ static int ad82584f_set_reg(struct snd_kcontrol *kcontrol,
 			    unsigned int size)
 {
 	struct snd_soc_component *component = snd_kcontrol_chip(kcontrol);
-	struct ad82584f_priv *ad82584f = snd_soc_component_get_drvdata(component);
+	struct snd_soc_codec *codec = snd_soc_component_to_codec(component);
+	struct ad82584f_priv *ad82584f = snd_soc_codec_get_drvdata(codec);
 	struct snd_ctl_tlv *tlv;
 	char *val = (char *)bytes + sizeof(*tlv);
 	char *p1 = ad82584f->m_reg_tab;
@@ -808,7 +872,7 @@ static int ad82584f_set_reg(struct snd_kcontrol *kcontrol,
 		int reg = (int)p1[2 * i];
 		int val = (int)p1[2 * i + 1];
 
-		snd_soc_component_write(component, reg, val);
+		snd_soc_write(codec, reg, val);
 	};
 
 	return 0;
@@ -819,7 +883,8 @@ static int ad82584f_get_reg(struct snd_kcontrol *kcontrol,
 			    unsigned int size)
 {
 	struct snd_soc_component *component = snd_kcontrol_chip(kcontrol);
-	struct ad82584f_priv *ad82584f = snd_soc_component_get_drvdata(component);
+	struct snd_soc_codec *codec = snd_soc_component_to_codec(component);
+	struct ad82584f_priv *ad82584f = snd_soc_codec_get_drvdata(codec);
 	struct snd_ctl_tlv *tlv;
 	char *val = (char *)bytes + sizeof(*tlv);
 	char *p1 = ad82584f->m_reg_tab;
@@ -832,81 +897,92 @@ static int ad82584f_get_reg(struct snd_kcontrol *kcontrol,
 	return 0;
 }
 
-static int ad82584f_GPIO_enable(struct snd_soc_component *component, bool enable)
+static int ad82584f_GPIO_enable(struct snd_soc_codec *codec, bool enable)
 {
-	struct ad82584f_priv *ad82584f =
-		snd_soc_component_get_drvdata(component);
+	struct ad82584f_priv *ad82584f = snd_soc_codec_get_drvdata(codec);
 	struct ad82584f_platform_data *pdata = ad82584f->pdata;
 
 	if (pdata->reset_pin < 0)
 		return 0;
 
-	if (enable) {
+	if (enable == true) {
+#if 0
+		int ret;
+
+		ret = devm_gpio_request_one(codec->dev, pdata->reset_pin,
+						GPIOF_OUT_INIT_LOW,
+						"ad82584f-reset-pin");
+		if (ret < 0) {
+			dev_err(codec->dev, "ad82584f get gpio error!\n");
+			return -1;
+		}
+#endif
 		gpio_direction_output(pdata->reset_pin, GPIOF_OUT_INIT_LOW);
 		usleep_range(10 * 1000, 11 * 1000);
 		gpio_direction_output(pdata->reset_pin, GPIOF_OUT_INIT_HIGH);
-		dev_info(component->dev, "ad82584f start status = %d\n",
+		dev_info(codec->dev, "ad82584f start status = %d\n",
 			gpio_get_value(pdata->reset_pin));
 		usleep_range(1 * 1000, 2 * 1000);
 	} else {
 		/*gpio_direction_output(pdata->reset_pin, GPIOF_OUT_INIT_LOW);*/
 		gpio_set_value(pdata->reset_pin, GPIOF_OUT_INIT_LOW);
-		dev_info(component->dev, "ad82584f stop status = %d\n",
+		dev_info(codec->dev, "ad82584f stop status = %d\n",
 			gpio_get_value(pdata->reset_pin));
-		/*devm_gpio_free(component->dev, pdata->reset_pin);*/
+		/*devm_gpio_free(codec->dev, pdata->reset_pin);*/
 	}
 
 	return 0;
 }
 
-static int ad82584f_reg_init(struct snd_soc_component *component)
+static int ad82584f_reg_init(struct snd_soc_codec *codec)
 {
 	int i = 0;
 
-	for (i = 0; i < AD82584F_REGISTER_COUNT; i++)
-		snd_soc_component_write(component, m_reg_tab[i][0], m_reg_tab[i][1]);
-
+	for (i = 0; i < AD82584F_REGISTER_COUNT; i++) {
+		snd_soc_write(codec, m_reg_tab[i][0], m_reg_tab[i][1]);
+	};
 	return 0;
+
 }
-
-static int ad82584f_init(struct snd_soc_component *component)
+static int ad82584f_init(struct snd_soc_codec *codec)
 {
-	struct ad82584f_priv *ad82584f =
-		snd_soc_component_get_drvdata(component);
+	struct ad82584f_priv *ad82584f = snd_soc_codec_get_drvdata(codec);
 
-	ad82584f_GPIO_enable(component, true);
+	ad82584f_GPIO_enable(codec, true);
 
-	dev_info(component->dev, "%s\n", __func__);
+	dev_info(codec->dev, "ad82584f_init!\n");
 
-	ad82584f_reg_init(component);
+	ad82584f_reg_init(codec);
 
 	/* Bclk system */
-	if (ad82584f->pdata->no_mclk)
-		snd_soc_component_write(component,
+	if (ad82584f->pdata->no_mclk) {
+		snd_soc_write(codec, 0x00, 0x04);
+
+		snd_soc_write(codec,
 			0x01,
 			0x1 << 7 | /* Bclk system enable */
 			0x1 << 0   /* 64x bclk/fs */
-		);
+			);
+	}
 
 	/* eq and drc */
-	ad82584f_set_eq_drc(component, 1, &m_ram1_tab[0][0]);
-	ad82584f_set_eq_drc(component, 2, &m_ram2_tab[0][0]);
+	ad82584f_set_eq_drc(codec, 1, &m_ram1_tab[0][0]);
+	ad82584f_set_eq_drc(codec, 2, &m_ram2_tab[0][0]);
 
 	/* for de-pop */
-	usleep_range(95, 105);
+	udelay(100);
 
-	snd_soc_component_write(component, MVOL, 0x11);
+	snd_soc_write(codec, MVOL, 0x11);
 
 	/* unmute, default power-on is mute. */
-	snd_soc_component_write(component, MUTE, 0x00);
+	snd_soc_write(codec, MUTE, 0x00);
 
 	return 0;
 }
 
-static int ad82584f_probe(struct snd_soc_component *component)
+static int ad82584f_probe(struct snd_soc_codec *codec)
 {
-	struct ad82584f_priv *ad82584f =
-		snd_soc_component_get_drvdata(component);
+	struct ad82584f_priv *ad82584f = snd_soc_codec_get_drvdata(codec);
 	struct ad82584f_platform_data *pdata = ad82584f->pdata;
 	int ret = 0;
 
@@ -914,74 +990,72 @@ static int ad82584f_probe(struct snd_soc_component *component)
 	ad82584f->early_suspend.level = EARLY_SUSPEND_LEVEL_BLANK_SCREEN;
 	ad82584f->early_suspend.suspend = ad82584f_early_suspend;
 	ad82584f->early_suspend.resume = ad82584f_late_resume;
-	ad82584f->early_suspend.param = component;
-	register_early_suspend(&ad82584f->early_suspend);
+	ad82584f->early_suspend.param = codec;
+	register_early_suspend(&(ad82584f->early_suspend));
 #endif
 
 	if (pdata->reset_pin > 0) {
-		ret = devm_gpio_request_one(component->dev, pdata->reset_pin,
+		ret = devm_gpio_request_one(codec->dev, pdata->reset_pin,
 						GPIOF_OUT_INIT_LOW,
 						"ad82584f-reset-pin");
 
 		if (ret < 0) {
-			dev_err(component->dev, "ad82584f get gpio error!\n");
+			dev_err(codec->dev, "ad82584f get gpio error!\n");
 			return -1;
 		}
 	}
 
-	ad82584f_init(component);
+	ad82584f_init(codec);
 
 	return 0;
 }
 
-static void ad82584f_remove(struct snd_soc_component *component)
+static int ad82584f_remove(struct snd_soc_codec *codec)
 {
-	struct ad82584f_priv *ad82584f =
-		snd_soc_component_get_drvdata(component);
+	struct ad82584f_priv *ad82584f = snd_soc_codec_get_drvdata(codec);
 	struct ad82584f_platform_data *pdata = ad82584f->pdata;
 
 #ifdef CONFIG_HAS_EARLYSUSPEND
-	unregister_early_suspend(&ad82584f->early_suspend);
+	unregister_early_suspend(&(ad82584f->early_suspend));
 #endif
 
-	devm_gpio_free(component->dev, pdata->reset_pin);
-}
-
-#ifdef CONFIG_PM
-static int ad82584f_suspend(struct snd_soc_component *component)
-{
-	struct ad82584f_priv *ad82584f =
-		snd_soc_component_get_drvdata(component);
-
-	dev_info(component->dev, "%s!\n", __func__);
-
-	/* save volume */
-	ad82584f->Ch1_vol = snd_soc_component_read32(component, C1VOL);
-	ad82584f->Ch2_vol = snd_soc_component_read32(component, C2VOL);
-	ad82584f->master_vol = snd_soc_component_read32(component, MVOL);
-	ad82584f->mute_val = snd_soc_component_read32(component, MUTE);
-
-	ad82584f_set_bias_level(component, SND_SOC_BIAS_OFF);
-
-	ad82584f_GPIO_enable(component, false);
+	devm_gpio_free(codec->dev, pdata->reset_pin);
 	return 0;
 }
 
-static int ad82584f_resume(struct snd_soc_component *component)
+#ifdef CONFIG_PM
+static int ad82584f_suspend(struct snd_soc_codec *codec)
 {
-	struct ad82584f_priv *ad82584f =
-		snd_soc_component_get_drvdata(component);
+	struct ad82584f_priv *ad82584f = snd_soc_codec_get_drvdata(codec);
 
-	dev_info(component->dev, "%s!\n", __func__);
+	dev_info(codec->dev, "ad82584f_suspend!\n");
 
-	ad82584f_init(component);
+	/* save volume */
+	ad82584f->Ch1_vol = snd_soc_read(codec, C1VOL);
+	ad82584f->Ch2_vol = snd_soc_read(codec, C2VOL);
+	ad82584f->master_vol = snd_soc_read(codec, MVOL);
+	ad82584f->mute_val = snd_soc_read(codec, MUTE);
 
-	snd_soc_component_write(component, C1VOL, ad82584f->Ch1_vol);
-	snd_soc_component_write(component, C2VOL, ad82584f->Ch2_vol);
-	snd_soc_component_write(component, MVOL, ad82584f->master_vol);
-	snd_soc_component_write(component, MUTE, ad82584f->mute_val);
+	ad82584f_set_bias_level(codec, SND_SOC_BIAS_OFF);
 
-	ad82584f_set_bias_level(component, SND_SOC_BIAS_STANDBY);
+	ad82584f_GPIO_enable(codec, false);
+	return 0;
+}
+
+static int ad82584f_resume(struct snd_soc_codec *codec)
+{
+	struct ad82584f_priv *ad82584f = snd_soc_codec_get_drvdata(codec);
+
+	dev_info(codec->dev, "ad82584f_resume!\n");
+
+	ad82584f_init(codec);
+
+	snd_soc_write(codec, C1VOL, ad82584f->Ch1_vol);
+	snd_soc_write(codec, C2VOL, ad82584f->Ch2_vol);
+	snd_soc_write(codec, MVOL, ad82584f->master_vol);
+	snd_soc_write(codec, MUTE, ad82584f->mute_val);
+
+	ad82584f_set_bias_level(codec, SND_SOC_BIAS_STANDBY);
 
 	return 0;
 }
@@ -1004,32 +1078,32 @@ static const struct snd_soc_dapm_widget ad82584f_dapm_widgets[] = {
 	SND_SOC_DAPM_DAC("DAC", "HIFI Playback", SND_SOC_NOPM, 0, 0),
 };
 
-static const struct snd_soc_component_driver soc_codec_dev_ad82584f = {
-	.name             = DRV_NAME,
-
-	.probe            = ad82584f_probe,
-	.remove           = ad82584f_remove,
-	.suspend          = ad82584f_suspend,
-	.resume           = ad82584f_resume,
-	.set_bias_level   = ad82584f_set_bias_level,
-
-	.controls         = ad82584f_snd_controls,
-	.num_controls     = ARRAY_SIZE(ad82584f_snd_controls),
-	.dapm_widgets     = ad82584f_dapm_widgets,
-	.num_dapm_widgets = ARRAY_SIZE(ad82584f_dapm_widgets),
+static const struct snd_soc_codec_driver soc_codec_dev_ad82584f = {
+	.probe = ad82584f_probe,
+	.remove = ad82584f_remove,
+	.suspend = ad82584f_suspend,
+	.resume = ad82584f_resume,
+	.set_bias_level = ad82584f_set_bias_level,
+	.component_driver = {
+		.controls = ad82584f_snd_controls,
+		.num_controls = ARRAY_SIZE(ad82584f_snd_controls),
+		.dapm_widgets = ad82584f_dapm_widgets,
+		.num_dapm_widgets = ARRAY_SIZE(ad82584f_dapm_widgets),
+	}
 };
 
 static const struct regmap_config ad82584f_regmap = {
-	.reg_bits         = 8,
-	.val_bits         = 8,
+	.reg_bits = 8,
+	.val_bits = 8,
 
-	.max_register     = AD82584F_REGISTER_COUNT,
-	.reg_defaults     = ad82584f_reg_defaults,
+	.max_register = AD82584F_REGISTER_COUNT,
+	.reg_defaults = ad82584f_reg_defaults,
 	.num_reg_defaults = ARRAY_SIZE(ad82584f_reg_defaults),
-	.cache_type       = REGCACHE_RBTREE,
+	.cache_type = REGCACHE_RBTREE,
 };
 
-static int ad82584f_parse_dt(struct ad82584f_priv *ad82584f,
+static int ad82584f_parse_dt(
+	struct ad82584f_priv *ad82584f,
 	struct device_node *np)
 {
 	int ret = 0;
@@ -1041,11 +1115,13 @@ static int ad82584f_parse_dt(struct ad82584f_priv *ad82584f,
 		ret = -1;
 	} else {
 		pr_info("%s pdata->reset_pin = %d!\n", __func__,
-			ad82584f->pdata->reset_pin);
+				ad82584f->pdata->reset_pin);
 	}
 	ad82584f->pdata->reset_pin = reset_pin;
 
-	ad82584f->pdata->no_mclk = of_property_read_bool(np, "no_mclk");
+	ad82584f->pdata->no_mclk = of_property_read_bool(
+			np,
+			"no_mclk");
 	if (ad82584f->pdata->no_mclk)
 		pr_info("%s mclk is not connected.\n", __func__);
 
@@ -1053,14 +1129,14 @@ static int ad82584f_parse_dt(struct ad82584f_priv *ad82584f,
 }
 
 static int ad82584f_i2c_probe(struct i2c_client *i2c,
-	const struct i2c_device_id *id)
+			     const struct i2c_device_id *id)
 {
 	struct ad82584f_priv *ad82584f;
 	struct ad82584f_platform_data *pdata;
 	int ret;
 
 	ad82584f = devm_kzalloc(&i2c->dev, sizeof(struct ad82584f_priv),
-		GFP_KERNEL);
+			       GFP_KERNEL);
 	if (!ad82584f)
 		return -ENOMEM;
 
@@ -1075,8 +1151,8 @@ static int ad82584f_i2c_probe(struct i2c_client *i2c,
 	i2c_set_clientdata(i2c, ad82584f);
 
 	pdata = devm_kzalloc(&i2c->dev,
-		sizeof(struct ad82584f_platform_data),
-		GFP_KERNEL);
+				sizeof(struct ad82584f_platform_data),
+				GFP_KERNEL);
 	if (!pdata) {
 		pr_err("%s failed to kzalloc for ad82584f pdata\n", __func__);
 		return -ENOMEM;
@@ -1085,12 +1161,10 @@ static int ad82584f_i2c_probe(struct i2c_client *i2c,
 
 	ad82584f_parse_dt(ad82584f, i2c->dev.of_node);
 
-	ret = devm_snd_soc_register_component(&i2c->dev,
-		&soc_codec_dev_ad82584f,
-		&ad82584f_dai, 1);
-
+	ret = snd_soc_register_codec(&i2c->dev, &soc_codec_dev_ad82584f,
+				     &ad82584f_dai, 1);
 	if (ret != 0)
-		dev_err(&i2c->dev, "%s, Failed to register codec (%d)\n", __func__, ret);
+		dev_err(&i2c->dev, "Failed to register codec (%d)\n", ret);
 
 	ad82584f->m_ram1_tab =
 		kzalloc(sizeof(char) * AD82584F_RAM_TABLE_SIZE, GFP_KERNEL);
@@ -1131,7 +1205,7 @@ static int ad82584f_i2c_remove(struct i2c_client *client)
 		kfree(ad82584f->m_reg_tab);
 	}
 
-	snd_soc_unregister_component(&client->dev);
+	snd_soc_unregister_codec(&client->dev);
 
 	return 0;
 }
@@ -1148,10 +1222,10 @@ static const struct of_device_id ad82584f_of_id[] = {
 MODULE_DEVICE_TABLE(of, ad82584f_of_id);
 
 static struct i2c_driver ad82584f_i2c_driver = {
-	.driver   = {
-		.name           = "ad82584f",
-		.owner          = THIS_MODULE,
+	.driver = {
+		.name = "ad82584f",
 		.of_match_table = ad82584f_of_id,
+		.owner = THIS_MODULE,
 	},
 	.probe = ad82584f_i2c_probe,
 	.remove = ad82584f_i2c_remove,

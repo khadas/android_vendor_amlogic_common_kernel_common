@@ -1,9 +1,10 @@
-// SPDX-License-Identifier: GPL-2.0
 /*
  * Greybus driver for the Raw protocol
  *
  * Copyright 2015 Google Inc.
  * Copyright 2015 Linaro Ltd.
+ *
+ * Released under the GPLv2 only.
  */
 #include <linux/kernel.h>
 #include <linux/module.h>
@@ -13,7 +14,8 @@
 #include <linux/fs.h>
 #include <linux/idr.h>
 #include <linux/uaccess.h>
-#include <linux/greybus.h>
+
+#include "greybus.h"
 
 struct gb_raw {
 	struct gb_connection *connection;

@@ -1,6 +1,18 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/amlogic/media/vout/vout_serve/dummy_venc.c
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
 /* Linux Headers */
@@ -17,14 +29,13 @@
 #include <linux/slab.h>
 #include <linux/ctype.h>
 #include <linux/of.h>
+#include <linux/of_device.h>
 #include <linux/clk.h>
 #include <linux/delay.h>
-#include <linux/of_device.h>
 #ifdef CONFIG_AMLOGIC_VPU
 #include <linux/amlogic/media/vpu/vpu.h>
 #endif
 #include <linux/amlogic/media/vout/vout_notify.h>
-#include <linux/amlogic/gki_module.h>
 
 /* Local Headers */
 #include "vout_func.h"
@@ -36,6 +47,8 @@ struct dummy_venc_data_s {
 	unsigned int vid_clk_div_reg;
 	unsigned int vid2_clk_ctrl_reg;
 	unsigned int vid2_clk_div_reg;
+	unsigned int vid_clk_mux;
+	unsigned int vid2_clk_mux;
 
 	void (*clktree_probe)(struct device *dev);
 	void (*clktree_remove)(struct device *dev);
@@ -49,7 +62,6 @@ static struct dummy_venc_data_s *dummy_venc_data;
 struct dummy_venc_driver_s {
 	struct device *dev;
 	unsigned char status;
-	unsigned char vout_valid;
 	unsigned char viu_sel;
 
 	unsigned char clk_gate_state;
@@ -57,18 +69,11 @@ struct dummy_venc_driver_s {
 	struct clk *top_gate;
 	struct clk *int_gate0;
 	struct clk *int_gate1;
-#ifdef CONFIG_AMLOGIC_VPU
-	struct vpu_dev_s *vpu_dev;
-#endif
 };
 
 static struct dummy_venc_driver_s *dummy_encp_drv;
 static struct dummy_venc_driver_s *dummy_enci_drv;
 static struct dummy_venc_driver_s *dummy_encl_drv;
-
-#define DUMMY_L_NAME    "dummy_encl"
-#define DUMMY_I_NAME    "dummy_enci"
-#define DUMMY_P_NAME    "dummy_encp"
 
 /* **********************************************************
  * dummy_encp support
@@ -113,7 +118,7 @@ static struct vinfo_s dummy_encp_vinfo[] = {
 		.viu_color_fmt     = COLOR_FMT_YUV444,
 		.viu_mux           = VIU_MUX_ENCP,
 		.vout_device       = NULL,
-	}
+	},
 };
 
 static void dummy_encp_venc_set(void)
@@ -188,56 +193,64 @@ static void dummy_encp_clk_ctrl(int flag)
 {
 	unsigned int temp;
 
-	if (!dummy_venc_data)
+	if (!dummy_venc_data) {
+		VOUTERR("%s: no dummy_venc_data\n", __func__);
 		return;
+	}
 
 	if (dummy_encp_index == 0) {
+		if (dummy_venc_data->vid2_clk_mux == 0xff) {
+			VOUTERR("%s: invalid vid2_clk, unsupport dummy_panel\n",
+				__func__);
+			return;
+		}
 		if (flag) {
-			temp = vout_clk_getb(dummy_venc_data->vid2_clk_div_reg,
+			temp = vout_hiu_getb(dummy_venc_data->vid2_clk_div_reg,
 					     ENCL_CLK_SEL, 4);
-			vout_clk_setb(dummy_venc_data->vid_clk_div_reg,
+			vout_hiu_setb(dummy_venc_data->vid_clk_div_reg,
 				      temp, ENCP_CLK_SEL, 4);
 
-			vout_clk_setb(dummy_venc_data->vid_clk_ctrl2_reg,
+			vout_hiu_setb(dummy_venc_data->vid_clk_ctrl2_reg,
 				      1, ENCP_GATE_VCLK, 1);
 		} else {
-			vout_clk_setb(dummy_venc_data->vid_clk_ctrl2_reg,
+			vout_hiu_setb(dummy_venc_data->vid_clk_ctrl2_reg,
 				      0, ENCP_GATE_VCLK, 1);
 		}
 	} else {
 		if (flag) {
 			/* clk source sel: fckl_div5 */
-			vout_clk_setb(dummy_venc_data->vid_clk_div_reg,
+			vout_hiu_setb(dummy_venc_data->vid_clk_div_reg,
 				      0xf, VCLK_XD0, 8);
-			usleep_range(5, 6);
-			vout_clk_setb(dummy_venc_data->vid_clk_ctrl_reg,
-				      6, VCLK_CLK_IN_SEL, 3);
-			vout_clk_setb(dummy_venc_data->vid_clk_ctrl_reg,
+			udelay(5);
+			vout_hiu_setb(dummy_venc_data->vid_clk_ctrl_reg,
+				      dummy_venc_data->vid_clk_mux,
+				      VCLK_CLK_IN_SEL, 3);
+			vout_hiu_setb(dummy_venc_data->vid_clk_ctrl_reg,
 				      1, VCLK_EN0, 1);
-			usleep_range(5, 6);
-			vout_clk_setb(dummy_venc_data->vid_clk_div_reg,
+			udelay(5);
+			vout_hiu_setb(dummy_venc_data->vid_clk_div_reg,
 				      0, ENCP_CLK_SEL, 4);
-			vout_clk_setb(dummy_venc_data->vid_clk_div_reg,
+			vout_hiu_setb(dummy_venc_data->vid_clk_div_reg,
 				      1, VCLK_XD_EN, 1);
-			usleep_range(5, 6);
-			vout_clk_setb(dummy_venc_data->vid_clk_ctrl_reg,
+			udelay(5);
+			vout_hiu_setb(dummy_venc_data->vid_clk_ctrl_reg,
 				      1, VCLK_DIV1_EN, 1);
-			vout_clk_setb(dummy_venc_data->vid_clk_ctrl_reg,
+			vout_hiu_setb(dummy_venc_data->vid_clk_ctrl_reg,
 				      1, VCLK_SOFT_RST, 1);
-			usleep_range(10, 11);
-			vout_clk_setb(dummy_venc_data->vid_clk_ctrl_reg,
+			udelay(10);
+			vout_hiu_setb(dummy_venc_data->vid_clk_ctrl_reg,
 				      0, VCLK_SOFT_RST, 1);
-			usleep_range(5, 6);
-			vout_clk_setb(dummy_venc_data->vid_clk_ctrl2_reg,
+			udelay(5);
+			vout_hiu_setb(dummy_venc_data->vid_clk_ctrl2_reg,
 				      1, ENCP_GATE_VCLK, 1);
 		} else {
-			vout_clk_setb(dummy_venc_data->vid_clk_ctrl2_reg,
+			vout_hiu_setb(dummy_venc_data->vid_clk_ctrl2_reg,
 				      0, ENCP_GATE_VCLK, 1);
-			vout_clk_setb(dummy_venc_data->vid_clk_ctrl_reg,
+			vout_hiu_setb(dummy_venc_data->vid_clk_ctrl_reg,
 				      0, VCLK_DIV1_EN, 1);
-			vout_clk_setb(dummy_venc_data->vid_clk_ctrl_reg,
+			vout_hiu_setb(dummy_venc_data->vid_clk_ctrl_reg,
 				      0, VCLK_EN0, 1);
-			vout_clk_setb(dummy_venc_data->vid_clk_div_reg,
+			vout_hiu_setb(dummy_venc_data->vid_clk_div_reg,
 				      0, VCLK_XD_EN, 1);
 		}
 	}
@@ -245,21 +258,19 @@ static void dummy_encp_clk_ctrl(int flag)
 
 static void dummy_encp_clk_gate_switch(int flag)
 {
-	int ret = 0;
-
 	if (flag) {
 		if (dummy_encp_drv->clk_gate_state)
 			return;
 		if (IS_ERR_OR_NULL(dummy_encp_drv->top_gate))
-			ret |= (1 << 0);
+			VOUTERR("%s: encp_top_gate\n", __func__);
 		else
 			clk_prepare_enable(dummy_encp_drv->top_gate);
 		if (IS_ERR_OR_NULL(dummy_encp_drv->int_gate0))
-			ret |= (1 << 1);
+			VOUTERR("%s: encp_int_gate0\n", __func__);
 		else
 			clk_prepare_enable(dummy_encp_drv->int_gate0);
 		if (IS_ERR_OR_NULL(dummy_encp_drv->int_gate1))
-			ret |= (1 << 2);
+			VOUTERR("%s: encp_int_gate1\n", __func__);
 		else
 			clk_prepare_enable(dummy_encp_drv->int_gate1);
 		dummy_encp_drv->clk_gate_state = 1;
@@ -268,21 +279,18 @@ static void dummy_encp_clk_gate_switch(int flag)
 			return;
 		dummy_encp_drv->clk_gate_state = 0;
 		if (IS_ERR_OR_NULL(dummy_encp_drv->int_gate0))
-			ret |= (1 << 1);
+			VOUTERR("%s: encp_int_gate0\n", __func__);
 		else
 			clk_disable_unprepare(dummy_encp_drv->int_gate0);
 		if (IS_ERR_OR_NULL(dummy_encp_drv->int_gate1))
-			ret |= (1 << 2);
+			VOUTERR("%s: encp_int_gate1\n", __func__);
 		else
 			clk_disable_unprepare(dummy_encp_drv->int_gate1);
 		if (IS_ERR_OR_NULL(dummy_encp_drv->top_gate))
-			ret |= (1 << 0);
+			VOUTERR("%s: encp_top_gate\n", __func__);
 		else
 			clk_disable_unprepare(dummy_encp_drv->top_gate);
 	}
-
-	if (ret)
-		VOUTERR("%s: ret=0x%x\n", __func__, ret);
 }
 
 static void dummy_encp_vinfo_update(void)
@@ -295,8 +303,10 @@ static void dummy_encp_vinfo_update(void)
 		return;
 
 	if (dummy_encp_drv->viu_sel == 1) {
+#ifdef CONFIG_AMLOGIC_VOUT2_SERVE
 		vinfo = get_current_vinfo2();
 		lcd_viu_sel = 2;
+#endif
 	} else if (dummy_encp_drv->viu_sel == 2) {
 		vinfo = get_current_vinfo();
 		lcd_viu_sel = 1;
@@ -304,7 +314,8 @@ static void dummy_encp_vinfo_update(void)
 
 	if (vinfo) {
 		if (vinfo->mode != VMODE_LCD) {
-			VOUTERR("display%d is not panel\n", lcd_viu_sel);
+			VOUTERR("display%d is not panel\n",
+				lcd_viu_sel);
 			vinfo = NULL;
 		}
 	}
@@ -324,7 +335,7 @@ static void dummy_encp_vinfo_update(void)
 	dummy_encp_vinfo[0].viu_color_fmt = vinfo->viu_color_fmt;
 }
 
-static struct vinfo_s *dummy_encp_get_current_info(void *data)
+static struct vinfo_s *dummy_encp_get_current_info(void)
 {
 	if (dummy_encp_index > 1)
 		return NULL;
@@ -332,7 +343,7 @@ static struct vinfo_s *dummy_encp_get_current_info(void *data)
 	return &dummy_encp_vinfo[dummy_encp_index];
 }
 
-static int dummy_encp_set_current_vmode(enum vmode_e mode, void *data)
+static int dummy_encp_set_current_vmode(enum vmode_e mode)
 {
 	if (dummy_encp_index > 1)
 		return -1;
@@ -340,9 +351,9 @@ static int dummy_encp_set_current_vmode(enum vmode_e mode, void *data)
 	dummy_encp_vinfo_update();
 
 #ifdef CONFIG_AMLOGIC_VPU
-	vpu_dev_clk_request(dummy_encp_drv->vpu_dev,
-			    dummy_encp_vinfo[dummy_encp_index].video_clk);
-	vpu_dev_mem_power_on(dummy_encp_drv->vpu_dev);
+	request_vpu_clk_vmod(dummy_encp_vinfo[dummy_encp_index].video_clk,
+			     VPU_VENCP);
+	switch_vpu_mem_pd_vmod(VPU_VENCP, VPU_MEM_POWER_ON);
 #endif
 	if (dummy_venc_data && dummy_venc_data->encp_clk_gate_switch)
 		dummy_venc_data->encp_clk_gate_switch(1);
@@ -351,14 +362,12 @@ static int dummy_encp_set_current_vmode(enum vmode_e mode, void *data)
 	dummy_encp_venc_set();
 
 	dummy_encp_drv->status = 1;
-	dummy_encp_drv->vout_valid = 1;
 	VOUTPR("%s finished\n", __func__);
 
 	return 0;
 }
 
-static enum vmode_e dummy_encp_validate_vmode(char *name, unsigned int frac,
-					      void *data)
+static enum vmode_e dummy_encp_validate_vmode(char *name, unsigned int frac)
 {
 	enum vmode_e vmode = VMODE_MAX;
 	int i;
@@ -377,7 +386,7 @@ static enum vmode_e dummy_encp_validate_vmode(char *name, unsigned int frac,
 	return vmode;
 }
 
-static int dummy_encp_vmode_is_supported(enum vmode_e mode, void *data)
+static int dummy_encp_vmode_is_supported(enum vmode_e mode)
 {
 	if ((mode & VMODE_MODE_BIT_MASK) == VMODE_DUMMY_ENCP)
 		return true;
@@ -385,10 +394,9 @@ static int dummy_encp_vmode_is_supported(enum vmode_e mode, void *data)
 	return false;
 }
 
-static int dummy_encp_disable(enum vmode_e cur_vmod, void *data)
+static int dummy_encp_disable(enum vmode_e cur_vmod)
 {
 	dummy_encp_drv->status = 0;
-	dummy_encp_drv->vout_valid = 0;
 	dummy_encp_index = 0xff;
 
 	vout_vcbus_write(ENCP_VIDEO_EN, 0); /* disable encp */
@@ -396,15 +404,17 @@ static int dummy_encp_disable(enum vmode_e cur_vmod, void *data)
 	if (dummy_venc_data && dummy_venc_data->encp_clk_gate_switch)
 		dummy_venc_data->encp_clk_gate_switch(0);
 #ifdef CONFIG_AMLOGIC_VPU
-	vpu_dev_mem_power_down(dummy_encp_drv->vpu_dev);
-	vpu_dev_clk_release(dummy_encp_drv->vpu_dev);
+	switch_vpu_mem_pd_vmod(VPU_VENCP, VPU_MEM_POWER_DOWN);
+	release_vpu_clk_vmod(VPU_VENCP);
 #endif
 
 	VOUTPR("%s finished\n", __func__);
+
 	return 0;
 }
 
-static int dummy_encp_suspend(void *data)
+#ifdef CONFIG_PM
+static int dummy_encp_lcd_suspend(void)
 {
 	dummy_encp_drv->status = 0;
 
@@ -413,30 +423,29 @@ static int dummy_encp_suspend(void *data)
 	if (dummy_venc_data && dummy_venc_data->encp_clk_gate_switch)
 		dummy_venc_data->encp_clk_gate_switch(0);
 #ifdef CONFIG_AMLOGIC_VPU
-	vpu_dev_mem_power_down(dummy_encp_drv->vpu_dev);
-	vpu_dev_clk_release(dummy_encp_drv->vpu_dev);
+	switch_vpu_mem_pd_vmod(VPU_VENCP, VPU_MEM_POWER_DOWN);
+	release_vpu_clk_vmod(VPU_VENCP);
 #endif
 
-	VOUTPR("%s finished\n", __func__);
 	return 0;
 }
 
-static int dummy_encp_resume(void *data)
+static int dummy_encp_lcd_resume(void)
 {
-	dummy_encp_set_current_vmode(VMODE_DUMMY_ENCP, NULL);
-	VOUTPR("%s finished\n", __func__);
+	dummy_encp_set_current_vmode(VMODE_DUMMY_ENCP);
 	return 0;
 }
+#endif
 
 static int dummy_encp_vout_state;
-static int dummy_encp_vout_set_state(int bit, void *data)
+static int dummy_encp_vout_set_state(int bit)
 {
 	dummy_encp_vout_state |= (1 << bit);
 	dummy_encp_drv->viu_sel = bit;
 	return 0;
 }
 
-static int dummy_encp_vout_clr_state(int bit, void *data)
+static int dummy_encp_vout_clr_state(int bit)
 {
 	dummy_encp_vout_state &= ~(1 << bit);
 	if (dummy_encp_drv->viu_sel == bit)
@@ -444,7 +453,7 @@ static int dummy_encp_vout_clr_state(int bit, void *data)
 	return 0;
 }
 
-static int dummy_encp_vout_get_state(void *data)
+static int dummy_encp_vout_get_state(void)
 {
 	return dummy_encp_vout_state;
 }
@@ -462,11 +471,10 @@ static struct vout_server_s dummy_encp_vout_server = {
 		.get_state          = dummy_encp_vout_get_state,
 		.set_bist           = NULL,
 #ifdef CONFIG_PM
-		.vout_suspend       = NULL,
-		.vout_resume        = NULL,
+		.vout_suspend       = dummy_encp_lcd_suspend,
+		.vout_resume        = dummy_encp_lcd_resume,
 #endif
 	},
-	.data = NULL,
 };
 
 #ifdef CONFIG_AMLOGIC_VOUT2_SERVE
@@ -483,11 +491,10 @@ static struct vout_server_s dummy_encp_vout2_server = {
 		.get_state          = dummy_encp_vout_get_state,
 		.set_bist           = NULL,
 #ifdef CONFIG_PM
-		.vout_suspend       = NULL,
-		.vout_resume        = NULL,
+		.vout_suspend       = dummy_encp_lcd_suspend,
+		.vout_resume        = dummy_encp_lcd_resume,
 #endif
 	},
-	.data = NULL,
 };
 #endif
 
@@ -533,6 +540,8 @@ static struct vinfo_s dummy_enci_vinfo = {
 
 static void dummy_enci_venc_set(void)
 {
+	VOUTPR("%s\n", __func__);
+
 	vout_vcbus_write(ENCI_VIDEO_EN, 0);
 
 	vout_vcbus_write(ENCI_CFILT_CTRL,                 0x12);
@@ -573,65 +582,68 @@ static void dummy_enci_venc_set(void)
 
 static void dummy_enci_clk_ctrl(int flag)
 {
-	if (!dummy_venc_data)
+	unsigned int reg_ctrl, reg_div, reg_ctrl2;
+	unsigned int clk_mux, clk_sel;
+
+	if (!dummy_venc_data) {
+		VOUTERR("%s: no dummy_venc_data\n", __func__);
 		return;
+	}
+	if (dummy_venc_data->vid2_clk_mux == 0xff) {
+		reg_ctrl = dummy_venc_data->vid_clk_ctrl_reg;
+		reg_div = dummy_venc_data->vid_clk_div_reg;
+		clk_mux = dummy_venc_data->vid_clk_mux;
+		clk_sel = 0;
+	} else {
+		reg_ctrl = dummy_venc_data->vid2_clk_ctrl_reg;
+		reg_div = dummy_venc_data->vid2_clk_div_reg;
+		clk_mux = dummy_venc_data->vid2_clk_mux;
+		clk_sel = 8;
+	}
+	reg_ctrl2 = dummy_venc_data->vid_clk_ctrl2_reg;
 
 	if (flag) {
 		/* clk source sel: fckl_div5 */
-		vout_clk_setb(dummy_venc_data->vid2_clk_div_reg,
-			      0xf, VCLK2_XD, 8);
-		usleep_range(5, 6);
-		vout_clk_setb(dummy_venc_data->vid2_clk_ctrl_reg,
-			      6, VCLK2_CLK_IN_SEL, 3);
-		vout_clk_setb(dummy_venc_data->vid2_clk_ctrl_reg,
-			      1, VCLK2_EN, 1);
-		usleep_range(5, 6);
+		vout_hiu_setb(reg_div, 0xf, VCLK2_XD, 8);
+		udelay(5);
+		vout_hiu_setb(reg_ctrl, clk_mux, VCLK2_CLK_IN_SEL, 3);
+		vout_hiu_setb(reg_ctrl, 1, VCLK2_EN, 1);
+		udelay(5);
 
-		vout_clk_setb(dummy_venc_data->vid_clk_div_reg,
-			      8, ENCI_CLK_SEL, 4);
-		vout_clk_setb(dummy_venc_data->vid2_clk_div_reg,
-			      1, VCLK2_XD_EN, 1);
-		usleep_range(5, 6);
+		vout_hiu_setb(dummy_venc_data->vid_clk_div_reg,
+			      clk_sel, ENCI_CLK_SEL, 4);
+		vout_hiu_setb(reg_div, 1, VCLK2_XD_EN, 1);
+		udelay(5);
 
-		vout_clk_setb(dummy_venc_data->vid2_clk_ctrl_reg,
-			      1, VCLK2_DIV1_EN, 1);
-		vout_clk_setb(dummy_venc_data->vid2_clk_ctrl_reg,
-			      1, VCLK2_SOFT_RST, 1);
-		usleep_range(10, 11);
-		vout_clk_setb(dummy_venc_data->vid2_clk_ctrl_reg,
-			      0, VCLK2_SOFT_RST, 1);
-		usleep_range(5, 6);
-		vout_clk_setb(dummy_venc_data->vid_clk_ctrl2_reg,
-			      1, ENCI_GATE_VCLK, 1);
+		vout_hiu_setb(reg_ctrl, 1, VCLK2_DIV1_EN, 1);
+		vout_hiu_setb(reg_ctrl, 1, VCLK2_SOFT_RST, 1);
+		udelay(10);
+		vout_hiu_setb(reg_ctrl, 0, VCLK2_SOFT_RST, 1);
+		udelay(5);
+		vout_hiu_setb(reg_ctrl2, 1, ENCI_GATE_VCLK, 1);
 	} else {
-		vout_clk_setb(dummy_venc_data->vid_clk_ctrl2_reg,
-			      0, ENCI_GATE_VCLK, 1);
-		vout_clk_setb(dummy_venc_data->vid2_clk_ctrl_reg,
-			      0, VCLK2_DIV1_EN, 1);
-		vout_clk_setb(dummy_venc_data->vid2_clk_ctrl_reg,
-			      0, VCLK2_EN, 1);
-		vout_clk_setb(dummy_venc_data->vid2_clk_div_reg,
-			      0, VCLK2_XD_EN, 1);
+		vout_hiu_setb(reg_ctrl2, 0, ENCI_GATE_VCLK, 1);
+		vout_hiu_setb(reg_ctrl, 0, VCLK2_DIV1_EN, 1);
+		vout_hiu_setb(reg_ctrl, 0, VCLK2_EN, 1);
+		vout_hiu_setb(reg_div, 0, VCLK2_XD_EN, 1);
 	}
 }
 
 static void dummy_enci_clk_gate_switch(int flag)
 {
-	int ret = 0;
-
 	if (flag) {
 		if (dummy_enci_drv->clk_gate_state)
 			return;
 		if (IS_ERR_OR_NULL(dummy_enci_drv->top_gate))
-			ret |= (1 << 0);
+			VOUTERR("%s: enci_top_gate\n", __func__);
 		else
 			clk_prepare_enable(dummy_enci_drv->top_gate);
 		if (IS_ERR_OR_NULL(dummy_enci_drv->int_gate0))
-			ret |= (1 << 1);
+			VOUTERR("%s: enci_int_gate0\n", __func__);
 		else
 			clk_prepare_enable(dummy_enci_drv->int_gate0);
 		if (IS_ERR_OR_NULL(dummy_enci_drv->int_gate1))
-			ret |= (1 << 2);
+			VOUTERR("%s: enci_int_gate1\n", __func__);
 		else
 			clk_prepare_enable(dummy_enci_drv->int_gate1);
 		dummy_enci_drv->clk_gate_state = 1;
@@ -640,34 +652,30 @@ static void dummy_enci_clk_gate_switch(int flag)
 			return;
 		dummy_enci_drv->clk_gate_state = 0;
 		if (IS_ERR_OR_NULL(dummy_enci_drv->int_gate0))
-			ret |= (1 << 1);
+			VOUTERR("%s: enci_int_gate0\n", __func__);
 		else
 			clk_disable_unprepare(dummy_enci_drv->int_gate0);
 		if (IS_ERR_OR_NULL(dummy_enci_drv->int_gate1))
-			ret |= (1 << 2);
+			VOUTERR("%s: enci_int_gate1\n", __func__);
 		else
 			clk_disable_unprepare(dummy_enci_drv->int_gate1);
 		if (IS_ERR_OR_NULL(dummy_enci_drv->top_gate))
-			ret |= (1 << 0);
+			VOUTERR("%s: enci_top_gate\n", __func__);
 		else
 			clk_disable_unprepare(dummy_enci_drv->top_gate);
 	}
-
-	if (ret)
-		VOUTERR("%s: ret=0x%x\n", __func__, ret);
 }
 
-static struct vinfo_s *dummy_enci_get_current_info(void *data)
+static struct vinfo_s *dummy_enci_get_current_info(void)
 {
 	return &dummy_enci_vinfo;
 }
 
-static int dummy_enci_set_current_vmode(enum vmode_e mode, void *data)
+static int dummy_enci_set_current_vmode(enum vmode_e mode)
 {
 #ifdef CONFIG_AMLOGIC_VPU
-	vpu_dev_clk_request(dummy_enci_drv->vpu_dev,
-			    dummy_enci_vinfo.video_clk);
-	vpu_dev_mem_power_on(dummy_enci_drv->vpu_dev);
+	request_vpu_clk_vmod(dummy_enci_vinfo.video_clk, VPU_VENCI);
+	switch_vpu_mem_pd_vmod(VPU_VENCI, VPU_MEM_POWER_ON);
 #endif
 	if (dummy_venc_data && dummy_venc_data->enci_clk_gate_switch)
 		dummy_venc_data->enci_clk_gate_switch(1);
@@ -676,14 +684,12 @@ static int dummy_enci_set_current_vmode(enum vmode_e mode, void *data)
 	dummy_enci_venc_set();
 
 	dummy_enci_drv->status = 1;
-	dummy_enci_drv->vout_valid = 1;
 	VOUTPR("%s finished\n", __func__);
 
 	return 0;
 }
 
-static enum vmode_e dummy_enci_validate_vmode(char *name, unsigned int frac,
-					      void *data)
+static enum vmode_e dummy_enci_validate_vmode(char *name, unsigned int frac)
 {
 	enum vmode_e vmode = VMODE_MAX;
 
@@ -696,7 +702,7 @@ static enum vmode_e dummy_enci_validate_vmode(char *name, unsigned int frac,
 	return vmode;
 }
 
-static int dummy_enci_vmode_is_supported(enum vmode_e mode, void *data)
+static int dummy_enci_vmode_is_supported(enum vmode_e mode)
 {
 	if ((mode & VMODE_MODE_BIT_MASK) == VMODE_DUMMY_ENCI)
 		return true;
@@ -704,18 +710,17 @@ static int dummy_enci_vmode_is_supported(enum vmode_e mode, void *data)
 	return false;
 }
 
-static int dummy_enci_disable(enum vmode_e cur_vmod, void *data)
+static int dummy_enci_disable(enum vmode_e cur_vmod)
 {
 	dummy_enci_drv->status = 0;
-	dummy_enci_drv->vout_valid = 0;
 
 	vout_vcbus_write(ENCI_VIDEO_EN, 0); /* disable encp */
 	dummy_enci_clk_ctrl(0);
 	if (dummy_venc_data && dummy_venc_data->enci_clk_gate_switch)
 		dummy_venc_data->enci_clk_gate_switch(0);
 #ifdef CONFIG_AMLOGIC_VPU
-	vpu_dev_mem_power_down(dummy_enci_drv->vpu_dev);
-	vpu_dev_clk_release(dummy_enci_drv->vpu_dev);
+	switch_vpu_mem_pd_vmod(VPU_VENCI, VPU_MEM_POWER_DOWN);
+	release_vpu_clk_vmod(VPU_VENCI);
 #endif
 
 	VOUTPR("%s finished\n", __func__);
@@ -724,30 +729,29 @@ static int dummy_enci_disable(enum vmode_e cur_vmod, void *data)
 }
 
 #ifdef CONFIG_PM
-static int dummy_enci_suspend(void *data)
+static int dummy_enci_lcd_suspend(void)
 {
-	dummy_enci_disable(VMODE_DUMMY_ENCI, NULL);
-	VOUTPR("%s finished\n", __func__);
+	dummy_enci_disable(VMODE_DUMMY_ENCI);
 	return 0;
 }
 
-static int dummy_enci_resume(void *data)
+static int dummy_enci_lcd_resume(void)
 {
-	dummy_enci_set_current_vmode(VMODE_DUMMY_ENCI, NULL);
-	VOUTPR("%s finished\n", __func__);
+	dummy_enci_set_current_vmode(VMODE_DUMMY_ENCI);
 	return 0;
 }
+
 #endif
 
 static int dummy_enci_vout_state;
-static int dummy_enci_vout_set_state(int bit, void *data)
+static int dummy_enci_vout_set_state(int bit)
 {
 	dummy_enci_vout_state |= (1 << bit);
 	dummy_enci_drv->viu_sel = bit;
 	return 0;
 }
 
-static int dummy_enci_vout_clr_state(int bit, void *data)
+static int dummy_enci_vout_clr_state(int bit)
 {
 	dummy_enci_vout_state &= ~(1 << bit);
 	if (dummy_enci_drv->viu_sel == bit)
@@ -755,7 +759,7 @@ static int dummy_enci_vout_clr_state(int bit, void *data)
 	return 0;
 }
 
-static int dummy_enci_vout_get_state(void *data)
+static int dummy_enci_vout_get_state(void)
 {
 	return dummy_enci_vout_state;
 }
@@ -773,11 +777,10 @@ static struct vout_server_s dummy_enci_vout_server = {
 		.get_state          = dummy_enci_vout_get_state,
 		.set_bist           = NULL,
 #ifdef CONFIG_PM
-		.vout_suspend       = NULL,
-		.vout_resume        = NULL,
+		.vout_suspend       = dummy_enci_lcd_suspend,
+		.vout_resume        = dummy_enci_lcd_resume,
 #endif
 	},
-	.data = NULL,
 };
 
 #ifdef CONFIG_AMLOGIC_VOUT2_SERVE
@@ -794,11 +797,10 @@ static struct vout_server_s dummy_enci_vout2_server = {
 		.get_state          = dummy_enci_vout_get_state,
 		.set_bist           = NULL,
 #ifdef CONFIG_PM
-		.vout_suspend       = NULL,
-		.vout_resume        = NULL,
+		.vout_suspend       = dummy_enci_lcd_suspend,
+		.vout_resume        = dummy_enci_lcd_resume,
 #endif
 	},
-	.data = NULL,
 };
 #endif
 
@@ -843,6 +845,8 @@ static struct vinfo_s dummy_encl_vinfo = {
 
 static void dummy_encl_venc_set(void)
 {
+	VOUTPR("%s\n", __func__);
+
 	vout_vcbus_write(ENCL_VIDEO_EN, 0);
 
 	vout_vcbus_write(ENCL_VIDEO_MODE, 0x8000);
@@ -870,59 +874,62 @@ static void dummy_encl_venc_set(void)
 
 static void dummy_encl_clk_ctrl(int flag)
 {
-	if (!dummy_venc_data)
+	unsigned int reg_ctrl, reg_div, reg_ctrl2;
+	unsigned int clk_mux, clk_sel;
+
+	if (!dummy_venc_data) {
+		VOUTERR("%s: no dummy_venc_data\n", __func__);
 		return;
+	}
+	if (dummy_venc_data->vid2_clk_mux == 0xff) {
+		reg_ctrl = dummy_venc_data->vid_clk_ctrl_reg;
+		reg_div = dummy_venc_data->vid_clk_div_reg;
+		clk_mux = dummy_venc_data->vid_clk_mux;
+		clk_sel = 0;
+	} else {
+		reg_ctrl = dummy_venc_data->vid2_clk_ctrl_reg;
+		reg_div = dummy_venc_data->vid2_clk_div_reg;
+		clk_mux = dummy_venc_data->vid2_clk_mux;
+		clk_sel = 8;
+	}
+	reg_ctrl2 = dummy_venc_data->vid_clk_ctrl2_reg;
 
 	if (flag) {
 		/* clk source sel: fckl_div5 */
-		vout_clk_setb(dummy_venc_data->vid2_clk_div_reg,
-			      0xf, VCLK2_XD, 8);
-		usleep_range(5, 6);
-		vout_clk_setb(dummy_venc_data->vid2_clk_ctrl_reg,
-			      6, VCLK2_CLK_IN_SEL, 3);
-		vout_clk_setb(dummy_venc_data->vid2_clk_ctrl_reg,
-			      1, VCLK2_EN, 1);
-		usleep_range(5, 6);
-		vout_clk_setb(dummy_venc_data->vid2_clk_div_reg,
-			      8, ENCL_CLK_SEL, 4);
-		vout_clk_setb(dummy_venc_data->vid2_clk_div_reg,
-			      1, VCLK2_XD_EN, 1);
-		usleep_range(5, 6);
-		vout_clk_setb(dummy_venc_data->vid2_clk_ctrl_reg,
-			      1, VCLK2_DIV1_EN, 1);
-		vout_clk_setb(dummy_venc_data->vid2_clk_ctrl_reg,
-			      1, VCLK2_SOFT_RST, 1);
-		usleep_range(10, 11);
-		vout_clk_setb(dummy_venc_data->vid2_clk_ctrl_reg,
-			      0, VCLK2_SOFT_RST, 1);
-		usleep_range(5, 6);
-		vout_clk_setb(dummy_venc_data->vid_clk_ctrl2_reg,
-			      1, ENCL_GATE_VCLK, 1);
+		vout_hiu_setb(reg_div, 0xf, VCLK2_XD, 8);
+		udelay(5);
+		vout_hiu_setb(reg_ctrl, clk_mux, VCLK2_CLK_IN_SEL, 3);
+		vout_hiu_setb(reg_ctrl, 1, VCLK2_EN, 1);
+		udelay(5);
+		vout_hiu_setb(dummy_venc_data->vid_clk_div_reg,
+			      clk_sel, ENCL_CLK_SEL, 4);
+		vout_hiu_setb(reg_div, 1, VCLK2_XD_EN, 1);
+		udelay(5);
+		vout_hiu_setb(reg_ctrl, 1, VCLK2_DIV1_EN, 1);
+		vout_hiu_setb(reg_ctrl, 1, VCLK2_SOFT_RST, 1);
+		udelay(10);
+		vout_hiu_setb(reg_ctrl, 0, VCLK2_SOFT_RST, 1);
+		udelay(5);
+		vout_hiu_setb(reg_ctrl2, 1, ENCL_GATE_VCLK, 1);
 	} else {
-		vout_clk_setb(dummy_venc_data->vid_clk_ctrl2_reg,
-			      0, ENCL_GATE_VCLK, 1);
-		vout_clk_setb(dummy_venc_data->vid2_clk_ctrl_reg,
-			      0, VCLK2_DIV1_EN, 1);
-		vout_clk_setb(dummy_venc_data->vid2_clk_ctrl_reg,
-			      0, VCLK2_EN, 1);
-		vout_clk_setb(dummy_venc_data->vid2_clk_div_reg,
-			      0, VCLK2_XD_EN, 1);
+		vout_hiu_setb(reg_ctrl2, 0, ENCL_GATE_VCLK, 1);
+		vout_hiu_setb(reg_ctrl, 0, VCLK2_DIV1_EN, 1);
+		vout_hiu_setb(reg_ctrl, 0, VCLK2_EN, 1);
+		vout_hiu_setb(reg_div, 0, VCLK2_XD_EN, 1);
 	}
 }
 
 static void dummy_encl_clk_gate_switch(int flag)
 {
-	int ret = 0;
-
 	if (flag) {
 		if (dummy_encl_drv->clk_gate_state)
 			return;
 		if (IS_ERR_OR_NULL(dummy_encl_drv->top_gate))
-			ret |= (1 << 0);
+			VOUTERR("%s: encl_top_gate\n", __func__);
 		else
 			clk_prepare_enable(dummy_encl_drv->top_gate);
 		if (IS_ERR_OR_NULL(dummy_encl_drv->int_gate0))
-			ret |= (1 << 1);
+			VOUTERR("%s: encl_int_gate\n", __func__);
 		else
 			clk_prepare_enable(dummy_encl_drv->int_gate0);
 		dummy_encl_drv->clk_gate_state = 1;
@@ -931,30 +938,26 @@ static void dummy_encl_clk_gate_switch(int flag)
 			return;
 		dummy_encl_drv->clk_gate_state = 0;
 		if (IS_ERR_OR_NULL(dummy_encl_drv->int_gate0))
-			ret |= (1 << 1);
+			VOUTERR("%s: encl_int_gate\n", __func__);
 		else
 			clk_disable_unprepare(dummy_encl_drv->int_gate0);
 		if (IS_ERR_OR_NULL(dummy_encl_drv->top_gate))
-			ret |= (1 << 0);
+			VOUTERR("%s: encl_top_gate\n", __func__);
 		else
 			clk_disable_unprepare(dummy_encl_drv->top_gate);
 	}
-
-	if (ret)
-		VOUTERR("%s: ret=0x%x\n", __func__, ret);
 }
 
-static struct vinfo_s *dummy_encl_get_current_info(void *data)
+static struct vinfo_s *dummy_encl_get_current_info(void)
 {
 	return &dummy_encl_vinfo;
 }
 
-static int dummy_encl_set_current_vmode(enum vmode_e mode, void *data)
+static int dummy_encl_set_current_vmode(enum vmode_e mode)
 {
 #ifdef CONFIG_AMLOGIC_VPU
-	vpu_dev_clk_request(dummy_encl_drv->vpu_dev,
-			    dummy_encl_vinfo.video_clk);
-	vpu_dev_mem_power_on(dummy_encl_drv->vpu_dev);
+	request_vpu_clk_vmod(dummy_encl_vinfo.video_clk, VPU_VENCP);
+	switch_vpu_mem_pd_vmod(VPU_VENCP, VPU_MEM_POWER_ON);
 #endif
 	if (dummy_venc_data && dummy_venc_data->encl_clk_gate_switch)
 		dummy_venc_data->encl_clk_gate_switch(1);
@@ -963,14 +966,12 @@ static int dummy_encl_set_current_vmode(enum vmode_e mode, void *data)
 	dummy_encl_venc_set();
 
 	dummy_encl_drv->status = 1;
-	dummy_encl_drv->vout_valid = 1;
 	VOUTPR("%s finished\n", __func__);
 
 	return 0;
 }
 
-static enum vmode_e dummy_encl_validate_vmode(char *name, unsigned int frac,
-					      void *data)
+static enum vmode_e dummy_encl_validate_vmode(char *name, unsigned int frac)
 {
 	enum vmode_e vmode = VMODE_MAX;
 
@@ -983,7 +984,7 @@ static enum vmode_e dummy_encl_validate_vmode(char *name, unsigned int frac,
 	return vmode;
 }
 
-static int dummy_encl_vmode_is_supported(enum vmode_e mode, void *data)
+static int dummy_encl_vmode_is_supported(enum vmode_e mode)
 {
 	if ((mode & VMODE_MODE_BIT_MASK) == VMODE_DUMMY_ENCL)
 		return true;
@@ -991,18 +992,17 @@ static int dummy_encl_vmode_is_supported(enum vmode_e mode, void *data)
 	return false;
 }
 
-static int dummy_encl_disable(enum vmode_e cur_vmod, void *data)
+static int dummy_encl_disable(enum vmode_e cur_vmod)
 {
 	dummy_encl_drv->status = 0;
-	dummy_encl_drv->vout_valid = 0;
 
 	vout_vcbus_write(ENCL_VIDEO_EN, 0);
 	dummy_encl_clk_ctrl(0);
 	if (dummy_venc_data && dummy_venc_data->encl_clk_gate_switch)
 		dummy_venc_data->encl_clk_gate_switch(0);
 #ifdef CONFIG_AMLOGIC_VPU
-	vpu_dev_mem_power_down(dummy_encl_drv->vpu_dev);
-	vpu_dev_clk_release(dummy_encl_drv->vpu_dev);
+	switch_vpu_mem_pd_vmod(VPU_VENCL, VPU_MEM_POWER_DOWN);
+	release_vpu_clk_vmod(VPU_VENCL);
 #endif
 
 	VOUTPR("%s finished\n", __func__);
@@ -1011,30 +1011,29 @@ static int dummy_encl_disable(enum vmode_e cur_vmod, void *data)
 }
 
 #ifdef CONFIG_PM
-static int dummy_encl_suspend(void *data)
+static int dummy_encl_lcd_suspend(void)
 {
-	dummy_encl_disable(VMODE_DUMMY_ENCL, NULL);
-	VOUTPR("%s finished\n", __func__);
+	dummy_encl_disable(VMODE_DUMMY_ENCL);
 	return 0;
 }
 
-static int dummy_encl_resume(void *data)
+static int dummy_encl_lcd_resume(void)
 {
-	dummy_encl_set_current_vmode(VMODE_DUMMY_ENCL, NULL);
-	VOUTPR("%s finished\n", __func__);
+	dummy_encl_set_current_vmode(VMODE_DUMMY_ENCL);
 	return 0;
 }
+
 #endif
 
 static int dummy_encl_vout_state;
-static int dummy_encl_vout_set_state(int bit, void *data)
+static int dummy_encl_vout_set_state(int bit)
 {
 	dummy_encl_vout_state |= (1 << bit);
 	dummy_encl_drv->viu_sel = bit;
 	return 0;
 }
 
-static int dummy_encl_vout_clr_state(int bit, void *data)
+static int dummy_encl_vout_clr_state(int bit)
 {
 	dummy_encl_vout_state &= ~(1 << bit);
 	if (dummy_encl_drv->viu_sel == bit)
@@ -1042,7 +1041,7 @@ static int dummy_encl_vout_clr_state(int bit, void *data)
 	return 0;
 }
 
-static int dummy_encl_vout_get_state(void *data)
+static int dummy_encl_vout_get_state(void)
 {
 	return dummy_encl_vout_state;
 }
@@ -1060,11 +1059,10 @@ static struct vout_server_s dummy_encl_vout_server = {
 		.get_state          = dummy_encl_vout_get_state,
 		.set_bist           = NULL,
 #ifdef CONFIG_PM
-		.vout_suspend       = NULL,
-		.vout_resume        = NULL,
+		.vout_suspend       = dummy_encl_lcd_suspend,
+		.vout_resume        = dummy_encl_lcd_resume,
 #endif
 	},
-	.data = NULL,
 };
 
 #ifdef CONFIG_AMLOGIC_VOUT2_SERVE
@@ -1081,11 +1079,10 @@ static struct vout_server_s dummy_encl_vout2_server = {
 		.get_state          = dummy_encl_vout_get_state,
 		.set_bist           = NULL,
 #ifdef CONFIG_PM
-		.vout_suspend       = NULL,
-		.vout_resume        = NULL,
+		.vout_suspend       = dummy_encl_lcd_suspend,
+		.vout_resume        = dummy_encl_lcd_resume,
 #endif
 	},
-	.data = NULL,
 };
 #endif
 
@@ -1114,19 +1111,23 @@ static int dummy_venc_vout_mode_update(void)
 
 	if (dummy_encp_drv->viu_sel == 1)
 		vout_notifier_call_chain(VOUT_EVENT_MODE_CHANGE_PRE, &mode);
+#ifdef CONFIG_AMLOGIC_VOUT2_SERVE
 	else if (dummy_encp_drv->viu_sel == 2)
 		vout2_notifier_call_chain(VOUT_EVENT_MODE_CHANGE_PRE, &mode);
-	dummy_encp_set_current_vmode(mode, NULL);
+#endif
+	dummy_encp_set_current_vmode(mode);
 	if (dummy_encp_drv->viu_sel == 1)
 		vout_notifier_call_chain(VOUT_EVENT_MODE_CHANGE, &mode);
+#ifdef CONFIG_AMLOGIC_VOUT2_SERVE
 	else if (dummy_encp_drv->viu_sel == 2)
 		vout2_notifier_call_chain(VOUT_EVENT_MODE_CHANGE, &mode);
+#endif
 
 	return 0;
 }
 
 static int dummy_encp_vout_notify_callback(struct notifier_block *block,
-					   unsigned long cmd, void *para)
+		unsigned long cmd, void *para)
 {
 	const struct vinfo_s *vinfo;
 
@@ -1152,7 +1153,7 @@ static int dummy_encp_vout_notify_callback(struct notifier_block *block,
 
 #ifdef CONFIG_AMLOGIC_VOUT2_SERVE
 static int dummy_encp_vout2_notify_callback(struct notifier_block *block,
-					    unsigned long cmd, void *para)
+		unsigned long cmd, void *para)
 {
 	const struct vinfo_s *vinfo;
 
@@ -1196,7 +1197,7 @@ static const char *dummy_venc_debug_usage_str = {
 };
 
 static ssize_t dummy_venc_debug_show(struct class *class,
-				     struct class_attribute *attr, char *buf)
+		struct class_attribute *attr, char *buf)
 {
 	return sprintf(buf, "%s\n", dummy_venc_debug_usage_str);
 }
@@ -1219,7 +1220,7 @@ static unsigned int dummy_encp_reg_dump[] = {
 	ENCP_VIDEO_VSO_BLINE,
 	ENCP_VIDEO_VSO_ELINE,
 	ENCP_VIDEO_RGBIN_CTRL,
-	0xffff
+	0xffff,
 };
 
 static unsigned int dummy_enci_reg_dump[] = {
@@ -1256,7 +1257,7 @@ static unsigned int dummy_enci_reg_dump[] = {
 	ENCI_VIDEO_SAT,
 	ENCI_SYNC_ADJ,
 	ENCI_VIDEO_CONT,
-	0xffff
+	0xffff,
 };
 
 static unsigned int dummy_encl_reg_dump[] = {
@@ -1277,7 +1278,7 @@ static unsigned int dummy_encl_reg_dump[] = {
 	ENCL_VIDEO_VSO_BLINE,
 	ENCL_VIDEO_VSO_ELINE,
 	ENCL_VIDEO_RGBIN_CTRL,
-	0xffff
+	0xffff,
 };
 
 static ssize_t dummy_encp_debug_store(struct class *class,
@@ -1367,7 +1368,7 @@ static struct class_attribute dummy_venc_class_attrs[] = {
 	__ATTR(enci, 0644,
 	       dummy_venc_debug_show, dummy_enci_debug_store),
 	__ATTR(encl, 0644,
-	       dummy_venc_debug_show, dummy_encl_debug_store)
+	       dummy_venc_debug_show, dummy_encl_debug_store),
 };
 
 static struct class *debug_class;
@@ -1404,55 +1405,50 @@ static int dummy_venc_remove_class(void)
 
 	return 0;
 }
-
 /* ********************************************************* */
+
 static void dummy_venc_clktree_probe(struct device *dev)
 {
-	int ret = 0;
-
 	/* encp */
 	dummy_encp_drv->clk_gate_state = 0;
 
 	dummy_encp_drv->top_gate = devm_clk_get(dev, "encp_top_gate");
 	if (IS_ERR_OR_NULL(dummy_encp_drv->top_gate))
-		ret |= (1 << 0);
+		VOUTERR("%s: get encp_top_gate error\n", __func__);
 
 	dummy_encp_drv->int_gate0 = devm_clk_get(dev, "encp_int_gate0");
 	if (IS_ERR_OR_NULL(dummy_encp_drv->int_gate0))
-		ret |= (1 << 1);
+		VOUTERR("%s: get encp_int_gate0 error\n", __func__);
 
 	dummy_encp_drv->int_gate1 = devm_clk_get(dev, "encp_int_gate1");
 	if (IS_ERR_OR_NULL(dummy_encp_drv->int_gate1))
-		ret |= (1 << 2);
+		VOUTERR("%s: get encp_int_gate1 error\n", __func__);
 
 	/* enci */
 	dummy_enci_drv->clk_gate_state = 0;
 
 	dummy_enci_drv->top_gate = devm_clk_get(dev, "enci_top_gate");
 	if (IS_ERR_OR_NULL(dummy_enci_drv->top_gate))
-		ret |= (1 << 3);
+		VOUTERR("%s: get enci_top_gate error\n", __func__);
 
 	dummy_enci_drv->int_gate0 = devm_clk_get(dev, "enci_int_gate0");
 	if (IS_ERR_OR_NULL(dummy_enci_drv->int_gate0))
-		ret |= (1 << 4);
+		VOUTERR("%s: get enci_int_gate0 error\n", __func__);
 
 	dummy_enci_drv->int_gate1 = devm_clk_get(dev, "enci_int_gate1");
 	if (IS_ERR_OR_NULL(dummy_enci_drv->int_gate1))
-		ret |= (1 << 5);
+		VOUTERR("%s: get enci_int_gate1 error\n", __func__);
 
 	/* encl */
 	dummy_encl_drv->clk_gate_state = 0;
 
 	dummy_encl_drv->top_gate = devm_clk_get(dev, "encl_top_gate");
 	if (IS_ERR_OR_NULL(dummy_encl_drv->top_gate))
-		ret |= (1 << 6);
+		VOUTERR("%s: get encl_top_gate error\n", __func__);
 
 	dummy_encl_drv->int_gate0 = devm_clk_get(dev, "encl_int_gate");
 	if (IS_ERR_OR_NULL(dummy_encl_drv->int_gate0))
-		ret |= (1 << 7);
-
-	if (ret)
-		VOUTERR("%s: ret=0x%x\n", __func__, ret);
+		VOUTERR("%s: get encl_int_gate error\n", __func__);
 }
 
 static void dummy_venc_clktree_remove(struct device *dev)
@@ -1483,6 +1479,8 @@ static struct dummy_venc_data_s dummy_venc_match_data = {
 	.vid_clk_div_reg = HHI_VID_CLK_DIV,
 	.vid2_clk_ctrl_reg = HHI_VIID_CLK_CNTL,
 	.vid2_clk_div_reg = HHI_VIID_CLK_DIV,
+	.vid_clk_mux = 6, /* fckl_div5 */
+	.vid2_clk_mux = 6, /* fckl_div5 */
 
 	.clktree_probe = dummy_venc_clktree_probe,
 	.clktree_remove = dummy_venc_clktree_remove,
@@ -1491,12 +1489,30 @@ static struct dummy_venc_data_s dummy_venc_match_data = {
 	.encl_clk_gate_switch = dummy_encl_clk_gate_switch,
 };
 
-static struct dummy_venc_data_s dummy_venc_match_data_sc2 = {
+static struct dummy_venc_data_s dummy_venc_match_data_gxl = {
+	.vid_clk_ctrl_reg = HHI_VID_CLK_CNTL,
+	.vid_clk_ctrl2_reg = HHI_VID_CLK_CNTL2,
+	.vid_clk_div_reg = HHI_VID_CLK_DIV,
+	.vid2_clk_ctrl_reg = HHI_VIID_CLK_CNTL,
+	.vid2_clk_div_reg = HHI_VIID_CLK_DIV,
+	.vid_clk_mux = 3, /* fckl_div5 */
+	.vid2_clk_mux = 0xff, /* invalid */
+
+	.clktree_probe = dummy_venc_clktree_probe,
+	.clktree_remove = dummy_venc_clktree_remove,
+	.encp_clk_gate_switch = dummy_encp_clk_gate_switch,
+	.enci_clk_gate_switch = dummy_enci_clk_gate_switch,
+	.encl_clk_gate_switch = dummy_encl_clk_gate_switch,
+};
+
+static struct dummy_venc_data_s dummy_venc_match_data_new = {
 	.vid_clk_ctrl_reg = CLKCTRL_VID_CLK_CTRL,
 	.vid_clk_ctrl2_reg = CLKCTRL_VID_CLK_CTRL2,
 	.vid_clk_div_reg = CLKCTRL_VID_CLK_DIV,
 	.vid2_clk_ctrl_reg = CLKCTRL_VIID_CLK_CTRL,
 	.vid2_clk_div_reg = CLKCTRL_VIID_CLK_DIV,
+	.vid_clk_mux = 6, /* fckl_div5 */
+	.vid2_clk_mux = 6, /* fckl_div5 */
 
 	.clktree_probe = NULL,
 	.clktree_remove = NULL,
@@ -1507,16 +1523,24 @@ static struct dummy_venc_data_s dummy_venc_match_data_sc2 = {
 
 static const struct of_device_id dummy_venc_dt_match_table[] = {
 	{
+		.compatible = "amlogic, dummy_lcd",
+		.data = &dummy_venc_match_data,
+	},
+	{
 		.compatible = "amlogic, dummy_venc",
 		.data = &dummy_venc_match_data,
 	},
 	{
-		.compatible = "amlogic, dummy_venc_sc2",
-		.data = &dummy_venc_match_data_sc2,
+		.compatible = "amlogic, dummy_venc-gxl",
+		.data = &dummy_venc_match_data_gxl,
 	},
 	{
-		.compatible = "amlogic, dummy_venc_s4",
-		.data = &dummy_venc_match_data_sc2,
+		.compatible = "amlogic, dummy_venc-gxlx",
+		.data = &dummy_venc_match_data_gxl,
+	},
+	{
+		.compatible = "amlogic, dummy_venc_sc2",
+		.data = &dummy_venc_match_data_new,
 	},
 	{}
 };
@@ -1536,30 +1560,25 @@ static int dummy_venc_probe(struct platform_device *pdev)
 		return -1;
 	}
 
-	dummy_encp_drv = kzalloc(sizeof(*dummy_encp_drv), GFP_KERNEL);
+	dummy_encp_drv = kzalloc(sizeof(struct dummy_venc_driver_s),
+				 GFP_KERNEL);
 	if (!dummy_encp_drv) {
 		VOUTERR("%s: dummy_venc driver no enough memory\n", __func__);
 		return -ENOMEM;
 	}
 	dummy_encp_drv->dev = &pdev->dev;
-#ifdef CONFIG_AMLOGIC_VPU
-	/*vpu dev register for encp*/
-	dummy_encp_drv->vpu_dev = vpu_dev_register(VPU_VENCP, DUMMY_P_NAME);
-#endif
 
-	dummy_enci_drv = kzalloc(sizeof(*dummy_enci_drv), GFP_KERNEL);
+	dummy_enci_drv = kzalloc(sizeof(struct dummy_venc_driver_s),
+				 GFP_KERNEL);
 	if (!dummy_enci_drv) {
 		VOUTERR("%s: dummy_venc driver no enough memory\n", __func__);
 		kfree(dummy_encp_drv);
 		return -ENOMEM;
 	}
 	dummy_enci_drv->dev = &pdev->dev;
-#ifdef CONFIG_AMLOGIC_VPU
-	/*vpu dev register for encp*/
-	dummy_enci_drv->vpu_dev = vpu_dev_register(VPU_VENCI, DUMMY_I_NAME);
-#endif
 
-	dummy_encl_drv = kzalloc(sizeof(*dummy_encl_drv), GFP_KERNEL);
+	dummy_encl_drv = kzalloc(sizeof(struct dummy_venc_driver_s),
+				 GFP_KERNEL);
 	if (!dummy_encl_drv) {
 		VOUTERR("%s: dummy_venc driver no enough memory\n", __func__);
 		kfree(dummy_encp_drv);
@@ -1567,10 +1586,6 @@ static int dummy_venc_probe(struct platform_device *pdev)
 		return -ENOMEM;
 	}
 	dummy_encl_drv->dev = &pdev->dev;
-#ifdef CONFIG_AMLOGIC_VPU
-	/*vpu dev register for encp*/
-	dummy_encl_drv->vpu_dev = vpu_dev_register(VPU_VENCL, DUMMY_L_NAME);
-#endif
 
 	if (dummy_venc_data->clktree_probe)
 		dummy_venc_data->clktree_probe(&pdev->dev);
@@ -1625,53 +1640,27 @@ static int dummy_venc_remove(struct platform_device *pdev)
 	return 0;
 }
 
-static int dummy_venc_resume(struct platform_device *pdev)
-{
-	if (dummy_encp_drv && dummy_encp_drv->vout_valid)
-		dummy_encp_resume(NULL);
-	if (dummy_enci_drv && dummy_enci_drv->vout_valid)
-		dummy_enci_resume(NULL);
-	if (dummy_encl_drv && dummy_encl_drv->vout_valid)
-		dummy_encl_resume(NULL);
-
-	return 0;
-}
-
-static int dummy_venc_suspend(struct platform_device *pdev, pm_message_t state)
-{
-	if (dummy_encp_drv && dummy_encp_drv->status)
-		dummy_encp_suspend(NULL);
-	if (dummy_enci_drv && dummy_enci_drv->status)
-		dummy_enci_suspend(NULL);
-	if (dummy_encl_drv && dummy_encl_drv->status)
-		dummy_encl_suspend(NULL);
-
-	return 0;
-}
-
 static void dummy_venc_shutdown(struct platform_device *pdev)
 {
 	if (!dummy_encp_drv)
 		return;
 	if (dummy_encp_drv->status)
-		dummy_encp_disable(VMODE_DUMMY_ENCP, NULL);
+		dummy_encp_disable(VMODE_DUMMY_ENCP);
 
 	if (!dummy_enci_drv)
 		return;
 	if (dummy_enci_drv->status)
-		dummy_enci_disable(VMODE_DUMMY_ENCI, NULL);
+		dummy_enci_disable(VMODE_DUMMY_ENCI);
 
 	if (!dummy_encl_drv)
 		return;
 	if (dummy_encl_drv->status)
-		dummy_encl_disable(VMODE_DUMMY_ENCL, NULL);
+		dummy_encl_disable(VMODE_DUMMY_ENCL);
 }
 
 static struct platform_driver dummy_venc_platform_driver = {
 	.probe = dummy_venc_probe,
 	.remove = dummy_venc_remove,
-	.suspend = dummy_venc_suspend,
-	.resume = dummy_venc_resume,
 	.shutdown = dummy_venc_shutdown,
 	.driver = {
 		.name = "dummy_venc",
@@ -1682,7 +1671,7 @@ static struct platform_driver dummy_venc_platform_driver = {
 	},
 };
 
-int __init dummy_venc_init(void)
+static int __init dummy_venc_init(void)
 {
 	if (platform_driver_register(&dummy_venc_platform_driver)) {
 		VOUTERR("failed to register dummy_venc driver module\n");
@@ -1692,8 +1681,11 @@ int __init dummy_venc_init(void)
 	return 0;
 }
 
-void __exit dummy_venc_exit(void)
+static void __exit dummy_venc_exit(void)
 {
 	platform_driver_unregister(&dummy_venc_platform_driver);
 }
+
+subsys_initcall(dummy_venc_init);
+module_exit(dummy_venc_exit);
 

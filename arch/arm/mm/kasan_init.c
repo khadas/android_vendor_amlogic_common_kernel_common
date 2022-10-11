@@ -1,295 +1,258 @@
-// SPDX-License-Identifier: GPL-2.0-only
 /*
- * This file contains kasan initialization code for ARM.
+ * This file contains kasan initialization code for ARM64.
  *
- * Copyright (c) 2018 Samsung Electronics Co., Ltd.
+ * Copyright (c) 2015 Samsung Electronics Co., Ltd.
  * Author: Andrey Ryabinin <ryabinin.a.a@gmail.com>
- * Author: Linus Walleij <linus.walleij@linaro.org>
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
+ *
  */
 
 #define pr_fmt(fmt) "kasan: " fmt
-#include <linux/types.h>
-#include <linux/kernel.h>
 #include <linux/kasan.h>
 #include <linux/kernel.h>
 #include <linux/memblock.h>
-#include <linux/sched/task.h>
 #include <linux/start_kernel.h>
+#include <linux/mm.h>
+
+#include <asm/mmu_context.h>
 #include <asm/pgtable.h>
-#include <asm/cputype.h>
-#include <asm/highmem.h>
-#include <asm/mach/map.h>
-#include <asm/memory.h>
 #include <asm/page.h>
 #include <asm/pgalloc.h>
-#include <asm/procinfo.h>
-#include <asm/proc-fns.h>
+#include <asm/pgtable.h>
+#include <asm/sections.h>
+#include <asm/tlbflush.h>
+#include <asm/mach/map.h>
+#include <asm/fixmap.h>
 
-#include "mm.h"
+#define PGD_SIZE	(PTRS_PER_PGD * sizeof(pgd_t))
 
-static pgd_t tmp_pgd_table[PTRS_PER_PGD] __initdata __aligned(PGD_SIZE);
-
-pmd_t tmp_pmd_table[PTRS_PER_PMD] __page_aligned_bss;
-
-
-static __init void *kasan_alloc_block(size_t size)
-{
-	return memblock_alloc_try_nid(size, size, __pa(MAX_DMA_ADDRESS),
-				      MEMBLOCK_ALLOC_KASAN, NUMA_NO_NODE);
-}
-
-static void __init kasan_pte_populate(pmd_t *pmdp, unsigned long addr,
-				      unsigned long end, bool early)
-{
-	unsigned long next;
-	pte_t *ptep = pte_offset_kernel(pmdp, addr);
-
-	do {
-		pte_t entry;
-		void *p;
-
-		next = addr + PAGE_SIZE;
-
-		if (!early) {
-			if (!pte_none(READ_ONCE(*ptep)))
-				continue;
-
-			p = kasan_alloc_block(PAGE_SIZE);
-			if (!p) {
-				panic("%s failed to allocate shadow page for address 0x%lx\n",
-				      __func__, addr);
-				return;
-			}
-			memset(p, KASAN_SHADOW_INIT, PAGE_SIZE);
-			entry = pfn_pte(virt_to_pfn(p),
-					__pgprot(pgprot_val(PAGE_KERNEL)));
-		} else if (pte_none(READ_ONCE(*ptep))) {
-			/*
-			 * The early shadow memory is mapping all KASan
-			 * operations to one and the same page in memory,
-			 * "kasan_early_shadow_page" so that the instrumentation
-			 * will work on a scratch area until we can set up the
-			 * proper KASan shadow memory.
-			 */
-			entry = pfn_pte(virt_to_pfn(kasan_early_shadow_page),
-					__pgprot(_L_PTE_DEFAULT | L_PTE_DIRTY | L_PTE_XN));
-		} else {
-			/*
-			 * Early shadow mappings are PMD_SIZE aligned, so if the
-			 * first entry is already set, they must all be set.
-			 */
-			return;
-		}
-
-		set_pte_at(&init_mm, addr, ptep, entry);
-	} while (ptep++, addr = next, addr != end);
-}
+static pgd_t tmp_pg_dir[PTRS_PER_PGD] __initdata __aligned(PGD_SIZE);
 
 /*
- * The pmd (page middle directory) is only used on LPAE
+ * The p*d_populate functions call virt_to_phys implicitly so they can't be used
+ * directly on kernel symbols (bm_p*d). All the early functions are called too
+ * early to use lm_alias so __p*d_populate functions must be used to populate
+ * with the physical address from __pa_symbol.
  */
-static void __init kasan_pmd_populate(pud_t *pudp, unsigned long addr,
-				      unsigned long end, bool early)
+
+static void __init kasan_early_pte_populate(pmd_t *pmd, unsigned long addr,
+					unsigned long end)
 {
+	pte_t *pte;
 	unsigned long next;
-	pmd_t *pmdp = pmd_offset(pudp, addr);
+	pgprot_t kernel_pte = __pgprot(L_PTE_PRESENT | L_PTE_YOUNG |
+				       L_PTE_SHARED  | L_PTE_DIRTY |
+				       L_PTE_MT_WRITEALLOC);
 
+	if (pmd_none(*pmd))
+		__pmd_populate(pmd, __pa_symbol(kasan_zero_pte),
+			       _PAGE_KERNEL_TABLE);
+
+	pte = pte_offset_kernel(pmd, addr);
 	do {
-		if (pmd_none(*pmdp)) {
-			/*
-			 * We attempt to allocate a shadow block for the PMDs
-			 * used by the PTEs for this address if it isn't already
-			 * allocated.
-			 */
-			void *p = early ? kasan_early_shadow_pte :
-				kasan_alloc_block(PAGE_SIZE);
+		next = addr + PAGE_SIZE;
+		cpu_v7_set_pte_ext(pte, pfn_pte(sym_to_pfn(kasan_zero_page),
+				   kernel_pte),
+				   0);
+	} while (pte++, addr = next, addr != end && pte_none(*pte));
+}
 
-			if (!p) {
-				panic("%s failed to allocate shadow block for address 0x%lx\n",
-				      __func__, addr);
-				return;
-			}
-			pmd_populate_kernel(&init_mm, pmdp, p);
-			flush_pmd_entry(pmdp);
-		}
+static void __init kasan_early_pmd_populate(pud_t *pud,
+					unsigned long addr,
+					unsigned long end)
+{
+	pmd_t *pmd;
+	unsigned long next;
 
+	if (pud_none(*pud))
+		pud_populate(pud, __pa_symbol(kasan_zero_pmd), PMD_TYPE_TABLE);
+
+	pmd = pmd_offset(pud, addr);
+	do {
 		next = pmd_addr_end(addr, end);
-		kasan_pte_populate(pmdp, addr, next, early);
-	} while (pmdp++, addr = next, addr != end);
+		kasan_early_pte_populate(pmd, addr, next);
+	} while (pmd++, addr = next, addr != end && pmd_none(*pmd));
 }
 
-static void __init kasan_pgd_populate(unsigned long addr, unsigned long end,
-				      bool early)
+static void __init kasan_early_pud_populate(pgd_t *pgd,
+					unsigned long addr,
+					unsigned long end)
 {
+	pud_t *pud;
 	unsigned long next;
-	pgd_t *pgdp;
-	p4d_t *p4dp;
-	pud_t *pudp;
 
-	pgdp = pgd_offset_k(addr);
+	if (pgd_none(*pgd))
+		pgd_populate(pgd, __pa_symbol(kasan_zero_pud), PUD_TYPE_TABLE);
 
+	pud = pud_offset(pgd, addr);
 	do {
-		/*
-		 * Allocate and populate the shadow block of p4d folded into
-		 * pud folded into pmd if it doesn't already exist
-		 */
-		if (!early && pgd_none(*pgdp)) {
-			void *p = kasan_alloc_block(PAGE_SIZE);
+		next = pud_addr_end(addr, end);
+		kasan_early_pmd_populate(pud, addr, next);
+	} while (pud++, addr = next, addr != end && pud_none(*pud));
+}
 
-			if (!p) {
-				panic("%s failed to allocate shadow block for address 0x%lx\n",
-				      __func__, addr);
-				return;
-			}
-			pgd_populate(&init_mm, pgdp, p);
-		}
+static void __init kasan_map_early_shadow(unsigned long start,
+					  unsigned long end)
+{
+	unsigned long addr = start;
+	unsigned long next;
+	pgd_t *pgd;
 
+	pgd = pgd_offset_k(addr);
+	do {
 		next = pgd_addr_end(addr, end);
-		/*
-		 * We just immediately jump over the p4d and pud page
-		 * directories since we believe ARM32 will never gain four
-		 * nor five level page tables.
-		 */
-		p4dp = p4d_offset(pgdp, addr);
-		pudp = pud_offset(p4dp, addr);
-
-		kasan_pmd_populate(pudp, addr, next, early);
-	} while (pgdp++, addr = next, addr != end);
+		kasan_early_pud_populate(pgd, addr, next);
+	} while (pgd++, addr = next, addr != end);
 }
 
-extern struct proc_info_list *lookup_processor_type(unsigned int);
-
-void __init kasan_early_init(void)
+asmlinkage void __init kasan_early_init(void)
 {
-	struct proc_info_list *list;
+	BUILD_BUG_ON(!IS_ALIGNED(KASAN_SHADOW_START, PGDIR_SIZE));
+	BUILD_BUG_ON(!IS_ALIGNED(KASAN_SHADOW_END, PGDIR_SIZE));
+	kasan_map_early_shadow(KASAN_SHADOW_START, KASAN_SHADOW_END);
+}
 
-	/*
-	 * locate processor in the list of supported processor
-	 * types.  The linker builds this table for us from the
-	 * entries in arch/arm/mm/proc-*.S
-	 */
-	list = lookup_processor_type(read_cpuid_id());
-	if (list) {
-#ifdef MULTI_CPU
-		processor = *list->proc;
+static inline pmd_t *pmd_off_k(unsigned long virt)
+{
+	return pmd_offset(pud_offset(pgd_offset_k(virt), virt), virt);
+}
+
+#ifdef CONFIG_AMLOGIC_VMAP
+void __init clear_pgds(unsigned long start, unsigned long end)
+#else
+static void __init clear_pgds(unsigned long start, unsigned long end)
 #endif
-	}
-
-	BUILD_BUG_ON((KASAN_SHADOW_END - (1UL << 29)) != KASAN_SHADOW_OFFSET);
-	/*
-	 * We walk the page table and set all of the shadow memory to point
-	 * to the scratch page.
-	 */
-	kasan_pgd_populate(KASAN_SHADOW_START, KASAN_SHADOW_END, true);
-}
-
-void __init clear_pgds(unsigned long start,
-			unsigned long end)
 {
-	for (; start && start < end; start += PMD_SIZE)
+	/*
+	 * Remove references to kasan page tables from
+	 * swapper_pg_dir. pmd_clear() can't be used
+	 * here because it's nop on 2,3-level pagetable setups
+	 */
+	pr_debug("%s, clear %lx %lx\n", __func__, start, end);
+	for (; start < end; start += PGDIR_SIZE)
 		pmd_clear(pmd_off_k(start));
 }
 
-static int __init create_mapping(void *start, void *end)
+static void kasan_alloc_and_map_shadow(unsigned long start, unsigned long end)
 {
-	void *shadow_start, *shadow_end;
+	struct map_desc desc;
+	unsigned long size;
+	phys_addr_t l_shadow;
 
-	shadow_start = kasan_mem_to_shadow(start);
-	shadow_end = kasan_mem_to_shadow(end);
+	size  = (end - start) >> KASAN_SHADOW_SCALE_SHIFT;
+	l_shadow = memblock_alloc(size, SECTION_SIZE);
+	WARN(!l_shadow, "%s, reserve %ld shadow memory failed",
+		__func__, size);
 
-	pr_info("Mapping kernel virtual memory block: %px-%px at shadow: %px-%px\n",
-		start, end, shadow_start, shadow_end);
-
-	kasan_pgd_populate((unsigned long)shadow_start & PAGE_MASK,
-			   PAGE_ALIGN((unsigned long)shadow_end), false);
-	return 0;
+	desc.virtual = (unsigned long)kasan_mem_to_shadow((void *)start);
+	desc.pfn     = __phys_to_pfn(l_shadow);
+	desc.length  = size;
+	desc.type    = MT_MEMORY_RW;
+	create_mapping(&desc);
+	pr_info("KASAN shadow, virt:[%lx-%lx], phys:%x, size:%lx\n",
+		start, end, l_shadow, size);
 }
 
 void __init kasan_init(void)
 {
-	phys_addr_t pa_start, pa_end;
-	u64 i;
+	unsigned long start, end, mem_size = 0;
+	struct memblock_region *reg;
+	int i;
 
 	/*
 	 * We are going to perform proper setup of shadow memory.
-	 *
-	 * At first we should unmap early shadow (clear_pgds() call bellow).
-	 * However, instrumented code can't execute without shadow memory.
-	 *
-	 * To keep the early shadow memory MMU tables around while setting up
-	 * the proper shadow memory, we copy swapper_pg_dir (the initial page
-	 * table) to tmp_pgd_table and use that to keep the early shadow memory
-	 * mapped until the full shadow setup is finished. Then we swap back
-	 * to the proper swapper_pg_dir.
+	 * At first we should unmap early shadow (clear_pmds() call bellow).
+	 * However, instrumented code couldn't execute without shadow memory.
+	 * tmp_pg_dir used to keep early shadow mapped until full shadow
+	 * setup will be finished.
 	 */
-
-	memcpy(tmp_pgd_table, swapper_pg_dir, sizeof(tmp_pgd_table));
-#ifdef CONFIG_ARM_LPAE
-	/* We need to be in the same PGD or this won't work */
-	BUILD_BUG_ON(pgd_index(KASAN_SHADOW_START) !=
-		     pgd_index(KASAN_SHADOW_END));
-	memcpy(tmp_pmd_table,
-	       pgd_page_vaddr(*pgd_offset_k(KASAN_SHADOW_START)),
-	       sizeof(tmp_pmd_table));
-	set_pgd(&tmp_pgd_table[pgd_index(KASAN_SHADOW_START)],
-		__pgd(__pa(tmp_pmd_table) | PMD_TYPE_TABLE | L_PGD_SWAPPER));
-#endif
-	cpu_switch_mm(tmp_pgd_table, &init_mm);
-	local_flush_tlb_all();
-
+	memcpy(tmp_pg_dir, swapper_pg_dir, sizeof(tmp_pg_dir));
+	dsb(ishst);
+	cpu_switch_mm(tmp_pg_dir, &init_mm);
 	clear_pgds(KASAN_SHADOW_START, KASAN_SHADOW_END);
 
-	kasan_populate_early_shadow(kasan_mem_to_shadow((void *)VMALLOC_START),
-				    kasan_mem_to_shadow((void *)-1UL) + 1);
-
-	for_each_mem_range(i, &memblock.memory, NULL, NUMA_NO_NODE,
-			MEMBLOCK_NONE, &pa_start, &pa_end, NULL) {
-		void *start = __va(pa_start);
-		void *end = __va(pa_end);
-
-		/* Do not attempt to shadow highmem */
-		if (pa_start >= arm_lowmem_limit) {
-			pr_info("Skip highmem block at %pa-%pa\n", &pa_start, &pa_end);
-			continue;
-		}
-		if (pa_end > arm_lowmem_limit) {
-			pr_info("Truncating shadow for memory block at %pa-%pa to lowmem region at %pa\n",
-				&pa_start, &pa_end, &arm_lowmem_limit);
-			end = __va(arm_lowmem_limit);
-		}
-		if (start >= end) {
-			pr_info("Skipping invalid memory block %pa-%pa (virtual %p-%p)\n",
-				&pa_start, &pa_end, start, end);
-			continue;
-		}
-
-		create_mapping(start, end);
+	for_each_memblock(memory, reg) {
+		mem_size += reg->size;
 	}
+	/* create shadow for linear map space */
+	if (mem_size < (KMEM_END - PAGE_OFFSET))
+		end = PAGE_OFFSET + mem_size;
+	else
+		end = KMEM_END;
+	pr_info("%s, total mem size:%lx, end:%lx\n", __func__, mem_size, end);
+
+	kasan_alloc_and_map_shadow(PAGE_OFFSET, end);
+	kasan_alloc_and_map_shadow(FIXADDR_START, FIXADDR_END);
+#ifdef CONFIG_HIGHMEM
+	kasan_alloc_and_map_shadow(PKMAP_BASE,
+				   PKMAP_BASE + LAST_PKMAP * PAGE_SIZE);
+#endif
 
 	/*
-	 * 1. The module global variables are in MODULES_VADDR ~ MODULES_END,
-	 *    so we need to map this area.
-	 * 2. PKMAP_BASE ~ PKMAP_BASE+PMD_SIZE's shadow and MODULES_VADDR
-	 *    ~ MODULES_END's shadow is in the same PMD_SIZE, so we can't
-	 *    use kasan_populate_zero_shadow.
+	 * populate zero page for vmalloc area and other gap area
+	 * TODO:
+	 *      Need check kasan for vmalloc?
 	 */
-	create_mapping((void *)MODULES_VADDR, (void *)(PKMAP_BASE + PMD_SIZE));
+	start = (ulong)kasan_mem_to_shadow((void *)MODULES_VADDR);
+	kasan_map_early_shadow(KASAN_SHADOW_START, start);
+
+	start = (ulong)kasan_mem_to_shadow((void *)KMEM_END);
+	end   = (ulong)kasan_mem_to_shadow((void *)FIXADDR_START);
+	kasan_map_early_shadow(start, end);
 
 	/*
-	 * KAsan may reuse the contents of kasan_early_shadow_pte directly, so
-	 * we should make sure that it maps the zero page read-only.
+	 * KAsan may reuse the contents of kasan_zero_pte directly, so we
+	 * should make sure that it maps the zero page read-only.
 	 */
 	for (i = 0; i < PTRS_PER_PTE; i++)
-		set_pte_at(&init_mm, KASAN_SHADOW_START + i*PAGE_SIZE,
-			   &kasan_early_shadow_pte[i],
-			   pfn_pte(virt_to_pfn(kasan_early_shadow_page),
-				__pgprot(pgprot_val(PAGE_KERNEL)
-					 | L_PTE_RDONLY)));
+		set_pte_ext(&kasan_zero_pte[i],
+			    pfn_pte(sym_to_pfn(kasan_zero_page),
+				    PAGE_KERNEL_RO), 0);
 
+	memset(kasan_zero_page, 0, PAGE_SIZE);
 	cpu_switch_mm(swapper_pg_dir, &init_mm);
 	local_flush_tlb_all();
+	flush_cache_all();
 
-	memset(kasan_early_shadow_page, 0, PAGE_SIZE);
-	pr_info("Kernel address sanitizer initialized\n");
+	/* clear all shawdow memory before kasan running */
+	memset(kasan_mem_to_shadow((void *)PAGE_OFFSET), 0,
+	       (KMEM_END - PAGE_OFFSET) >> KASAN_SHADOW_SCALE_SHIFT);
+	memset(kasan_mem_to_shadow((void *)FIXADDR_START), 0,
+	       (FIXADDR_END - FIXADDR_START) >> KASAN_SHADOW_SCALE_SHIFT);
+#ifdef CONFIG_HIGHMEM
+	memset(kasan_mem_to_shadow((void *)PKMAP_BASE), 0,
+	       (LAST_PKMAP * PAGE_SIZE) >> KASAN_SHADOW_SCALE_SHIFT);
+#endif
+
+	/* At this point kasan is fully initialized. Enable error messages */
 	init_task.kasan_depth = 0;
+	pr_info("KernelAddressSanitizer initialized\n");
+}
+
+/*
+ * This is work around for mis-report of KASAN when resume.
+ * On arm architecture, cpu suspend/resume routine is done in
+ * function call path:
+ *    cpu_suspend -> psci_cpu_suspend -> __invoke_psci_fn_smc
+ * during this call path, some parts of stack will be marked as
+ * shadow memory. But when cpu resume from smc call, it directly
+ * return to point which saved in cpu_suspend and call resume
+ * procedure. Which do not comeback as a reverse return path:
+ *    __invoke_psci_fn_smc -> psci_cpu_suspend -> cpu_suspend
+ * So some residual shadow memory may affect KASAN report when
+ * cpu is calling resume hooks.
+ * We just need to clear all shadow in stack for this case.
+ */
+void kasan_clear_shadow_for_resume(unsigned long sp)
+{
+	unsigned long size;
+
+	size = sp &  (THREAD_SIZE - 1);
+	sp   = sp & ~(THREAD_SIZE - 1);
+	size = ALIGN(size, (1 << KASAN_SHADOW_SCALE_SHIFT));
+	pr_debug("%s, sp:%lx, size:%lx\n", __func__, sp, size);
+	kasan_unpoison_shadow((void *)sp, size);
 }

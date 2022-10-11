@@ -1,8 +1,12 @@
-// SPDX-License-Identifier: GPL-2.0-or-later
 /*
  * PPP async serial channel driver for Linux.
  *
  * Copyright 1999 Paul Mackerras.
+ *
+ *  This program is free software; you can redistribute it and/or
+ *  modify it under the terms of the GNU General Public License
+ *  as published by the Free Software Foundation; either version
+ *  2 of the License, or (at your option) any later version.
  *
  * This driver provides the encapsulation and framing for sending
  * and receiving PPP frames over async serial lines.  It relies on
@@ -30,7 +34,7 @@
 #include <linux/jiffies.h>
 #include <linux/slab.h>
 #include <asm/unaligned.h>
-#include <linux/uaccess.h>
+#include <asm/uaccess.h>
 #include <asm/string.h>
 
 #define PPP_VERSION	"2.4.2"
@@ -65,8 +69,8 @@ struct asyncppp {
 
 	struct tasklet_struct tsk;
 
-	refcount_t	refcnt;
-	struct completion dead;
+	atomic_t	refcnt;
+	struct semaphore dead_sem;
 	struct ppp_channel chan;	/* interface to generic ppp layer */
 	unsigned char	obuf[OBUFSIZE];
 };
@@ -136,15 +140,15 @@ static struct asyncppp *ap_get(struct tty_struct *tty)
 	read_lock(&disc_data_lock);
 	ap = tty->disc_data;
 	if (ap != NULL)
-		refcount_inc(&ap->refcnt);
+		atomic_inc(&ap->refcnt);
 	read_unlock(&disc_data_lock);
 	return ap;
 }
 
 static void ap_put(struct asyncppp *ap)
 {
-	if (refcount_dec_and_test(&ap->refcnt))
-		complete(&ap->dead);
+	if (atomic_dec_and_test(&ap->refcnt))
+		up(&ap->dead_sem);
 }
 
 /*
@@ -181,8 +185,8 @@ ppp_asynctty_open(struct tty_struct *tty)
 	skb_queue_head_init(&ap->rqueue);
 	tasklet_init(&ap->tsk, ppp_async_process, (unsigned long) ap);
 
-	refcount_set(&ap->refcnt, 1);
-	init_completion(&ap->dead);
+	atomic_set(&ap->refcnt, 1);
+	sema_init(&ap->dead_sem, 0);
 
 	ap->chan.private = ap;
 	ap->chan.ops = &async_ops;
@@ -230,8 +234,8 @@ ppp_asynctty_close(struct tty_struct *tty)
 	 * our channel ops (i.e. ppp_async_send/ioctl) are in progress
 	 * by the time it returns.
 	 */
-	if (!refcount_dec_and_test(&ap->refcnt))
-		wait_for_completion(&ap->dead);
+	if (!atomic_dec_and_test(&ap->refcnt))
+		down(&ap->dead_sem);
 	tasklet_kill(&ap->tsk);
 
 	ppp_unregister_channel(&ap->chan);
@@ -330,7 +334,7 @@ ppp_asynctty_ioctl(struct tty_struct *tty, struct file *file,
 }
 
 /* No kernel lock - fine */
-static __poll_t
+static unsigned int
 ppp_asynctty_poll(struct tty_struct *tty, struct file *file, poll_table *wait)
 {
 	return 0;
@@ -890,7 +894,8 @@ ppp_async_input(struct asyncppp *ap, const unsigned char *buf,
 				/* packet overflowed MRU */
 				ap->state |= SC_TOSS;
 			} else {
-				sp = skb_put_data(skb, buf, n);
+				sp = skb_put(skb, n);
+				memcpy(sp, buf, n);
 				if (ap->state & SC_ESCAPE) {
 					sp[0] ^= PPP_TRANS;
 					ap->state &= ~SC_ESCAPE;

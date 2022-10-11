@@ -1,4 +1,3 @@
-/* SPDX-License-Identifier: GPL-2.0 */
 /*
  * Copyright IBM Corp. 2008, 2009
  *
@@ -20,7 +19,6 @@
 
 ENTRY(ftrace_stub)
 	BR_EX	%r14
-ENDPROC(ftrace_stub)
 
 #define STACK_FRAME_SIZE  (STACK_FRAME_OVERHEAD + __PT_SIZE)
 #define STACK_PTREGS	  (STACK_FRAME_OVERHEAD)
@@ -35,7 +33,7 @@ ENDPROC(ftrace_stub)
 
 ENTRY(_mcount)
 	BR_EX	%r14
-ENDPROC(_mcount)
+
 EXPORT_SYMBOL(_mcount)
 
 ENTRY(ftrace_caller)
@@ -43,7 +41,7 @@ ENTRY(ftrace_caller)
 	.set	ftrace_regs_caller,ftrace_caller
 	stg	%r14,(__SF_GPRS+8*8)(%r15)	# save traced function caller
 	lgr	%r1,%r15
-#if !(defined(CC_USING_HOTPATCH) || defined(CC_USING_NOP_MCOUNT))
+#ifndef CC_USING_HOTPATCH
 	aghi	%r0,MCOUNT_RETURN_FIXUP
 #endif
 	# allocate stack frame for ftrace_caller to contain traced function
@@ -76,11 +74,10 @@ ENTRY(ftrace_caller)
 #ifdef CONFIG_FUNCTION_GRAPH_TRACER
 # The j instruction gets runtime patched to a nop instruction.
 # See ftrace_enable_ftrace_graph_caller.
-	.globl ftrace_graph_caller
-ftrace_graph_caller:
+ENTRY(ftrace_graph_caller)
 	j	ftrace_graph_caller_end
-	lmg	%r2,%r3,(STACK_PTREGS_GPRS+14*8)(%r15)
-	lg	%r4,(STACK_PTREGS_PSW+8)(%r15)
+	lg	%r2,(STACK_PTREGS_GPRS+14*8)(%r15)
+	lg	%r3,(STACK_PTREGS_PSW+8)(%r15)
 	brasl	%r14,prepare_ftrace_return
 	stg	%r2,(STACK_PTREGS_GPRS+14*8)(%r15)
 ftrace_graph_caller_end:
@@ -89,7 +86,6 @@ ftrace_graph_caller_end:
 	lg	%r1,(STACK_PTREGS_PSW+8)(%r15)
 	lmg	%r2,%r15,(STACK_PTREGS_GPRS+2*8)(%r15)
 	BR_EX	%r1
-ENDPROC(ftrace_caller)
 
 #ifdef CONFIG_FUNCTION_GRAPH_TRACER
 
@@ -103,6 +99,5 @@ ENTRY(return_to_handler)
 	lgr	%r14,%r2
 	lmg	%r2,%r5,32(%r15)
 	BR_EX	%r14
-ENDPROC(return_to_handler)
 
 #endif

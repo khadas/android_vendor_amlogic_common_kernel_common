@@ -1,6 +1,18 @@
-/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/amlogic/media/vout/hdmitx/hdmi_tx_20/hw/reg_ops.h
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
 #ifndef __REG_OPS_H__
@@ -21,7 +33,7 @@
 #include <linux/mutex.h>
 #include <linux/cdev.h>
 #include <linux/io.h>
-//#include <linux/amlogic/iomap.h>
+#include <linux/amlogic/iomap.h>
 
 /*
  * RePacket HDMI related registers rd/wr
@@ -32,61 +44,15 @@ struct reg_map {
 	void __iomem *p;
 };
 
-enum map_addr_idx_e {
-	CBUS_REG_IDX = 0,
-	VCBUS_REG_IDX,
-	HHI_REG_IDX,
-	HDMITX_REG_IDX,
-	HDMITX_SEC_REG_IDX,
-	ELP_ESM_REG_IDX,
-	/* new added in SC2 */
-	ANACTRL_REG_IDX,
-	PWRCTRL_REG_IDX,
-	RESETCTRL_REG_IDX,
-	SYSCTRL_REG_IDX,
-	CLKCTRL_REG_IDX,
-	REG_IDX_END
-};
-
-#define BASE_REG_OFFSET		24
-
-#define CBUS_REG_ADDR(reg) \
-	((CBUS_REG_IDX << BASE_REG_OFFSET) + ((reg) << 2))
-#define VCBUS_REG_ADDR(reg) \
-	((VCBUS_REG_IDX << BASE_REG_OFFSET) + ((reg) << 2))
-#define HHI_REG_ADDR(reg) \
-	((HHI_REG_IDX << BASE_REG_OFFSET) + ((reg) << 2))
-#define HDMITX_SEC_REG_ADDR(reg) \
-	((HDMITX_SEC_REG_IDX << BASE_REG_OFFSET) + (reg))/*DWC*/
-#define HDMITX_REG_ADDR(reg) \
-	((HDMITX_REG_IDX << BASE_REG_OFFSET) + (reg))/*TOP*/
-#define ELP_ESM_REG_ADDR(reg) \
-	((ELP_ESM_REG_IDX << BASE_REG_OFFSET) + ((reg) << 2))
-#define ANACTRL_REG_ADDR(reg) \
-	((ANACTRL_REG_IDX << BASE_REG_OFFSET) + ((reg) << 2))
-#define PWRCTRL_REG_ADDR(reg) \
-	((PWRCTRL_REG_IDX << BASE_REG_OFFSET) + ((reg) << 2))
-#define RESETCTRL_REG_ADDR(reg) \
-	((RESETCTRL_REG_IDX << BASE_REG_OFFSET) + ((reg) << 2))
-#define SYSCTRL_REG_ADDR(reg) \
-	((SYSCTRL_REG_IDX << BASE_REG_OFFSET) + ((reg) << 2))
-#define CLKCTRL_REG_ADDR(reg) \
-	((CLKCTRL_REG_IDX << BASE_REG_OFFSET) + ((reg) << 2))
-
-extern struct reg_map reg_maps[REG_IDX_END];
+extern struct reg_map *map;
 
 unsigned int TO_PHY_ADDR(unsigned int addr);
 void __iomem *TO_PMAP_ADDR(unsigned int addr);
 
-unsigned int hd_read_reg(unsigned int addr);
-void hd_write_reg(unsigned int addr, unsigned int val);
-void hd_set_reg_bits(unsigned int addr, unsigned int value,
+extern unsigned int hd_read_reg(unsigned int addr);
+extern void hd_write_reg(unsigned int addr, unsigned int val);
+extern void hd_set_reg_bits(unsigned int addr, unsigned int value,
 		unsigned int offset, unsigned int len);
-void init_reg_map(unsigned int type);
+extern void init_reg_map(unsigned int type);
 
-unsigned int hd_read_reg(unsigned int addr);
-void hd_write_reg(unsigned int addr, unsigned int val);
-void hd_set_reg_bits(unsigned int addr, unsigned int value,
-		     unsigned int offset, unsigned int len);
-int hdmitx_init_reg_map(struct platform_device *pdev);
 #endif

@@ -1,4 +1,3 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
  * drivers/amlogic/debug/debug_ftrace_ramoops.c
  *
@@ -66,6 +65,38 @@ const char *record_name[] = {
 	"IO-TAG",
 };
 
+void notrace pstore_ftrace_save(struct pstore_ftrace_record *rec)
+{
+	int cpu = raw_smp_processor_id();
+
+	if (unlikely(oops_in_progress) || unlikely(per_cpu(en, cpu)))
+		return;
+	per_cpu(en, cpu) = 1;
+	pstore_ftrace_encode_cpu(rec, cpu);
+	strlcpy(rec->comm, current->comm, sizeof(rec->comm) - 1);
+	rec->pid = current->pid;
+	rec->time = trace_clock_local();
+	psinfo->write_buf(PSTORE_TYPE_FTRACE, 0, NULL, 0, (void *)rec,
+			  0, sizeof(*rec), psinfo);
+	per_cpu(en, cpu) = 0;
+}
+EXPORT_SYMBOL(pstore_ftrace_save);
+
+static void notrace pstore_function_dump(struct pstore_ftrace_record *rec,
+					 struct seq_file *s)
+{
+	unsigned long sec = 0, us = 0;
+	unsigned long long time = rec->time;
+
+	do_div(time, 1000);
+	us = (unsigned long)do_div(time, 1000000);
+	sec = (unsigned long)time;
+	seq_printf(s, "[%04ld.%06ld@%d %d] <%5d-%s>  <%pf <- %pF>\n",
+		   sec, us, pstore_ftrace_decode_cpu(rec), rec->in_irq,
+		   rec->pid, rec->comm, (void *)rec->ip,
+		   (void *)rec->parent_ip);
+}
+
 void notrace pstore_io_rw_dump(struct pstore_ftrace_record *rec,
 			       struct seq_file *s)
 {
@@ -76,11 +107,10 @@ void notrace pstore_io_rw_dump(struct pstore_ftrace_record *rec,
 	do_div(time, 1000);
 	us = (unsigned long)do_div(time, 1000000);
 	sec = (unsigned long)time;
-	seq_printf(s, "[%04ld.%06ld@%d %d] <%5d-%6s> <%6s %08lx-%8lx>  <%ps <- %pS>\n",
+	seq_printf(s, "[%04ld.%06ld@%d %d] <%5d-%6s> <%6s %08lx-%8lx>  <%pf <- %pF>\n",
 		   sec, us, cpu, rec->in_irq, rec->pid, rec->comm,
 		   record_name[rec->flag], rec->val1,
-		   (rec->flag == PSTORE_FLAG_IO_W || rec->flag == PSTORE_FLAG_IO_TAG) ?
-		   rec->val2 : 0,
+		   (rec->flag == PSTORE_FLAG_IO_W) ? rec->val2 : 0,
 		   (void *)rec->ip, (void *)rec->parent_ip);
 }
 
@@ -88,6 +118,9 @@ void notrace pstore_ftrace_dump(struct pstore_ftrace_record *rec,
 				struct seq_file *s)
 {
 	switch (rec->flag & PSTORE_FLAG_MASK) {
+	case PSTORE_FLAG_FUNC:
+		pstore_function_dump(rec, s);
+		break;
 	case PSTORE_FLAG_IO_R:
 	case PSTORE_FLAG_IO_W:
 	case PSTORE_FLAG_IO_W_END:
@@ -101,17 +134,10 @@ void notrace pstore_ftrace_dump(struct pstore_ftrace_record *rec,
 }
 
 void notrace pstore_io_save(unsigned long reg, unsigned long val,
-			    unsigned long parent, unsigned int flag,
+			    unsigned long parant, unsigned int flag,
 			    unsigned long *irq_flag)
 {
-	int cpu;
-	struct pstore_ftrace_record rec = {};
-	struct pstore_record record = {
-		.type = PSTORE_TYPE_FTRACE,
-		.buf = (char *)&rec,
-		.size = sizeof(rec),
-		.psi = psinfo,
-	};
+	struct pstore_ftrace_record rec;
 
 	if (!ramoops_ftrace_en || !ramoops_io_en)
 		return;
@@ -134,7 +160,7 @@ void notrace pstore_io_save(unsigned long reg, unsigned long val,
 		break;
 	default:
 		rec.ip = CALLER_ADDR0;
-		rec.parent_ip = parent;
+		rec.parent_ip = parant;
 		break;
 	}
 
@@ -142,26 +168,10 @@ void notrace pstore_io_save(unsigned long reg, unsigned long val,
 	rec.in_irq = !!in_irq();
 	rec.val1 = reg;
 	rec.val2 = val;
-
-	cpu = raw_smp_processor_id();
-
-	if (unlikely(oops_in_progress) || unlikely(per_cpu(en, cpu))) {
-		if ((flag == PSTORE_FLAG_IO_R || flag == PSTORE_FLAG_IO_W) && IRQ_D)
-			local_irq_restore(*irq_flag);
-
-		return;
-	}
-	per_cpu(en, cpu) = 1;
-	pstore_ftrace_encode_cpu(&rec, cpu);
-	strlcpy(rec.comm, current->comm, sizeof(rec.comm) - 1);
-	rec.pid = current->pid;
-	rec.time = trace_clock_local();
-
-	psinfo->write(&record);
-	per_cpu(en, cpu) = 0;
+	pstore_ftrace_save(&rec);
 
 	if ((flag == PSTORE_FLAG_IO_R_END || flag == PSTORE_FLAG_IO_W_END) &&
-	    IRQ_D)
+		IRQ_D)
 		local_irq_restore(*irq_flag);
 }
 EXPORT_SYMBOL(pstore_io_save);
@@ -175,10 +185,10 @@ static void notrace __pstore_io_rw_dump(struct pstore_ftrace_record *rec)
 	do_div(time, 1000);
 	us = (unsigned long)do_div(time, 1000000);
 	sec = (unsigned long)time;
-	pr_info("[%04ld.%06ld@%d %d] <%5d-%6s> <%6s %08lx-%8lx>  <%pS <- %pS>\n",
+	pr_info("[%04ld.%06ld@%d %d] <%5d-%6s> <%6s %08lx-%8lx>  <%pf <- %pF>\n",
 		sec, us, cpu, rec->in_irq, rec->pid, rec->comm,
 		record_name[rec->flag], rec->val1,
-		(rec->flag == PSTORE_FLAG_IO_W || rec->flag == PSTORE_FLAG_IO_TAG) ? rec->val2 : 0,
+		(rec->flag == PSTORE_FLAG_IO_W) ? rec->val2 : 0,
 		(void *)rec->ip, (void *)rec->parent_ip);
 }
 
@@ -202,7 +212,7 @@ static void notrace __pstore_ftrace_dump_old(struct pstore_ftrace_record *rec)
 static char reboot_mode[16];
 static int __init reboot_mode_setup(char *s)
 {
-	if (s)
+	if (s != NULL)
 		snprintf(reboot_mode, sizeof(reboot_mode), "%s", s);
 
 	return 0;
@@ -217,9 +227,12 @@ void notrace pstore_ftrace_dump_old(struct persistent_ram_zone *prz)
 	rec = (struct pstore_ftrace_record *)prz->old_log;
 	rec_end = (void *)rec + prz->old_log_size;
 
-	pr_info("ramoops_io_dump=%d, buffer=%px ftrace_old_log=%px, size=%u, reboot_mode=%s\n",
-		ramoops_io_dump, prz->buffer,
-		rec, (unsigned int)prz->old_log_size, reboot_mode);
+	pr_info("ramoops_io_dump=%d, buffer=%p ftrace_old_log=%p, size=%u, reboot_mode=%s\n",
+			ramoops_io_dump,
+			prz->buffer,
+			rec,
+			(unsigned int)prz->old_log_size,
+			reboot_mode);
 
 	if (!strcmp(reboot_mode, "cold_boot"))
 		return;

@@ -1,18 +1,39 @@
+#
+# Amlogic DVB configuration
+#
+
+menu "Amlogic dvb configuration"
+
+config AMLOGIC_DVB
+	bool "Amlogic dvb support"
+	select DVB_CORE
+	select AMLOGIC_DVB_COMPAT
+	default y
+	help
+		This option is used only to control the
+		compilation of dvb related driver code, for
+		example hw_demux, it is enabled by default,
+		When it is turned on,it will automatically
+		select DVB_CORE and AMLOGIC_DVB_COMPAT.
+
+config AMLOGIC_DVB_COMPAT
+	bool "Compat amlogic dvb"
+	depends on AMLOGIC_DVB && DVB_CORE
+	default y
+	help
+		This option is used only to compatible with
+		amlogic dvb related code, for example dvb-core,
+		it is enabled by default,depending on
+		AMLOGIC_DVB and DVB_CORE.
+
+endmenu
+
 
 #
 # Amlogic multimedia configuration
 #
 
 menu "Amlogic multimedia configuration"
-
-config AMLOGIC_MEDIA_MODULE
-	tristate "Amlgoic Multimedia compile support"
-	default y
-	help
-		media module compile support
-		select y for built-in
-		select m for ko
-		select n for disable
 
 config AMLOGIC_MEDIA_ENABLE
 	bool "Amlgoic Multimedia Support"
@@ -35,7 +56,6 @@ config AMLOGIC_MEDIA_COMMON
 		registers, memory allocation and the chain of
 		responsibility management of the frame processing.
 
-
 config AMLOGIC_MEDIA_DRIVERS
 	bool "Amlogic drivers of the media"
 	depends on AMLOGIC_MEDIA_COMMON
@@ -49,11 +69,14 @@ config AMLOGIC_MEDIA_DRIVERS
 config AMLOGIC_MEDIA_MULTI_DEC
 	bool "Support multi-instance decoding"
 	default n
+
+config AMLOGIC_AVSP_LONG_CABAC
+	bool "GXL support avs long cabac"
+	default n
 	help
-		Support for multi-instance decoding features,
-		this option must be configured if multi playback
-		is required, the feature supports decoding
-		at the same time.
+		This option is used only to configure GXL avs
+		decode, other platform behind GXL is not need.
+		disable it to save memory default.
 
 
 if AMLOGIC_MEDIA_COMMON
@@ -64,20 +87,19 @@ if AMLOGIC_MEDIA_DRIVERS
 source "drivers/amlogic/media/video_sink/Kconfig"
 source "drivers/amlogic/media/vout/Kconfig"
 source "drivers/amlogic/media/osd/Kconfig"
+source "drivers/amlogic/media/osd_ext/Kconfig"
 source "drivers/amlogic/media/deinterlace/Kconfig"
 source "drivers/amlogic/media/di_multi/Kconfig"
 source "drivers/amlogic/media/di_local/Kconfig"
+source "drivers/amlogic/media/vin/Kconfig"
 source "drivers/amlogic/media/video_processor/Kconfig"
 source "drivers/amlogic/media/enhancement/Kconfig"
-source "drivers/amlogic/media/frame_sync/Kconfig"
 source "drivers/amlogic/media/gdc/Kconfig"
-source "drivers/amlogic/media/vin/Kconfig"
-source "drivers/amlogic/media/cec/Kconfig"
-source "drivers/amlogic/media/esm/Kconfig"
-source "drivers/amlogic/media/atv_demod/Kconfig"
+source "drivers/amlogic/media/algorithm/Kconfig"
+source "drivers/amlogic/media/camera/Kconfig"
 source "drivers/amlogic/media/avsync/Kconfig"
-source "drivers/amlogic/media/dtv_demod/Kconfig"
-source "drivers/amlogic/media/di_v4l/Kconfig"
 endif
+source "drivers/amlogic/media/dtv_demod/Kconfig"
 endmenu
+
 

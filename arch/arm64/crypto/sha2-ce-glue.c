@@ -1,15 +1,16 @@
-// SPDX-License-Identifier: GPL-2.0-only
 /*
  * sha2-ce-glue.c - SHA-224/SHA-256 using ARMv8 Crypto Extensions
  *
- * Copyright (C) 2014 - 2017 Linaro Ltd <ard.biesheuvel@linaro.org>
+ * Copyright (C) 2014 Linaro Ltd <ard.biesheuvel@linaro.org>
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
  */
 
 #include <asm/neon.h>
-#include <asm/simd.h>
 #include <asm/unaligned.h>
 #include <crypto/internal/hash.h>
-#include <crypto/internal/simd.h>
 #include <crypto/sha.h>
 #include <crypto/sha256_base.h>
 #include <linux/cpufeature.h>
@@ -19,8 +20,6 @@
 MODULE_DESCRIPTION("SHA-224/SHA-256 secure hash using ARMv8 Crypto Extensions");
 MODULE_AUTHOR("Ard Biesheuvel <ard.biesheuvel@linaro.org>");
 MODULE_LICENSE("GPL v2");
-MODULE_ALIAS_CRYPTO("sha224");
-MODULE_ALIAS_CRYPTO("sha256");
 
 struct sha256_ce_state {
 	struct sha256_state	sst;
@@ -29,39 +28,29 @@ struct sha256_ce_state {
 
 asmlinkage void sha2_ce_transform(struct sha256_ce_state *sst, u8 const *src,
 				  int blocks);
-
-static void __sha2_ce_transform(struct sha256_state *sst, u8 const *src,
-				int blocks)
+#ifdef CONFIG_CFI_CLANG
+static inline void __cfi_sha2_ce_transform(struct sha256_state *sst,
+					   u8 const *src, int blocks)
 {
-	return sha2_ce_transform(container_of(sst, struct sha256_ce_state, sst),
-				 src, blocks);
+	sha2_ce_transform((struct sha256_ce_state *)sst, src, blocks);
 }
+#define sha2_ce_transform __cfi_sha2_ce_transform
+#endif
 
 const u32 sha256_ce_offsetof_count = offsetof(struct sha256_ce_state,
 					      sst.count);
 const u32 sha256_ce_offsetof_finalize = offsetof(struct sha256_ce_state,
 						 finalize);
 
-asmlinkage void sha256_block_data_order(u32 *digest, u8 const *src, int blocks);
-
-static void __sha256_block_data_order(struct sha256_state *sst, u8 const *src,
-				      int blocks)
-{
-	return sha256_block_data_order(sst->state, src, blocks);
-}
-
 static int sha256_ce_update(struct shash_desc *desc, const u8 *data,
 			    unsigned int len)
 {
 	struct sha256_ce_state *sctx = shash_desc_ctx(desc);
 
-	if (!crypto_simd_usable())
-		return sha256_base_do_update(desc, data, len,
-				__sha256_block_data_order);
-
 	sctx->finalize = 0;
-	kernel_neon_begin();
-	sha256_base_do_update(desc, data, len, __sha2_ce_transform);
+	kernel_neon_begin_partial(28);
+	sha256_base_do_update(desc, data, len,
+			      (sha256_block_fn *)sha2_ce_transform);
 	kernel_neon_end();
 
 	return 0;
@@ -73,24 +62,18 @@ static int sha256_ce_finup(struct shash_desc *desc, const u8 *data,
 	struct sha256_ce_state *sctx = shash_desc_ctx(desc);
 	bool finalize = !sctx->sst.count && !(len % SHA256_BLOCK_SIZE) && len;
 
-	if (!crypto_simd_usable()) {
-		if (len)
-			sha256_base_do_update(desc, data, len,
-				__sha256_block_data_order);
-		sha256_base_do_finalize(desc, __sha256_block_data_order);
-		return sha256_base_finish(desc, out);
-	}
-
 	/*
 	 * Allow the asm code to perform the finalization if there is no
 	 * partial data and the input is a round multiple of the block size.
 	 */
 	sctx->finalize = finalize;
 
-	kernel_neon_begin();
-	sha256_base_do_update(desc, data, len, __sha2_ce_transform);
+	kernel_neon_begin_partial(28);
+	sha256_base_do_update(desc, data, len,
+			      (sha256_block_fn *)sha2_ce_transform);
 	if (!finalize)
-		sha256_base_do_finalize(desc, __sha2_ce_transform);
+		sha256_base_do_finalize(desc,
+					(sha256_block_fn *)sha2_ce_transform);
 	kernel_neon_end();
 	return sha256_base_finish(desc, out);
 }
@@ -99,14 +82,9 @@ static int sha256_ce_final(struct shash_desc *desc, u8 *out)
 {
 	struct sha256_ce_state *sctx = shash_desc_ctx(desc);
 
-	if (!crypto_simd_usable()) {
-		sha256_base_do_finalize(desc, __sha256_block_data_order);
-		return sha256_base_finish(desc, out);
-	}
-
 	sctx->finalize = 0;
-	kernel_neon_begin();
-	sha256_base_do_finalize(desc, __sha2_ce_transform);
+	kernel_neon_begin_partial(28);
+	sha256_base_do_finalize(desc, (sha256_block_fn *)sha2_ce_transform);
 	kernel_neon_end();
 	return sha256_base_finish(desc, out);
 }
@@ -122,6 +100,7 @@ static struct shash_alg algs[] = { {
 		.cra_name		= "sha224",
 		.cra_driver_name	= "sha224-ce",
 		.cra_priority		= 200,
+		.cra_flags		= CRYPTO_ALG_TYPE_SHASH,
 		.cra_blocksize		= SHA256_BLOCK_SIZE,
 		.cra_module		= THIS_MODULE,
 	}
@@ -136,6 +115,7 @@ static struct shash_alg algs[] = { {
 		.cra_name		= "sha256",
 		.cra_driver_name	= "sha256-ce",
 		.cra_priority		= 200,
+		.cra_flags		= CRYPTO_ALG_TYPE_SHASH,
 		.cra_blocksize		= SHA256_BLOCK_SIZE,
 		.cra_module		= THIS_MODULE,
 	}

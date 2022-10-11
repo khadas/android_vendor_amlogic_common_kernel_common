@@ -1,11 +1,26 @@
-/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
- * Author: Yue Wang <yue.wang@amlogic.com>
+ * drivers/amlogic/pci/pcie-amlogic.h
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
 #ifndef __AMLOGIC_PCI_H__
 #define __AMLOGIC_PCI_H__
+
+#ifdef CONFIG_AMLOGIC_PCIE
+#include <linux/irqdesc.h>
+#endif
 
 /* PCIe Port Logic registers */
 #define PLR_OFFSET			0x700
@@ -155,5 +170,12 @@ struct pcie_phy {
 	u32 pcie_hhi_mem_pd_mask;
 	u32 pcie_ctrl_iso_shift;
 	u32 pcie_hhi_mem_pd_shift;
+	u32 pcie_ctrl_a_rst_bit;
 };
+
+#ifdef CONFIG_AMLOGIC_PCIE
+extern void mask_irq(struct irq_desc *desc);
+extern void unmask_irq(struct irq_desc *desc);
+#endif
+
 #endif

@@ -1,4 +1,3 @@
-/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
  * include/linux/amlogic/tee.h
  *
@@ -48,21 +47,107 @@
 #define DMC_DEV_ID_DI_POST                                 17
 #define DMC_DEV_ID_GDC                                     18
 
-bool tee_enabled(void);
-int is_secload_get(void);
-int tee_load_video_fw(u32 index, u32 vdec);
-int tee_load_video_fw_swap(u32 index, u32 vdec, bool is_swap);
-u32 tee_protect_tvp_mem(u32 start, u32 size,
-			u32 *handle);
-void tee_unprotect_tvp_mem(u32 handle);
-u32 tee_protect_mem_by_type(u32 type,
-		u32 start, u32 size,
-		u32 *handle);
-void tee_unprotect_mem(u32 handle);
+/*
+ * Desc: tee enabled state
+ *
+ * Return: 1 if tee enabled, 0 if tee disabled
+ */
+extern bool tee_enabled(void);
 
-int tee_config_device_state(int dev_id, int secure);
+/*
+ * Desc: not used
+ */
+extern int is_secload_get(void);
 
-void tee_demux_config_pipeline(int tsn_in, int tsn_out);
+/*
+ * Desc: load video firmware to hardware
+ *
+ * Input:
+ * index: video firmware index
+ * vdec:  vdec type
+ *
+ * Return: 0 if suceess
+ */
+extern int tee_load_video_fw(uint32_t index, uint32_t vdec);
+
+/*
+ * Desc: load video fw to hardware
+ *
+ * Input:
+ * index: video firmware index
+ * vdec:  vdec type
+ * is_swap: 1 if swapped, 0 if not swpped
+ *
+ * Return: 0 if suceess
+ */
+extern int tee_load_video_fw_swap(uint32_t index, uint32_t vdec, bool is_swap);
+
+/*
+ * Desc: protect tvp memory, same as
+ * tee_protect_mem_by_type(TEE_MEM_TYPE_STREAM_OUTPUT, pa, size, handle)
+ *
+ * Input:
+ * start: the start of physical memory, must aligned with TEE_MEM_ALIGN_SIZE
+ * size: the size of the physical memory, must aligned with TEE_MEM_ALIGN_SIZE
+ *
+ * Output:
+ * handle: the handle
+ *
+ * Return: 0 if suceess
+ */
+extern uint32_t tee_protect_tvp_mem(uint32_t start, uint32_t size,
+			uint32_t *handle);
+
+/*
+ * Desc: Unprotect tvp memory, same as tee_unprotect_mem
+ *
+ * Input:
+ * handle: the handle from tee_protect_tvp_mem
+ *
+ * Return: 0 if suceess
+ */
+
+extern void tee_unprotect_tvp_mem(uint32_t handle);
+
+/*
+ * Desc: protect memory by type
+ *
+ * Input:
+ * type: memory type
+ * start: the start of physical memory, must aligned with TEE_MEM_ALIGN_SIZE
+ * size: the size of the physical memory, must aligned with TEE_MEM_ALIGN_SIZE
+ *
+ * Output:
+ * handle: the handle
+ *
+ * Return: 0 if suceess
+ */
+extern uint32_t tee_protect_mem_by_type(uint32_t type,
+		uint32_t start, uint32_t size,
+		uint32_t *handle);
+
+/*
+ * Desc: Unprotect memory
+ *
+ * Input:
+ * handle: the handle from tee_protect_mem_by_type
+ *
+ * Return: 0 if suceess
+ */
+extern void tee_unprotect_mem(uint32_t handle);
+
+/*
+ * Desc: Switch device state
+ *
+ * Input:
+ * dev_id: device type id
+ * secure: secure state 0/1
+ *
+ * Return: 0 if suceess
+ */
+extern int tee_config_device_state(int dev_id, int secure);
+
+extern void tee_demux_config_pipeline(int tsn_in, int tsn_out);
 
 int tee_demux_config_pad(int reg, int val);
 

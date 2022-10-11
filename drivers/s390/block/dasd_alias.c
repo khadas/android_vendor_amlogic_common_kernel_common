@@ -1,4 +1,3 @@
-// SPDX-License-Identifier: GPL-2.0
 /*
  * PAV alias management for the DASD ECKD discipline
  *
@@ -421,9 +420,9 @@ static int read_unit_address_configuration(struct dasd_device *device,
 	int rc;
 	unsigned long flags;
 
-	cqr = dasd_smalloc_request(DASD_ECKD_MAGIC, 1 /* PSF */	+ 1 /* RSSD */,
+	cqr = dasd_kmalloc_request(DASD_ECKD_MAGIC, 1 /* PSF */	+ 1 /* RSSD */,
 				   (sizeof(struct dasd_psf_prssd_data)),
-				   device, NULL);
+				   device);
 	if (IS_ERR(cqr))
 		return PTR_ERR(cqr);
 	cqr->startdev = device;
@@ -475,7 +474,7 @@ static int read_unit_address_configuration(struct dasd_device *device,
 		spin_unlock_irqrestore(&lcu->lock, flags);
 	}
 out:
-	dasd_sfree_request(cqr, cqr->memdev);
+	dasd_kfree_request(cqr, cqr->memdev);
 	return rc;
 }
 
@@ -736,7 +735,7 @@ static int reset_summary_unit_check(struct alias_lcu *lcu,
 	struct ccw1 *ccw;
 
 	cqr = lcu->rsu_cqr;
-	memcpy((char *) &cqr->magic, "ECKD", 4);
+	strncpy((char *) &cqr->magic, "ECKD", 4);
 	ASCEBC((char *) &cqr->magic, 4);
 	ccw = cqr->cpaddr;
 	ccw->cmd_code = DASD_ECKD_CCW_RSCK;
@@ -792,6 +791,7 @@ static void flush_all_alias_devices_on_lcu(struct alias_lcu *lcu)
 	struct alias_pav_group *pavgroup;
 	struct dasd_device *device, *temp;
 	struct dasd_eckd_private *private;
+	int rc;
 	unsigned long flags;
 	LIST_HEAD(active);
 
@@ -822,7 +822,7 @@ static void flush_all_alias_devices_on_lcu(struct alias_lcu *lcu)
 		device = list_first_entry(&active, struct dasd_device,
 					  alias_list);
 		spin_unlock_irqrestore(&lcu->lock, flags);
-		dasd_flush_device_queue(device);
+		rc = dasd_flush_device_queue(device);
 		spin_lock_irqsave(&lcu->lock, flags);
 		/*
 		 * only move device around if it wasn't moved away while we

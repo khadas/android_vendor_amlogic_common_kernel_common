@@ -211,9 +211,7 @@ Appendix A: gather_on_build.sh
 ------------------------------
 
 Sample script to gather coverage meta files on the build machine
-(see 6a):
-
-.. code-block:: sh
+(see 6a)::
 
     #!/bin/bash
 
@@ -244,9 +242,7 @@ Appendix B: gather_on_test.sh
 -----------------------------
 
 Sample script to gather coverage data files on the test machine
-(see 6b):
-
-.. code-block:: sh
+(see 6b)::
 
     #!/bin/bash -e
 

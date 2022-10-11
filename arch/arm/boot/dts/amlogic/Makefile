@@ -1,10 +1,14 @@
-dtb-$(CONFIG_ARCH_MESON) += sm1_s905x3_ac213.dtb
-dtb-$(CONFIG_ARCH_MESON) += sm1_s905x3_ac214.dtb
-dtb-$(CONFIG_ARCH_MESON) += tm2_t962e2_ab311.dtb
-dtb-$(CONFIG_ARCH_MESON) += sc2_s905x4_ah219.dtb
-dtb-$(CONFIG_ARCH_MESON) += sc2_s905x4_ah219_drm.dtb
-dtb-$(CONFIG_ARCH_MESON) += sc2_s905x4_ah212.dtb
-dtb-$(CONFIG_ARCH_MESON) += sc2_s905x4_ah212_drm.dtb
-dtb-$(CONFIG_ARCH_MESON) += s4_s905y4_ap222_drm.dtb
-dtb-$(CONFIG_ARCH_MESON) += s4_s805x2_aq222_drm_1g.dtb
-dtb-$(CONFIG_ARCH_MESON) += t5d_t950x4_am311_1g.dtb
+
+targets += dtbs
+
+DTB_NAMES := $(subst $\",,$(CONFIG_BUILD_ARM64_APPENDED_DTB_IMAGE_NAMES))
+ifneq ($(DTB_NAMES),)
+DTB_LIST := $(addsuffix .dtb,$(DTB_NAMES))
+else
+DTB_LIST := $(dtb-y)
+endif
+targets += $(DTB_LIST)
+
+dtbs: $(addprefix $(obj)/, $(DTB_LIST))
+
+clean-files := *.dtb

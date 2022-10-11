@@ -1,8 +1,21 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/amlogic/reg_access/reg_access.c
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
+/* Standard Linux headers */
 #include <linux/types.h>
 #include <linux/init.h>
 #include <linux/module.h>
@@ -14,67 +27,63 @@
 #include <linux/debugfs.h>
 #include <linux/io.h>
 #include <linux/uaccess.h>
-#include <linux/kasan.h>
-#include <linux/highmem.h>
-
-static struct aml_ddev {
+static struct dentry *debugfs_root;
+/* amlogic debug device*/
+struct aml_ddev {
 	unsigned int cached_reg_addr;
 	unsigned int size;
 	int (*debugfs_reg_access)(struct aml_ddev *indio_dev,
-				  unsigned int reg, unsigned int writeval,
-				  unsigned int *readval);
-} aml_dev;
-
+				 unsigned int reg, unsigned int writeval,
+				 unsigned int *readval);
+};
 int aml_reg_access(struct aml_ddev *indio_dev,
-		   unsigned int reg, unsigned int writeval,
-		   unsigned int *readval)
+				 unsigned int reg, unsigned int writeval,
+				 unsigned int *readval)
 {
 	void __iomem *vaddr;
 
 	reg = round_down(reg, 0x3);
+
 	vaddr = ioremap(reg, 0x4);
-	if (!vaddr)
-		return -ENOMEM;
 
 	if (readval)
-		*readval = readl_relaxed(vaddr);
+		*readval = readl(vaddr);
 	else
-		writel_relaxed(writeval, vaddr);
+		writel(writeval, vaddr);
 	iounmap(vaddr);
 	return 0;
 }
-
-int aml_mem_access(struct aml_ddev *indio_dev,
-		   unsigned int addr, unsigned int writeval,
-		   unsigned int *readval)
+int aml_reg_access_16(struct aml_ddev *indio_dev,
+				 unsigned int reg, unsigned int writeval,
+				 unsigned int *readval)
 {
-	void *vaddr;
-	struct page *page = pfn_to_page(addr >> PAGE_SHIFT);
+	void __iomem *vaddr;
 
-	vaddr = kmap(page) + (addr & ~PAGE_MASK);
-	kasan_disable_current();
+	reg = round_down(reg, 0x2);
+
+	vaddr = ioremap(reg, 0x4);
+
 	if (readval)
-		*readval = *(unsigned int *)vaddr;
+		*readval = readw(vaddr);
 	else
-		*(unsigned int *)vaddr = writeval;
-	kasan_enable_current();
-	kunmap(page);
+		writew(writeval, vaddr);
+	iounmap(vaddr);
 	return 0;
 }
-
+static struct aml_ddev aml_dev;
+static struct aml_ddev aml_dev_16;
 static ssize_t paddr_read_file(struct file *file, char __user *userbuf,
-			       size_t count, loff_t *ppos)
+				 size_t count, loff_t *ppos)
 {
 	struct aml_ddev *indio_dev = file->private_data;
 	char buf[80];
 	unsigned int val = 0;
 	ssize_t len;
-	int ret = -1;
+	int ret;
 
-	if (indio_dev->debugfs_reg_access)
-		ret = indio_dev->debugfs_reg_access(indio_dev,
-					   indio_dev->cached_reg_addr,
-					   0, &val);
+	ret = indio_dev->debugfs_reg_access(indio_dev,
+						  indio_dev->cached_reg_addr,
+						  0, &val);
 	if (ret)
 		pr_err("%s: read failed\n", __func__);
 
@@ -82,28 +91,24 @@ static ssize_t paddr_read_file(struct file *file, char __user *userbuf,
 		       indio_dev->cached_reg_addr, val);
 
 	return simple_read_from_buffer(userbuf, count, ppos, buf, len);
+
 }
 
 static ssize_t paddr_write_file(struct file *file, const char __user *userbuf,
-				size_t count, loff_t *ppos)
+				   size_t count, loff_t *ppos)
 {
 	struct aml_ddev *indio_dev = file->private_data;
 	unsigned int reg, val;
 	char buf[80];
 	int ret;
 
-	count = min_t(size_t, count, (sizeof(buf) - 1));
+	count = min_t(size_t, count, (sizeof(buf)-1));
 	if (copy_from_user(buf, userbuf, count))
 		return -EFAULT;
 
 	buf[count] = 0;
 
 	ret = sscanf(buf, "%x %x", &reg, &val);
-
-	if (pfn_valid(reg >> PAGE_SHIFT))
-		indio_dev->debugfs_reg_access = aml_mem_access;
-	else
-		indio_dev->debugfs_reg_access = aml_reg_access;
 
 	switch (ret) {
 	case 1:
@@ -132,7 +137,7 @@ static const struct file_operations paddr_file_ops = {
 };
 
 static ssize_t dump_write_file(struct file *file, const char __user *userbuf,
-			       size_t count, loff_t *ppos)
+				   size_t count, loff_t *ppos)
 {
 	struct seq_file *s = file->private_data;
 	struct aml_ddev *indio_dev = s->private;
@@ -140,17 +145,13 @@ static ssize_t dump_write_file(struct file *file, const char __user *userbuf,
 	char buf[80];
 	int ret;
 
-	count = min_t(size_t, count, (sizeof(buf) - 1));
+	count = min_t(size_t, count, (sizeof(buf)-1));
 	if (copy_from_user(buf, userbuf, count))
 		return -EFAULT;
 
 	buf[count] = 0;
 
 	ret = sscanf(buf, "%x %i", &reg, &val);
-	if (pfn_valid(reg >> PAGE_SHIFT))
-		indio_dev->debugfs_reg_access = aml_mem_access;
-	else
-		indio_dev->debugfs_reg_access = aml_reg_access;
 	switch (ret) {
 	case 2:
 		indio_dev->cached_reg_addr = reg;
@@ -188,6 +189,7 @@ static int dump_open(struct inode *inode, struct file *file)
 	return single_open(file, dump_show, inode->i_private);
 }
 
+
 static const struct file_operations dump_file_ops = {
 	.open		= dump_open,
 	.read		= seq_read,
@@ -195,24 +197,23 @@ static const struct file_operations dump_file_ops = {
 	.llseek		= seq_lseek,
 	.release	= single_release,
 };
-
 static int __init aml_debug_init(void)
 {
-	static struct dentry *dir_aml_reg;
-
-	if (IS_ENABLED(CONFIG_DEBUG_FS)) {
-		dir_aml_reg = debugfs_create_dir("aml_reg", NULL);
-		if (IS_ERR_OR_NULL(dir_aml_reg)) {
-			pr_warn("failed to create debugfs directory\n");
-			dir_aml_reg = NULL;
-			return -ENOMEM;
-		}
-		debugfs_create_file("paddr", S_IFREG | 0440,
-				    dir_aml_reg, &aml_dev, &paddr_file_ops);
-		debugfs_create_file("dump", S_IFREG | 0440,
-				    dir_aml_reg, &aml_dev, &dump_file_ops);
+	debugfs_root = debugfs_create_dir("aml_reg", NULL);
+	if (IS_ERR(debugfs_root) || !debugfs_root) {
+		pr_warn("failed to create debugfs directory\n");
+		debugfs_root = NULL;
+		return -1;
 	}
+	aml_dev.debugfs_reg_access = aml_reg_access;
+	aml_dev_16.debugfs_reg_access = aml_reg_access_16;
 
+	debugfs_create_file("paddr", S_IFREG | 0440,
+			    debugfs_root, &aml_dev, &paddr_file_ops);
+	debugfs_create_file("paddr16", S_IFREG | 0440,
+			    debugfs_root, &aml_dev_16, &paddr_file_ops);
+	debugfs_create_file("dump", S_IFREG | 0440,
+			    debugfs_root, &aml_dev, &dump_file_ops);
 	return 0;
 }
 
@@ -220,8 +221,11 @@ static void __exit aml_debug_exit(void)
 {
 }
 
+
 module_init(aml_debug_init);
 module_exit(aml_debug_exit);
 
 MODULE_DESCRIPTION("Amlogic debug module");
 MODULE_LICENSE("GPL");
+MODULE_AUTHOR("Xing Xu <xing.xu@amlogic.com>");
+

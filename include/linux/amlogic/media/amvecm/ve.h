@@ -1,4 +1,3 @@
-/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
  * include/linux/amlogic/media/amvecm/ve.h
  *
@@ -53,7 +52,6 @@ struct ve_bext_s {
 	unsigned char midpt;
 	unsigned char slope2;
 };
-
 #if defined(CONFIG_AMLOGIC_MEDIA_ENHANCEMENT_VECM)
 #define DNLP_SCURV_LEN 65
 #define GAIN_VAR_LUT_LEN 49
@@ -66,6 +64,8 @@ struct ve_bext_s {
 #define DNLP_PARM_MAX_NUM 100
 #define DNLP_VPP_HIST_BIN_NUM 64
 #define HDR_HIST_BIN_NUM 128
+#define HUE_HIST_BIN_NUM 32
+#define SAT_HIST_BIN_NUM 32
 struct ve_dnlp_s {
 	unsigned int      en;
 	unsigned int rt;    /* 0 ~ 255, */
@@ -73,7 +73,6 @@ struct ve_dnlp_s {
 	unsigned int black; /* 0 ~  16, weak ~ strong */
 	unsigned int white; /* 0 ~  16, weak ~ strong */
 };
-
 struct ve_hist_s {
 	unsigned int sum;
 	int width;
@@ -87,8 +86,9 @@ struct vpp_hist_param_s {
 	unsigned int vpp_pixel_sum;
 	unsigned short vpp_histgram[DNLP_VPP_HIST_BIN_NUM];
 	unsigned int hdr_histgram[HDR_HIST_BIN_NUM];
+	unsigned int hue_histgram[HUE_HIST_BIN_NUM];
+	unsigned int sat_histgram[SAT_HIST_BIN_NUM];
 };
-
 struct ve_dnlp_curve_param_s {
 	unsigned int ve_dnlp_scurv_low[DNLP_SCURV_LEN];
 	unsigned int ve_dnlp_scurv_mid1[DNLP_SCURV_LEN];
@@ -104,7 +104,6 @@ struct ve_dnlp_curve_param_s {
 	unsigned int ve_reg_trend_wht_expand_lut8[TREND_WHT_EXP_LUT_LEN];
 	unsigned int param[DNLP_PARM_MAX_NUM];
 };
-
 enum dnlp_param_e {
 	ve_dnlp_enable = 0,
 	ve_dnlp_respond,
@@ -185,7 +184,6 @@ enum dnlp_param_e {
 	ve_dnlp_reg_mono_binrang_ed,
 	ve_dnlp_param_max,
 };
-
 enum dnlp_curve_e {
 	ve_scurv_low = 1000,
 	ve_scurv_mid1,
@@ -318,7 +316,6 @@ struct ve_cbar_s {
 	unsigned char cb;
 	unsigned char y;
 };
-
 struct ve_demo_s {
 	unsigned char bext;
 	unsigned char dnlp;
@@ -343,44 +340,45 @@ struct ve_regmap_s {
 
 /********************OSD HDR registers backup********************************/
 struct hdr_osd_lut_s {
-	u32 r_map[33];
-	u32 g_map[33];
-	u32 b_map[33];
-	u32 or_map[41];
-	u32 og_map[41];
-	u32 ob_map[41];
+	uint32_t r_map[33];
+	uint32_t g_map[33];
+	uint32_t b_map[33];
+	uint32_t or_map[41];
+	uint32_t og_map[41];
+	uint32_t ob_map[41];
 };
 
 struct hdr_osd_reg_s {
-	u32 viu_osd1_matrix_ctrl; /* 0x1a90 */
-	u32 viu_osd1_matrix_coef00_01; /* 0x1a91 */
-	u32 viu_osd1_matrix_coef02_10; /* 0x1a92 */
-	u32 viu_osd1_matrix_coef11_12; /* 0x1a93 */
-	u32 viu_osd1_matrix_coef20_21; /* 0x1a94 */
-	u32 viu_osd1_matrix_colmod_coef42; /* 0x1a95 */
-	u32 viu_osd1_matrix_offset0_1; /* 0x1a96 */
-	u32 viu_osd1_matrix_offset2; /* 0x1a97 */
-	u32 viu_osd1_matrix_pre_offset0_1; /* 0x1a98 */
-	u32 viu_osd1_matrix_pre_offset2; /* 0x1a99 */
-	u32 viu_osd1_matrix_coef22_30; /* 0x1a9d */
-	u32 viu_osd1_matrix_coef31_32; /* 0x1a9e */
-	u32 viu_osd1_matrix_coef40_41; /* 0x1a9f */
-	u32 viu_osd1_eotf_ctl; /* 0x1ad4 */
-	u32 viu_osd1_eotf_coef00_01; /* 0x1ad5 */
-	u32 viu_osd1_eotf_coef02_10; /* 0x1ad6 */
-	u32 viu_osd1_eotf_coef11_12; /* 0x1ad7 */
-	u32 viu_osd1_eotf_coef20_21; /* 0x1ad8 */
-	u32 viu_osd1_eotf_coef22_rs; /* 0x1ad9 */
-	u32 VIU_OSD1_EOTF_3X3_OFST_0; /* 0x1aa0*/
-	u32 VIU_OSD1_EOTF_3X3_OFST_1; /* 0x1aa1*/
-	u32 viu_osd1_oetf_ctl; /* 0x1adc */
+	uint32_t viu_osd1_matrix_ctrl; /* 0x1a90 */
+	uint32_t viu_osd1_matrix_coef00_01; /* 0x1a91 */
+	uint32_t viu_osd1_matrix_coef02_10; /* 0x1a92 */
+	uint32_t viu_osd1_matrix_coef11_12; /* 0x1a93 */
+	uint32_t viu_osd1_matrix_coef20_21; /* 0x1a94 */
+	uint32_t viu_osd1_matrix_colmod_coef42; /* 0x1a95 */
+	uint32_t viu_osd1_matrix_offset0_1; /* 0x1a96 */
+	uint32_t viu_osd1_matrix_offset2; /* 0x1a97 */
+	uint32_t viu_osd1_matrix_pre_offset0_1; /* 0x1a98 */
+	uint32_t viu_osd1_matrix_pre_offset2; /* 0x1a99 */
+	uint32_t viu_osd1_matrix_coef22_30; /* 0x1a9d */
+	uint32_t viu_osd1_matrix_coef31_32; /* 0x1a9e */
+	uint32_t viu_osd1_matrix_coef40_41; /* 0x1a9f */
+	uint32_t viu_osd1_eotf_ctl; /* 0x1ad4 */
+	uint32_t viu_osd1_eotf_coef00_01; /* 0x1ad5 */
+	uint32_t viu_osd1_eotf_coef02_10; /* 0x1ad6 */
+	uint32_t viu_osd1_eotf_coef11_12; /* 0x1ad7 */
+	uint32_t viu_osd1_eotf_coef20_21; /* 0x1ad8 */
+	uint32_t viu_osd1_eotf_coef22_rs; /* 0x1ad9 */
+	uint32_t VIU_OSD1_EOTF_3X3_OFST_0; /* 0x1aa0*/
+	uint32_t VIU_OSD1_EOTF_3X3_OFST_1; /* 0x1aa1*/
+	uint32_t viu_osd1_oetf_ctl; /* 0x1adc */
 	struct hdr_osd_lut_s lut_val;
 	/* -1: invalid, 0: not shadow, >1: delay count */
-	s32 shadow_mode;
+	int32_t shadow_mode;
 };
 
 extern struct hdr_osd_reg_s hdr_osd_reg;
 /***********************OSD HDR registers*******************************/
+
 
 /* ******************************************************************* */
 /* *** MACRO definitions ********** */

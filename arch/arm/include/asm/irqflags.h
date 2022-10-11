@@ -1,4 +1,3 @@
-/* SPDX-License-Identifier: GPL-2.0 */
 #ifndef __ASM_ARM_IRQFLAGS_H
 #define __ASM_ARM_IRQFLAGS_H
 
@@ -7,7 +6,7 @@
 #include <asm/ptrace.h>
 
 #ifdef CONFIG_AMLOGIC_DEBUG_LOCKUP
-#include <linux/amlogic/irqflags_debug_arm.h>
+#include <../drivers/amlogic/debug/irqflags_debug_arm.h>
 #else
 
 /*
@@ -187,6 +186,6 @@ static inline int arch_irqs_disabled_flags(unsigned long flags)
 
 #include <asm-generic/irqflags.h>
 
+#endif
 #endif /* ifdef __KERNEL__ */
 #endif /* ifndef __ASM_ARM_IRQFLAGS_H */
-#endif /* ifdef CONFIG_AMLOGIC_DEBUG_LOCKUP */

@@ -1,4 +1,3 @@
-/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
  * drivers/amlogic/media/enhancement/amvecm/arch/vpp_keystone_regs.h
  *
@@ -33,6 +32,7 @@
 #define VKS_LBUF_SIZE                              0x310b
 #define VKS_PARA_ADDR_PORT                         0x310e
 #define VKS_PARA_DATA_PORT                         0x310f
+
 
 #endif
 

@@ -6,15 +6,19 @@
 #include <linux/of_device.h>
 #include <linux/pm_domain.h>
 #include <linux/platform_device.h>
-#include <linux/amlogic/power_domain.h>
+#include <linux/amlogic/pwr_ctrl.h>
 
 static unsigned int power_domain;
 struct generic_pm_domain **power_domains;
 static unsigned int pdid_start, pdid_max;
 
-int get_max_id(void)
+static void pd_snprintf(char *buf, unsigned int cnt, const char *fmt, ...)
 {
-	return pdid_max;
+	va_list args;
+
+	va_start(args, fmt);
+	vsnprintf(buf, cnt, fmt, args);
+	va_end(args);
 }
 
 static ssize_t power_on_store(struct device *dev,
@@ -56,11 +60,9 @@ static ssize_t power_status_show(struct device *_dev,
 	unsigned int len = 0, cnt = 20;
 
 	for (i = pdid_start; i < pdid_max; i++) {
-		if (!*(power_domains + i))
-			continue;
 		power_status = pwr_ctrl_status_psci_smc(i);
-		snprintf(buf, cnt, "%s[%d]		:%d\n",
-			 (*(power_domains + i))->name, i, power_status);
+		pd_snprintf(buf, cnt, "%s[%d]		:%d\n",
+			    (*(power_domains + i))->name, i, power_status);
 		buf = buf + cnt;
 		len = len + cnt;
 	}
@@ -89,9 +91,9 @@ void pd_dev_create_file(struct device *dev, int cnt_start, int cnt_end,
 	pdid_start = cnt_start;
 	pdid_max = cnt_end;
 
-	WARN_ON(device_create_file(dev, &dev_attr_power_status));
-	WARN_ON(device_create_file(dev, &dev_attr_power_on));
-	WARN_ON(device_create_file(dev, &dev_attr_power_off));
+	device_create_file(dev, &dev_attr_power_status);
+	device_create_file(dev, &dev_attr_power_on);
+	device_create_file(dev, &dev_attr_power_off);
 }
 
 void pd_dev_remove_file(struct device *dev)

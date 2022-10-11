@@ -1,4 +1,3 @@
-/* SPDX-License-Identifier: GPL-2.0 */
 #include <linux/linkage.h>
 #include <linux/threads.h>
 #include <asm/asm-offsets.h>
@@ -113,6 +112,10 @@ ENDPROC(cpu_resume_mmu)
 	.popsection
 cpu_resume_after_mmu:
 	bl	cpu_init		@ restore the und/abt/irq banked regs
+#ifdef CONFIG_AMLOGIC_KASAN32
+	mov	r0, sp
+	bl	kasan_clear_shadow_for_resume
+#endif
 	mov	r0, #0			@ return zero on success
 	ldmfd	sp!, {r4 - r11, pc}
 ENDPROC(cpu_resume_after_mmu)
@@ -146,7 +149,12 @@ ARM_BE8(setend be)			@ ensure we are in BE mode
 no_hyp:
 	mov	r1, #0
 	ALT_SMP(mrc p15, 0, r0, c0, c0, 5)
+	ALT_SMP(and r2, r0, #1<<24)
+	ALT_SMP(cmp r2, #0)
+	ALT_SMP(beq 2f)
+	ALT_SMP(lsr r0, r0, #8)
 	ALT_UP_B(1f)
+2:
 	adr	r2, mpidr_hash_ptr
 	ldr	r3, [r2]
 	add	r2, r2, r3		@ r2 = struct mpidr_hash phys address
@@ -184,7 +192,6 @@ mpidr_hash_ptr:
 	.long	mpidr_hash - .			@ mpidr_hash struct offset
 
 	.data
-	.align	2
 	.type	sleep_save_sp, #object
 ENTRY(sleep_save_sp)
 	.space	SLEEP_SAVE_SP_SZ		@ struct sleep_save_sp

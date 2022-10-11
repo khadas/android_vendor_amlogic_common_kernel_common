@@ -1,6 +1,18 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/amlogic/media/osd/osd_debug.c
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
 /* Linux Headers */
@@ -49,7 +61,7 @@ static void osd_debug_dump_value(void)
 	struct pandata_s *pdata = NULL;
 
 	osd_get_hw_para(&hwpara);
-	if (!hwpara)
+	if (hwpara == NULL)
 		return;
 
 	osd_log_info("--- OSD ---\n");
@@ -62,21 +74,21 @@ static void osd_debug_dump_value(void)
 		struct hw_osd_blending_s *blend_para = NULL;
 
 		osd_get_blending_para(&blend_para);
-		if (blend_para) {
+		if (blend_para != NULL) {
 			osd_log_info("OSD LAYER: %d\n", blend_para->layer_cnt);
 			osd_log_info("|index\t|order\t|src axis\t|dst axis\n");
 			for (index = 0; index < HW_OSD_COUNT; index++) {
 				osd_log_info("%2d\t%2d\t(%4d,%4d,%4d,%4d)\t(%4d,%4d,%4d,%4d)\n",
-					     index,
-					     hwpara->order[index],
-					     hwpara->src_data[index].x,
-					     hwpara->src_data[index].y,
-					     hwpara->src_data[index].w,
-					     hwpara->src_data[index].h,
-					     hwpara->dst_data[index].x,
-					     hwpara->dst_data[index].y,
-					     hwpara->dst_data[index].w,
-					     hwpara->dst_data[index].h);
+					index,
+					hwpara->order[index],
+					hwpara->src_data[index].x,
+					hwpara->src_data[index].y,
+					hwpara->src_data[index].w,
+					hwpara->src_data[index].h,
+					hwpara->dst_data[index].x,
+					hwpara->dst_data[index].y,
+					hwpara->dst_data[index].w,
+					hwpara->dst_data[index].h);
 			}
 		}
 	}
@@ -86,48 +98,49 @@ static void osd_debug_dump_value(void)
 		osd_log_info("scan_mode: %d\n", hwpara->scan_mode[index]);
 		osd_log_info("enable: %d\n", hwpara->enable[index]);
 		osd_log_info("2x-scale enable.h:%d .v: %d\n",
-			     hwpara->scale[index].h_enable,
-			     hwpara->scale[index].v_enable);
+				hwpara->scale[index].h_enable,
+				hwpara->scale[index].v_enable);
 		osd_log_info("free-scale-mode: %d\n",
-			     hwpara->free_scale_mode[index]);
+				hwpara->free_scale_mode[index]);
 		osd_log_info("free-scale enable.h:%d .v: %d\n",
-			     hwpara->free_scale[index].h_enable,
-			     hwpara->free_scale[index].v_enable);
+				hwpara->free_scale[index].h_enable,
+				hwpara->free_scale[index].v_enable);
 		pdata = &hwpara->pandata[index];
 		osd_log_info("pan data:\n");
 		osd_log_info("\tx_start: 0x%08x, x_end: 0x%08x\n",
-			     pdata->x_start, pdata->x_end);
+				pdata->x_start, pdata->x_end);
 		osd_log_info("\ty_start: 0x%08x, y_end: 0x%08x\n",
-			     pdata->y_start, pdata->y_end);
+				pdata->y_start, pdata->y_end);
 
 		pdata = &hwpara->dispdata[index];
 		osd_log_info("disp data:\n");
 		osd_log_info("\tx_start: 0x%08x, x_end: 0x%08x\n",
-			     pdata->x_start, pdata->x_end);
+				pdata->x_start, pdata->x_end);
 		osd_log_info("\ty_start: 0x%08x, y_end: 0x%08x\n",
-			     pdata->y_start, pdata->y_end);
+				pdata->y_start, pdata->y_end);
 
 		pdata = &hwpara->scaledata[index];
 		osd_log_info("2x-scale data:\n");
 		osd_log_info("\tx_start: 0x%08x, x_end: 0x%08x\n",
-			     pdata->x_start, pdata->x_end);
+				pdata->x_start, pdata->x_end);
 		osd_log_info("\ty_start: 0x%08x, y_end: 0x%08x\n",
-			     pdata->y_start, pdata->y_end);
+				pdata->y_start, pdata->y_end);
 
 		pdata = &hwpara->free_src_data[index];
 		osd_log_info("free-scale src data:\n");
 		osd_log_info("\tx_start: 0x%08x, x_end: 0x%08x\n",
-			     pdata->x_start, pdata->x_end);
+				pdata->x_start, pdata->x_end);
 		osd_log_info("\ty_start: 0x%08x, y_end: 0x%08x\n",
-			     pdata->y_start, pdata->y_end);
+				pdata->y_start, pdata->y_end);
 
 		pdata = &hwpara->free_dst_data[index];
 		osd_log_info("free-scale dst data:\n");
 		osd_log_info("\tx_start: 0x%08x, x_end: 0x%08x\n",
-			     pdata->x_start, pdata->x_end);
+				pdata->x_start, pdata->x_end);
 		osd_log_info("\ty_start: 0x%08x, y_end: 0x%08x\n",
-			     pdata->y_start, pdata->y_end);
+				pdata->y_start, pdata->y_end);
 	}
+
 }
 
 static void osd_debug_dump_register_all(void)
@@ -145,59 +158,6 @@ static void osd_debug_dump_register_all(void)
 	osd_log_info("reg[0x%x]: 0x%08x\n", reg, osd_reg_read(reg));
 	reg = VPP_HOLD_LINES;
 	osd_log_info("reg[0x%x]: 0x%08x\n", reg, osd_reg_read(reg));
-	if (osd_dev_hw.t7_display) {
-		reg = PATH_START_SEL;
-		osd_log_info("reg[0x%x]: 0x%08x(osd vsync sel)\n", reg, osd_reg_read(reg));
-		reg = OSD_PATH_MISC_CTRL;
-		osd_log_info("reg[0x%x]: 0x%08x(vpp mux)\n", reg, osd_reg_read(reg));
-		reg = MALI_AFBCD_TOP_CTRL;
-		osd_log_info("reg[0x%x]: 0x%08x(osd1/2 dv bypass bit14/20)\n",
-			     reg, osd_reg_read(reg));
-		reg = MALI_AFBCD1_TOP_CTRL;
-		osd_log_info("reg[0x%x]: 0x%08x(osd3 dv bypass bit20)\n", reg, osd_reg_read(reg));
-		reg = MALI_AFBCD2_TOP_CTRL;
-		osd_log_info("reg[0x%x]: 0x%08x(osd4 dv bypass bit20)\n", reg, osd_reg_read(reg));
-		reg = VPP_WRAP_OSD1_MATRIX_EN_CTRL;
-		osd_log_info("reg[0x%x]: 0x%08x(osd1 matrix en)\n", reg, osd_reg_read(reg));
-		reg = VPP_WRAP_OSD2_MATRIX_EN_CTRL;
-		osd_log_info("reg[0x%x]: 0x%08x(osd2 matrix en)\n", reg, osd_reg_read(reg));
-		reg = VIU_OSD3_MATRIX_EN_CTRL;
-		osd_log_info("reg[0x%x]: 0x%08x(osd3 matrix en)\n", reg, osd_reg_read(reg));
-		reg = VIU_OSD4_MATRIX_EN_CTRL;
-		osd_log_info("reg[0x%x]: 0x%08x(osd4 matrix en)\n", reg, osd_reg_read(reg));
-		reg = OSD1_HDR_IN_SIZE;
-		osd_log_info("reg[0x%x]: 0x%08x(osd1 hdr size)\n", reg, osd_reg_read(reg));
-		reg = OSD2_HDR_IN_SIZE;
-		osd_log_info("reg[0x%x]: 0x%08x(osd2 hdr size)\n", reg, osd_reg_read(reg));
-		reg = OSD3_HDR_IN_SIZE;
-		osd_log_info("reg[0x%x]: 0x%08x(osd3 hdr size)\n", reg, osd_reg_read(reg));
-		reg = OSD4_HDR_IN_SIZE;
-		osd_log_info("reg[0x%x]: 0x%08x(osd4 hdr size)\n", reg, osd_reg_read(reg));
-		reg = OSD1_HDR2_CTRL;
-		osd_log_info("reg[0x%x]: 0x%08x(osd1 hdr ctrl)\n", reg, osd_reg_read(reg));
-		reg = _OSD2_HDR2_CTRL;
-		osd_log_info("reg[0x%x]: 0x%08x(osd2 hdr ctrl)\n", reg, osd_reg_read(reg));
-		reg = OSD3_HDR2_CTRL;
-		osd_log_info("reg[0x%x]: 0x%08x(osd3 hdr ctrl)\n", reg, osd_reg_read(reg));
-		reg = OSD4_HDR2_CTRL;
-		osd_log_info("reg[0x%x]: 0x%08x(osd4 hdr ctrl)\n", reg, osd_reg_read(reg));
-		reg = OSD1_HDR2_MATRIXI_EN_CTRL;
-		osd_log_info("reg[0x%x]: 0x%08x(osd1 csc matrixi ctrl)\n", reg, osd_reg_read(reg));
-		reg = OSD1_HDR2_MATRIXO_EN_CTRL;
-		osd_log_info("reg[0x%x]: 0x%08x(osd1 csc matrixo ctrl)\n", reg, osd_reg_read(reg));
-		reg = _OSD2_HDR2_MATRIXI_EN_CTRL;
-		osd_log_info("reg[0x%x]: 0x%08x(osd2 csc matrixi ctrl)\n", reg, osd_reg_read(reg));
-		reg = _OSD2_HDR2_MATRIXO_EN_CTRL;
-		osd_log_info("reg[0x%x]: 0x%08x(osd2 csc matrixo ctrl)\n", reg, osd_reg_read(reg));
-		reg = OSD3_HDR2_MATRIXI_EN_CTRL;
-		osd_log_info("reg[0x%x]: 0x%08x(osd3 csc matrixi ctrl)\n", reg, osd_reg_read(reg));
-		reg = OSD3_HDR2_MATRIXO_EN_CTRL;
-		osd_log_info("reg[0x%x]: 0x%08x(osd3 csc matrixo ctrl)\n", reg, osd_reg_read(reg));
-		reg = OSD4_HDR2_MATRIXI_EN_CTRL;
-		osd_log_info("reg[0x%x]: 0x%08x(osd4 csc matrixi ctrl)\n", reg, osd_reg_read(reg));
-		reg = OSD4_HDR2_MATRIXO_EN_CTRL;
-		osd_log_info("reg[0x%x]: 0x%08x(osd4 csc matrixo ctrl)\n", reg, osd_reg_read(reg));
-	}
 	if (osd_hw.osd_meson_dev.osd_ver == OSD_HIGH_ONE) {
 		reg = OSD_PATH_MISC_CTRL;
 		osd_log_info("reg[0x%x]: 0x%08x\n", reg, osd_reg_read(reg));
@@ -242,10 +202,6 @@ static void osd_debug_dump_register_all(void)
 		osd_log_info("reg[0x%x]: 0x%08x\n", reg, osd_reg_read(reg));
 		reg = VD2_BLEND_SRC_CTRL;
 		osd_log_info("reg[0x%x]: 0x%08x\n", reg, osd_reg_read(reg));
-		if (osd_dev_hw.t7_display) {
-			reg = VD3_BLEND_SRC_CTRL;
-			osd_log_info("reg[0x%x]: 0x%08x\n", reg, osd_reg_read(reg));
-		}
 		reg = OSD1_BLEND_SRC_CTRL;
 		osd_log_info("reg[0x%x]: 0x%08x\n", reg, osd_reg_read(reg));
 		reg = OSD2_BLEND_SRC_CTRL;
@@ -263,8 +219,7 @@ static void osd_debug_dump_register_all(void)
 		osd_log_info("reg[0x%x]: 0x%08x\n", reg, osd_reg_read(reg));
 		reg = VPP_OSD2_MATRIX_EN_CTRL;
 		osd_log_info("reg[0x%x]: 0x%08x\n", reg, osd_reg_read(reg));
-		/* avoid crash for reading viu2 osd regs */
-		if (!osd_hw.powered[count - 1] && osd_hw.osd_meson_dev.has_viu2)
+		if (!osd_hw.powered[count - 1])
 			count--;
 	}
 	if (osd_hw.osd_meson_dev.osd_ver == OSD_NORMAL) {
@@ -277,6 +232,12 @@ static void osd_debug_dump_register_all(void)
 		reg = VPP_OSD_SCO_V_START_END;
 		osd_log_info("reg[0x%x]: 0x%08x\n\n", reg, osd_reg_read(reg));
 	}
+	#if 0
+	if (osd_hw.osd_meson_dev.osd_ver == OSD_SIMPLE) {
+		reg = OSD_DB_FLT_CTRL;
+		osd_log_info("reg[0x%x]: 0x%08x\n\n", reg, osd_reg_read(reg));
+	}
+	#endif
 	for (index = 0; index < count; index++) {
 		osd_reg = &hw_osd_reg_array[index];
 		reg = osd_reg->osd_fifo_ctrl_stat;
@@ -299,179 +260,157 @@ static void osd_debug_dump_register_all(void)
 		if (osd_hw.osd_meson_dev.osd_ver == OSD_HIGH_ONE) {
 			reg = osd_reg->osd_blk1_cfg_w4;
 			osd_log_info("reg[0x%x]: 0x%08x\n",
-				     reg, osd_reg_read(reg));
+				reg, osd_reg_read(reg));
 			reg = osd_reg->osd_blk2_cfg_w4;
 			osd_log_info("reg[0x%x]: 0x%08x\n",
-				     reg, osd_reg_read(reg));
+				reg, osd_reg_read(reg));
 			reg = osd_reg->osd_prot_ctrl;
 			osd_log_info("reg[0x%x]: 0x%08x\n",
-				     reg, osd_reg_read(reg));
+				reg, osd_reg_read(reg));
 			reg = osd_reg->osd_mali_unpack_ctrl;
 			osd_log_info("reg[0x%x]: 0x%08x\n",
-				     reg, osd_reg_read(reg));
+				reg, osd_reg_read(reg));
 			reg = osd_reg->osd_dimm_ctrl;
 			osd_log_info("reg[0x%x]: 0x%08x\n",
-				     reg, osd_reg_read(reg));
+				reg, osd_reg_read(reg));
 			reg = osd_reg->osd_matrix_en_ctrl;
 			osd_log_info("reg[0x%x]: 0x%08x\n",
 				     reg, osd_reg_read(reg));
 			reg = osd_reg->osd_vsc_phase_step;
 			osd_log_info("reg[0x%x]: 0x%08x\n",
-				     reg, osd_reg_read(reg));
+				reg, osd_reg_read(reg));
 			reg = osd_reg->osd_vsc_init_phase;
 			osd_log_info("reg[0x%x]: 0x%08x\n",
-				     reg, osd_reg_read(reg));
+				reg, osd_reg_read(reg));
 			reg = osd_reg->osd_vsc_ctrl0;
 			osd_log_info("reg[0x%x]: 0x%08x\n",
-				     reg, osd_reg_read(reg));
+				reg, osd_reg_read(reg));
 			reg = osd_reg->osd_hsc_phase_step;
 			osd_log_info("reg[0x%x]: 0x%08x\n",
-				     reg, osd_reg_read(reg));
+				reg, osd_reg_read(reg));
 			reg = osd_reg->osd_hsc_init_phase;
 			osd_log_info("reg[0x%x]: 0x%08x\n",
-				     reg, osd_reg_read(reg));
+				reg, osd_reg_read(reg));
 			reg = osd_reg->osd_hsc_ctrl0;
 			osd_log_info("reg[0x%x]: 0x%08x\n",
-				     reg, osd_reg_read(reg));
+				reg, osd_reg_read(reg));
 			reg = osd_reg->osd_sc_dummy_data;
 			osd_log_info("reg[0x%x]: 0x%08x\n",
-				     reg, osd_reg_read(reg));
+				reg, osd_reg_read(reg));
 			reg = osd_reg->osd_sc_ctrl0;
 			osd_log_info("reg[0x%x]: 0x%08x\n",
-				     reg, osd_reg_read(reg));
+				reg, osd_reg_read(reg));
 			reg = osd_reg->osd_sci_wh_m1;
 			osd_log_info("reg[0x%x]: 0x%08x\n",
-				     reg, osd_reg_read(reg));
+				reg, osd_reg_read(reg));
 			reg = osd_reg->osd_sco_h_start_end;
 			osd_log_info("reg[0x%x]: 0x%08x\n",
-				     reg, osd_reg_read(reg));
+				reg, osd_reg_read(reg));
 			reg = osd_reg->osd_sco_v_start_end;
 			osd_log_info("reg[0x%x]: 0x%08x\n\n",
-				     reg, osd_reg_read(reg));
+				reg, osd_reg_read(reg));
 		}
-		if (osd_hw.osd_meson_dev.afbc_type == MALI_AFBC &&
-		    osd_hw.osd_afbcd[index].enable) {
+		if ((osd_hw.osd_meson_dev.afbc_type == MALI_AFBC) &&
+			(osd_hw.osd_afbcd[index].enable)) {
 			reg = osd_reg->afbc_header_buf_addr_low_s;
 			osd_log_info("reg[0x%x]: 0x%08x\n",
-				     reg, osd_reg_read(reg));
+				reg, osd_reg_read(reg));
 			reg = osd_reg->afbc_header_buf_addr_high_s;
 			osd_log_info("reg[0x%x]: 0x%08x\n",
-				     reg, osd_reg_read(reg));
+				reg, osd_reg_read(reg));
 			reg = osd_reg->afbc_format_specifier_s;
 			osd_log_info("reg[0x%x]: 0x%08x\n",
-				     reg, osd_reg_read(reg));
+				reg, osd_reg_read(reg));
 			reg = osd_reg->afbc_buffer_width_s;
 			osd_log_info("reg[0x%x]: 0x%08x\n",
-				     reg, osd_reg_read(reg));
+				reg, osd_reg_read(reg));
 			reg = osd_reg->afbc_buffer_hight_s;
 			osd_log_info("reg[0x%x]: 0x%08x\n",
-				     reg, osd_reg_read(reg));
+				reg, osd_reg_read(reg));
 			reg = osd_reg->afbc_boundings_box_x_start_s;
 			osd_log_info("reg[0x%x]: 0x%08x\n",
-				     reg, osd_reg_read(reg));
+				reg, osd_reg_read(reg));
 			reg = osd_reg->afbc_boundings_box_x_end_s;
 			osd_log_info("reg[0x%x]: 0x%08x\n",
-				     reg, osd_reg_read(reg));
+				reg, osd_reg_read(reg));
 			reg = osd_reg->afbc_boundings_box_y_start_s;
 			osd_log_info("reg[0x%x]: 0x%08x\n",
-				     reg, osd_reg_read(reg));
+				reg, osd_reg_read(reg));
 			reg = osd_reg->afbc_boundings_box_y_end_s;
 			osd_log_info("reg[0x%x]: 0x%08x\n",
-				     reg, osd_reg_read(reg));
+				reg, osd_reg_read(reg));
 			reg = osd_reg->afbc_output_buf_addr_low_s;
 			osd_log_info("reg[0x%x]: 0x%08x\n",
-				     reg, osd_reg_read(reg));
+				reg, osd_reg_read(reg));
 			reg = osd_reg->afbc_output_buf_addr_high_s;
 			osd_log_info("reg[0x%x]: 0x%08x\n",
-				     reg, osd_reg_read(reg));
+				reg, osd_reg_read(reg));
 			reg = osd_reg->afbc_output_buf_stride_s;
 			osd_log_info("reg[0x%x]: 0x%08x\n",
-				     reg, osd_reg_read(reg));
+				reg, osd_reg_read(reg));
 			reg = osd_reg->afbc_prefetch_cfg_s;
 			osd_log_info("reg[0x%x]: 0x%08x\n",
-				     reg, osd_reg_read(reg));
+				reg, osd_reg_read(reg));
 		}
 	}
 
 	if (osd_hw.osd_meson_dev.cpu_id >= __MESON_CPU_MAJOR_ID_G12B) {
 		if (osd_hw.osd_meson_dev.has_viu2 &&
-		    osd_hw.powered[osd_hw.osd_meson_dev.viu2_index]) {
+			osd_hw.powered[osd_hw.osd_meson_dev.viu2_index]) {
 			reg = VPP2_MISC;
 			osd_log_info("reg[0x%x]: 0x%08x\n",
-				     reg, osd_reg_read(reg));
+				reg, osd_reg_read(reg));
 			reg = VPU_VIU_VENC_MUX_CTRL;
 			osd_log_info("reg[0x%x]: 0x%08x\n",
-				     reg, osd_reg_read(reg));
+				reg, osd_reg_read(reg));
 			reg = VIU2_RMIF_CTRL1;
 			osd_log_info("reg[0x%x]: 0x%08x\n",
-				     reg, osd_reg_read(reg));
+				reg, osd_reg_read(reg));
 			reg = VIU2_RMIF_SCOPE_X;
 			osd_log_info("reg[0x%x]: 0x%08x\n",
-				     reg, osd_reg_read(reg));
+				reg, osd_reg_read(reg));
 			reg = VIU2_RMIF_SCOPE_Y;
 			osd_log_info("reg[0x%x]: 0x%08x\n",
-				     reg, osd_reg_read(reg));
+				reg, osd_reg_read(reg));
 			reg = VIU2_ROT_BLK_SIZE;
 			osd_log_info("reg[0x%x]: 0x%08x\n",
-				     reg, osd_reg_read(reg));
+				reg, osd_reg_read(reg));
 			reg = VIU2_ROT_LBUF_SIZE;
 			osd_log_info("reg[0x%x]: 0x%08x\n",
-				     reg, osd_reg_read(reg));
+				reg, osd_reg_read(reg));
 			reg = VIU2_ROT_FMT_CTRL;
 			osd_log_info("reg[0x%x]: 0x%08x\n",
-				     reg, osd_reg_read(reg));
+				reg, osd_reg_read(reg));
 			reg = VIU2_ROT_OUT_VCROP;
 			osd_log_info("reg[0x%x]: 0x%08x\n",
-				     reg, osd_reg_read(reg));
+				reg, osd_reg_read(reg));
 			reg = VPP2_OFIFO_SIZE;
 			osd_log_info("reg[0x%x]: 0x%08x\n",
-				     reg, osd_reg_read(reg));
+				reg, osd_reg_read(reg));
 		}
 	}
 	if (osd_hw.osd_meson_dev.afbc_type == MESON_AFBC) {
 		reg = VIU_MISC_CTRL1;
 			osd_log_info("reg[0x%x]: 0x%08x\n",
-				     reg, osd_reg_read(reg));
+				reg, osd_reg_read(reg));
 		for (reg = OSD1_AFBCD_ENABLE;
 			reg <= OSD1_AFBCD_PIXEL_VSCOPE; reg++)
 			osd_log_info("reg[0x%x]: 0x%08x\n",
-				     reg, osd_reg_read(reg));
+				reg, osd_reg_read(reg));
 	} else if (osd_hw.osd_meson_dev.afbc_type == MALI_AFBC) {
 		reg = OSD_PATH_MISC_CTRL;
 		osd_log_info("reg[0x%x]: 0x%08x\n\n",
-			     reg, osd_reg_read(reg));
+			reg, osd_reg_read(reg));
 	}
 
 	if (osd_hw.osd_meson_dev.osd_ver == OSD_SIMPLE) {
 		reg = hw_osd_reg_array[OSD1].osd_blk1_cfg_w4;
 		osd_log_info("reg[0x%x]: 0x%08x\n",
-			     reg, osd_reg_read(reg));
+			reg, osd_reg_read(reg));
 
 		reg = hw_osd_reg_array[OSD1].osd_blk2_cfg_w4;
 		osd_log_info("reg[0x%x]: 0x%08x\n",
-			     reg, osd_reg_read(reg));
-	}
-
-	if (osd_dev_hw.t7_display) {
-		for (reg = VPP1_BLD_CTRL; reg <= VPP1_BLD_DIN2_VSCOPE; reg++)
-			osd_log_info("reg[0x%x]: 0x%08x\n",
-				     reg, osd_reg_read(reg));
-		reg = VPP1_BLEND_BLEND_DUMMY_DATA;
-			osd_log_info("reg[0x%x]: 0x%08x\n",
-				     reg, osd_reg_read(reg));
-		reg = VPP1_BLEND_DUMMY_ALPHA;
-			osd_log_info("reg[0x%x]: 0x%08x\n\n",
-				     reg, osd_reg_read(reg));
-
-		for (reg = VPP2_BLD_CTRL; reg <= VPP2_BLD_DIN2_VSCOPE; reg++)
-			osd_log_info("reg[0x%x]: 0x%08x\n",
-				     reg, osd_reg_read(reg));
-		reg = VPP2_BLEND_BLEND_DUMMY_DATA;
-			osd_log_info("reg[0x%x]: 0x%08x\n",
-				     reg, osd_reg_read(reg));
-		reg = VPP2_BLEND_DUMMY_ALPHA;
-			osd_log_info("reg[0x%x]: 0x%08x\n",
-				     reg, osd_reg_read(reg));
+			reg, osd_reg_read(reg));
 	}
 }
 
@@ -479,19 +418,18 @@ static void osd_debug_dump_register_region(u32 start, u32 end)
 {
 	u32 reg = 0;
 
-	for (reg = start; reg <= end; reg += 1)
+	for (reg = start; reg <= end; reg += 4)
 		osd_log_info("reg[0x%x]: 0x%08x\n", reg, osd_reg_read(reg));
 }
-
-static void osd_debug_dump_register(u32 output_index, int argc, char **argv)
+static void osd_debug_dump_register(int argc, char **argv)
 {
 	int reg_start, reg_end;
 	int ret;
 
 	if (!(osd_hw.osd_meson_dev.osd_ver == OSD_SIMPLE) &&
-	    osd_hw.hw_rdma_en)
-		read_rdma_table(output_index);
-	if (argc == 3 && argv[1] && argv[2]) {
+		(osd_hw.hw_rdma_en))
+		read_rdma_table();
+	if ((argc == 3) && argv[1] && argv[2]) {
 		ret = kstrtoint(argv[1], 16, &reg_start);
 		ret = kstrtoint(argv[2], 16, &reg_end);
 		osd_debug_dump_register_region(reg_start, reg_end);
@@ -505,7 +443,7 @@ static void osd_debug_read_register(int argc, char **argv)
 	int reg;
 	int ret;
 
-	if (argc == 2 && argv[1]) {
+	if ((argc == 2) && argv[1]) {
 		ret = kstrtoint(argv[1], 16, &reg);
 		osd_log_info("reg[0x%x]: 0x%08x\n", reg, osd_reg_read(reg));
 	} else {
@@ -518,12 +456,12 @@ static void osd_debug_write_register(int argc, char **argv)
 	int reg, val;
 	int ret;
 
-	if (argc == 3 && argv[1] && argv[2]) {
+	if ((argc == 3) && argv[1] && argv[2]) {
 		ret = kstrtoint(argv[1], 16, &reg);
 		ret = kstrtoint(argv[2], 16, &val);
 		osd_reg_write(reg, val);
 		osd_log_info("reg[0x%x]: 0x%08x =0x%08x\n",
-			     reg, val, osd_reg_read(reg));
+				reg, val, osd_reg_read(reg));
 	} else {
 		osd_log_err("write: arg error\n");
 	}
@@ -600,25 +538,23 @@ static void osd_test_rect(void)
 #ifdef CONFIG_AMLOGIC_MEDIA_CANVAS
 	struct canvas_s cs;
 #endif
-	ulong cs_addr;
-	u32 cs_width, cs_height;
+	u32 cs_addr, cs_width, cs_height;
 	struct config_para_s *cfg = &ge2d_config;
 	struct config_para_ex_s *cfg_ex = &ge2d_config_ex;
 	struct ge2d_context_s *context = ge2d_context;
 
 #ifdef CONFIG_AMLOGIC_MEDIA_CANVAS
-	if (!(osd_hw.osd_meson_dev.osd_ver == OSD_SIMPLE)) {
+	if (!osd_hw.osd_meson_dev.osd_ver == OSD_SIMPLE) {
 		canvas_read(OSD1_CANVAS_INDEX, &cs);
 		cs_addr = cs.addr;
 		cs_width = cs.width;
 		cs_height = cs.height;
-	} else {
+	} else
 		osd_get_info(0, &cs_addr,
-			     &cs_width, &cs_height);
-	}
+			&cs_width, &cs_height);
 #else
 	osd_get_info(0, &cs_addr,
-		     &cs_width, &cs_height);
+		&cs_width, &cs_height);
 #endif
 	context = create_ge2d_work_queue();
 	if (!context) {
@@ -723,7 +659,7 @@ static void osd_test_rect(void)
 
 static void osd_debug_auto_test(void)
 {
-	if (!(osd_hw.osd_meson_dev.osd_ver == OSD_SIMPLE))
+	if (!osd_hw.osd_meson_dev.osd_ver == OSD_SIMPLE)
 		osd_test_colorbar();
 
 	osd_test_dummydata();
@@ -736,19 +672,18 @@ char *osd_get_debug_hw(void)
 	return osd_debug_help;
 }
 
-int osd_set_debug_hw(u32 index, const char *buf)
+int osd_set_debug_hw(const char *buf)
 {
 	int argc;
 	char *buffer, *p, *para;
 	char *argv[4];
 	char cmd;
-	u32 output_index = get_output_device_id(index);
 
 	buffer = kstrdup(buf, GFP_KERNEL);
 	p = buffer;
 	for (argc = 0; argc < 4; argc++) {
 		para = strsep(&p, " ");
-		if (!para)
+		if (para == NULL)
 			break;
 		argv[argc] = para;
 	}
@@ -764,7 +699,7 @@ int osd_set_debug_hw(u32 index, const char *buf)
 		osd_debug_dump_value();
 		break;
 	case 'd':
-		osd_debug_dump_register(output_index, argc, argv);
+		osd_debug_dump_register(argc, argv);
 		break;
 	case 'r':
 		osd_debug_read_register(argc, argv);

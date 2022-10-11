@@ -1,8 +1,19 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/amlogic/input/keyboard/gpio_keypad.c
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
-
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/input.h>
@@ -12,12 +23,12 @@
 #include <linux/interrupt.h>
 #include <linux/slab.h>
 #include <linux/amlogic/pm.h>
-#include <linux/irq.h>
-#include <linux/amlogic/power_domain.h>
+#include <linux/amlogic/scpi_protocol.h>
 
 #undef pr_fmt
 #define pr_fmt(fmt) "gpio-keypad: " fmt
 
+#define GPIO_PWRKEY_NAME	"power"
 #define DEFAULT_SCAN_PERION	20
 #define	DEFAULT_POLL_MODE	0
 #define KEY_JITTER_COUNT	1
@@ -27,20 +38,21 @@ struct pin_desc {
 	struct gpio_desc *desc;
 	int irq_num;
 	u32 code;
-	u32 key_type;
 	const char *name;
-	int count;
 };
 
 struct gpio_keypad {
 	int key_size;
-	int use_irq;/* 1:irq mode ; 0:polling mode */
+	int use_irq;//1:irq mode ; 0:polling mode
 	int scan_period;
+	int current_irq;
+	int count;
+	int index;
+	u32 pwrkey_code;
 	struct pin_desc *key;
 	struct pin_desc *current_key;
 	struct timer_list polling_timer;
 	struct input_dev *input_dev;
-	struct class kp_class;
 };
 
 static irqreturn_t gpio_irq_handler(int irq, void *data)
@@ -48,101 +60,95 @@ static irqreturn_t gpio_irq_handler(int irq, void *data)
 	struct gpio_keypad *keypad;
 
 	keypad = (struct gpio_keypad *)data;
-	mod_timer(&keypad->polling_timer,
-		  jiffies + msecs_to_jiffies(20));
+	keypad->current_irq  = irq;
+	keypad->count++;
+	mod_timer(&(keypad->polling_timer),
+			jiffies+msecs_to_jiffies(20));
 	return IRQ_HANDLED;
 }
 
-static void report_key_code(struct gpio_keypad *keypad, int gpio_val)
-{
-	struct pin_desc *key = keypad->current_key;
-
-	if (key->count >= KEY_JITTER_COUNT) {
-		key->current_status = gpio_val;
-		if (key->current_status) {
-			input_event(keypad->input_dev, key->key_type,
-				    key->code, 0);
-
-			dev_info(&keypad->input_dev->dev,
-				 "key %d up.\n", key->code);
-		} else {
-			input_event(keypad->input_dev, key->key_type,
-				    key->code, 1);
-
-			dev_info(&keypad->input_dev->dev,
-				 "key %d down.\n", key->code);
-		}
-		input_sync(keypad->input_dev);
-
-		key->count = 0;
-	}
-}
-
-static void polling_timer_handler(struct timer_list *t)
+static struct pin_desc *get_current_key(struct gpio_keypad *keypad)
 {
 	int i;
-	int gpio_val;
-	int is_pressing = 0;
-	struct gpio_keypad *keypad = from_timer(keypad, t, polling_timer);
-
-	if (keypad->use_irq) {/* irq mode */
-		for (i = 0; i < keypad->key_size; i++) {
-			gpio_val = gpiod_get_value(keypad->key[i].desc);
-			if (gpio_val == 0) {
-				keypad->key[i].count++;
-				is_pressing = 1;
-			}
-
-			if (keypad->key[i].current_status != gpio_val) {
-				keypad->current_key = &keypad->key[i];
-				report_key_code(keypad, gpio_val);
-			}
-		}
-		if (is_pressing)
-			mod_timer(&keypad->polling_timer,
-				  jiffies +
-				  msecs_to_jiffies(keypad->scan_period));
-	} else {/* polling mode */
-		for (i = 0; i < keypad->key_size; i++) {
-			gpio_val = gpiod_get_value(keypad->key[i].desc);
-			if (gpio_val == 0)
-				keypad->key[i].count++;
-			if (keypad->key[i].current_status != gpio_val) {
-				keypad->current_key = &keypad->key[i];
-				report_key_code(keypad, gpio_val);
-			}
-		mod_timer(&keypad->polling_timer,
-			  jiffies + msecs_to_jiffies(keypad->scan_period));
-		}
-	}
-}
-
-static ssize_t table_show(struct class *cls, struct class_attribute *attr,
-			  char *buf)
-{
-	struct gpio_keypad *keypad = container_of(cls,
-					struct gpio_keypad, kp_class);
-	int i;
-	int len = 0;
 
 	for (i = 0; i < keypad->key_size; i++) {
-		len += sprintf(buf + len,
-			"[%d]: name = %-21s status = %-5d\n", i,
-			keypad->key[i].name,
-			keypad->key[i].current_status);
+		if (keypad->current_irq == keypad->key[i].irq_num)
+			return &(keypad->key[i]);
 	}
-
-	return len;
+	return NULL;
 }
+static void report_key_code(struct gpio_keypad *keypad, int gpio_val)
+{
+	struct pin_desc *key;
 
-static CLASS_ATTR_RO(table);
+	if (keypad->count < KEY_JITTER_COUNT)
+		keypad->count++;
+	else {
+		key = keypad->current_key;
+		key->current_status = gpio_val;
+		if (key->current_status) {
+			input_report_key(keypad->input_dev,
+				key->code, 0);
+			if (keypad->use_irq)
+				enable_irq(key->irq_num);
+			dev_info(&(keypad->input_dev->dev),
+				"key %d up.\n",
+				key->code);
+		} else {
+			input_report_key(keypad->input_dev,
+				key->code, 1);
+			if (keypad->use_irq)
+				disable_irq_nosync(key->irq_num);
 
-static struct attribute *meson_gpiokey_attrs[] = {
-	&class_attr_table.attr,
-	NULL
-};
+			dev_info(&(keypad->input_dev->dev),
+				"key %d down.\n",
+				key->code);
+		}
+		input_sync(keypad->input_dev);
+		if (key->code == keypad->pwrkey_code) {
+			if (key->current_status)
+				pm_relax(keypad->input_dev->dev.parent);
+			else
+				pm_stay_awake(keypad->input_dev->dev.parent);
+		}
+		keypad->count = 0;
+	}
+}
+static void polling_timer_handler(unsigned long data)
+{
+	struct gpio_keypad *keypad;
+	struct pin_desc *key;
+	int i;
+	int gpio_val;
 
-ATTRIBUTE_GROUPS(meson_gpiokey);
+	keypad = (struct gpio_keypad *)data;
+	if (keypad->use_irq) {//irq mode
+		keypad->current_key = get_current_key(keypad);
+		if (!(keypad->current_key))
+			return;
+		key = keypad->current_key;
+		gpio_val = gpiod_get_value(key->desc);
+		if (key->current_status != gpio_val)
+			report_key_code(keypad, gpio_val);
+		else
+			keypad->count = 0;
+		if (key->current_status == 0)
+			mod_timer(&(keypad->polling_timer),
+				jiffies+msecs_to_jiffies(keypad->scan_period));
+	} else {//polling mode
+		for (i = 0; i < keypad->key_size; i++) {
+			gpio_val = gpiod_get_value(keypad->key[i].desc);
+			if (keypad->key[i].current_status != gpio_val) {
+				keypad->index = i;
+				keypad->current_key = &(keypad->key[i]);
+				report_key_code(keypad, gpio_val);
+			} else if (keypad->index ==  i)
+				keypad->count = 0;
+		mod_timer(&(keypad->polling_timer),
+			jiffies+msecs_to_jiffies(keypad->scan_period));
+		}
+	}
+}
 
 static int meson_gpio_kp_probe(struct platform_device *pdev)
 {
@@ -150,10 +156,7 @@ static int meson_gpio_kp_probe(struct platform_device *pdev)
 	int ret, i;
 	struct input_dev *input_dev;
 	struct gpio_keypad *keypad;
-	struct irq_desc *d;
-	unsigned int number;
-	int wakeup_source = 0;
-	int register_flag = 0;
+	bool pwrkey_update_flg = false;
 
 	if (!(pdev->dev.of_node)) {
 		dev_err(&pdev->dev,
@@ -161,88 +164,73 @@ static int meson_gpio_kp_probe(struct platform_device *pdev)
 		return -EINVAL;
 	}
 	keypad = devm_kzalloc(&pdev->dev,
-			      sizeof(struct gpio_keypad), GFP_KERNEL);
+		sizeof(struct gpio_keypad), GFP_KERNEL);
 	if (!keypad)
 		return -EINVAL;
 	ret = of_property_read_u32(pdev->dev.of_node,
-				   "detect_mode", &keypad->use_irq);
+		"detect_mode", &(keypad->use_irq));
 	if (ret)
-		/* The default mode is polling. */
+		//The default mode is polling.
 		keypad->use_irq = DEFAULT_POLL_MODE;
 	ret = of_property_read_u32(pdev->dev.of_node,
-				   "scan_period", &keypad->scan_period);
+		"scan_period", &(keypad->scan_period));
 	if (ret)
-		/* he default scan period is 20. */
+		//The default scan period is 20.
 		keypad->scan_period = DEFAULT_SCAN_PERION;
-	if (of_property_read_bool(pdev->dev.of_node, "wakeup-source"))
-		wakeup_source = 1;
 	ret = of_property_read_u32(pdev->dev.of_node,
-				   "key_num", &keypad->key_size);
+		"key_num", &(keypad->key_size));
 	if (ret) {
 		dev_err(&pdev->dev,
 			"failed to get key_num!\n");
 		return -EINVAL;
 	}
 	keypad->key = devm_kzalloc(&pdev->dev,
-				   (keypad->key_size) * sizeof(*keypad->key),
-				   GFP_KERNEL);
+		(keypad->key_size)*sizeof(*(keypad->key)), GFP_KERNEL);
 	if (!(keypad->key))
 		return -EINVAL;
 	for (i = 0; i < keypad->key_size; i++) {
-		/* get all gpio desc. */
+		//get all gpio desc.
 		desc = devm_gpiod_get_index(&pdev->dev, "key", i, GPIOD_IN);
 		if (IS_ERR_OR_NULL(desc))
 			return -EINVAL;
 		keypad->key[i].desc = desc;
-		/* The gpio default is high level. */
+		//The gpio default is high level.
 		keypad->key[i].current_status = 1;
 		ret = of_property_read_u32_index(pdev->dev.of_node,
-						 "key_code", i,
-						 &keypad->key[i].code);
+		"key_code", i, &(keypad->key[i].code));
 		if (ret < 0) {
 			dev_err(&pdev->dev,
 				"find key_code=%d finished\n", i);
 			return -EINVAL;
 		}
-
-		ret = of_property_read_u32_index(pdev->dev.of_node,
-						 "key_type", i,
-						 &keypad->key[i].key_type);
-		if (ret)
-			keypad->key[i].key_type = EV_KEY;
-
 		ret = of_property_read_string_index(pdev->dev.of_node,
-						    "key_name", i,
-						    &keypad->key[i].name);
+			"key_name", i, &(keypad->key[i].name));
 		if (ret < 0) {
 			dev_err(&pdev->dev,
 				"find key_name=%d finished\n", i);
 			return -EINVAL;
 		}
+		if (!strcmp(keypad->key[i].name, GPIO_PWRKEY_NAME)) {
+			keypad->pwrkey_code = keypad->key[i].code;
+			pwrkey_update_flg = true;
+		}
+
 		gpiod_direction_input(keypad->key[i].desc);
 		gpiod_set_pull(keypad->key[i].desc, GPIOD_PULL_UP);
 	}
 
-	keypad->kp_class.name = "gpio_keypad";
-	keypad->kp_class.owner = THIS_MODULE;
-	keypad->kp_class.class_groups = meson_gpiokey_groups;
-	ret = class_register(&keypad->kp_class);
-	if (ret) {
-		dev_err(&pdev->dev, "fail to create gpio keypad class.\n");
-		return -EINVAL;
-	}
+	if (!pwrkey_update_flg)
+		keypad->pwrkey_code = KEY_RESERVED;
 
-	/* input */
+	//input
 	input_dev = input_allocate_device();
 	if (!input_dev)
 		return -EINVAL;
+	set_bit(EV_KEY,  input_dev->evbit);
 	for (i = 0; i < keypad->key_size; i++) {
-		input_set_capability(input_dev, keypad->key[i].key_type,
-				     keypad->key[i].code);
-
-		dev_info(&pdev->dev, "%s key(%d) type(0x%x) registered.\n",
-			 keypad->key[i].name, keypad->key[i].code,
-			 keypad->key[i].key_type);
+		set_bit(keypad->key[i].code,  input_dev->keybit);
+		dev_info(&pdev->dev, "%s key(%d) registed.\n",
+			keypad->key[i].name, keypad->key[i].code);
 	}
 	input_dev->name = "gpio_keypad";
 	input_dev->phys = "gpio_keypad/input0";
@@ -262,48 +250,33 @@ static int meson_gpio_kp_probe(struct platform_device *pdev)
 		return -EINVAL;
 	}
 	platform_set_drvdata(pdev, keypad);
-	timer_setup(&keypad->polling_timer,
-		    polling_timer_handler, 0);
+	keypad->count = 0;
+	keypad->index = -1;
+	setup_timer(&(keypad->polling_timer),
+		polling_timer_handler, (unsigned long) keypad);
+
+	device_init_wakeup(&pdev->dev, true);
+
 	if (keypad->use_irq) {
 		for (i = 0; i < keypad->key_size; i++) {
-			keypad->key[i].count = 0;
 			keypad->key[i].irq_num =
 				gpiod_to_irq(keypad->key[i].desc);
 			ret = devm_request_irq(&pdev->dev,
-					       keypad->key[i].irq_num,
-					       gpio_irq_handler,
-					       IRQF_TRIGGER_FALLING,
-					       "gpio_keypad", keypad);
+				keypad->key[i].irq_num,
+				gpio_irq_handler, IRQF_TRIGGER_FALLING,
+				"gpio_keypad", keypad);
 			if (ret) {
 				dev_err(&pdev->dev,
 					"Requesting irq failed!\n");
 				input_free_device(keypad->input_dev);
-				del_timer(&keypad->polling_timer);
+				del_timer(&(keypad->polling_timer));
 				return -EINVAL;
-			}
-			if (keypad->key[i].code == KEY_POWER) {
-				d = irq_to_desc(keypad->key[i].irq_num);
-				if (d) {
-					number =
-					 d->irq_data.parent_data->hwirq - 32;
-					pwr_ctrl_irq_set(number, 1, 0);
-					register_flag = 1;
-				}
 			}
 		}
 	} else {
-		mod_timer(&keypad->polling_timer,
-			  jiffies + msecs_to_jiffies(keypad->scan_period));
+		mod_timer(&(keypad->polling_timer),
+			jiffies+msecs_to_jiffies(keypad->scan_period));
 	}
-	if (wakeup_source) {
-		if (register_flag)
-			dev_info(&pdev->dev,
-				 "succeed to register wakeup source!\n");
-		else
-			dev_info(&pdev->dev,
-				 "failed to register wakeup source!\n");
-	}
-
 	return 0;
 }
 
@@ -312,10 +285,9 @@ static int meson_gpio_kp_remove(struct platform_device *pdev)
 	struct gpio_keypad *keypad;
 
 	keypad = platform_get_drvdata(pdev);
-	class_unregister(&keypad->kp_class);
 	input_unregister_device(keypad->input_dev);
 	input_free_device(keypad->input_dev);
-	del_timer(&keypad->polling_timer);
+	del_timer(&(keypad->polling_timer));
 	return 0;
 }
 
@@ -324,38 +296,50 @@ static const struct of_device_id key_dt_match[] = {
 	{},
 };
 
+static bool meson_gpio_pwrkey_is_valid(struct gpio_keypad *pdata)
+{
+	return (pdata->pwrkey_code != KEY_RESERVED);
+}
+
 static int meson_gpio_kp_suspend(struct platform_device *dev,
-				 pm_message_t state)
+	pm_message_t state)
 {
 	struct gpio_keypad *pdata;
-
 	pdata = (struct gpio_keypad *)platform_get_drvdata(dev);
+
+	if (meson_gpio_pwrkey_is_valid(pdata) && is_pm_freeze_mode())
+		return 0;
+
 	if (!pdata->use_irq)
-		del_timer(&pdata->polling_timer);
+		del_timer(&(pdata->polling_timer));
 	return 0;
 }
 
 static int meson_gpio_kp_resume(struct platform_device *dev)
 {
-	int i;
 	struct gpio_keypad *pdata;
 
 	pdata = (struct gpio_keypad *)platform_get_drvdata(dev);
+
+	if (meson_gpio_pwrkey_is_valid(pdata) && is_pm_freeze_mode())
+		return 0;
+
 	if (!pdata->use_irq)
-		mod_timer(&pdata->polling_timer,
-			  jiffies + msecs_to_jiffies(5));
+		mod_timer(&(pdata->polling_timer),
+			jiffies+msecs_to_jiffies(5));
+
 	if (get_resume_method() == POWER_KEY_WAKEUP) {
-		for (i = 0; i < pdata->key_size; i++) {
-			if (pdata->key[i].code == KEY_POWER) {
-				pr_info("gpio keypad wakeup\n");
-				input_report_key(pdata->input_dev,
-						 KEY_POWER,  1);
-				input_sync(pdata->input_dev);
-				input_report_key(pdata->input_dev,
-						 KEY_POWER,  0);
-				input_sync(pdata->input_dev);
-				break;
-			}
+		if (meson_gpio_pwrkey_is_valid(pdata)) {
+			pr_info("gpio keypad wakeup\n");
+			input_report_key(pdata->input_dev,
+					 pdata->pwrkey_code,  1);
+			input_sync(pdata->input_dev);
+			input_report_key(pdata->input_dev,
+					 pdata->pwrkey_code,  0);
+			input_sync(pdata->input_dev);
+
+			if (scpi_clr_wakeup_reason())
+				pr_debug("clr gpio kp wakeup reason fail.\n");
 		}
 	}
 	return 0;

@@ -1,10 +1,11 @@
-// SPDX-License-Identifier: GPL-2.0-only
 /*
  * Windfarm PowerMac thermal control.
  * Control loops for machines with SMU and PPC970MP processors.
  *
  * Copyright (C) 2005 Paul Mackerras, IBM Corp. <paulus@samba.org>
  * Copyright (C) 2006 Benjamin Herrenschmidt, IBM Corp.
+ *
+ * Use and redistribute under the terms of the GNU GPL v2.
  */
 #include <linux/types.h>
 #include <linux/errno.h>
@@ -12,6 +13,7 @@
 #include <linux/device.h>
 #include <linux/platform_device.h>
 #include <linux/reboot.h>
+#include <linux/slab.h>
 #include <asm/prom.h>
 #include <asm/smu.h>
 
@@ -95,14 +97,14 @@ static int cpu_last_target;
 static struct wf_pid_state backside_pid;
 static int backside_tick;
 static struct wf_pid_state slots_pid;
-static bool slots_started;
+static int slots_started;
 static struct wf_pid_state drive_bay_pid;
 static int drive_bay_tick;
 
 static int nr_cores;
 static int have_all_controls;
 static int have_all_sensors;
-static bool started;
+static int started;
 
 static int failure_state;
 #define FAILURE_SENSOR		1
@@ -466,7 +468,7 @@ static void slots_fan_tick(void)
 		/* first time; initialize things */
 		printk(KERN_INFO "windfarm: Slots control loop started.\n");
 		wf_pid_init(&slots_pid, &slots_param);
-		slots_started = true;
+		slots_started = 1;
 	}
 
 	err = slots_power->ops->get_value(slots_power, &power);
@@ -510,7 +512,7 @@ static void pm112_tick(void)
 	int i, last_failure;
 
 	if (!started) {
-		started = true;
+		started = 1;
 		printk(KERN_INFO "windfarm: CPUs control loops started.\n");
 		for (i = 0; i < nr_cores; ++i) {
 			if (create_cpu_loop(i) < 0) {

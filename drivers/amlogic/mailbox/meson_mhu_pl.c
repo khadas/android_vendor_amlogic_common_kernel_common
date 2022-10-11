@@ -1,6 +1,18 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/amlogic/mailbox/meson_mhu_pl.c
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
 #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
@@ -37,8 +49,6 @@ static struct class *mbox_class;
 
 static struct list_head mbox_list[CHANNEL_PL_MAX];
 
-static int mbflag;
-
 enum USR_CMD {
 	MBOX_USER_CMD = 0x1001,
 };
@@ -54,6 +64,16 @@ struct mbdata_sync {
 	u64 reserve;
 	char data[252];
 } __packed;
+
+struct mhu_ctlr {
+	struct device *dev;
+	void __iomem *mbox_sts_base[MHUDEV_MAX];
+	void __iomem *mbox_set_base[MHUDEV_MAX];
+	void __iomem *mbox_clr_base[MHUDEV_MAX];
+	void __iomem *mbox_pl_base[MHUDEV_MAX];
+	struct mbox_controller mbox_con;
+	struct mhu_chan *channels;
+};
 
 /*
  * mbox_chan_report
@@ -137,18 +157,6 @@ static irqreturn_t mbox_dsp_handler(int irq, void *p)
 	return IRQ_HANDLED;
 }
 
-void memcpy_tomb(void __iomem *to, const void *from, long count)
-{
-	while (count > 0) {
-		__raw_writeb(*(const u8 *)from, to);
-		count--;
-		to++;
-		from++;
-	}
-	/*for sram issue*/
-	mb();
-}
-
 static int mhu_transfer_data(struct mbox_chan *link, void *msg)
 {
 	struct mhu_chan *mhu_chan = link->con_priv;
@@ -163,15 +171,10 @@ static int mhu_transfer_data(struct mbox_chan *link, void *msg)
 
 	mhu_chan->data = data;
 	if (data->tx_buf) {
-		if (mbflag == 1) {
-			memcpy_tomb(payload + TX_PAYLOAD,
-				    data->tx_buf, data->tx_size);
-		} else {
-			memset_io(payload + TX_PAYLOAD,
-				  0, MBOX_PL_SIZE);
-			memcpy_toio(payload + TX_PAYLOAD,
-				    data->tx_buf, data->tx_size);
-		}
+		memset_io(payload + TX_PAYLOAD,
+			  0, MBOX_PL_SIZE);
+		memcpy_toio(payload + TX_PAYLOAD,
+			    data->tx_buf, data->tx_size);
 	}
 	writel(data->cmd, mbox_set_base);
 
@@ -377,8 +380,7 @@ static ssize_t mbox_message_read(struct file *filp, char __user *userbuf,
 			spin_unlock_irqrestore(&mhu_list_lock, flags);
 			ret = wait_for_completion_killable(&msg->complete);
 			if (ret < 0) {
-				dev_err(dev, "Read msg wait killed %d\n",
-					ret);
+				dev_err(dev, "Read msg wait killed %d\n", ret);
 				return -ENXIO;
 			}
 			dev_dbg(dev, "Wait end %s\n", msg->data);
@@ -487,8 +489,7 @@ static int mhu_cdev_init(struct device *dev, struct mhu_ctlr *mhu_ctlr)
 			goto out_err;
 		}
 
-		strncpy(cur->char_name, name, CDEV_NAME_SIZE - 1);
-		cur->char_name[CDEV_NAME_SIZE - 1] = '\0';
+		strncpy(cur->char_name, name, 32);
 		pr_debug("dts char name[%d]: %s\n", index, cur->char_name);
 
 		cur->mhu_dev = dev;
@@ -544,12 +545,6 @@ static int mhu_pl_probe(struct platform_device *pdev)
 		return -ENXIO;
 	}
 
-	mbflag = 0;
-	of_property_read_u32(dev->of_node,
-			     "mbox-mb", &mbflag);
-	if (!mbflag)
-		dev_err(dev, "no mailbox mbox-mb\n");
-
 	memid = num_chans / 2;
 
 	for (i = 0; i < memid; i++) {
@@ -590,7 +585,6 @@ static int mhu_pl_probe(struct platform_device *pdev)
 			return PTR_ERR(mhu_ctlr->mbox_pl_base[i]);
 	}
 
-	mutex_init(&mhu_ctlr->mutex);
 	mhu_ctlr->dev = dev;
 	platform_set_drvdata(pdev, mhu_ctlr);
 
@@ -662,11 +656,11 @@ static int mhu_pl_probe(struct platform_device *pdev)
 
 	mhu_pl_device = dev;
 	mhu_f |= MASK_MHU_PL;
-	pr_info("pl mailbox init done %pK, 0x%x\n", mhu_pl_device, mhu_f);
+	pr_info("pl mailbox init done\n");
 	return 0;
 }
 
-static int mhu_pl_remove(struct platform_device *pdev)
+static int mhu_remove(struct platform_device *pdev)
 {
 	struct mhu_ctlr *ctlr = platform_get_drvdata(pdev);
 
@@ -681,9 +675,9 @@ static const struct of_device_id mhu_of_match[] = {
 	{},
 };
 
-static struct platform_driver mhu_pl_driver = {
+static struct platform_driver mhu_driver = {
 	.probe = mhu_pl_probe,
-	.remove = mhu_pl_remove,
+	.remove = mhu_remove,
 	.driver = {
 		.owner		= THIS_MODULE,
 		.name = DRIVER_NAME,
@@ -691,12 +685,18 @@ static struct platform_driver mhu_pl_driver = {
 	},
 };
 
-int __init aml_mhu_pl_init(void)
+static int __init mhu_init(void)
 {
-	return platform_driver_register(&mhu_pl_driver);
+	return platform_driver_register(&mhu_driver);
 }
+core_initcall(mhu_init);
 
-void __exit aml_mhu_pl_exit(void)
+static void __exit mhu_exit(void)
 {
-	platform_driver_unregister(&mhu_pl_driver);
+	platform_driver_unregister(&mhu_driver);
 }
+module_exit(mhu_exit);
+
+MODULE_AUTHOR("Huan Biao <huan.biao@amlogic.com>");
+MODULE_DESCRIPTION("MESON MHU mailbox pl driver");
+MODULE_LICENSE("GPL");

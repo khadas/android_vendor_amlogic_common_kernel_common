@@ -1,4 +1,3 @@
-/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
  * drivers/amlogic/media/enhancement/amvecm/amve_gamma_table.h
  *
@@ -82,5 +81,7 @@ struct tcon_gamma_table_s video_curve_2d2 = {
 	973,  982,  990,  999, 1008, 1016,
 	},
 };
+
+
 #endif
 

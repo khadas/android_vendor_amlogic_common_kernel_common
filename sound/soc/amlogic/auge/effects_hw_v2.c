@@ -1,9 +1,19 @@
-// SPDX-License-Identifier: GPL-2.0
 /*
- * Copyright (C) 2019 Amlogic, Inc. All rights reserved.
+ * sound/soc/amlogic/auge/effect_hw_v2.c
+ *
+ * Copyright (C) 2018 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
  *
  */
-
 #include <linux/kernel.h>
 
 #include "effects_hw_v2.h"
@@ -125,7 +135,7 @@ void aed_set_multiband_drc_coeff(int band, unsigned int *params)
 
 	for (i = 0; i < offset; i++) {
 		eqdrc_write(reg + band * offset + i,
-			    params[band * offset + i]);
+			params[band * offset + i]);
 	}
 }
 
@@ -136,8 +146,7 @@ void aed_get_multiband_drc_coeff(int band, unsigned int *params)
 	int reg = AED_MDRC_RMS_COEF00;
 
 	for (i = 0; i < offset; i++) {
-		*(params + band * offset + i) =
-			eqdrc_read(reg + band * offset + i);
+		*(params + i) = eqdrc_read(reg + band * offset + i);
 	}
 }
 
@@ -159,15 +168,18 @@ void aed_set_fullband_drc_coeff(int group, unsigned int *params)
 		eqdrc_write(AED_DRC_ATTACK_COEF11, *p++);
 		eqdrc_write(AED_DRC_THD1, *p++);
 		eqdrc_write(AED_DRC_K2, *p++);
-		eqdrc_write(AED_DRC_THD_OUT0, eqdrc_read(AED_DRC_THD1));
+
 	} else if (group == 2) {
 		eqdrc_write(AED_DRC_RMS_COEF0, *p++);
 		eqdrc_write(AED_DRC_RMS_COEF1, *p++);
 		eqdrc_write(AED_DRC_LOOPBACK_CNTL, *p++);
-		/*THD_OUT0 = THD1; K1 = 1.0*/
-		eqdrc_write(AED_DRC_THD_OUT0, eqdrc_read(AED_DRC_THD1));
-		eqdrc_write(AED_DRC_K1, 0x40000);
+		/* bypass THD_OUT0 and K1, it can't be set by user space. */
+		p += 2;
+		eqdrc_write(AED_DRC_OFFSET, *p++);
 	}
+	/*THD_OUT0 = THD1; K1 = 1.0*/
+	eqdrc_write(AED_DRC_THD_OUT0, eqdrc_read(AED_DRC_THD1));
+	eqdrc_write(AED_DRC_K1, 0x40000);
 }
 
 void aed_get_fullband_drc_coeff(int len, unsigned int *params)
@@ -193,6 +205,7 @@ void aed_get_fullband_drc_coeff(int len, unsigned int *params)
 	*p++ = eqdrc_read(AED_DRC_LOOPBACK_CNTL);
 	*p++ = eqdrc_read(AED_DRC_THD_OUT0);
 	*p++ = eqdrc_read(AED_DRC_K1);
+	*p++ = eqdrc_read(AED_DRC_OFFSET);
 }
 
 void aed_set_mixer_params(void)
@@ -228,7 +241,7 @@ void aed_nd_enable(bool enable)
 		eqdrc_write(AED_ND_ATTACK_COEF1, 0x7fae78);
 	}
 
-	eqdrc_write(AED_ND_CNTL, (enable << 0) | (3 << 1));
+	eqdrc_write(AED_ND_CNTL, (enable << 0)|(3 << 1));
 }
 
 void aed_eq_enable(int idx, bool enable)
@@ -249,33 +262,38 @@ void aed_eq_taps(unsigned int eq1_taps)
 void aed_set_multiband_drc_param(void)
 {
 	eqdrc_update_bits(AED_MDRC_CNTL,
-			  (0x1 << 16) | (0x7 << 3) | (0x7 << 0),
-			  (0x0 << 16) | (0x7 << 3) | (0x7 << 0));
+		(0x1 << 16) | (0x7 << 3) | (0x7 << 0),
+		(0x0 << 16) | (0x7 << 3) | (0x7 << 0));
 }
 
 void aed_set_fullband_drc_param(int tap)
 {
-	eqdrc_update_bits(AED_DRC_CNTL, (0x7 << 3), (tap << 3));
+	eqdrc_update_bits(AED_DRC_CNTL,
+		(0x7 << 3), (tap << 3));
 }
 
 void aed_set_multiband_drc_enable(bool enable)
 {
-	eqdrc_update_bits(AED_MDRC_CNTL, (0x1 << 8), (enable << 8));
+	eqdrc_update_bits(AED_MDRC_CNTL,
+		(0x1 << 8), (enable << 8));
 }
 
 void aed_set_fullband_drc_enable(bool enable)
 {
-	eqdrc_update_bits(AED_DRC_CNTL, (0x1 << 0), (enable << 0));
+	eqdrc_update_bits(AED_DRC_CNTL,
+		(0x1 << 0), (enable << 0));
 }
 
-void aed_set_volume(unsigned int master_vol,
-		    unsigned int lch_vol, unsigned int rch_vol)
+void aed_set_volume(
+	unsigned int master_vol,
+	unsigned int Lch_vol,
+	unsigned int Rch_vol)
 {
 	eqdrc_write(AED_EQ_VOLUME,
-		    (0 << 30) |          /* volume step: 0.125dB */
-		    (master_vol << 16) | /* master volume: 0dB */
-		    (lch_vol << 8) |     /* channel 2 volume: 0dB */
-		    (rch_vol << 0)       /* channel 1 volume: 0dB */
+		(0 << 30) |          /* volume step: 0.125dB */
+		(master_vol << 16) | /* master volume: 0dB */
+		(Rch_vol << 8) |     /* channel 2 volume: 0dB */
+		(Lch_vol << 0)       /* channel 1 volume: 0dB */
 	);
 	eqdrc_write(AED_EQ_VOLUME_SLEW_CNT, 0x2); /*40ms from -120dB~0dB*/
 	eqdrc_write(AED_MUTE, 0);
@@ -287,8 +305,8 @@ void aed_set_lane_and_channels(int lane_mask, int ch_mask)
 	int val = ch_mask & 0xff;
 
 	eqdrc_update_bits(AED_TOP_CTL,
-			  0xff << 18 | 0xf << 14,
-			  ch_mask << 18 | lane_mask << 14);
+		0xff << 18 | 0xf << 14,
+		ch_mask << 18 | lane_mask << 14);
 
 	for (i = 0; i < 8; i++) {
 		if ((val & 0x1) == 0x1)
@@ -297,7 +315,7 @@ void aed_set_lane_and_channels(int lane_mask, int ch_mask)
 	}
 
 	eqdrc_update_bits(AED_TOP_REQ_CTL,
-			  0xff << 12, (ch_num - 1) << 12);
+		0xff << 12, (ch_num - 1) << 12);
 }
 
 /* max 16ch, 8 lane*/
@@ -317,12 +335,16 @@ void aed_set_lane_and_channels_v3(int lane_mask, int ch_mask)
 	}
 
 	eqdrc_update_bits(AED_TOP_CTL1,
-			  0xf << 20 | 0xf << 16 | 0x1 << 5 | 0x1 << 4 | 0xf,
-			  (lane_num * 2 + 1) << 20 | (lane_num * 2) << 16 |
-			  0x1 << 5 | 0x1 << 4 | (ch_num - 1));
+		0xf << 20 | 0xf << 16 | 0x1 << 5 | 0x1 << 4 | 0xf,
+		(lane_num * 2 + 1) << 20 | (lane_num * 2) << 16 |
+		0x1 << 5 | 0x1 << 4 | (ch_num - 1));
 
-	eqdrc_update_bits(AED_TOP_CTL2, 0xff << 12, (ch_num - 1) << 12);
+	eqdrc_update_bits(AED_TOP_CTL2,
+		0xff << 12, (ch_num - 1) << 12);
+
+	/*pr_info("ch_num = %d, lane_num = %d", ch_num, lane_num);*/
 }
+
 
 void aed_set_ctrl(bool enable, int sel, enum frddr_dest module, int offset)
 {
@@ -343,7 +365,7 @@ void aed_set_ctrl(bool enable, int sel, enum frddr_dest module, int offset)
 		break;
 	default:
 		pr_err("unknown AED req_sel:%d, module:%d\n",
-		       sel, module);
+			sel, module);
 		return;
 	}
 
@@ -358,15 +380,15 @@ void aed_set_ctrl(bool enable, int sel, enum frddr_dest module, int offset)
 		/* SPDIFOUT A/B */
 		aml_spdifout_select_aed(enable, module - SPDIFOUT_A);
 	}
+
 }
 
 void aed_set_format(int msb, enum ddr_types frddr_type,
-		    enum ddr_num source, int offset)
+				enum ddr_num source, int offset)
 {
 	eqdrc_update_bits(AED_TOP_CTL,
-			  0x7 << 11 | 0x1f << 6 | 0x3 << (4 - offset),
-			  frddr_type << 11 | msb << 6 |
-			  source << (4 - offset));
+		0x7 << 11 | 0x1f << 6 | 0x3 << (4 - offset),
+		frddr_type << 11 | msb << 6 | source << (4 - offset));
 }
 
 void aed_reload_config(void)
@@ -396,7 +418,7 @@ void aed_enable(bool enable)
 void aed_module_reset(int offset)
 {
 	audiobus_update_bits(EE_AUDIO_SW_RESET0(offset),
-			     REG_BIT_RESET_EQDRC, REG_BIT_RESET_EQDRC);
+		REG_BIT_RESET_EQDRC, REG_BIT_RESET_EQDRC);
 	audiobus_update_bits(EE_AUDIO_SW_RESET0(offset),
-			     REG_BIT_RESET_EQDRC, 0);
+		REG_BIT_RESET_EQDRC, 0);
 }

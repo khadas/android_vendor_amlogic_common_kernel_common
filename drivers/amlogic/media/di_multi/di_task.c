@@ -21,7 +21,7 @@
 #include <linux/semaphore.h>
 #include <linux/kfifo.h>
 #include <linux/spinlock.h>
-#include <uapi/linux/sched/types.h>
+
 #include "deinterlace.h"
 #include "di_data_l.h"
 
@@ -191,9 +191,9 @@ void task_polling_cmd_keep(unsigned int ch, unsigned int top_sts)
 			sct_alloc_in_poling(pch->ch_id);
 		}
 	}
-	if (top_sts != EDI_TOP_STATE_IDLE	&&
-	    top_sts != EDI_TOP_STATE_READY	&&
-	    top_sts != EDI_TOP_STATE_BYPASS)
+	if ((top_sts != EDI_TOP_STATE_IDLE)	&&
+	    (top_sts != EDI_TOP_STATE_READY)	&&
+	    (top_sts != EDI_TOP_STATE_BYPASS))
 		return;
 
 //ary 2020-12-09	spin_lock_irqsave(&plist_lock, flags);
@@ -634,7 +634,7 @@ bool mtsk_alloc_block2(unsigned int ch, struct mtsk_cmd_s *cmd)
 	timeout = wait_for_completion_timeout(&fcmd->alloc_done,
 		msecs_to_jiffies(30));
 	if (!timeout) {
-		PR_ERR("%s:ch[%d]timeout\n", __func__, ch);
+		PR_ERR("%s:timeout\n", __func__);
 		return false;
 	}
 	return true;

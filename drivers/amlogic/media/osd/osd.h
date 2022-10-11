@@ -1,6 +1,18 @@
-/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/amlogic/media/osd/osd.h
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
 #ifndef _OSD_H_
@@ -42,18 +54,18 @@ enum color_index_e {
 	COLOR_INDEX_RGBA_1010102 = 34,
 };
 
-#define VPP_OSD2_PREBLEND           BIT(17)
-#define VPP_OSD1_PREBLEND           BIT(16)
-#define VPP_VD2_PREBLEND            BIT(15)
-#define VPP_VD1_PREBLEND            BIT(14)
-#define VPP_OSD2_POSTBLEND          BIT(13)
-#define VPP_OSD1_POSTBLEND          BIT(12)
-#define VPP_VD2_POSTBLEND           BIT(11)
-#define VPP_VD1_POSTBLEND           BIT(10)
-#define VPP_POSTBLEND_EN            BIT(7)
-#define VPP_PRE_FG_OSD2             BIT(5)
-#define VPP_PREBLEND_EN             BIT(6)
-#define VPP_POST_FG_OSD2            BIT(4)
+#define VPP_OSD2_PREBLEND           (1 << 17)
+#define VPP_OSD1_PREBLEND           (1 << 16)
+#define VPP_VD2_PREBLEND            (1 << 15)
+#define VPP_VD1_PREBLEND            (1 << 14)
+#define VPP_OSD2_POSTBLEND          (1 << 13)
+#define VPP_OSD1_POSTBLEND          (1 << 12)
+#define VPP_VD2_POSTBLEND           (1 << 11)
+#define VPP_VD1_POSTBLEND           (1 << 10)
+#define VPP_POSTBLEND_EN            (1 << 7)
+#define VPP_PRE_FG_OSD2             (1 << 5)
+#define VPP_PREBLEND_EN             (1 << 6)
+#define VPP_POST_FG_OSD2            (1 << 4)
 
 /* OSD device ioctl definition */
 #define FBIOPUT_OSD_SRCKEY_ENABLE        0x46fa
@@ -101,12 +113,12 @@ enum color_index_e {
 
 #define HW_OSD_COUNT     4
 #define OSD_BLEND_LAYERS 4
-#define VIU_COUNT        3
+#define VIU_COUNT        2
 #define MAX_TRACE_NUM    16
 
 /* OSD block definition */
 #define HW_OSD_BLOCK_COUNT 4
-#define HW_OSD_BLOCK_REG_COUNT (HW_OSD_BLOCK_COUNT * 2)
+#define HW_OSD_BLOCK_REG_COUNT (HW_OSD_BLOCK_COUNT*2)
 #define HW_OSD_BLOCK_ENABLE_MASK        0x000F
 #define HW_OSD_BLOCK_ENABLE_0           0x0001 /* osd blk0 enable */
 #define HW_OSD_BLOCK_ENABLE_1           0x0002 /* osd blk1 enable */
@@ -118,37 +130,37 @@ enum color_index_e {
 #define HW_OSD_BLOCK_LAYOUT_GRID        0x00030000
 #define HW_OSD_BLOCK_LAYOUT_CUSTOMER    0xFFFF0000
 
-#define OSD_LEFT                0
-#define OSD_RIGHT               1
-#define OSD_ORDER_01            1
-#define OSD_ORDER_10            2
-#define OSD_GLOBAL_ALPHA_DEF    0x100
-#define OSD_DATA_BIG_ENDIAN     0
-#define OSD_DATA_LITTLE_ENDIAN  1
+#define OSD_LEFT 0
+#define OSD_RIGHT 1
+#define OSD_ORDER_01 1
+#define OSD_ORDER_10 2
+#define OSD_GLOBAL_ALPHA_DEF 0x100
+#define OSD_DATA_BIG_ENDIAN 0
+#define OSD_DATA_LITTLE_ENDIAN 1
 #define OSD_TC_ALPHA_ENABLE_DEF 0  /* disable tc_alpha */
 
-#define INT_VIU_VSYNC  30 /* 35 */
+#define INT_VIU_VSYNC 30 /* 35 */
 #define INT_VIU2_VSYNC 45
-#define INT_RDMA       121
+#define INT_RDMA 121
 
-#define OSD_MAX_BUF_NUM        1  /* fence relative */
+#define OSD_MAX_BUF_NUM 1  /* fence relative */
 #define MALI_AFBC_16X16_PIXEL  0
 #define MALI_AFBC_32X8_PIXEL   1
 
 #define MALI_AFBC_SPLIT_OFF  0
 #define MALI_AFBC_SPLIT_ON   1
-#define OSD_HW_CURSOR        BIT(0)
-#define OSD_UBOOT_LOGO       BIT(1)
-#define OSD_ZORDER           BIT(2)
-#define OSD_PRIMARY          BIT(3)
-#define OSD_FREESCALE        BIT(4)
-#define OSD_AFBC             BIT(5)
-#define OSD_VIU3             BIT(28)
-#define OSD_VIU2             BIT(29)
-#define OSD_VIU1             BIT(30)
-#define OSD_LAYER_ENABLE     BIT(31)
-#define BYPASS_DIN           BIT(7)
-#define OSD_BACKUP_COUNT     24
+#define OSD_HW_CURSOR           BIT(0)
+#define OSD_UBOOT_LOGO          BIT(1)
+#define OSD_ZORDER              BIT(2)
+#define OSD_PRIMARY             BIT(3)
+#define OSD_FREESCALE           BIT(4)
+#define OSD_AFBC                BIT(5)
+#define OSD_VIU2                BIT(29)
+#define OSD_VIU1                BIT(30)
+#define OSD_LAYER_ENABLE        BIT(31)
+
+#define BYPASS_DIN        BIT(7)
+#define OSD_BACKUP_COUNT 24
 
 #define LOGO_DEV_OSD0      0x0
 #define LOGO_DEV_OSD1      0x1
@@ -161,16 +173,8 @@ enum osd_index_e {
 	OSD2,
 	OSD3,
 	OSD4,
-	OSD_MAX,
+	OSD_MAX = OSD4,
 };
-
-/* osd table for viux */
-#define OSD_TABLE_1   (0xffff0000 | (OSD4 << 12) | (OSD3 << 8) | (OSD2 << 4) | OSD1)
-#define OSD_TABLE_2_1 (0xfffff000 | (OSD4 << 8) | (OSD2 << 4) | OSD1)
-#define OSD_TABLE_2_2 (0xfffffff0 | OSD3)
-#define OSD_TABLE_3_1 (0xffffff00 | (OSD2 << 4) | OSD1)
-#define OSD_TABLE_3_2 (0xfffffff0 | OSD3)
-#define OSD_TABLE_3_3 (0xfffffff0 | OSD4)
 
 enum osd_enable_e {
 	DISABLE = 0,
@@ -286,10 +290,6 @@ enum cpuid_type_e {
 	__MESON_CPU_MAJOR_ID_TM2,
 	__MESON_CPU_MAJOR_ID_A1,
 	__MESON_CPU_MAJOR_ID_SC2,
-	__MESON_CPU_MAJOR_ID_T5,
-	__MESON_CPU_MAJOR_ID_T5D,
-	__MESON_CPU_MAJOR_ID_T7,
-	__MESON_CPU_MAJOR_ID_S4,
 	__MESON_CPU_MAJOR_ID_UNKNOWN,
 };
 
@@ -326,20 +326,10 @@ enum vpp_blend_input_e {
 	POSTBLD_OSD2,
 };
 
-enum vpp_blend_input_t7_e {
-	POSTBLD_CLOSE_T7 = 0,
-	POSTBLD_VD1_T7,
-	POSTBLD_VD2_T7,
-	POSTBLD_VD3_T7,
-	POSTBLD_OSD1_T7,
-	POSTBLD_OSD2_T7,
-};
-
 enum osd_zorder_e {
 	LAYER_1 = 1,
 	LAYER_2,
 	LAYER_3,
-	LAYER_4,
 	LAYER_UNSUPPORT
 };
 
@@ -357,8 +347,6 @@ enum osd_blend_mode_e {
 	OSD_BLEND_ABC,
 	OSD_BLEND_A_BC,
 	OSD_BLEND_AB_C,
-	OSD_BLEND_ABCD,
-	OSD_BLEND_AB_CD,
 };
 
 enum afbc_pix_format_e {
@@ -385,28 +373,18 @@ enum viu2_rotate_format {
 enum viu_type {
 	VIU1,
 	VIU2,
-	VIU3,
-};
-
-enum vpp_mux_input_type {
-	VPP_DIN_NONE = 0,
-	VPP_OSD1,
-	VPP_OSD2,
-	VPP_OSD3,
-	VPP_OSD4,
-};
-
-enum vpp_vsync_type {
-	VPU_VPP0,
-	VPU_VPP1,
-	VPU_VPP2,
-	VPU_VPP_MAX
 };
 
 enum render_cmd_type {
 	LAYER_SYNC,
 	BLANK_CMD,
 	PAGE_FLIP,
+};
+
+enum osd_scaler_workaroud_type {
+	SC_NORMAL = 0,
+	SC_4K2K,
+	SC_DOUBLE,
 };
 
 struct pandata_s {
@@ -427,7 +405,7 @@ struct fb_geometry_s {
 	u32 width;  /* in byte unit */
 	u32 height;
 	u32 canvas_idx;
-	ulong addr;
+	u32 addr;
 	u32 xres;
 	u32 yres;
 };
@@ -461,7 +439,7 @@ struct osd_fence_map_s {
 	u32 yres;
 	s32 in_fd;
 	s32 out_fd;
-	ulong ext_addr;
+	u32 ext_addr;
 	u32 format;
 	u32 width;
 	u32 height;
@@ -480,7 +458,7 @@ struct osd_fence_map_s {
 	u32 background_w;
 	u32 background_h;
 	size_t afbc_len;
-	struct dma_fence *in_fence;
+	struct fence *in_fence;
 };
 
 struct layer_fence_map_s {
@@ -488,7 +466,7 @@ struct layer_fence_map_s {
 	u32 enable;
 	s32 in_fd;
 	s32 out_fd;
-	ulong ext_addr;
+	u32 ext_addr;
 	u32 format;
 	u32 compose_type;
 	u32 fb_width;
@@ -512,7 +490,7 @@ struct layer_fence_map_s {
 	u32 secure_enable;
 	size_t afbc_len;
 	struct file *buf_file;
-	struct dma_fence *in_fence;
+	struct fence *in_fence;
 };
 
 struct osd_layers_fence_map_s {
@@ -526,8 +504,8 @@ struct osd_layers_fence_map_s {
 
 struct afbcd_data_s {
 	u32 enable;
-	ulong phy_addr;
-	ulong addr[OSD_MAX_BUF_NUM];
+	u32 phy_addr;
+	u32 addr[OSD_MAX_BUF_NUM];
 	u32 frame_width;
 	u32 frame_height;
 	u32 conv_lbuf_len;
@@ -551,21 +529,9 @@ struct osd_device_data_s {
 	u32 dummy_data;
 	u32 has_viu2;
 	u32 osd0_sc_independ;
-	u32 osd_rgb2yuv;
 	u32 viu1_osd_count;
 	u32 viu2_index;
-	u32 mif_linear;
-	u32 has_vpp1;
-	u32 has_vpp2;
 	struct clk *vpu_clkc;
-};
-
-struct osd_device_hw_s {
-	u32 t7_display;
-	u32 has_8G_addr;
-	u32 multi_afbc_core;
-	u32 has_multi_vpp;
-	u32 new_blend_bypass;
 };
 
 struct hw_osd_reg_s {
@@ -606,7 +572,6 @@ struct hw_osd_reg_s {
 	u32 osd_sci_wh_m1;/* VPP_OSD_SCI_WH_M1 */
 	u32 osd_sco_h_start_end;/* VPP_OSD_SCO_H_START_END */
 	u32 osd_sco_v_start_end;/* VPP_OSD_SCO_V_START_END */
-	u32 osd_db_flt_ctrl;
 	u32 afbc_header_buf_addr_low_s;/* VPU_MAFBC_HEADER_BUF_ADDR_LOW_S0 */
 	u32 afbc_header_buf_addr_high_s;/* VPU_MAFBC_HEADER_BUF_ADDR_HIGH_S0 */
 	u32 afbc_format_specifier_s;/* VPU_MAFBC_FORMAT_SPECIFIER_S0 */
@@ -620,18 +585,9 @@ struct hw_osd_reg_s {
 	u32 afbc_output_buf_addr_high_s;/* VPU_MAFBC_OUTPUT_BUF_ADDR_HIGH_S0 */
 	u32 afbc_output_buf_stride_s;/* VPU_MAFBC_OUTPUT_BUF_STRIDE_S0 */
 	u32 afbc_prefetch_cfg_s;/* VPU_MAFBC_PREFETCH_CFG_S0 */
-
-	u32 mali_afbcd_top_ctrl; /* MALI_AFBCD_TOP_CTRL */
-	u32 vpu_mafbc_irq_mask; /* VPU_MAFBC_IRQ_MASK */
-	u32 vpu_mafbc_surface_cfg; /* VPU_MAFBC_SURFACE_CFG */
-	u32 vpu_mafbc_command; /* VPU_MAFBC_COMMAND */
-	u32 vpu_mafbc_irq_raw_status; /* VPU_MAFBC_IRQ_RAW_STATUS */
-	u32 vpu_mafbc_irq_clear; /* VPU_MAFBC_IRQ_CLEAR */
-
-	u32 vpp_osd1_scale_ctrl; /* VPP_OSD1_SCALE_CTRL */
 };
 
-struct osd_blend_reg_s {
+struct layer_blend_reg_s {
 	u32 hold_line;
 	u32 blend2_premult_en;
 	u32 din0_byp_blend;
@@ -644,61 +600,20 @@ struct osd_blend_reg_s {
 	u32 osd_blend_din_scope_v[OSD_BLEND_LAYERS];
 	u32 osd_blend_blend0_size;
 	u32 osd_blend_blend1_size;
-	u32 osd_bld_out0_premult;
-	u32 osd_bld_out1_premult;
-};
-
-struct vpp0_blend_reg_s {
 	/* pre blend */
 	u32 prebld_src3_sel;
 	u32 prebld_osd1_premult;
 	u32 prebld_src4_sel;
 	u32 prebld_osd2_premult;
-
 	/* post blend */
 	u32 postbld_src3_sel;
 	u32 postbld_osd1_premult;
 	u32 postbld_src4_sel;
 	u32 postbld_osd2_premult;
-
-	u32 osd1_index;
-	u32 osd1_h_start;
-	u32 osd1_h_end;
-	u32 osd1_v_start;
-	u32 osd1_v_end;
-	u32 osd2_index;
-	u32 osd2_h_start;
-	u32 osd2_h_end;
-	u32 osd2_v_start;
-	u32 osd2_v_end;
-};
-
-struct vpp1_blend_reg_s {
-	/* pre blend */
-	u32 prebld_src3_sel;
-	u32 prebld_osd1_premult;
-	u32 prebld_src4_sel;
-	u32 prebld_osd2_premult;
-	/* post blend */
-	u32 osd1_index;
-	u32 osd1_h_start;
-	u32 osd1_h_end;
-	u32 osd1_v_start;
-	u32 osd1_v_end;
-	u32 osd2_index;
-	u32 osd2_h_start;
-	u32 osd2_h_end;
-	u32 osd2_v_start;
-	u32 osd2_v_end;
-};
-
-struct hw_vppx_blend_reg_s {
-	u32 vpp_bld_din1_hscope;
-	u32 vpp_bld_din1_vscope;
-	u32 vpp_bld_out_size;
-	u32 vpp_bld_ctrl;
-	u32 vpp_bld_dummy_data;
-	u32 vpp_bld_dummy_alpha;
+	u32 vpp_osd1_blend_h_scope;
+	u32 vpp_osd1_blend_v_scope;
+	u32 vpp_osd2_blend_h_scope;
+	u32 vpp_osd2_blend_v_scope;
 };
 
 struct layer_blend_s {
@@ -709,7 +624,6 @@ struct layer_blend_s {
 	struct dispdata_s output_data;
 	u32 blend_core1_bypass;
 };
-
 struct hw_osd_blending_s {
 	u8 osd_blend_mode;
 	u8 osd_to_bdin_table[OSD_BLEND_LAYERS];
@@ -717,10 +631,10 @@ struct hw_osd_blending_s {
 	u8 blend_din;
 	u32 din_reoder_sel;
 	u32 layer_cnt;
-	u32 b_exchange_din;
-	u32 b_exchange_blend_in;
-	u32 osd1_freescale_used;
-	u32 osd1_freescale_disable;
+	bool b_exchange_din;
+	bool b_exchange_blend_in;
+	bool osd1_freescale_used;
+	bool osd1_freescale_disable;
 	u32 vinfo_width;
 	u32 vinfo_height;
 	u32 screen_ratio_w_num;
@@ -728,10 +642,7 @@ struct hw_osd_blending_s {
 	u32 screen_ratio_h_num;
 	u32 screen_ratio_h_den;
 	struct dispdata_s dst_data;
-	struct osd_blend_reg_s osd_blend_reg;
-	struct vpp0_blend_reg_s vpp0_blend_reg;
-	struct vpp1_blend_reg_s vpp1_blend_reg;
-
+	struct layer_blend_reg_s blend_reg;
 	struct layer_blend_s layer_blend;
 };
 
@@ -744,33 +655,18 @@ struct hw_list_s {
 
 typedef int (*sync_render_fence)(u32 index, u32 yres,
 	struct sync_req_render_s *request,
-	ulong phys_addr,
+	u32 phys_addr,
 	size_t len);
-typedef void (*osd_toggle_buffer_op)(struct kthread_work *work);
+typedef void (*osd_toggle_buffer_op)(
+	struct kthread_work *work);
 struct osd_fence_fun_s {
 	sync_render_fence sync_fence_handler;
 	osd_toggle_buffer_op toggle_buffer_handler;
 };
 
-typedef u32 (*osd_rdma_rd_op)(u32 reg);
-typedef int (*osd_rdma_wr_op)(u32 reg, u32 val);
-typedef int (*osd_rdma_wr_bits_op)(u32 reg, u32 val, u32 start, u32 len);
-typedef int (*osd_rdma_set_mask_op)(u32 reg, u32 mask);
-typedef int (*osd_rdma_clr_mask_op)(u32 reg, u32 mask);
-typedef int (*osd_rdma_wr_irq_op)(u32 reg, u32 val);
-
-struct osd_rdma_fun_s {
-	osd_rdma_rd_op osd_rdma_rd;
-	osd_rdma_wr_op osd_rdma_wr;
-	osd_rdma_wr_bits_op osd_rdma_wr_bits;
-	osd_rdma_set_mask_op osd_rdma_set_mask;
-	osd_rdma_clr_mask_op osd_rdma_clr_mask;
-	osd_rdma_wr_irq_op osd_rdma_wr_irq;
-};
-
 struct layer_info_s {
 	int enable;
-	ulong ext_addr;
+	u32 ext_addr;
 	unsigned int    src_x;
 	unsigned int    src_y;
 	unsigned int	src_w;
@@ -788,12 +684,12 @@ struct layer_info_s {
 
 struct osd_debug_backup_s {
 	struct layer_info_s layer[HW_OSD_COUNT];
-	struct osd_blend_reg_s osd_blend_reg;
-	struct vpp0_blend_reg_s vpp0_blend_reg;
+	struct layer_blend_reg_s blend_reg;
 };
 
+
 struct hw_debug_s {
-	u32 wait_fence_release;
+	bool wait_fence_release;
 	u32 osd_single_step_mode;
 	u32 osd_single_step;
 	int backup_count;
@@ -863,6 +759,7 @@ struct hw_para_s {
 	struct hw_list_s reg[HW_REG_INDEX_MAX];
 	u32 field_out_en[VIU_COUNT];
 	u32 scale_workaround;
+	u32 sc_filter_workaround[HW_OSD_COUNT];
 	u32 fb_for_4k2k;
 	u32 antiflicker_mode;
 	u32 angle[HW_OSD_COUNT];
@@ -872,7 +769,7 @@ struct hw_para_s {
 	struct afbcd_data_s osd_afbcd[HW_OSD_COUNT];
 	struct osd_device_data_s osd_meson_dev;
 	u32 urgent[HW_OSD_COUNT];
-	u32 osd_deband_enable[HW_OSD_COUNT];
+	u32 osd_deband_enable;
 	u32 osd_fps[VIU_COUNT];
 	u32 osd_fps_start[VIU_COUNT];
 	u32 osd_display_debug[VIU_COUNT];
@@ -892,12 +789,12 @@ struct hw_para_s {
 	u32 osd_use_latch[HW_OSD_COUNT];
 	u32 hw_cursor_en;
 	u32 hw_rdma_en;
-	u32 blend_bypass[HW_OSD_COUNT];
+	u32 blend_bypass;
 	u32 hdr_used;
 	u32 workaround_line;
 	u32 basic_urgent;
 	u32 two_ports;
-	u32 afbc_err_cnt[HW_OSD_COUNT];
+	u32 afbc_err_cnt;
 	u32 viu_type;
 	u32 line_n_rdma;
 	u32 osd_preblend_en; /* only for viu1 */
@@ -915,13 +812,10 @@ struct hw_para_s {
 	u32 rdma_delayed_cnt2;
 	u32 rdma_delayed_cnt3;
 	u32 osd_reg_check;
-	u32 mif_linear;
-	u32 vpp_num;
+	u32 fb_mem_free[HW_OSD_COUNT];
 	struct hw_debug_s osd_debug;
 	int out_fence_fd[VIU_COUNT];
 	int in_fd[HW_OSD_COUNT];
 	struct osd_fence_fun_s osd_fence[VIU_COUNT][2];
-	struct osd_rdma_fun_s osd_rdma_func[VIU_COUNT];
-	u32 viu_osd_table[VIU_COUNT];
 };
 #endif /* _OSD_H_ */

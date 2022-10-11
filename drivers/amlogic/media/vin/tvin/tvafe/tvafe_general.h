@@ -1,6 +1,18 @@
-/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/amlogic/media/vin/tvin/tvafe/tvafe_general.h
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
 #ifndef _TVAFE_GENERAL_H
@@ -133,6 +145,9 @@ enum tvafe_adc_ch_e {
 };
 
 enum tvafe_cpu_type {
+	TVAFE_CPU_TYPE_TXL  = 0,
+	TVAFE_CPU_TYPE_TXLX = 1,
+	TVAFE_CPU_TYPE_GXLX = 2,
 	TVAFE_CPU_TYPE_TL1  = 3,
 	TVAFE_CPU_TYPE_TM2  = 4,
 	TVAFE_CPU_TYPE_TM2_B  = 5,
@@ -171,14 +186,15 @@ int tvafe_adc_pin_muxing(enum tvafe_adc_ch_e adc_ch);
 void tvafe_set_regmap(struct am_regs_s *p);
 void tvafe_init_reg(struct tvafe_cvd2_s *cvd2, struct tvafe_cvd2_mem_s *mem,
 		    enum tvin_port_e port);
-void tvafe_set_apb_bus_err_ctrl(void);
-void tvafe_enable_module(bool enable);
-void tvafe_enable_avout(enum tvin_port_e port, bool enable);
-int tvafe_cpu_type(void);
-void tvafe_clk_gate_ctrl(int status);
+extern void tvafe_set_apb_bus_err_ctrl(void);
+extern void tvafe_enable_module(bool enable);
+extern void tvafe_enable_avout(enum tvin_port_e port, bool enable);
+extern int tvafe_cpu_type(void);
+extern void tvafe_clk_gate_ctrl(int status);
 void white_pattern_pga_reset(enum tvin_port_e port);
 
 extern unsigned int cvd_reg87_pal;
+extern unsigned int acd_166;
 extern void __iomem *ana_addr;
 #endif  /* _TVAFE_GENERAL_H */
 

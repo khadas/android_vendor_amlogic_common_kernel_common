@@ -1,6 +1,18 @@
-/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * include/linux/amlogic/media/vpu/vpu.h
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
 #ifndef __VPU_H__
@@ -79,9 +91,9 @@ enum vpu_mod_e {
 	VPU_HDMI,             /* reg4[13:12], TM2B */
 	VPU_FGRAIN0,          /* reg4[15:14], TM2B */
 	VPU_FGRAIN1,          /* reg4[17:16], TM2B */
-	VPU_DI_AFBCD,         /* reg9[23:18], SC2 */
-	VPU_DI_AFBCE,         /* reg9[27:24], SC2 */
-	VPU_DI_DOLBY,         /* reg9[29:28], SC2 */
+	VPU_DI_AFBCD,          /* reg9[23:18], SC2 */
+	VPU_DI_AFBCE,          /* reg9[27:24], SC2 */
+	VPU_DI_DOLBY,          /* reg9[29:28], SC2 */
 	VPU_DECONTOUR,        /* reg4[19:18], T5 */
 
 	VPU_MOD_MAX,
@@ -100,34 +112,24 @@ enum vpu_mod_e {
 	VPU_MAX,
 };
 
-struct vpu_dev_s {
-	unsigned int index;
-	char owner_name[30];
-	unsigned int dev_id;
-	unsigned char mem_pd_state;
-	unsigned char clk_gate_state;
-};
+/* VPU memory power down */
+#define VPU_MEM_POWER_ON		0
+#define VPU_MEM_POWER_DOWN		1
 
-#define VPU_MEM_POWER_ON                0
-#define VPU_MEM_POWER_DOWN              1
+#define VPU_CLK_GATE_ON			1
+#define VPU_CLK_GATE_OFF		0
 
-struct vpu_dev_s *vpu_dev_get(unsigned int vmod, char *owner_name);
-struct vpu_dev_s *vpu_dev_register(unsigned int vmod, char *owner_name);
-int vpu_dev_unregister(struct vpu_dev_s *vpu_dev);
+extern unsigned int get_vpu_clk(void);
+extern unsigned int get_vpu_clk_vmod(unsigned int vmod);
+extern int request_vpu_clk_vmod(unsigned int vclk, unsigned int vmod);
+extern int release_vpu_clk_vmod(unsigned int vmod);
 
-unsigned int vpu_clk_get(void);
-unsigned int vpu_dev_clk_get(struct vpu_dev_s *vpu_dev);
-int vpu_dev_clk_request(struct vpu_dev_s *vpu_dev, unsigned int vclk);
-int vpu_dev_clk_release(struct vpu_dev_s *vpu_dev);
+extern void switch_vpu_mem_pd_vmod(unsigned int vmod, int flag);
+extern int get_vpu_mem_pd_vmod(unsigned int vmod);
 
-void vpu_dev_mem_power_on(struct vpu_dev_s *vpu_dev);
-void vpu_dev_mem_power_down(struct vpu_dev_s *vpu_dev);
-int vpu_dev_mem_pd_get(struct vpu_dev_s *vpu_dev);
+extern void switch_vpu_clk_gate_vmod(unsigned int vmod, int flag);
 
-void vpu_dev_clk_gate_on(struct vpu_dev_s *vpu_dev);
-void vpu_dev_clk_gate_off(struct vpu_dev_s *vpu_dev);
-
-/* vcbus reg access api */
+/* vpu vcbus reg access api */
 unsigned int vpu_vcbus_read(unsigned int _reg);
 void vpu_vcbus_write(unsigned int _reg, unsigned int _value);
 void vpu_vcbus_setb(unsigned int _reg, unsigned int _value,

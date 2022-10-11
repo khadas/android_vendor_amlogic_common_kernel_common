@@ -1,6 +1,18 @@
-/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/amlogic/media/common/uvm/meson_uvm_allocator.h
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
 #ifndef __MESON_UVM_ALLOCATOR_H
@@ -21,14 +33,8 @@
 #include <linux/amlogic/media/vfm/vframe.h>
 #include <linux/amlogic/media/video_sink/v4lvideo_ext.h>
 
-#define MUA_IMM_ALLOC        BIT(UVM_IMM_ALLOC)
-#define MUA_DELAY_ALLOC      BIT(UVM_DELAY_ALLOC)
-#define MUA_FAKE_ALLOC       BIT(UVM_FAKE_ALLOC)
-#define MUA_USAGE_PROTECTED  BIT(UVM_SECURE_ALLOC)
-#define MUA_SKIP_REALLOC     BIT(UVM_SKIP_REALLOC)
-#define MUA_DETACH           BIT(UVM_DETACH_FLAG)
-#define ION_FLAG_PROTECTED   BIT(31)
-#define META_DATA_SIZE       (256)
+#define MUA_IMM_ALLOC	BIT(UVM_IMM_ALLOC)
+#define MUA_DELAY_ALLOC	BIT(UVM_DELAY_ALLOC)
 
 struct mua_device;
 struct mua_buffer;
@@ -37,8 +43,7 @@ struct mua_buffer {
 	struct uvm_buf_obj base;
 	struct mua_device *dev;
 	size_t size;
-	struct ion_buffer *ibuffer[2];
-	struct dma_buf *idmabuf[2];
+	struct ion_handle *handle;
 	struct sg_table *sg_table;
 
 	int byte_stride;
@@ -47,16 +52,23 @@ struct mua_buffer {
 	phys_addr_t paddr;
 	int commit_display;
 	u32 index;
-	u32 ion_flags;
-	u32 align;
 };
 
+/**
+ * struct mua_device - meson uvm allocator device
+ *
+ * @root:	rb tree root
+ * @buffer_lock:	lock to protect rb tree
+ */
 struct mua_device {
 	struct miscdevice dev;
 	struct rb_root root;
-
+	/* protects the rb tree root fields */
 	struct mutex buffer_lock;
+	struct ion_client *client;
 	int pid;
+
+	struct device *pdev;
 };
 
 struct uvm_alloc_data {
@@ -81,25 +93,10 @@ struct uvm_fd_data {
 	int commit_display;
 };
 
-struct uvm_meta_data {
-	int fd;
-	int type;
-	int size;
-	u8 data[META_DATA_SIZE];
-};
-
-struct uvm_hook_data {
-	int mode_type;
-	int shared_fd;
-	char data_buf[META_DATA_SIZE + 1];
-};
-
 union uvm_ioctl_arg {
 	struct uvm_alloc_data alloc_data;
 	struct uvm_pid_data pid_data;
 	struct uvm_fd_data fd_data;
-	struct uvm_meta_data meta_data;
-	struct uvm_hook_data hook_data;
 };
 
 #define UVM_IOC_MAGIC 'U'
@@ -111,15 +108,6 @@ union uvm_ioctl_arg {
 				struct uvm_pid_data)
 #define UVM_IOC_SET_FD _IOWR(UVM_IOC_MAGIC, 3, \
 				struct uvm_fd_data)
-#define UVM_IOC_GET_METADATA _IOWR(UVM_IOC_MAGIC, 4, \
-				struct uvm_meta_data)
-#define UVM_IOC_ATTATCH _IOWR(UVM_IOC_MAGIC, 5, \
-				struct uvm_hook_data)
-#define UVM_IOC_GET_INFO _IOWR(UVM_IOC_MAGIC, 6, \
-				struct uvm_hook_data)
-#define UVM_IOC_SET_INFO _IOWR(UVM_IOC_MAGIC, 7, \
-				struct uvm_hook_data)
-#define UVM_IOC_DETATCH _IOWR(UVM_IOC_MAGIC, 8, \
-				struct uvm_hook_data)
+
 #endif
 

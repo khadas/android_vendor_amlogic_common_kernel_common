@@ -1,6 +1,18 @@
-/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/amlogic/mmc/emmc_key.h
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
 #ifndef __EMMC_KEY_H__
@@ -29,16 +41,16 @@ struct emmckey_valid_node_t {
 
 struct aml_emmckey_info_t {
 	/* struct memory_card *card; */
-	struct	emmckey_valid_node_t *key_valid_node;
-	u64	keyarea_phy_addr;
-	u64	keyarea_phy_size;
-	u64	lba_start;
-	u64	lba_end;
-	u32	blk_size;
-	u32	blk_shift;
-	u8	key_init;
-	u8	key_valid;
-	u8	key_part_count;
+	struct emmckey_valid_node_t *key_valid_node;
+	u64    keyarea_phy_addr;
+	u64    keyarea_phy_size;
+	u64    lba_start;
+	u64    lba_end;
+	u32    blk_size;
+	u32    blk_shift;
+	u8     key_init;
+	u8     key_valid;
+	u8     key_part_count;
 };
 
 struct aml_key_info {
@@ -50,19 +62,19 @@ struct aml_key_info {
 #define EMMCKEY_DATA_VALID_LEN		\
 	(EMMC_KEYAREA_SIZE - EMMC_KEY_AREA_SIGNAL_LEN - 4 - 4 - 4)
 struct emmckey_data_t {
-	u8	keyarea_mark[EMMC_KEY_AREA_SIGNAL_LEN];
-	u32	keyarea_mark_checksum;
-	u32	checksum;
-	u32	reserve;
-	u8	data[EMMCKEY_DATA_VALID_LEN];
+	u8     keyarea_mark[EMMC_KEY_AREA_SIGNAL_LEN];
+	u32	   keyarea_mark_checksum;
+	u32    checksum;
+	u32    reserve;
+	u8     data[EMMCKEY_DATA_VALID_LEN];
 };
 
 int emmc_key_init(struct mmc_card *card);
 
-int32_t emmc_key_read(u8 *buffer,
-		      u32 length, u32 *actual_length);
-int32_t emmc_key_write(u8 *buffer,
-		       u32 length, u32 *actual_length);
+int32_t emmc_key_read(uint8_t *buffer,
+	uint32_t length, uint32_t *actual_length);
+int32_t emmc_key_write(uint8_t *buffer,
+	uint32_t length, uint32_t *actual_length);
 
 #endif
 

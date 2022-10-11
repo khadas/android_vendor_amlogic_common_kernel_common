@@ -38,16 +38,7 @@
 #define TUNING_MODE_EXTLEVEL_2_DISABLE     0x4
 #define TUNING_MODE_EXTLEVEL_4_DISABLE     0x8
 #define TUNING_MODE_EXTLEVEL_5_DISABLE     0x10
-#define TUNING_MODE_EL_FORCE_DISABLE       0x20
-
-#define VPP_VD1_DSC_CTRL                   0x1a83
-#define VIU_VD1_PATH_CTRL                  0x1a73
-#define VPP_VD2_DSC_CTRL                   0x1a84
-#define VPP_VD3_DSC_CTRL                   0x1a85
-#define DOLBY_PATH_SWAP_CTRL1              0x1a70
-#define DOLBY_PATH_SWAP_CTRL2              0x1a71
-#define MALI_AFBCD_TOP_CTRL                0x1a0f
-#define MALI_AFBCD1_TOP_CTRL               0x1a55
+#define TUNING_MODE_EL_FORCE_DISABLE      0x20
 
 enum core1_switch_type {
 	NO_SWITCH = 0,
@@ -128,6 +119,7 @@ struct ambient_cfg {
 	u32 al_rise;
 	u32 al_fall;
 };
+
 #pragma pack(pop)
 
 # pragma pack(push, 1)
@@ -142,6 +134,7 @@ struct tgt_ab_cfg {
 	u32  ab_delay_msec_ll;
 	u32  reserved[3];
 };
+
 #pragma pack(pop)
 
 # pragma pack(push, 1)
@@ -196,6 +189,7 @@ struct target_config {
 	s16 blu_light[5];
 	s16 padding[36];
 };
+
 #pragma pack(pop)
 
 struct pq_config {
@@ -223,7 +217,8 @@ enum signal_format_enum {
 	FORMAT_HLG = 4,
 	FORMAT_HDR10PLUS = 5,
 	FORMAT_SDR_2020 = 6,
-	FORMAT_MVC = 7
+	FORMAT_MVC = 7,
+	FORMAT_CUVA = 8
 };
 
 enum priority_mode_enum  {
@@ -534,9 +529,6 @@ enum cpuID_e {
 	_CPU_MAJOR_ID_TM2,
 	_CPU_MAJOR_ID_TM2_REVB,
 	_CPU_MAJOR_ID_SC2,
-	_CPU_MAJOR_ID_T7,
-	_CPU_MAJOR_ID_T3,
-	_CPU_MAJOR_ID_S4D,
 	_CPU_MAJOR_ID_UNKNOWN,
 };
 
@@ -656,6 +648,6 @@ int VSYNC_WR_MPEG_REG(u32 adr, u32 val);
 void dv_mem_power_on(enum vpu_mod_e mode);
 void dv_mem_power_off(enum vpu_mod_e mode);
 int get_dv_mem_power_flag(enum vpu_mod_e mode);
-int get_dv_vpu_mem_power_status(enum vpu_mod_e mode);
 bool get_disable_video_flag(enum vd_path_e vd_path);
+
 #endif

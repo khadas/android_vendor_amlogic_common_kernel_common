@@ -1,14 +1,26 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/amlogic/media/common/ge2d/bitblt.c
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
 /* Amlogic Headers */
 #include <linux/amlogic/media/ge2d/ge2d.h>
 
 static void _bitblt(struct ge2d_context_s *wq,
-		    int src_x, int src_y, int w, int h,
-		    int dst_x, int dst_y, int block)
+			   int src_x, int src_y, int w, int h,
+			   int dst_x, int dst_y, int block)
 {
 	struct ge2d_cmd_s *ge2d_cmd_cfg = ge2d_wq_get_cmd(wq);
 
@@ -40,8 +52,8 @@ static void _bitblt(struct ge2d_context_s *wq,
 }
 
 static void _bitblt_noalpha(struct ge2d_context_s *wq,
-			    int src_x, int src_y, int w, int h,
-			    int dst_x, int dst_y, int block)
+				   int src_x, int src_y, int w, int h,
+				   int dst_x, int dst_y, int block)
 {
 	struct ge2d_cmd_s *ge2d_cmd_cfg = ge2d_wq_get_cmd(wq);
 	struct ge2d_dp_gen_s *dp_gen_cfg = ge2d_wq_get_dp_gen(wq);

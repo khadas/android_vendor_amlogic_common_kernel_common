@@ -1,5 +1,5 @@
 #
-# Amlogic VOUT_CLK_SERVE driver configuration
+# Amlogic VOUT_CLK_SERVE driver configuation
 #
 
 config AMLOGIC_VOUT_CLK_SERVE

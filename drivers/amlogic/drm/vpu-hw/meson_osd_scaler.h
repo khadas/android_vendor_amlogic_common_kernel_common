@@ -1,6 +1,18 @@
-/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/amlogic/drm/vpu-hw/meson_osd_scaler.h
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
 #ifndef _MESON_OSD_SCALER_H_
@@ -70,15 +82,9 @@
 #define OSD_SCALER_COEFF_V 0
 
 enum scaler_coef_e {
-	COEFS_BICUBIC_SHARP = 0,
-	COEFS_BICUBIC,
-	COEFS_BILINEAR,
+	COEFS_BICUBIC = 0,
 	COEFS_2POINT_BINILEAR,
-	COEFS_3POINT_TRIANGLE_SHARP,
-	COEFS_3POINT_TRIANGLE,
 	COEFS_4POINT_TRIANGLE,
-	COEFS_4POINT_BSPLINE,
-	COEFS_3POINT_BSPLINE,
 	COEFS_REPEATE,
 	COEFS_MAX
 };

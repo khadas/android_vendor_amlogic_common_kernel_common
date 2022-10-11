@@ -1,29 +1,39 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/amlogic/audioinfo/audio_data.c
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
 #include <linux/init.h>
 #include <linux/module.h>
 #include <linux/types.h>
-#include <linux/cdev.h>
+#include <linux/fs.h>
 #include <linux/proc_fs.h>
 #include <linux/device.h>
 #include <linux/uaccess.h>
+#include "../efuse/efuse.h"
 #include <linux/delay.h>
 #include <linux/platform_device.h>
 #include <linux/of.h>
 #include <linux/slab.h>
+#include "audio_data.h"
 #include <linux/arm-smccc.h>
-#include <linux/io.h>
 
 #ifdef CONFIG_MESON_TRUSTZONE
 #include <mach/meson-secure.h>
 #endif
-
-#include "audio_data.h"
-#include "../efuse_unifykey/efuse.h"
-
+#include <linux/amlogic/secmon.h>
 /*#define MYPRT pr_info*/
 #define MYPRT(...)
 /* major device number and minor device number */
@@ -33,8 +43,6 @@ static struct class *class_audio_data;
 static struct device  *dev_audio_data;
 void __iomem *sharemem_input;/*used as input and output memory, may not ok*/
 unsigned int efuse_query_licence_cmd;
-unsigned int mem_in_base_cmd;
-
 
 static int audio_data_open(struct inode *inode, struct file *filp);
 static int audio_data_release(struct inode *inode, struct file *filp);
@@ -53,14 +61,6 @@ static struct file_operations const audio_data_fops = {
 	/* .unlocked_ioctl = audio_data_ioctl, */
 };
 
-static unsigned long get_sharemem_info(unsigned long function_id)
-{
-	struct arm_smccc_res res;
-
-	arm_smccc_smc((unsigned long)function_id, 0, 0, 0, 0, 0, 0, 0, &res);
-
-	return res.a0;
-}
 
 int meson_efuse_fn_smc_query_audioinfo(struct efuse_hal_api_arg *arg)
 {
@@ -105,7 +105,7 @@ int meson_trustzone_audio_info_get(struct efuse_hal_api_arg *arg)
 
 	if (!arg)
 		return -1;
-	cpumask_copy(&org_cpumask, current->cpus_ptr);
+	cpumask_copy(&org_cpumask, &current->cpus_allowed);
 	set_cpus_allowed_ptr(current, cpumask_of(0));
 	ret = meson_efuse_fn_smc_query_audioinfo(arg);
 	set_cpus_allowed_ptr(current, &org_cpumask);
@@ -118,7 +118,6 @@ unsigned long audio_info_get(char *buf, unsigned long count,
 	struct efuse_hal_api_arg arg;
 	unsigned long retcnt;
 	int ret;
-	long phy_in_base;
 
 	arg.cmd =  efuse_query_licence_cmd;
 	arg.offset = pos;
@@ -126,14 +125,7 @@ unsigned long audio_info_get(char *buf, unsigned long count,
 	arg.buffer = (unsigned long)buf;
 	arg.retcnt = (unsigned long)&retcnt;
 
-	//sharemem_input = get_secmon_sharemem_input_base();
-	phy_in_base = get_sharemem_info(mem_in_base_cmd);
-
-	if (!pfn_valid(__phys_to_pfn(phy_in_base)))
-		sharemem_input = ioremap_nocache(phy_in_base, count);
-	else
-		sharemem_input = phys_to_virt(phy_in_base);
-
+	sharemem_input = get_secmon_sharemem_input_base();
 	ret = meson_trustzone_audio_info_get(&arg);
 
 	if (ret == 0)
@@ -142,6 +134,7 @@ unsigned long audio_info_get(char *buf, unsigned long count,
 		MYPRT("[%s:%d]: read error!!!\n", __func__, __LINE__);
 	return ret;
 }
+
 
 #define EFUSE_BUF_SIZE 1024
 /* open device methods */
@@ -157,6 +150,7 @@ static int audio_data_release(struct inode *inode, struct file *filp)
 	MYPRT("[%s]\n", __func__);
 	return 0;
 }
+
 
 /* read device reg val */
 static ssize_t audio_data_read(struct file *filp, char __user *buf,
@@ -176,7 +170,7 @@ static ssize_t audio_data_read(struct file *filp, char __user *buf,
 	if (count > EFUSE_BUF_SIZE) {
 		MYPRT("[%s %d]buffer is too small\n", __func__, __LINE__);
 		err =  -1;
-	} else {
+	} else{
 		err = copy_from_user(buftmp, buf, count);
 		if (!err) {
 			err = audio_info_get(buftmp, count, pos);
@@ -184,7 +178,7 @@ static ssize_t audio_data_read(struct file *filp, char __user *buf,
 				MYPRT("[%s %d]copy data to user (count/%d)\n",
 					__func__, __LINE__, (int)count);
 				err = copy_to_user(buf, buftmp, count);
-			} else {
+			} else{
 				err =  -1;
 			}
 		}
@@ -231,11 +225,8 @@ static int audio_data_probe(struct platform_device *pdev)
 	if (pdev->dev.of_node) {
 		int ret;
 		struct device_node *np = pdev->dev.of_node;
+
 		of_node_get(np);
-
-		ret = of_property_read_u32(np, "mem_in_base_cmd",
-				&mem_in_base_cmd);
-
 		ret = of_property_read_u32(np, "query_licence_cmd",
 				&efuse_query_licence_cmd);
 		if (ret) {
@@ -249,6 +240,7 @@ err1:
 err0:
 	unregister_chrdev(major_audio_data, AUDIO_DATA_DEVICE_NODE_NAME);
 	return PTR_ERR(ptr_err);
+
 }
 
 static int audio_data_remove(struct platform_device *pdev)
@@ -258,13 +250,11 @@ static int audio_data_remove(struct platform_device *pdev)
 	class_destroy(class_audio_data);
 	return 0;
 }
-
 static const struct of_device_id amlogic_audio_data_dt_match[] = {
 	{	.compatible = "amlogic, audio_data",
 	},
 	{},
 };
-
 static struct platform_driver audio_data_driver = {
 	.probe = audio_data_probe,
 	.remove = audio_data_remove,
@@ -274,7 +264,6 @@ static struct platform_driver audio_data_driver = {
 	.owner = THIS_MODULE,
 	},
 };
-
 static int __init audio_data_init(void)
 {
 	int ret = -1;
@@ -286,7 +275,6 @@ static int __init audio_data_init(void)
 	}
 	return ret;
 }
-
 /* module unload */
 static  void __exit audio_data_exit(void)
 {

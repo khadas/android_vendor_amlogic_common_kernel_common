@@ -1,4 +1,3 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
  * drivers/amlogic/media/vin/tvin/vdin/vdin_vf.c
  *
@@ -27,7 +26,7 @@
 #include <linux/slab.h>
 #include <linux/spinlock.h>
 #include <linux/time.h>
-#include <linux/seq_file.h>
+
 
 /* Amlogic Headers */
 #include <linux/amlogic/media/vfm/vframe.h>
@@ -35,7 +34,6 @@
 /* Local Headers */
 #include "vdin_vf.h"
 #include "vdin_ctl.h"
-
 static bool vf_log_enable = true;
 static bool vf_log_fe = true;
 static bool vf_log_be = true;
@@ -62,7 +60,7 @@ void vf_log_init(struct vf_pool *p)
 
 #ifdef VF_LOG_EN
 static void vf_log(struct vf_pool *p, enum vf_operation_e operation,
-		   bool operation_done)
+		bool operation_done)
 {
 	unsigned int i = 0;
 	struct vf_log_s *log = &p->log;
@@ -85,7 +83,7 @@ static void vf_log(struct vf_pool *p, enum vf_operation_e operation,
 	if (log->log_cur >= VF_LOG_LEN)
 		return;
 
-	ktime_get_ts(&log->log_time[log->log_cur]);
+	do_gettimeofday(&log->log_time[log->log_cur]);
 	for (i = 0; i < 11; i++)
 		log->log_buf[log->log_cur][i] = 0x00;
 	for (i = 0; i < p->size; i++) {
@@ -137,7 +135,7 @@ static void vf_log(struct vf_pool *p, enum vf_operation_e operation,
 }
 #else
 static void vf_log(struct vf_pool *p, enum vf_operation_e operation,
-		   bool failure)
+		bool failure)
 {
 }
 #endif
@@ -152,8 +150,8 @@ void vf_log_print(struct vf_pool *p)
 	struct vf_log_s *log = &p->log;
 
 	pr_info("%-10s %-10s %-10s %-10s %-10s %-10s %5s\n",
-		"WR_LIST", "RW_MODE", "RD_LIST", "RD_MODE", "WT_LIST",
-		"OPERATIOIN", "TIME");
+			"WR_LIST", "RW_MODE", "RD_LIST", "RD_MODE", "WT_LIST",
+			"OPERATIOIN", "TIME");
 
 	for (i = 0; i < log->log_cur; i++) {
 		memset(buf1, 0, sizeof(buf1));
@@ -162,48 +160,48 @@ void vf_log_print(struct vf_pool *p)
 		for (j = 0; j < 5; j++) {
 			for (k = 0; k < 8; k++) {
 				if (k == 4)
-					len += sprintf(buf1 + len, "-");
-				len += sprintf(buf1 + len, "%1d",
+					len += sprintf(buf1+len, "-");
+				len += sprintf(buf1+len, "%1d",
 					(log->log_buf[i][j] >> (7 - k)) & 1);
 			}
-			len += sprintf(buf1 + len, "  ");
+			len += sprintf(buf1+len, "  ");
 		}
 
 		if (log->log_buf[i][10] & 0x80)
-			len += sprintf(buf1 + len, "(X)");
+			len += sprintf(buf1+len, "(X)");
 		else
-			len += sprintf(buf1 + len, "	 ");
+			len += sprintf(buf1+len, "	 ");
 		switch (log->log_buf[i][10] & 0x7) {
 		case VF_OPERATION_INIT:
-			len += sprintf(buf1 + len, "%-7s", "INIT");
+			len += sprintf(buf1+len, "%-7s", "INIT");
 			break;
 		case VF_OPERATION_FPEEK:
-			len += sprintf(buf1 + len, "%-7s", "FE_PEEK");
+			len += sprintf(buf1+len, "%-7s", "FE_PEEK");
 			break;
 		case VF_OPERATION_FGET:
-			len += sprintf(buf1 + len, "%-7s", "FE_GET");
+			len += sprintf(buf1+len, "%-7s", "FE_GET");
 			break;
 		case VF_OPERATION_FPUT:
-			len += sprintf(buf1 + len, "%-7s", "FE_PUT");
+			len += sprintf(buf1+len, "%-7s", "FE_PUT");
 			break;
 		case VF_OPERATION_BPEEK:
-			len += sprintf(buf1 + len, "%-7s", "BE_PEEK");
+			len += sprintf(buf1+len, "%-7s", "BE_PEEK");
 			break;
 		case VF_OPERATION_BGET:
-			len += sprintf(buf1 + len, "%-7s", "BE_GET");
+			len += sprintf(buf1+len, "%-7s", "BE_GET");
 			break;
 		case VF_OPERATION_BPUT:
-			len += sprintf(buf1 + len, "%-7s", "BE_PUT");
+			len += sprintf(buf1+len, "%-7s", "BE_PUT");
 			break;
 		case VF_OPERATION_FREE:
-			len += sprintf(buf1 + len, "%-7s", "FREE");
+			len += sprintf(buf1+len, "%-7s", "FREE");
 			break;
 		default:
 			break;
 		}
-		len += sprintf(buf1 + len, " %ld.%03ld",
+		len += sprintf(buf1+len, " %ld.%03ld",
 				(long)log->log_time[i].tv_sec,
-				(long)log->log_time[i].tv_nsec);
+				(long)log->log_time[i].tv_usec/1000);
 
 		memset(buf2, 0, sizeof(buf2));
 		len = 0;
@@ -225,14 +223,12 @@ void vf_log_print(struct vf_pool *p)
 {
 }
 #endif
-
 #ifdef ISR_LOG_EN
 void isr_log_init(struct vf_pool *p)
 {
 	memset(&p->isr_log, 0, sizeof(struct isr_log_s));
 	p->isr_log.isr_log_en = 1;
 }
-
 void isr_log_print(struct vf_pool *p)
 {
 	unsigned int i = 0;
@@ -240,16 +236,17 @@ void isr_log_print(struct vf_pool *p)
 
 	log->isr_log_en = 0;
 	pr_info("%-7s\t%-7s\t%-7s\n",
-		"ID", "ITIME", "OTIME");
+			"ID", "ITIME", "OTIME");
 	for (i = 0; i <= log->log_cur; i += 2) {
 		pr_info("%u\t %7ld.%03ld\t%7ld.%03ld\n",
-			i >> 1, (long)log->isr_time[i].tv_sec,
-			(long)log->isr_time[i].tv_nsec,
-			(long)log->isr_time[i + 1].tv_sec,
-			(long)log->isr_time[i + 1].tv_nsec);
+			i>>1, (long)log->isr_time[i].tv_sec,
+			(long)log->isr_time[i].tv_usec,
+			(long)log->isr_time[i+1].tv_sec,
+			(long)log->isr_time[i+1].tv_usec);
 	}
-}
 
+
+}
 void isr_log(struct vf_pool *p)
 {
 	struct isr_log_s *log = &p->isr_log;
@@ -258,26 +255,23 @@ void isr_log(struct vf_pool *p)
 		return;
 	if (log->log_cur >= ISR_LOG_LEN)
 		return;
-	ktime_get_ts(&log->isr_time[log->log_cur]);
+	do_gettimeofday(&log->isr_time[log->log_cur]);
 	log->log_cur++;
 }
-
 #else
-
 void isr_log_init(struct vf_pool *p)
 {
-}
 
+}
 void isr_log_print(struct vf_pool *p)
 {
-}
 
+}
 void isr_log(struct vf_pool *p)
 {
+
 }
-
 #endif
-
 struct vf_entry *vf_get_master(struct vf_pool *p, int index)
 {
 	if (index >= p->max_size)
@@ -297,7 +291,7 @@ struct vf_pool *vf_pool_alloc(int size)
 {
 	struct vf_pool *p;
 
-	p = kmalloc(sizeof(*p), GFP_KERNEL);
+	p = kmalloc(sizeof(struct vf_pool), GFP_KERNEL);
 	if (!p)
 		return NULL;
 
@@ -389,7 +383,7 @@ int vf_pool_init(struct vf_pool *p, int size)
 	for (i = 0; i < size; i++) {
 		p->dv_buf_size[i] = 0;
 		master = vf_get_master(p, i);
-		if (!master) {
+		if (master == NULL) {
 			log_state = false;
 			break;
 		}
@@ -405,7 +399,7 @@ int vf_pool_init(struct vf_pool *p, int size)
 
 	for (i = 0; i < size; i++) {
 		slave = vf_get_slave(p, i);
-		if (!slave) {
+		if (slave == NULL) {
 			log_state = false;
 			break;
 		}
@@ -427,6 +421,7 @@ int vf_pool_init(struct vf_pool *p, int size)
 #endif
 	return 0;
 }
+
 
 /* free the vframe pool of the vfp */
 void vf_pool_free(struct vf_pool *p)
@@ -473,10 +468,9 @@ static inline void vf_pool_put(struct vf_entry *vfe, struct list_head *head)
 {
 	list_add(&vfe->list, head);
 }
-
 /*
- * move all vf_entries in tmp list to writable list
- */
+*move all vf_entrys in tmp list to writable list
+*/
 void recycle_tmp_vfs(struct vf_pool *p)
 {
 	struct vf_entry *pos = NULL, *tmp = NULL;
@@ -490,10 +484,9 @@ void recycle_tmp_vfs(struct vf_pool *p)
 	}
 	spin_unlock_irqrestore(&p->tmp_lock, flags);
 }
-
 /*
- * put vf_entry to tmp list
- */
+*put vf_entry to tmp list
+*/
 void tmp_vf_put(struct vf_entry *vfe, struct vf_pool *p)
 {
 	unsigned long flags;
@@ -503,10 +496,9 @@ void tmp_vf_put(struct vf_entry *vfe, struct vf_pool *p)
 	p->tmp_list_size++;
 	spin_unlock_irqrestore(&p->tmp_lock, flags);
 }
-
 /*
- * move all vf_entry in tmp list to readable list
- */
+*move all vf_entry in tmp list to readable list
+*/
 void tmp_to_rd(struct vf_pool *p)
 {
 	struct vf_entry *pos = NULL, *tmp = NULL;
@@ -520,7 +512,6 @@ void tmp_to_rd(struct vf_pool *p)
 	}
 	spin_unlock_irqrestore(&p->tmp_lock, flags);
 }
-
 struct vf_entry *provider_vf_peek(struct vf_pool *p)
 {
 	struct vf_entry *vfe;
@@ -638,7 +629,6 @@ struct vf_entry *receiver_vf_get(struct vf_pool *p)
 	spin_unlock_irqrestore(&p->log_lock, flags);
 	return vfe;
 }
-
 /*check vf point,0:nornal;1:bad*/
 static unsigned int check_vf_put(struct vframe_s *vf, struct vf_pool *p)
 {
@@ -649,13 +639,12 @@ static unsigned int check_vf_put(struct vframe_s *vf, struct vf_pool *p)
 		return 1;
 	for (i = 0; i < p->size; i++) {
 		master = vf_get_master(p, i);
-		if (&master->vf == vf)
+		if (&(master->vf) == vf)
 			return 0;
 	}
 	pr_info("[%s]vf:%p!!!!\n", __func__, vf);
 	return 1;
 }
-
 void receiver_vf_put(struct vframe_s *vf, struct vf_pool *p)
 {
 	struct vf_entry *master, *slave;
@@ -666,7 +655,7 @@ void receiver_vf_put(struct vframe_s *vf, struct vf_pool *p)
 	if (check_vf_put(vf, p))
 		return;
 	master = vf_get_master(p, vf->index);
-	if (!master) {
+	if (master == NULL) {
 		spin_lock_irqsave(&p->log_lock, flags);
 		vf_log(p, VF_OPERATION_BPUT, false);
 		spin_unlock_irqrestore(&p->log_lock, flags);
@@ -684,7 +673,7 @@ void receiver_vf_put(struct vframe_s *vf, struct vf_pool *p)
 		}
 		master->flag &= (~VF_FLAG_FREEZED_FRAME);
 		pr_info("%s: del frame %u from fz list.\n",
-			__func__, master->vf.index);
+				__func__, master->vf.index);
 	}
 
 	/* normal vframe */
@@ -693,7 +682,7 @@ void receiver_vf_put(struct vframe_s *vf, struct vf_pool *p)
 		spin_lock_irqsave(&p->wr_lock, flags);
 		vf_pool_put(master, &p->wr_list);
 		p->wr_list_size++;
-		memset(&master->vf.pic_mode, 0, sizeof(master->vf.pic_mode));
+		memset(&(master->vf.pic_mode), 0, sizeof(master->vf.pic_mode));
 		master->vf.ratio_control = 0;
 		spin_unlock_irqrestore(&p->wr_lock, flags);
 		spin_lock_irqsave(&p->log_lock, flags);
@@ -719,7 +708,7 @@ void receiver_vf_put(struct vframe_s *vf, struct vf_pool *p)
 		 * entry 'master' or 'slave'
 		 */
 		slave = vf_get_slave(p, vf->index);
-		if (!slave) {
+		if (slave == NULL) {
 			spin_unlock_irqrestore(&p->wt_lock, flags);
 			spin_lock_irqsave(&p->log_lock, flags);
 			vf_log(p, VF_OPERATION_BPUT, false);
@@ -738,8 +727,8 @@ void receiver_vf_put(struct vframe_s *vf, struct vf_pool *p)
 			spin_lock_irqsave(&p->wr_lock, flags);
 			vf_pool_put(master, &p->wr_list);
 			p->wr_list_size++;
-			memset(&master->vf.pic_mode, 0,
-			       sizeof(master->vf.pic_mode));
+			memset(&(master->vf.pic_mode), 0,
+				sizeof(master->vf.pic_mode));
 			master->vf.ratio_control = 0;
 			spin_unlock_irqrestore(&p->wr_lock, flags);
 			slave->status = VF_STATUS_SL;
@@ -813,11 +802,11 @@ void vdin_vf_put(struct vframe_s *vf, void *op_arg)
 	/*clean dv-buf-size*/
 	if (vf && (dv_dbg_mask & DV_CLEAN_UP_MEM)) {
 		p->dv_buf_size[vf->index] = 0;
-		/*if (p->dv_buf_ori[vf->index])*/
-		/*	memset(p->dv_buf_ori[vf->index], 0, dolby_size_byte);*/
+		if (p->dv_buf_ori[vf->index])
+			memset(p->dv_buf_ori[vf->index], 0, dolby_size_byte);
+
 	}
 }
-
 int vdin_vf_states(struct vframe_states *vf_ste, void *op_arg)
 {
 	struct vf_pool *p;
@@ -833,9 +822,9 @@ int vdin_vf_states(struct vframe_states *vf_ste, void *op_arg)
 }
 
 /*
- * hold the buffer from rd list,if rd list is not enough,
- * get buffer from wr list
- */
+*hold the buffer from rd list,if rd list is not enough,
+*get buffer from wr list
+*/
 void vdin_vf_freeze(struct vf_pool *p, unsigned int num)
 {
 	struct vf_entry *vfe, *tmp;
@@ -849,14 +838,15 @@ void vdin_vf_freeze(struct vf_pool *p, unsigned int num)
 	if (p->fz_list_size < num) {
 		/*add the buffer in rd list to fz list*/
 		spin_lock_irqsave(&p->rd_lock, flags);
-		list_for_each_entry_safe(vfe, tmp, rd_head, list) {
+		list_for_each_entry_safe(vfe, tmp,
+				rd_head, list) {
 			list_del(&vfe->list);
 			spin_lock_irqsave(&p->fz_lock, flags);
 			list_add_tail(&vfe->list, fz_head);
 			spin_unlock_irqrestore(&p->fz_lock, flags);
 			vfe->flag |=  VF_FLAG_FREEZED_FRAME;
 			pr_info("%s: add  %u frame from rd list.\n",
-				__func__, vfe->vf.index);
+					__func__, vfe->vf.index);
 			if (++p->fz_list_size >= num)
 				break;
 		}
@@ -864,13 +854,13 @@ void vdin_vf_freeze(struct vf_pool *p, unsigned int num)
 		if (p->fz_list_size < num) {
 			spin_lock_irqsave(&p->wr_lock, flags);
 			spin_lock_irqsave(&p->fz_lock, flags);
-			list_for_each_entry_safe_reverse(vfe, tmp, wr_head,
-							 list) {
+			list_for_each_entry_safe_reverse(vfe, tmp,
+					wr_head, list) {
 				list_del(&vfe->list);
 				list_add(&vfe->list, fz_head);
 				vfe->flag |=  VF_FLAG_FREEZED_FRAME;
 				pr_info("%s: add frame %u from wr list.\n",
-					__func__, vfe->vf.index);
+						__func__, vfe->vf.index);
 				if (++p->fz_list_size >= num)
 					break;
 			}
@@ -897,14 +887,13 @@ void vdin_vf_unfreeze(struct vf_pool *p)
 			list_del(&vfe->list);
 			list_add_tail(&vfe->list, wr_head);
 			vfe->flag &=  (~VF_FLAG_FREEZED_FRAME);
-			pr_info("%s: del frame %u from fz list.\n",
+		pr_info("%s: del frame %u from fz list.\n",
 				__func__, vfe->vf.index);
 		}
 		spin_unlock_irqrestore(&p->wr_lock, flags);
 		spin_unlock_irqrestore(&p->fz_lock, flags);
 	}
 }
-
 /*dump vframe state*/
 void vdin_dump_vf_state(struct vf_pool *p)
 {
@@ -954,6 +943,7 @@ void vdin_dump_vf_state(struct vf_pool *p)
 	}
 	spin_unlock_irqrestore(&p->tmp_lock, flags);
 	pr_info("buffer get count %d.\n", atomic_read(&p->buffer_cnt));
+
 }
 
 /*2018-07-18 add debugfs*/
@@ -967,11 +957,11 @@ void vdin_dump_vf_state_seq(struct vf_pool *p, struct seq_file *seq)
 	spin_lock_irqsave(&p->wr_lock, flags);
 	list_for_each_entry_safe(pos, tmp, &p->wr_list, list) {
 		seq_printf(seq, "index: %2u,status %u, canvas index0: 0x%x,\n",
-			   pos->vf.index, pos->status, pos->vf.canvas0Addr);
+			pos->vf.index, pos->status, pos->vf.canvas0Addr);
 		seq_printf(seq, "\t canvas index1: 0x%x, vframe type: 0x%x.\n",
-			   pos->vf.canvas1Addr, pos->vf.type);
+			pos->vf.canvas1Addr, pos->vf.type);
 		seq_printf(seq, "\t ratio_control(0x%x).\n",
-			   pos->vf.ratio_control);
+			pos->vf.ratio_control);
 	}
 	spin_unlock_irqrestore(&p->wr_lock, flags);
 
@@ -979,11 +969,11 @@ void vdin_dump_vf_state_seq(struct vf_pool *p, struct seq_file *seq)
 	spin_lock_irqsave(&p->rd_lock, flags);
 	list_for_each_entry_safe(pos, tmp, &p->rd_list, list) {
 		seq_printf(seq, "index: %u,status %u, canvas index0: 0x%x,\n",
-			   pos->vf.index, pos->status, pos->vf.canvas0Addr);
+			pos->vf.index, pos->status, pos->vf.canvas0Addr);
 		seq_printf(seq, "\t canvas index1: 0x%x, vframe type: 0x%x.\n",
-			   pos->vf.canvas1Addr, pos->vf.type);
+			pos->vf.canvas1Addr, pos->vf.type);
 		seq_printf(seq, "\t ratio_control(0x%x).\n",
-			   pos->vf.ratio_control);
+			pos->vf.ratio_control);
 	}
 	spin_unlock_irqrestore(&p->rd_lock, flags);
 
@@ -991,25 +981,26 @@ void vdin_dump_vf_state_seq(struct vf_pool *p, struct seq_file *seq)
 	spin_lock_irqsave(&p->wt_lock, flags);
 	list_for_each_entry_safe(pos, tmp, &p->wt_list, list) {
 		seq_printf(seq, "index: %u, status %u, canvas index0: 0x%x,\n",
-			   pos->vf.index, pos->status, pos->vf.canvas0Addr);
+			pos->vf.index, pos->status, pos->vf.canvas0Addr);
 		seq_printf(seq, "\t canvas index1: 0x%x, vframe type: 0x%x.\n",
-			   pos->vf.canvas1Addr, pos->vf.type);
+			pos->vf.canvas1Addr, pos->vf.type);
 		seq_printf(seq, "\t ratio_control(0x%x).\n",
-			   pos->vf.ratio_control);
+			pos->vf.ratio_control);
 	}
 	spin_unlock_irqrestore(&p->wt_lock, flags);
 	seq_puts(seq, "buffer in temp list:\n");
 	spin_lock_irqsave(&p->tmp_lock, flags);
 	list_for_each_entry_safe(pos, tmp, &p->tmp_list, list) {
 		seq_printf(seq, "index: %u, status %u, canvas index0: 0x%x,\n",
-			   pos->vf.index, pos->status, pos->vf.canvas0Addr);
+			pos->vf.index, pos->status, pos->vf.canvas0Addr);
 		seq_printf(seq, "\t canvas index1: 0x%x, vframe type: 0x%x.\n",
-			   pos->vf.canvas1Addr, pos->vf.type);
+			pos->vf.canvas1Addr, pos->vf.type);
 		seq_printf(seq, "\t ratio_control(0x%x).\n",
-			   pos->vf.ratio_control);
+			pos->vf.ratio_control);
 	}
 	spin_unlock_irqrestore(&p->tmp_lock, flags);
 	seq_printf(seq, "buffer get count %d.\n", atomic_read(&p->buffer_cnt));
+
 }
 
 /*update the vframe disp_mode
@@ -1033,7 +1024,6 @@ void vdin_vf_disp_mode_update(struct vf_entry *vfe, struct vf_pool *p)
 
 	p->disp_mode[p->disp_index[0]] = VFRAME_DISP_MODE_UNKNOWN;
 }
-
 /*skip all from current
  *disp_index[i]:
  *2:last last vframe,	1:last vframe
@@ -1042,7 +1032,7 @@ void vdin_vf_disp_mode_update(struct vf_entry *vfe, struct vf_pool *p)
 void vdin_vf_disp_mode_skip(struct vf_pool *p)
 {
 	unsigned int i;
-
 	for (i = 0; i <= p->skip_vf_num; i++)
 		p->disp_mode[p->disp_index[i]] = VFRAME_DISP_MODE_SKIP;
 }
+

@@ -1,4 +1,3 @@
-/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
  * drivers/amlogic/media/video_processor/ppmgr/vfp.h
  *
@@ -33,7 +32,6 @@ static inline void vfq_lookup_start(struct vfq_s *q)
 	q->pre_rp = q->rp;
 	q->pre_wp = q->wp;
 }
-
 static inline void vfq_lookup_end(struct vfq_s *q)
 {
 	q->rp = q->pre_rp;
@@ -42,8 +40,7 @@ static inline void vfq_lookup_end(struct vfq_s *q)
 
 static inline void vfq_init(struct vfq_s *q, u32 size, struct vframe_s **pool)
 {
-	q->rp = 0;
-	q->wp = 0;
+	q->rp = q->wp = 0;
 	q->size = size;
 	q->pool = pool;
 }

@@ -1,6 +1,18 @@
-/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * sound/soc/amlogic/auge/ddr_mngr.h
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
 #ifndef __AML_AUDIO_DDR_MANAGER_H_
@@ -19,8 +31,8 @@
 #define MEMIF_INT_FIFO_DEPTH        BIT(5)
 #define MEMIF_INT_MASK              GENMASK(7, 0)
 
-#define TODDR_FIFO_CNT              GENMASK(19, 8)
-#define FRDDR_FIFO_CNT              GENMASK(17, 8)
+#define TODDR_FIFO_CNT                    GENMASK(19, 8)
+#define FRDDR_FIFO_CNT                    GENMASK(17, 8)
 
 #define FIFO_BURST                  8
 #define FIFO_DEPTH_32K              0x8000
@@ -177,6 +189,11 @@ struct toddr {
 	unsigned int resample: 1;
 	unsigned int ext_signed: 1;
 	unsigned int reg_base;
+	unsigned int bitdepth;
+	unsigned int channels;
+	unsigned int rate;
+	unsigned int frame_size;
+	unsigned int buf_frames;
 
 	struct toddr_fmt fmt;
 	unsigned int start_addr;
@@ -238,6 +255,11 @@ struct frddr {
 	unsigned int rate;
 	unsigned int msb;
 	unsigned int type;
+	unsigned int frame_size;
+	unsigned int buf_frames;
+
+	unsigned int start_addr;
+	unsigned int end_addr;
 
 	int irq;
 	bool in_use;
@@ -307,7 +329,7 @@ int aml_frddr_set_intrpt(struct frddr *fr, unsigned int intrpt);
 unsigned int aml_frddr_get_position(struct frddr *fr);
 void aml_frddr_enable(struct frddr *fr, bool enable);
 void aml_frddr_select_dst(struct frddr *fr, enum frddr_dest);
-void aml_frddr_select_dst_ss(struct frddr *fr,
+extern void aml_frddr_select_dst_ss(struct frddr *fr,
 	enum frddr_dest dst, int sel, bool enable);
 
 int aml_check_sharebuffer_valid(struct frddr *fr, int ss_sel);

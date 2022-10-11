@@ -1,15 +1,19 @@
-$(MEDIA_MODULE_NAME)-$(CONFIG_AMLOGIC_MEDIA_GDC) += gdc/src/fw_lib/acamera_gdc.o
-$(MEDIA_MODULE_NAME)-$(CONFIG_AMLOGIC_MEDIA_GDC) += gdc/src/platform/system_gdc_io.o
-$(MEDIA_MODULE_NAME)-$(CONFIG_AMLOGIC_MEDIA_GDC) += gdc/app/gdc_main.o
-$(MEDIA_MODULE_NAME)-$(CONFIG_AMLOGIC_MEDIA_GDC) += gdc/app/gdc_module.o
-$(MEDIA_MODULE_NAME)-$(CONFIG_AMLOGIC_MEDIA_GDC) += gdc/app/gdc_dmabuf.o
-$(MEDIA_MODULE_NAME)-$(CONFIG_AMLOGIC_MEDIA_GDC) += gdc/app/gdc_wq.o
+FW_SRC := src/fw_lib/acamera_gdc.c \
+	src/platform/system_gdc_io.c \
+	app/gdc_main.c \
+	app/gdc_module.c \
+	app/gdc_dmabuf.c \
+	app/gdc_wq.c
 
-PWD=$(srctree)/drivers/amlogic/media/gdc
+FW_SRC_OBJ := $(FW_SRC:.c=.o)
+
+obj-$(CONFIG_AMLOGIC_MEDIA_GDC) += $(FW_SRC_OBJ)
+
+PWD=$(src)
 ccflags-y +=-I$(PWD)/app -I$(PWD)/inc
 ccflags-y +=-I$(PWD)/inc/api -I$(PWD)/inc/gdc -I$(PWD)/inc/sys
 ccflags-y +=-I$(PWD)/src/platform -I$(PWD)/src/fw_lib
-ccflags-y += -I$(srctree)/drivers/amlogic/media/common/ion_dev/
-ccflags-y += -I$(srctree)/drivers/staging/android/
+ccflags-y += -Idrivers/amlogic/media/common/ion_dev/
+ccflags-y += -Idrivers/staging/android/
 
 ccflags-y += -Wno-declaration-after-statement

@@ -62,7 +62,7 @@ static void nins_m_recycle(struct di_ch_s *pch)
 	struct dim_nins_s *ins;
 	struct vframe_s *vfm;
 
-	if (!pch || pch->itf.etype != EDIM_NIN_TYPE_VFM) {
+	if ((!pch) || (pch->itf.etype != EDIM_NIN_TYPE_VFM)) {
 		PR_ERR("%s:\n", __func__);
 		return;
 	}
@@ -101,7 +101,7 @@ static void nins_m_unreg(struct di_ch_s *pch)
 
 void nins_used2idle_one(struct di_ch_s *pch, struct dim_nins_s *ins)
 {
-	if (!pch || pch->itf.etype != EDIM_NIN_TYPE_VFM) {
+	if ((!pch) || (pch->itf.etype != EDIM_NIN_TYPE_VFM)) {
 		PR_ERR("%s:\n", __func__);
 		return;
 	}
@@ -138,7 +138,7 @@ static bool nins_m_in_vf(struct di_ch_s *pch)
 	in_nub		= qbufp_count(pbufq, QBF_NINS_Q_CHECK);
 	free_nub	= qbufp_count(pbufq, QBF_NINS_Q_IDLE);
 
-	if (in_nub >= DIM_K_VFM_IN_LIMIT	||
+	if ((in_nub >= DIM_K_VFM_IN_LIMIT)	||
 	    (free_nub < (DIM_K_VFM_IN_LIMIT - in_nub))) {
 		return false;
 	}
@@ -167,84 +167,6 @@ static bool nins_m_in_vf(struct di_ch_s *pch)
 		//pins->c.etype = EDIM_NIN_TYPE_VFM;
 		memcpy(&pins->c.vfm_cp, vf, sizeof(pins->c.vfm_cp));
 		flg_q = qbuf_in(pbufq, QBF_NINS_Q_CHECK, index);
-		if (!flg_q) {
-			PR_ERR("%s:qin\n", __func__);
-			err_cnt++;
-			pw_vf_put(vf, ch);
-			qbuf_in(pbufq, QBF_NINS_Q_IDLE, index);
-			break;
-		}
-		if (pch->in_cnt < 4) {
-			if (pch->in_cnt == 1)
-				dbg_timer(ch, EDBG_TIMER_1_GET);
-			else if (pch->in_cnt == 2)
-				dbg_timer(ch, EDBG_TIMER_2_GET);
-			else if (pch->in_cnt == 3)
-				dbg_timer(ch, EDBG_TIMER_3_GET);
-		}
-	}
-
-	if (err_cnt)
-		return false;
-	return true;
-}
-
-#define DIM_K_VFM_IN_DCT_LIMIT	3
-static bool nins_m_in_vf_dct(struct di_ch_s *pch)
-{
-	struct buf_que_s *pbufq;
-	unsigned int in_nub, free_nub, dct_nub;
-	int i;
-	unsigned int ch;
-	struct vframe_s *vf;
-	struct dim_nins_s	*pins;
-	unsigned int index;
-	bool flg_q;
-	unsigned int err_cnt = 0;
-
-	if (!get_datal()->dct_op || !get_datal()->dct_op->is_en(pch))
-		return nins_m_in_vf(pch);
-
-	if (!pch) {
-		PR_ERR("%s:\n", __func__);
-		return false;
-	}
-	ch = pch->ch_id;
-	pbufq = &pch->nin_qb;
-
-	in_nub		= qbufp_count(pbufq, QBF_NINS_Q_CHECK);
-	free_nub	= qbufp_count(pbufq, QBF_NINS_Q_IDLE);
-	dct_nub		= qbufp_count(pbufq, QBF_NINS_Q_DCT);
-
-	if ((in_nub + dct_nub) >= DIM_K_VFM_IN_DCT_LIMIT	||
-	    (free_nub < (DIM_K_VFM_IN_DCT_LIMIT - in_nub - dct_nub))) {
-		return false;
-	}
-
-	for (i = 0; i < (DIM_K_VFM_IN_DCT_LIMIT - in_nub - dct_nub); i++) {
-		vf = pw_vf_peek(ch);
-		if (!vf)
-			break;
-
-		vf = pw_vf_get(ch);
-		if (!vf)
-			break;
-
-		/* get ins */
-		flg_q = qbuf_out(pbufq, QBF_NINS_Q_IDLE, &index);
-		if (!flg_q) {
-			PR_ERR("%s:qout\n", __func__);
-			err_cnt++;
-			pw_vf_put(vf, ch);
-			break;
-		}
-		pins = (struct dim_nins_s *)pbufq->pbuf[index].qbc;
-		pins->c.ori = vf;
-		pins->c.cnt = pch->in_cnt;
-		pch->in_cnt++;
-		//pins->c.etype = EDIM_NIN_TYPE_VFM;
-		memcpy(&pins->c.vfm_cp, vf, sizeof(pins->c.vfm_cp));
-		flg_q = qbuf_in(pbufq, QBF_NINS_Q_DCT, index);
 		if (!flg_q) {
 			PR_ERR("%s:qin\n", __func__);
 			err_cnt++;
@@ -382,10 +304,7 @@ static void dev_vframe_reg_first(struct dim_itf_s *itf)
 
 	/* clear */
 	memset(pvfmc, 0, sizeof(*pvfmc));
-	if (IS_IC_SUPPORT(DECONTOUR))
-		pvfmc->vf_m_fill_polling	= nins_m_in_vf_dct;
-	else
-		pvfmc->vf_m_fill_polling	= nins_m_in_vf;
+	pvfmc->vf_m_fill_polling	= nins_m_in_vf;
 	pvfmc->vf_m_fill_ready		= vfm_m_fill_ready;
 	pvfmc->vf_m_bypass_first_frame	= dim_bypass_first_frame;
 	itf->opins_m_back_in	= nins_m_recycle;
@@ -604,7 +523,7 @@ struct vframe_s *di_vf_l_get(unsigned int channel)
 	}
 	/**************************/
 	vframe_ret = ndrd_qout(pch);
-	if (!vframe_ret || !vframe_ret->private_data) {
+	if ((!vframe_ret) || (!vframe_ret->private_data)) {
 		dbg_nq("%s:bypass?\n", __func__);
 		didbg_vframe_out_save(channel, vframe_ret, 3);
 		return vframe_ret;
@@ -1374,5 +1293,5 @@ void dev_vframe_init(void)
 		vf_provider_init(&pvfm->di_vf_prov, pvfm->name,
 				 &deinterlace_vf_provider, &pvfm->indx);
 	}
-	dbg_reg("%s finish\n", __func__);
+	pr_info("%s finish\n", __func__);
 }

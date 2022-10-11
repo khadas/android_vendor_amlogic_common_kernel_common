@@ -1,7 +1,17 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
+ * drivers/amlogic/media/vout/lcd/lcd_extern/i2c_DLPC3439.c
  *
- * Copyright (C) 2019 Amlogic, Inc. All rights reserved.
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
  *
  */
 
@@ -27,9 +37,10 @@
 static struct lcd_extern_config_s *ext_config;
 static struct aml_lcd_extern_i2c_dev_s *i2c_dev;
 
-/* Write: ImageCrop: 1920x1080
- * W 36 10 00 00 00 00 80 07 38 04
- */
+
+	/* Write: ImageCrop: 1920x1080
+	 * W 36 10 00 00 00 00 80 07 38 04
+	 */
 static unsigned char data_1[] = {0x10, 0x00, 0x00, 0x00, 0x00,
 		0x80, 0x07, 0x38, 0x04};
 	/* Write: DisplaySize: 1920x1080
@@ -55,7 +66,7 @@ static int lcd_extern_power_on(void)
 
 	lcd_extern_pinmux_set(1);
 
-	if (!i2c_dev) {
+	if (i2c_dev == NULL) {
 		EXTERR("invalid i2c device\n");
 		return -1;
 	}
@@ -82,7 +93,7 @@ static int lcd_extern_driver_update(struct aml_lcd_extern_driver_s *ext_drv)
 {
 	int ret = 0;
 
-	if (!ext_drv) {
+	if (ext_drv == NULL) {
 		EXTERR("%s: driver is null\n", LCD_EXTERN_NAME);
 		return -1;
 	}
@@ -100,12 +111,12 @@ int aml_lcd_extern_i2c_DLPC3439_probe(struct aml_lcd_extern_driver_s *ext_drv)
 	ext_config = ext_drv->config;
 
 	i2c_dev = lcd_extern_get_i2c_device(ext_config->i2c_addr);
-	if (!i2c_dev) {
+	if (i2c_dev == NULL) {
 		EXTERR("invalid i2c device\n");
 		return -1;
 	}
 	EXTPR("get i2c device: %s, addr 0x%02x OK\n",
-	      i2c_dev->name, i2c_dev->client->addr);
+		i2c_dev->name, i2c_dev->client->addr);
 
 	ret = lcd_extern_driver_update(ext_drv);
 

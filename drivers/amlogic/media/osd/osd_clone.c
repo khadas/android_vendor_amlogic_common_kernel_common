@@ -1,6 +1,18 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/amlogic/media/osd/osd_clone.c
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
 /* Linux Headers */
@@ -15,6 +27,7 @@
 #include <linux/sched.h>
 
 /* Amlogic Headers */
+#include <linux/amlogic/cpu_version.h>
 #ifdef CONFIG_AMLOGIC_MEDIA_CANVAS
 #include <linux/amlogic/media/canvas/canvas.h>
 #include <linux/amlogic/media/canvas/canvas_mgr.h>
@@ -28,6 +41,7 @@
 #include "osd_io.h"
 #include "osd_canvas.h"
 #include "osd_hw.h"
+
 
 #ifdef OSD_GE2D_CLONE_SUPPORT
 struct osd_clone_s {
@@ -48,9 +62,8 @@ static void osd_clone_process(void)
 #ifdef CONFIG_AMLOGIC_MEDIA_CANVAS
 	struct canvas_s cs, cd;
 #endif
-	ulong cs_addr = 0, cd_addr = 0;
-	u32 cs_width = 0, cs_height = 0;
-	u32 cd_width = 0, cd_height = 0;
+	u32 cs_addr  = 0, cs_width = 0, cs_height = 0;
+	u32 cd_addr = 0, cd_width = 0, cd_height = 0;
 	u32 x0 = 0;
 	u32 y0 = 0;
 	u32 y1 = 0;
@@ -60,7 +73,7 @@ static void osd_clone_process(void)
 	struct config_para_ex_s *ge2d_config = &s_osd_clone.ge2d_config;
 	struct ge2d_context_s *context = s_osd_clone.ge2d_context;
 #ifdef CONFIG_AMLOGIC_MEDIA_CANVAS
-	if (osd_hw.osd_meson_dev.cpu_id != __MESON_CPU_MAJOR_ID_AXG) {
+	if (osd_hw.osd_meson_dev.cpu_id != MESON_CPU_MAJOR_ID_AXG) {
 		canvas_read(OSD1_CANVAS_INDEX, &cs);
 		canvas_read(OSD2_CANVAS_INDEX, &cd);
 		cs_addr = cs.addr;
@@ -71,15 +84,15 @@ static void osd_clone_process(void)
 		cd_height = cd.height;
 	} else {
 		osd_get_info(OSD1, &cs_addr,
-			     &cs_width, &cs_height);
+			&cs_width, &cs_height);
 		osd_get_info(OSD2, &cs_addr,
-			     &cs_width, &cs_height);
+			&cs_width, &cs_height);
 	}
 #else
 	osd_get_info(OSD1, &cs_addr,
-		     &cs_width, &cs_height);
+		&cs_width, &cs_height);
 	osd_get_info(OSD2, &cs_addr,
-		     &cs_width, &cs_height);
+		&cs_width, &cs_height);
 #endif
 	y0 = s_osd_clone.osd1_yres * s_osd_clone.buffer_number;
 	y1 = s_osd_clone.osd2_yres * s_osd_clone.buffer_number;
@@ -142,8 +155,8 @@ static void osd_clone_process(void)
 	}
 
 	stretchblt(context, x0, y0, cs_width / 4,
-		   s_osd_clone.osd1_yres, x0, y1,
-		   cd_width / 4, s_osd_clone.osd2_yres);
+		s_osd_clone.osd1_yres, x0, y1,
+		cd_width / 4, s_osd_clone.osd2_yres);
 }
 
 void osd_clone_update_pan(int buffer_number)
@@ -188,7 +201,7 @@ int osd_clone_task_start(void)
 
 	osd_log_info("osd_clone_task start.\n");
 
-	if (!s_osd_clone.ge2d_context)
+	if (s_osd_clone.ge2d_context == NULL)
 		s_osd_clone.ge2d_context = create_ge2d_work_queue();
 
 	memset(&s_osd_clone.ge2d_config, 0, sizeof(struct config_para_ex_s));
@@ -207,8 +220,7 @@ void osd_clone_task_stop(void)
 	osd_log_info("osd_clone_task stop.\n");
 
 	if (s_osd_clone.ge2d_context) {
-		if (destroy_ge2d_work_queue(s_osd_clone.ge2d_context))
-			osd_log_err("%s destroy_ge2d_work failed.\n", __func__);
+		destroy_ge2d_work_queue(s_osd_clone.ge2d_context);
 		s_osd_clone.ge2d_context = NULL;
 	}
 

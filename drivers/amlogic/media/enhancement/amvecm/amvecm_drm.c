@@ -1,4 +1,3 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
  * drivers/amlogic/media/enhancement/amvecm/amvecm_drm.c
  *
@@ -55,6 +54,7 @@ EXPORT_SYMBOL(amvecm_drm_gamma_get);
 /*set gamma table*/
 int amvecm_drm_gamma_set(u32 index, struct drm_color_lut *lut, int lut_size)
 {
+
 	int i = 0;
 
 	if (lut_size != GAMMA_SIZE) {
@@ -94,7 +94,7 @@ EXPORT_SYMBOL(amvecm_drm_gamma_disable);
 
 int am_meson_ctm_set(u32 index, struct drm_color_ctm *ctm)
 {
-	s64 m[9];
+	int64_t m[9];
 	int i = 0;
 
 	for (i = 0; i < 9; i++) {

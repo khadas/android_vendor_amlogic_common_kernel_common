@@ -1,4 +1,3 @@
-/* SPDX-License-Identifier: GPL-2.0 WITH Linux-syscall-note */
 /*
  * ARM Power State and Coordination Interface (PSCI) header
  *
@@ -49,18 +48,20 @@
 
 #define PSCI_1_0_FN_PSCI_FEATURES		PSCI_0_2_FN(10)
 #define PSCI_1_0_FN_SYSTEM_SUSPEND		PSCI_0_2_FN(14)
-#define PSCI_1_0_FN_SET_SUSPEND_MODE		PSCI_0_2_FN(15)
-#define PSCI_1_1_FN_SYSTEM_RESET2		PSCI_0_2_FN(18)
 
 #define PSCI_1_0_FN64_SYSTEM_SUSPEND		PSCI_0_2_FN64(14)
-#define PSCI_1_1_FN64_SYSTEM_RESET2		PSCI_0_2_FN64(18)
 
 /* PSCI v0.2 power state encoding for CPU_SUSPEND function */
 #define PSCI_0_2_POWER_STATE_ID_MASK		0xffff
 #define PSCI_0_2_POWER_STATE_ID_SHIFT		0
 #define PSCI_0_2_POWER_STATE_TYPE_SHIFT		16
+#ifdef CONFIG_AMLOGIC_MODIFY
+#define PSCI_0_2_POWER_STATE_TYPE_MASK		\
+				(0x3 << PSCI_0_2_POWER_STATE_TYPE_SHIFT)
+#else
 #define PSCI_0_2_POWER_STATE_TYPE_MASK		\
 				(0x1 << PSCI_0_2_POWER_STATE_TYPE_SHIFT)
+#endif
 #define PSCI_0_2_POWER_STATE_AFFL_SHIFT		24
 #define PSCI_0_2_POWER_STATE_AFFL_MASK		\
 				(0x3 << PSCI_0_2_POWER_STATE_AFFL_SHIFT)
@@ -99,10 +100,6 @@
 #define PSCI_1_0_FEATURES_CPU_SUSPEND_PF_SHIFT	1
 #define PSCI_1_0_FEATURES_CPU_SUSPEND_PF_MASK	\
 			(0x1 << PSCI_1_0_FEATURES_CPU_SUSPEND_PF_SHIFT)
-
-#define PSCI_1_0_OS_INITIATED			BIT(0)
-#define PSCI_1_0_SUSPEND_MODE_PC		0
-#define PSCI_1_0_SUSPEND_MODE_OSI		1
 
 /* PSCI return values (inclusive of all PSCI versions) */
 #define PSCI_RET_SUCCESS			0

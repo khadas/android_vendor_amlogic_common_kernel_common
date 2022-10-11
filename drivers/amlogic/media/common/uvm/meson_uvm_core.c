@@ -1,6 +1,18 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/amlogic/media/common/uvm/meson_uvm_core.c
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
 #include <linux/device.h>
@@ -19,7 +31,6 @@
 #include <linux/dma-buf.h>
 #include <linux/pagemap.h>
 #include <linux/amlogic/meson_uvm_core.h>
-#include "meson_uvm_nn_processor.h"
 
 static int uvm_debug_level;
 module_param(uvm_debug_level, int, 0644);
@@ -39,27 +50,36 @@ static void uvm_handle_destroy(struct kref *kref)
 	struct uvm_handle *handle;
 
 	handle = container_of(kref, struct uvm_handle, ref);
-	if (handle->ua && handle->ua->sgt) {
-		sg_free_table(handle->ua->sgt);
-		kfree(handle->ua->sgt);
-	}
 
 	kfree(handle->ua);
 
 	kfree(handle);
-	UVM_PRINTK(1, "%s called\n", __func__);
 }
 
-static struct sg_table
-	*meson_uvm_map_dma_buf(struct dma_buf_attachment *attachment,
-			       enum dma_data_direction direction)
+static int meson_uvm_attach(struct dma_buf *dmabuf, struct device *dev,
+			    struct dma_buf_attachment *attach)
+{
+	UVM_PRINTK(2, "%s called, %s.\n", __func__, current->comm);
+	return 0;
+}
+
+static void meson_uvm_detach(struct dma_buf *dmabuf,
+			     struct dma_buf_attachment *attach)
+{
+	UVM_PRINTK(2, "%s called, %s.\n", __func__, current->comm);
+	/* TODO */
+}
+
+static struct sg_table *meson_uvm_map_dma_buf(
+			struct dma_buf_attachment *attachment,
+			enum dma_data_direction direction)
 {
 	struct dma_buf *dmabuf;
 	struct uvm_handle *handle;
 	struct uvm_alloc *ua;
 	struct sg_table *sgt;
 	bool gpu_access = false;
-	bool skip_realloc = false;
+	u64 flag = 0;
 
 	if (strstr(dev_name(attachment->dev), "bifrost") ||
 		strstr(dev_name(attachment->dev), "mali")) {
@@ -70,18 +90,25 @@ static struct sg_table
 	handle = dmabuf->priv;
 	ua = handle->ua;
 
-	UVM_PRINTK(1, "%s called, %s. gpu_access:%d\n", __func__, current->comm, gpu_access);
-	if (ua->flags & BIT(UVM_SKIP_REALLOC))
-		skip_realloc = true;
+	UVM_PRINTK(1, "%s called, %s. gpu_access:%d ua->flags:%llu dmabuf:%p\n",
+			__func__, current->comm, gpu_access, ua->flags, dmabuf);
 
-	if (ua->flags & BIT(UVM_DELAY_ALLOC))
-		ua->delay_alloc(dmabuf, ua->obj);
+	if (ua->flags & BIT(UVM_DELAY_ALLOC) && gpu_access) {
+		if (ua->flags & BIT(UVM_SKIP_REALLOC))
+			return ERR_PTR(-ENOMEM);
 
-	if (ua->flags & BIT(UVM_IMM_ALLOC) && gpu_access && !skip_realloc) {
+		if (ua->delay_alloc(dmabuf, ua->obj, &flag)) {
+			ua->flags |= flag;
+			UVM_PRINTK(0, "delay_realloc fail. ua->flags:%llu\n", ua->flags);
+			return ERR_PTR(-ENOMEM);
+		}
+	}
+
+	if (ua->flags & BIT(UVM_IMM_ALLOC) && gpu_access && ua->scalar > 1) {
 		UVM_PRINTK(1, "begin ua->gpu_realloc. size: %zu scalar: %d\n",
 					ua->size, ua->scalar);
 		if (ua->gpu_realloc(dmabuf, ua->obj, ua->scalar)) {
-			UVM_PRINTK(1, "gpu_realloc fail\n");
+			UVM_PRINTK(0, "gpu_realloc fail\n");
 			return ERR_PTR(-ENOMEM);
 		}
 	}
@@ -92,15 +119,19 @@ static struct sg_table
 		return ERR_PTR(-ENOMEM);
 	}
 
+	if (ua->flags & BIT(UVM_SECURE_ALLOC))
+		return sgt;
+
 	if (ua->flags & BIT(UVM_FAKE_ALLOC)) {
 		dma_map_page(attachment->dev, sg_page(sgt->sgl), 0,
-			     UVM_FAKE_SIZE, direction);
+					UVM_FAKE_SIZE, direction);
 	} else if (!dma_map_sg(attachment->dev, sgt->sgl, sgt->nents,
 				direction)) {
 		UVM_PRINTK(0, "meson_uvm: dma_map_sg call failed.\n");
 		return ERR_PTR(-ENOMEM);
 	}
-	dma_sync_sg_for_device(attachment->dev, sgt->sgl, sgt->nents, DMA_BIDIRECTIONAL);
+	dma_sync_sg_for_device(attachment->dev, sgt->sgl,
+			       sgt->nents, DMA_BIDIRECTIONAL);
 	return sgt;
 }
 
@@ -112,11 +143,19 @@ static void meson_uvm_unmap_dma_buf(struct dma_buf_attachment *attachment,
 	struct uvm_handle *handle;
 	struct uvm_alloc *ua;
 
+	if (!attachment || !sgt)
+		return;
+
 	dmabuf = attachment->dmabuf;
 	handle = dmabuf->priv;
 	ua = handle->ua;
 
-	UVM_PRINTK(1, "%s called, %s.\n", __func__, current->comm);
+	UVM_PRINTK(1, "%s called, %s. sgt:%p dmabuf:%p handle:%p ua:%p\n",
+				__func__, current->comm, sgt, dmabuf, handle, ua);
+
+	if (ua->flags & (BIT(UVM_SECURE_ALLOC) | BIT(UVM_SKIP_REALLOC)))
+		return;
+
 	if (ua->flags & BIT(UVM_FAKE_ALLOC))
 		dma_unmap_page(attachment->dev, sgt->sgl->dma_address,
 			       UVM_FAKE_SIZE, direction);
@@ -131,7 +170,7 @@ static void meson_uvm_release(struct dma_buf *dmabuf)
 	struct uvm_handle *handle = dmabuf->priv;
 	struct uvm_alloc *ua = handle->ua;
 
-	UVM_PRINTK(1, "%s called, %s.\n", __func__, current->comm);
+	UVM_PRINTK(2, "%s called, %s.\n", __func__, current->comm);
 
 	if (ua->free)
 		ua->free(ua->obj);
@@ -139,35 +178,47 @@ static void meson_uvm_release(struct dma_buf *dmabuf)
 	list_for_each_entry_safe(uhmod, uhtmp, &handle->mod_attached, list)
 		kref_put(&uhmod->ref, uvm_hook_mod_release);
 
-	UVM_PRINTK(1, "%s called, %u\n", __func__, kref_read(&handle->ref));
 	kref_put(&handle->ref, uvm_handle_destroy);
 }
 
 static int meson_uvm_begin_cpu_access(struct dma_buf *dmabuf,
 				      enum dma_data_direction dir)
 {
-	UVM_PRINTK(1, "%s called.\n", __func__);
+	UVM_PRINTK(2, "%s called.\n", __func__);
 	return 0;
 }
 
 static int meson_uvm_end_cpu_access(struct dma_buf *dmabuf,
 				    enum dma_data_direction dir)
 {
-	UVM_PRINTK(1, "%s called.\n", __func__);
+	UVM_PRINTK(2, "%s called.\n", __func__);
 	return 0;
 }
 
-static int meson_uvm_attach(struct dma_buf *dmabuf,
-			    struct dma_buf_attachment *attach)
+static void *meson_uvm_kmap(struct dma_buf *dmabuf, unsigned long offset)
 {
-	UVM_PRINTK(1, "%s called, %s.\n", __func__, current->comm);
-	return 0;
+	UVM_PRINTK(2, "%s called.\n", __func__);
+	return NULL;
 }
 
-static void meson_uvm_detach(struct dma_buf *dmabuf,
-			     struct dma_buf_attachment *attach)
+static void meson_uvm_kunmap(struct dma_buf *dmabuf,
+			     unsigned long offset, void *ptr)
 {
-	UVM_PRINTK(1, "%s called, %s.\n", __func__, current->comm);
+	UVM_PRINTK(2, "%s called.\n", __func__);
+	/* TODO */
+}
+
+static void *meson_uvm_kmap_atomic(struct dma_buf *dmabuf,
+				   unsigned long offset)
+{
+	UVM_PRINTK(2, "%s called.\n", __func__);
+	return NULL;
+}
+
+static void meson_uvm_kunmap_atomic(struct dma_buf *dmabuf,
+				    unsigned long offset, void *ptr)
+{
+	UVM_PRINTK(2, "%s called.\n", __func__);
 	/* TODO */
 }
 
@@ -207,7 +258,7 @@ static void *meson_uvm_vmap(struct dma_buf *dmabuf)
 		return ERR_PTR(-ENOMEM);
 
 	handle->ua->vaddr = vaddr;
-	UVM_PRINTK(1, "%s called.\n", __func__);
+	UVM_PRINTK(2, "%s called.\n", __func__);
 	return vaddr;
 }
 
@@ -215,7 +266,7 @@ static void meson_uvm_vunmap(struct dma_buf *dmabuf, void *vaddr)
 {
 	struct uvm_handle *handle = dmabuf->priv;
 
-	UVM_PRINTK(1, "%s called.\n", __func__);
+	UVM_PRINTK(2, "%s called.\n", __func__);
 	vunmap(handle->ua->vaddr);
 }
 
@@ -229,13 +280,13 @@ static int meson_uvm_mmap(struct dma_buf *dmabuf, struct vm_area_struct *vma)
 	unsigned long addr = vma->vm_start;
 	unsigned long offset = vma->vm_pgoff * PAGE_SIZE;
 
-	UVM_PRINTK(1, "%s called.\n", __func__);
+	UVM_PRINTK(2, "%s called.\n", __func__);
 
 	if (!table) {
 		UVM_PRINTK(0, "buffer was not allocated.\n");
 		return -EINVAL;
 	}
-	vma->vm_page_prot = pgprot_dmacoherent(vma->vm_page_prot);
+
 	for_each_sg(table->sgl, sg, table->nents, i) {
 		struct page *page = sg_page(sg);
 		unsigned long remainder = vma->vm_end - addr;
@@ -270,6 +321,10 @@ static struct dma_buf_ops meson_uvm_dma_ops = {
 	.release = meson_uvm_release,
 	.begin_cpu_access = meson_uvm_begin_cpu_access,
 	.end_cpu_access = meson_uvm_end_cpu_access,
+	.kmap = meson_uvm_kmap,
+	.kmap_atomic = meson_uvm_kmap_atomic,
+	.kunmap = meson_uvm_kunmap,
+	.kunmap_atomic = meson_uvm_kunmap_atomic,
 	.vmap = meson_uvm_vmap,
 	.vunmap = meson_uvm_vunmap,
 	.mmap = meson_uvm_mmap,
@@ -287,7 +342,6 @@ static struct uvm_handle *uvm_handle_alloc(size_t len, size_t align,
 
 	kref_init(&handle->ref);
 	mutex_init(&handle->lock);
-	mutex_init(&handle->detachlock);
 	handle->size = len;
 	handle->align = align;
 	handle->flags = flags;
@@ -397,8 +451,8 @@ int dmabuf_bind_uvm_alloc(struct dma_buf *dmabuf, struct uvm_alloc_info *info)
 	struct uvm_handle *handle;
 	struct uvm_alloc *ua;
 
-	if (IS_ERR_OR_NULL(dmabuf) || !dmabuf_is_uvm(dmabuf)) {
-		UVM_PRINTK(0, "dmabuf is not uvm. %s %d\n", __func__, __LINE__);
+	if (!dmabuf || !dmabuf_is_uvm(dmabuf)) {
+		UVM_PRINTK(0, "dmabuf is not uvm.\n");
 		return -EINVAL;
 	}
 
@@ -430,8 +484,8 @@ int dmabuf_bind_uvm_delay_alloc(struct dma_buf *dmabuf,
 	struct uvm_handle *handle;
 	struct uvm_alloc *ua;
 
-	if (IS_ERR_OR_NULL(dmabuf) || !dmabuf_is_uvm(dmabuf)) {
-		UVM_PRINTK(0, "dmabuf is not uvm. %s %d\n", __func__, __LINE__);
+	if (!dmabuf || !dmabuf_is_uvm(dmabuf)) {
+		UVM_PRINTK(0, "dmabuf is not uvm.\n");
 		return -EINVAL;
 	}
 
@@ -450,8 +504,8 @@ int dmabuf_set_vframe(struct dma_buf *dmabuf, struct vframe_s *vf,
 {
 	struct uvm_handle *handle;
 
-	if (IS_ERR_OR_NULL(dmabuf) || !dmabuf_is_uvm(dmabuf)) {
-		UVM_PRINTK(0, "dmabuf is not uvm. %s %d\n", __func__, __LINE__);
+	if (!dmabuf || !dmabuf_is_uvm(dmabuf)) {
+		UVM_PRINTK(0, "dmabuf is not uvm.\n");
 		return -EINVAL;
 	}
 
@@ -460,7 +514,6 @@ int dmabuf_set_vframe(struct dma_buf *dmabuf, struct vframe_s *vf,
 	handle->vfp = vf;
 
 	handle->mod_attached_mask |= (1 << type);
-	UVM_PRINTK(1, "%s called, type-%d.\n", __func__, type);
 
 	return 0;
 }
@@ -470,8 +523,8 @@ struct vframe_s *dmabuf_get_vframe(struct dma_buf *dmabuf)
 {
 	struct uvm_handle *handle;
 
-	if (IS_ERR_OR_NULL(dmabuf) || !dmabuf_is_uvm(dmabuf)) {
-		UVM_PRINTK(0, "dmabuf is not uvm. %s %d\n", __func__, __LINE__);
+	if (!dmabuf || !dmabuf_is_uvm(dmabuf)) {
+		UVM_PRINTK(0, "dmabuf is not uvm.\n");
 		return ERR_PTR(-EINVAL);
 	}
 
@@ -486,8 +539,8 @@ int dmabuf_put_vframe(struct dma_buf *dmabuf)
 {
 	struct uvm_handle *handle;
 
-	if (IS_ERR_OR_NULL(dmabuf) || !dmabuf_is_uvm(dmabuf)) {
-		UVM_PRINTK(0, "dmabuf is not uvm. %s %d\n", __func__, __LINE__);
+	if (!dmabuf || !dmabuf_is_uvm(dmabuf)) {
+		UVM_PRINTK(0, "dmabuf is not uvm.\n");
 		return -EINVAL;
 	}
 
@@ -501,8 +554,8 @@ bool is_valid_mod_type(struct dma_buf *dmabuf,
 {
 	struct uvm_handle *handle;
 
-	if (IS_ERR_OR_NULL(dmabuf) || !dmabuf_is_uvm(dmabuf)) {
-		UVM_PRINTK(0, "dmabuf is not uvm. %s %d\n", __func__, __LINE__);
+	if (!dmabuf || !dmabuf_is_uvm(dmabuf)) {
+		UVM_PRINTK(1, "dmabuf is not uvm.\n");
 		return 0;
 	}
 
@@ -518,8 +571,8 @@ int uvm_attach_hook_mod(struct dma_buf *dmabuf,
 	struct uvm_handle *handle;
 	struct uvm_hook_mod *uhmod;
 
-	if (IS_ERR_OR_NULL(dmabuf) || !dmabuf_is_uvm(dmabuf)) {
-		UVM_PRINTK(0, "dmabuf is not uvm. %s %d\n", __func__, __LINE__);
+	if (!dmabuf || !dmabuf_is_uvm(dmabuf)) {
+		UVM_PRINTK(0, "dmabuf is not uvm.\n");
 		return -EINVAL;
 	}
 
@@ -533,119 +586,24 @@ int uvm_attach_hook_mod(struct dma_buf *dmabuf,
 	kref_init(&uhmod->ref);
 	uhmod->type = info->type;
 	uhmod->arg = info->arg;
-	uhmod->getinfo = info->getinfo;
-	uhmod->setinfo = info->setinfo;
 	uhmod->free = info->free;
 	uhmod->acquire_fence = info->acquire_fence;
 
 	mutex_lock(&handle->lock);
 	list_add_tail(&uhmod->list, &handle->mod_attached);
-	handle->flags &= ~BIT(UVM_DETACH_FLAG);
 	handle->n_mod_attached++;
 	handle->mod_attached_mask |= 1 << (uhmod->type);
 	mutex_unlock(&handle->lock);
 
-	UVM_PRINTK(1, "info->type:%d attach ok! dmabuf =%p, handle=%p\n",
-				info->type, dmabuf, handle);
+	UVM_PRINTK(2, "%s called.\n", __func__);
 
 	return 0;
 }
 EXPORT_SYMBOL(uvm_attach_hook_mod);
 
-int meson_uvm_getinfo(int shared_fd, int mode_type, char *buf)
-{
-	struct uvm_handle *handle;
-	struct uvm_hook_mod *uhmod = NULL;
-	struct dma_buf *dmabuf = NULL;
-	int ret = 0;
-
-	UVM_PRINTK(1, "uvm_getinfo: shared_fd=%d, mode_type=%d\n", shared_fd, mode_type);
-	dmabuf = dma_buf_get(shared_fd);
-
-	if (IS_ERR_OR_NULL(dmabuf)) {
-		UVM_PRINTK(0, "Invalid dmabuf %s %d\n", __func__, __LINE__);
-		return -EINVAL;
-	}
-
-	if (!dmabuf_is_uvm(dmabuf)) {
-		dma_buf_put(dmabuf);
-		UVM_PRINTK(0, "dmabuf is not uvm. %s %d\n", __func__, __LINE__);
-		return -EINVAL;
-	}
-
-	handle = dmabuf->priv;
-
-	uhmod = uvm_find_hook_mod(handle, mode_type);
-	if (uhmod) {
-		ret = uhmod->getinfo(uhmod->arg, buf);
-		dma_buf_put(dmabuf);
-		if (ret < 0)
-			return -EINVAL;
-		return 0;
-	}
-	UVM_PRINTK(1, "%s %px, %d.\n", __func__, uhmod, mode_type);
-	dma_buf_put(dmabuf);
-	return -EINVAL;
-}
-EXPORT_SYMBOL(meson_uvm_getinfo);
-
-static void meson_uvm_core_setinfo(struct uvm_handle *handle,
-	char *buf)
-{
-	int ret = 0;
-	int detach_flag = 0;
-
-	UVM_PRINTK(1, "setinfo buf=%s.\n", buf);
-	ret = sscanf(buf, "detach_flag=%d", &detach_flag);
-	if (ret == 1 && detach_flag == 1) {
-		mutex_lock(&handle->lock);
-		handle->flags |= BIT(UVM_DETACH_FLAG);
-		mutex_unlock(&handle->lock);
-	}
-}
-
-int meson_uvm_setinfo(int shared_fd, int mode_type, char *buf)
-{
-	struct uvm_handle *handle;
-	struct uvm_hook_mod *uhmod = NULL;
-	struct dma_buf *dmabuf = NULL;
-	int ret = 0;
-
-	dmabuf = dma_buf_get(shared_fd);
-	if (IS_ERR_OR_NULL(dmabuf)) {
-		UVM_PRINTK(0, "invalid dmabuf. %s %d\n", __func__, __LINE__);
-		return -EINVAL;
-	}
-
-	if (!dmabuf_is_uvm(dmabuf)) {
-		UVM_PRINTK(0, "dmabuf is not uvm. %s %d\n", __func__, __LINE__);
-		dma_buf_put(dmabuf);
-		return -EINVAL;
-	}
-
-	handle = dmabuf->priv;
-	meson_uvm_core_setinfo(handle, buf);
-	if (mode_type == PROCESS_INVALID) {
-		dma_buf_put(dmabuf);
-		return 0;
-	}
-	uhmod = uvm_find_hook_mod(handle, mode_type);
-	if (uhmod) {
-		ret = uhmod->setinfo(uhmod->arg, buf);
-		dma_buf_put(dmabuf);
-		if (ret < 0)
-			return -EINVAL;
-		return 0;
-	}
-	dma_buf_put(dmabuf);
-	UVM_PRINTK(1, "%s %px, %d.\n", __func__, uhmod, mode_type);
-	return -EINVAL;
-}
-EXPORT_SYMBOL(meson_uvm_setinfo);
-
 int uvm_detach_hook_mod(struct dma_buf *dmabuf, int type)
 {
-	UVM_PRINTK(1, "%s called.\n", __func__);
+	UVM_PRINTK(2, "%s called.\n", __func__);
 	return uvm_put_hook_mod(dmabuf, type);
 }
 EXPORT_SYMBOL(uvm_detach_hook_mod);
@@ -653,28 +611,23 @@ EXPORT_SYMBOL(uvm_detach_hook_mod);
 static struct uvm_hook_mod *uvm_find_hook_mod(struct uvm_handle *handle,
 					      int type)
 {
-	struct uvm_hook_mod *ret = NULL;
 	struct uvm_hook_mod *uhmod = NULL;
-
-	UVM_PRINTK(1, "%s called, type-%d.\n", __func__, type);
 
 	mutex_lock(&handle->lock);
 	if (!list_empty(&handle->mod_attached)) {
 		list_for_each_entry(uhmod, &handle->mod_attached, list) {
-			if (uhmod->type == type) {
-				ret = uhmod;
+			if (uhmod->type == type)
 				break;
-			}
 		}
 	}
 	mutex_unlock(&handle->lock);
 
-	if (!ret) {
+	if (!uhmod) {
 		UVM_PRINTK(1, "%s fail.\n", __func__);
 		return NULL;
 	}
-	UVM_PRINTK(1, "%s success.\n", __func__);
-	return ret;
+
+	return uhmod;
 }
 
 struct uvm_hook_mod *uvm_get_hook_mod(struct dma_buf *dmabuf,
@@ -683,8 +636,8 @@ struct uvm_hook_mod *uvm_get_hook_mod(struct dma_buf *dmabuf,
 	struct uvm_handle *handle;
 	struct uvm_hook_mod *uhmod = NULL;
 
-	if (IS_ERR_OR_NULL(dmabuf) || !dmabuf_is_uvm(dmabuf)) {
-		UVM_PRINTK(0, "dmabuf is not uvm. %s %d\n", __func__, __LINE__);
+	if (!dmabuf || !dmabuf_is_uvm(dmabuf)) {
+		UVM_PRINTK(0, "dmabuf is not uvm.\n");
 		return ERR_PTR(-EINVAL);
 	}
 
@@ -693,7 +646,7 @@ struct uvm_hook_mod *uvm_get_hook_mod(struct dma_buf *dmabuf,
 	if (uhmod)
 		kref_get(&uhmod->ref);
 
-	UVM_PRINTK(1, "%s %px, %d.\n", __func__, uhmod, type);
+	UVM_PRINTK(2, "%s %px, %d.\n", __func__, uhmod, type);
 	return uhmod;
 }
 EXPORT_SYMBOL(uvm_get_hook_mod);
@@ -704,34 +657,26 @@ static void uvm_hook_mod_release(struct kref *kref)
 
 	uhmod = container_of(kref, struct uvm_hook_mod, ref);
 	list_del(&uhmod->list);
-	UVM_PRINTK(1, "%s called, %px.\n", __func__, uhmod);
+	UVM_PRINTK(2, "%s called, %px.\n", __func__, uhmod);
 	uhmod->free(uhmod->arg);
-	kfree(uhmod);
 }
 
 int uvm_put_hook_mod(struct dma_buf *dmabuf, int type)
 {
 	struct uvm_handle *handle;
 	struct uvm_hook_mod *uhmod = NULL;
-	int ret = 0;
 
-	UVM_PRINTK(1, "%s called, mod_type%d.\n", __func__, type);
-
-	if (IS_ERR_OR_NULL(dmabuf) || !dmabuf_is_uvm(dmabuf)) {
-		UVM_PRINTK(0, "dmabuf is not uvm. %s %d\n", __func__, __LINE__);
+	if (!dmabuf || !dmabuf_is_uvm(dmabuf)) {
+		UVM_PRINTK(0, "dmabuf is not uvm.\n");
 		return -EINVAL;
 	}
 
 	handle = dmabuf->priv;
-
-	mutex_lock(&handle->detachlock);
 	uhmod = uvm_find_hook_mod(handle, type);
 
 	if (uhmod)
-		ret = kref_put(&uhmod->ref, uvm_hook_mod_release);
+		return kref_put(&uhmod->ref, uvm_hook_mod_release);
 	else
-		ret = -EINVAL;
-	mutex_unlock(&handle->detachlock);
-	return ret;
+		return -EINVAL;
 }
 EXPORT_SYMBOL(uvm_put_hook_mod);

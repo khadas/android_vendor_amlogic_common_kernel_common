@@ -1,10 +1,21 @@
-// SPDX-License-Identifier: GPL-2.0
 /*
- * Copyright (C) 2019 Amlogic, Inc. All rights reserved.
+ * sound/soc/amlogic/auge/vad_hw.c
  *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
  */
 
 #include "vad_hw.h"
+
 
 void vad_set_ram_coeff(int len, int *params)
 {
@@ -31,9 +42,9 @@ void vad_set_pwd(void)
 {
 	/* frame for 32 ms */
 	vad_write(VAD_FRAME_CTRL0,
-		  0x2 << 30 |
-		  0x1 << 24 |
-		  0x1 << 16);
+		0x2 << 30 |
+		0x1 << 24 |
+		0x1 << 16);
 
 	vad_write(VAD_FRAME_CTRL1, 0x00000d65);
 	vad_write(VAD_FRAME_CTRL2, 0xd00103ff);

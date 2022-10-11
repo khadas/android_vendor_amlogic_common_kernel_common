@@ -1,4 +1,3 @@
-/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
  * drivers/amlogic/media/vout/cvbs/cvbs_out.h
  *
@@ -26,8 +25,9 @@
 #include <linux/amlogic/media/vout/vout_notify.h>
 #include "cvbs_mode.h"
 
-/* sync kernel 4.9 code */
-#define CVBSOUT_VER "Ref.2020/10/23"
+/* 20200619: add sc2 support */
+/* 20210916: add txlx/tl1 support */
+#define CVBSOUT_VER "Ref.2021/09/16"
 
 #define CVBS_CLASS_NAME	"cvbs"
 #define CVBS_NAME	"cvbs"
@@ -35,12 +35,9 @@
 
 #define _TM_V 'V'
 
-#ifdef CONFIG_AML_VOUT_CC_BYPASS
-#define MAX_RING_BUFF_LEN 128
 #define VOUT_IOC_CC_OPEN           _IO(_TM_V, 0x01)
 #define VOUT_IOC_CC_CLOSE          _IO(_TM_V, 0x02)
-#define VOUT_IOC_CC_DATA           _IOW(_TM_V, 0x03, struct vout_cc_parm_s)
-#endif
+#define VOUT_IOC_CC_DATA           _IOW(_TM_V, 0x03, struct vout_CCparm_s)
 
 struct reg_s {
 	unsigned int reg;
@@ -48,24 +45,26 @@ struct reg_s {
 };
 
 enum cvbs_cpu_type {
-	CVBS_CPU_TYPE_G12A   = 0,
-	CVBS_CPU_TYPE_G12B   = 1,
-	CVBS_CPU_TYPE_TL1    = 2,
-	CVBS_CPU_TYPE_SM1    = 3,
-	CVBS_CPU_TYPE_TM2    = 4,
-	CVBS_CPU_TYPE_SC2    = 5,
-	CVBS_CPU_TYPE_T5     = 6,
-	CVBS_CPU_TYPE_T5D    = 7,
-	CVBS_CPU_TYPE_S4     = 8,
-	CVBS_CPU_TYPE_T3    = 9,
-	CVBS_CPU_TYPE_S4D    = 10,
+	CVBS_CPU_TYPE_GXL    = 0,
+	CVBS_CPU_TYPE_GXM    = 1,
+	CVBS_CPU_TYPE_TXLX   = 2,
+	CVBS_CPU_TYPE_G12A   = 3,
+	CVBS_CPU_TYPE_G12B   = 4,
+	CVBS_CPU_TYPE_TL1    = 5,
+	CVBS_CPU_TYPE_SM1    = 6,
+	CVBS_CPU_TYPE_TM2    = 7,
+	CVBS_CPU_TYPE_SC2    = 8,
+	CVBS_CPU_TYPE_T5     = 9,
+	CVBS_CPU_TYPE_T5D    = 10,
 };
 
 struct meson_cvbsout_data {
 	enum cvbs_cpu_type cpu_id;
 	const char *name;
+
 	unsigned int vdac_vref_adj;
 	unsigned int vdac_gsw;
+
 	unsigned int reg_vid_pll_clk_div;
 	unsigned int reg_vid_clk_div;
 	unsigned int reg_vid_clk_ctrl;
@@ -93,7 +92,6 @@ struct cvbs_drv_s {
 	struct meson_cvbsout_data *cvbs_data;
 	struct performance_config_s perf_conf_pal;
 	struct performance_config_s perf_conf_ntsc;
-	struct performance_config_s perf_conf_pal_sva;
 	struct delayed_work vdac_dwork;
 	unsigned int flag;
 
@@ -103,44 +101,24 @@ struct cvbs_drv_s {
 	struct clk *venci_0_gate;
 	struct clk *venci_1_gate;
 	struct clk *vdac_clk_gate;
-#ifdef CONFIG_AMLOGIC_VPU
-	struct vpu_dev_s *cvbs_vpu_dev;
-#endif
 };
 
 static  DEFINE_MUTEX(cvbs_mutex);
 
-#ifdef CONFIG_AML_VOUT_CC_BYPASS
-struct cc_parm_s {
-	unsigned int type;
-	unsigned int data;
-};
-
-struct cc_ring_mgr_s {
-	unsigned int max_len;
-	unsigned int rp;
-	unsigned int wp;
-	int over_flag;
-	struct cc_parm_s cc_data[MAX_RING_BUFF_LEN];
-};
-
-struct vout_cc_parm_s {
+struct vout_CCparm_s {
 	unsigned int type;
 	unsigned char data1;
 	unsigned char data2;
 };
-#endif
 
 struct cvbsregs_set_t {
 	enum cvbs_mode_e cvbsmode;
 	const struct reg_s *enc_reg_setting;
 };
 
-void amvecm_clip_range_limit(bool limit_en);
+extern void amvecm_clip_range_limit(bool limit_en);
 
 int cvbs_cpu_type(void);
-const struct vinfo_s *get_valid_vinfo(char  *mode);
-int cvbs_set_current_vmode(enum vmode_e mode, void *data);
 struct meson_cvbsout_data *get_cvbs_data(void);
 
 #endif

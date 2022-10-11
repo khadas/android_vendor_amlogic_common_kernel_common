@@ -1,6 +1,18 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/amlogic/media/dtv_demod/aml_demod.c
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
 #include <linux/init.h>
@@ -30,7 +42,7 @@
 
 /* #include <asm/fiq.h> */
 #include <linux/uaccess.h>
-#include "aml_demod.h"
+#include <linux/dvb/aml_demod.h>
 #include "demod_func.h"
 #include "demod_dbg.h"
 
@@ -65,34 +77,28 @@ const char aml_demod_dev_id[] = "aml_demod";
  * extern struct aml_demod_sta demod_sta;
  * #endif
  *******************************/
-unsigned int demod_id;
+
+static struct aml_demod_sta demod_sta;
 
 static DECLARE_WAIT_QUEUE_HEAD(lock_wq);
 
-static ssize_t aml_demod_info_store(struct class *class,
-		struct class_attribute *attr, const char *buf, size_t count)
-{
-	return count;
-}
-
-static ssize_t aml_demod_info_show(struct class *class,
-		struct class_attribute *attr, char *buf)
+static ssize_t aml_demod_info(struct class *cla,
+			      struct class_attribute *attr, char *buf)
 {
 	return 0;
 }
 
-static CLASS_ATTR_RW(aml_demod_info);
-
-static struct attribute *aml_demod_info_class_attrs[] = {
-	&class_attr_aml_demod_info.attr,
-	NULL,
+static struct class_attribute aml_demod_class_attrs[] = {
+	__ATTR(info,
+	       0644,
+	       aml_demod_info,
+	       NULL),
+	__ATTR_NULL
 };
-
-ATTRIBUTE_GROUPS(aml_demod_info_class);
 
 static struct class aml_demod_class = {
 	.name		= "aml_demod",
-	.class_groups	= aml_demod_info_class_groups,
+	.class_attrs	= aml_demod_class_attrs,
 };
 
 
@@ -122,26 +128,14 @@ static long aml_demod_ioctl(struct file *file,
 			    unsigned int cmd, unsigned long arg)
 {
 	int strength = 0;
-	struct aml_tuner_sys tuner_para = {0};
-	struct aml_demod_reg arg_t;
+	struct dvb_frontend *dvbfe;
+	struct aml_tuner_sys  tuner_para = {0};
+	struct aml_demod_reg  arg_t;
 	unsigned int val;
 	struct amldtvdemod_device_s *devp = dtvdemod_get_dev();
-	struct aml_dtvdemod *demod = NULL, *tmp = NULL;
 
 	if (!devp) {
 		pr_err("%s devp is NULL\n", __func__);
-		return -EFAULT;
-	}
-
-	list_for_each_entry(tmp, &devp->demod_list, list) {
-		if (tmp->id == demod_id) {
-			demod = tmp;
-			break;
-		}
-	}
-
-	if (!demod) {
-		pr_err("%s get demod [id %d] is NULL.\n", __func__, demod_id);
 		return -EFAULT;
 	}
 
@@ -168,7 +162,7 @@ static long aml_demod_ioctl(struct file *file,
 		break;
 
 	case AML_DEMOD_GET_RSSI:
-		strength = tuner_get_ch_power(&demod->frontend);
+		strength = tuner_get_ch_power2();
 
 		if (strength < 0)
 			strength = 0 - strength;
@@ -181,6 +175,13 @@ static long aml_demod_ioctl(struct file *file,
 		break;
 
 	case AML_DEMOD_SET_TUNER:
+		dvbfe = aml_get_fe();
+
+		if (dvbfe == NULL) {
+			PR_ERR("point fe is NULL\n");
+			return -EINVAL;
+		}
+
 		if (copy_from_user(&tuner_para, (void __user *)arg,
 			sizeof(struct aml_tuner_sys))) {
 			PR_ERR("copy error AML_DEMOD_SET_TUNER\n");
@@ -188,21 +189,21 @@ static long aml_demod_ioctl(struct file *file,
 			if (tuner_para.mode <= FE_ISDBT) {
 				PR_INFO("set tuner md = %d\n",
 					tuner_para.mode);
-				demod->frontend.ops.info.type = tuner_para.mode;
+				dvbfe->ops.info.type = tuner_para.mode;
 			} else {
 				PR_ERR("wrong md: %d\n", tuner_para.mode);
 			}
 
-			demod->frontend.dtv_property_cache.frequency =
+			dvbfe->dtv_property_cache.frequency =
 				tuner_para.ch_freq;
-			demod->frontend.ops.tuner_ops.set_config(&demod->frontend, NULL);
-			tuner_set_params(&demod->frontend);
+			dvbfe->ops.tuner_ops.set_config(dvbfe, NULL);
+			tuner_set_params(dvbfe);
 		}
 		break;
 
 	case AML_DEMOD_SET_SYS:
 		pr_dbg("Ioctl Demod Set System\n");
-		demod_set_sys(demod, (struct aml_demod_sys *)arg);
+		demod_set_sys(devp, &demod_sta, (struct aml_demod_sys *)arg);
 		break;
 
 	case AML_DEMOD_GET_SYS:
@@ -213,17 +214,17 @@ static long aml_demod_ioctl(struct file *file,
 
 	case AML_DEMOD_DVBC_SET_CH:
 		pr_dbg("Ioctl DVB-C Set Channel.\n");
-		dvbc_set_ch(demod, (struct aml_demod_dvbc *)arg,
-			&demod->frontend);
+		dvbc_set_ch(&demod_sta, (struct aml_demod_dvbc *)arg);
 		break;
 
 	case AML_DEMOD_DVBC_GET_CH:
-		dvbc_status(demod, (struct aml_demod_sts *)arg, NULL);
+		dvbc_status(devp, (struct aml_demod_sts *)arg, NULL);
 		break;
 
 	case AML_DEMOD_DVBT_SET_CH:
 		pr_dbg("Ioctl DVB-T Set Channel\n");
-		dvbt_isdbt_set_ch(demod, (struct aml_demod_dvbt *)arg);
+		dvbt_isdbt_set_ch(&demod_sta, /*&demod_i2c,*/
+			    (struct aml_demod_dvbt *)arg);
 		break;
 
 	case AML_DEMOD_DVBT_GET_CH:
@@ -233,11 +234,13 @@ static long aml_demod_ioctl(struct file *file,
 		break;
 
 	case AML_DEMOD_DTMB_SET_CH:
-		dtmb_set_ch(demod, (struct aml_demod_dtmb *)arg);
+		dtmb_set_ch(&demod_sta, /*&demod_i2c,*/
+			    (struct aml_demod_dtmb *)arg);
 		break;
 
 	case AML_DEMOD_ATSC_SET_CH:
-		atsc_set_ch(demod, (struct aml_demod_atsc *)arg);
+		atsc_set_ch(&demod_sta, /*&demod_i2c,*/
+			    (struct aml_demod_atsc *)arg);
 		break;
 
 	case AML_DEMOD_ATSC_GET_CH:
@@ -249,7 +252,7 @@ static long aml_demod_ioctl(struct file *file,
 			sizeof(struct aml_demod_reg))) {
 			pr_dbg("copy error AML_DEMOD_SET_REG\n");
 		} else
-			demod_set_reg(demod, &arg_t);
+			demod_set_reg(&arg_t);
 
 		break;
 
@@ -258,7 +261,7 @@ static long aml_demod_ioctl(struct file *file,
 			sizeof(struct aml_demod_reg)))
 			pr_dbg("copy error AML_DEMOD_GET_REG\n");
 		else
-			demod_get_reg(demod, &arg_t);
+			demod_get_reg(&arg_t);
 
 		if (copy_to_user((void __user *)arg, &arg_t,
 			sizeof(struct aml_demod_reg))) {
@@ -287,19 +290,11 @@ static long aml_demod_ioctl(struct file *file,
 		break;
 
 	case AML_DEMOD_GET_CAPTURE_ADDR:
-		val = devp->mem_start;
+		val = dtvdd_devp->mem_start;
 
 		if (copy_to_user((void __user *)arg, &val,
 				 sizeof(unsigned int)))
 			pr_dbg("copy_to_user error AML_DEMOD_GET_CAPTURE_ADDR\n");
-		break;
-
-	case AML_DEMOD_SET_ID:
-		if (copy_from_user(&demod_id, (void __user *)arg,
-			sizeof(demod_id)))
-			pr_dbg("copy error AML_DEMOD_SET_ID\n");
-		else
-			pr_dbg("set demod_id %d.\n", demod_id);
 		break;
 
 	default:

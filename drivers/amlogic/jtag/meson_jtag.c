@@ -1,31 +1,54 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/amlogic/jtag/meson_jtag.c
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
 #define pr_fmt(fmt)	"jtag: " fmt
 
 #include <linux/init.h>
+#include <linux/kernel.h>
 #include <linux/module.h>
+#include <linux/sysfs.h>
+#include <linux/device.h>
+#include <linux/slab.h>
+#include <linux/types.h>
+#include <linux/uaccess.h>
 #include <linux/platform_device.h>
+#include <linux/io.h>
+#include <linux/of.h>
 #include <linux/of_device.h>
 #include <linux/of_gpio.h>
 #include <linux/of_address.h>
 #include <linux/of_platform.h>
+#include <linux/printk.h>
+#include <linux/string.h>
+#include <linux/pinctrl/consumer.h>
 #include <linux/arm-smccc.h>
+#include <linux/psci.h>
+#include <uapi/linux/psci.h>
 
+#include <linux/amlogic/cpu_version.h>
 #include <linux/amlogic/jtag.h>
-#include <linux/arm-smccc.h>
-#include <linux/interrupt.h>
-#include <linux/ctype.h>
 #ifdef CONFIG_MACH_MESON8B
 #include <linux/amlogic/meson-secure.h>
 #endif
 
 #include "meson_jtag.h"
 
+
 #define AML_JTAG_NAME		"jtag"
-#define JTAG_IRQ_CMD		0xFFF
 
 /* store the jtag select globaly */
 static int global_select = AMLOGIC_JTAG_DISABLE;
@@ -37,15 +60,7 @@ static bool jtag_select_setup;
 
 /* store the params that are setup by the boot param */
 static int jtag_select = AMLOGIC_JTAG_DISABLE;
-
-/* cluster default is 0 */
-static int jtag_cluster;
-
-static struct jtag_id_desc jtag_id_data[] = {
-	{JTAG_SELECT_ID(AP,   JTAG_A,  0), "ap", "jtag_a", "apao"},
-	{JTAG_SELECT_ID(AP,   JTAG_B,  0), "ap", "jtag_b", "apee"},
-	{JTAG_SELECT_ID(AP,   SWD_A,   0), "ap",  "swd_a", "swd_apao"},
-};
+static int jtag_cluster = CLUSTER_DISABLE;
 
 bool is_jtag_disable(void)
 {
@@ -56,187 +71,134 @@ bool is_jtag_disable(void)
 }
 EXPORT_SYMBOL(is_jtag_disable);
 
-bool is_jtag_a(void)
+bool is_jtag_apao(void)
 {
-	if (global_select == JTAG_SELECT_ID(AP, JTAG_A, 0))
+	if (global_select == AMLOGIC_JTAG_APAO)
 		return true;
 	else
 		return false;
 }
-EXPORT_SYMBOL(is_jtag_a);
+EXPORT_SYMBOL(is_jtag_apao);
 
-bool is_jtag_b(void)
+bool is_jtag_apee(void)
 {
-	if (global_select == JTAG_SELECT_ID(AP, JTAG_B, 0))
+	if (global_select == AMLOGIC_JTAG_APEE)
 		return true;
 	else
 		return false;
 }
-EXPORT_SYMBOL(is_jtag_b);
+EXPORT_SYMBOL(is_jtag_apee);
 
-static int jtag_id_find(const char *core_type, const char *jtag_type)
+static inline char *select_to_name(int select)
 {
-	int i;
-
-	for (i = 0; i < ARRAY_SIZE(jtag_id_data); i++) {
-		if (!jtag_id_data[i].core_type ||
-		    !jtag_id_data[i].jtag_type)
-			continue;
-		if ((strcmp(core_type, jtag_id_data[i].core_type) == 0) &&
-		    (strcmp(jtag_type, jtag_id_data[i].jtag_type) == 0)) {
-			return jtag_id_data[i].id;
-		}
-	}
-
-	return AMLOGIC_JTAG_DISABLE;
-}
-
-static int jtag_id_find_by_alias(const char *name)
-{
-	int i;
-
-	for (i = 0; i < ARRAY_SIZE(jtag_id_data); i++) {
-		if (!jtag_id_data[i].alias)
-			continue;
-		if (strcmp(name, jtag_id_data[i].alias) == 0)
-			return jtag_id_data[i].id;
-	}
-
-	return AMLOGIC_JTAG_DISABLE;
-}
-
-static struct jtag_id_desc *select_to_name(int select)
-{
-	int i;
-
-	for (i = 0; i < ARRAY_SIZE(jtag_id_data); i++) {
-		if (select == jtag_id_data[i].id)
-			return &jtag_id_data[i];
-	}
-
-	return NULL;
-}
-
-static void aml_jtag_option_parse(const char *s,
-				  int *jtag_select, int *jtag_cluster)
-{
-	char *argv;
-	int argc = 0;
-	void *parameter[MAX_PARAM_NUM];
-	int ret;
-	unsigned long cluster = 0;
-	int jtag_id = AMLOGIC_JTAG_DISABLE;
-
-	if (strcmp(s, "disable") == 0) {
-		*jtag_select = jtag_id;
-		*jtag_cluster = (int)cluster;
-		return;
-	}
-
-	do {
-		argv = strsep((char **)&s, ",");
-		if (!argv)
-			break;
-		pr_debug("param[%d] = %s\n", argc, argv);
-		parameter[argc] = argv;
-		argc++;
-	} while (argc < MAX_PARAM_NUM);
-
-	switch (argc) {
-	case 1:
-		jtag_id = jtag_id_find_by_alias(parameter[0]);
-		break;
-	case 2:
-		if (isdigit(*(char *)parameter[1])) {
-			jtag_id = jtag_id_find_by_alias(parameter[0]);
-			ret = kstrtoul(parameter[1], 10,
-				       (unsigned long *)&cluster);
-			if (ret)
-				cluster = 0;
-		} else {
-			jtag_id = jtag_id_find(parameter[0], parameter[1]);
-		}
-		break;
-	case 3:
-		jtag_id = jtag_id_find(parameter[0], parameter[1]);
-		ret = kstrtoul(parameter[2], 10, (unsigned long *)&cluster);
-		if (ret)
-			cluster = 0;
-		break;
+	switch (select) {
+	case AMLOGIC_JTAG_APAO:
+		return "apao";
+	case AMLOGIC_JTAG_APEE:
+		return "apee";
+	case AMLOGIC_SWD_APAO:
+		return "swd_apao";
 	default:
-		pr_info("invalid argument count!\n");
-		*jtag_select = jtag_id;
-		*jtag_cluster = (int)cluster;
-		return;
+		return "disable";
 	}
-	if (jtag_id == AMLOGIC_JTAG_DISABLE)
-		pr_info("parameter not support, disabled jtag.\n");
-	*jtag_select = jtag_id;
-	*jtag_cluster = (int)cluster;
+
+}
+static inline int name_to_select(const char *s)
+{
+	int select;
+
+	if (!strncmp(s, "disable", 7))
+		select = AMLOGIC_JTAG_DISABLE;
+	else if (!strncmp(s, "apao", 4))
+		select = AMLOGIC_JTAG_APAO;
+	else if (!strncmp(s, "apee", 4))
+		select = AMLOGIC_JTAG_APEE;
+	else if (!strncmp(s, "swd_apao", 8))
+		select = AMLOGIC_SWD_APAO;
+	else {
+		pr_err("unknown select: %s\n", s);
+		select = AMLOGIC_JTAG_DISABLE;
+	}
+
+	return select;
 }
 
-static int setup_jtag(char *p)
+static void aml_jtag_option_parse(struct aml_jtag_dev *jdev, const char *s)
 {
+	char *cluster;
+	unsigned long value;
+	int ret;
+
+	jdev->select = name_to_select(s);
+	cluster = strchr(s, ',');
+	if (cluster != NULL) {
+		cluster++;
+		ret = kstrtoul(cluster, 10, &value);
+		if (ret) {
+			pr_err("invalid cluster index %d\n", jdev->cluster);
+			jdev->cluster = CLUSTER_DISABLE;
+		} else {
+			jdev->cluster = value;
+		}
+	} else {
+		jdev->cluster = CLUSTER_DISABLE;
+	}
+}
+
+static int __init setup_jtag(char *p)
+{
+	char *cluster;
+	unsigned long value;
+	int ret;
+
 	if (!p)
 		return -EINVAL;
-
 	jtag_select_setup = true;
-	aml_jtag_option_parse(p, &jtag_select, &jtag_cluster);
+	jtag_select = name_to_select(p);
+	cluster = strchr(p, ',');
+	if (cluster != NULL) {
+		cluster++;
+		ret = kstrtoul(cluster, 10, &value);
+		if (ret) {
+			pr_err("invalid cluster index %d\n", jtag_cluster);
+			jtag_cluster = CLUSTER_DISABLE;
+		} else {
+			jtag_cluster = value;
+		}
+		pr_info("cluster index %d\n", jtag_cluster);
+	}
 
 	return 0;
 }
 
 /*
- * jtag=[ap,jtag_a|ap,jtag_b|ap,swd_a]
- * jtag=[ap,jtag_a|ap,jtag_b|ap,swd_a]{,[0|1]}
  * jtag=[apao|apee|swd_apao]
- * jtag=[apao|apee|swd_apao]{,[0|1]}
+ * jtag=[apao|apee]{,[0|1]}
  *
- * [jtag_a|jtag_b]: jtag_type
+ * [apao|apee]: jtag domain
  * [0|1]: cluster index
  */
-static char *jtag_mode = "";
-
-static int set_jtag_mode(const char *val, const struct kernel_param *kp)
-{
-	param_set_charp(val, kp);
-
-	return setup_jtag(jtag_mode);
-}
-
-static const struct kernel_param_ops setup_jtag_ops = {
-	.set = set_jtag_mode,
-	.get = param_get_charp,
-};
-
-module_param_cb(jtag, &setup_jtag_ops, &jtag_mode, 0644);
-MODULE_PARM_DESC(jtag, "jtag mode");
-
+__setup("jtag=", setup_jtag);
 
 #ifdef CONFIG_MACH_MESON8B
 
 static int aml_jtag_select_tee(struct platform_device *pdev)
 {
 	struct aml_jtag_dev *jdev = platform_get_drvdata(pdev);
-	u32 select = jdev->select;
-	struct jtag_id_desc *tmp = NULL;
+	uint32_t select = jdev->select;
+	struct cpumask org_cpumask;
 
-	pr_info("set state %u\n", select);
+	cpumask_copy(&org_cpumask, &current->cpus_allowed);
 	set_cpus_allowed_ptr(current, cpumask_of(0));
-	tmp = select_to_name(jdev->select);
-	if (tmp)
-		pr_info("meson8b select %s,%s, alias:%s\n",
-			tmp->core_type, tmp->jtag_type, tmp->alias);
-	else
-		pr_info("meson8b select disable\n");
+	pr_info("meson8b select %s\n", select_to_name(jdev->select));
 	switch (select) {
 	case AMLOGIC_JTAG_DISABLE:
 		meson_secure_jtag_disable();
 		break;
-	case JTAG_SELECT_ID(AP, JTAG_A, 0):
+	case AMLOGIC_JTAG_APAO:
 		meson_secure_jtag_apao();
 		break;
-	case JTAG_SELECT_ID(AP, JTAG_B, 0):
+	case AMLOGIC_JTAG_APEE:
 		meson_secure_jtag_apao();
 		break;
 
@@ -244,7 +206,7 @@ static int aml_jtag_select_tee(struct platform_device *pdev)
 		writel_relaxed(0x0, jdev->base);
 		break;
 	}
-	set_cpus_allowed_ptr(current, cpu_all_mask);
+	set_cpus_allowed_ptr(current, &org_cpumask);
 
 	return 0;
 }
@@ -256,30 +218,24 @@ static int aml_jtag_select_ree(struct platform_device *pdev)
 	struct aml_jtag_dev *jdev = platform_get_drvdata(pdev);
 	unsigned int sel = jdev->select;
 	u32 val;
-	struct jtag_id_desc *tmp = NULL;
 
 	jdev->base = of_iomap(np, 0);
 	if (!jdev->base) {
 		pr_err("failed to iomap regs");
 		return -ENODEV;
 	}
-	tmp = select_to_name(jdev->select);
-	if (tmp)
-		pr_info("meson8b select %s,%s, alias:%s\n",
-			tmp->core_type, tmp->jtag_type, tmp->alias);
-	else
-		pr_info("meson8b select disable\n");
+	pr_info("meson8b select %s\n", select_to_name(jdev->select));
 	switch (sel) {
 	case AMLOGIC_JTAG_DISABLE:
 		writel_relaxed(0x0, jdev->base);
 		break;
-	case JTAG_SELECT_ID(AP, JTAG_A, 0):
+	case AMLOGIC_JTAG_APAO:
 		val = readl_relaxed(jdev->base);
 		val &= ~0x3FF;
 		val |= (2 << 0) | (1 << 8);
 		writel_relaxed(val, jdev->base);
 		break;
-	case JTAG_SELECT_ID(AP, JTAG_B, 0):
+	case AMLOGIC_JTAG_APEE:
 		val = readl_relaxed(jdev->base);
 		val &= ~0x3FF;
 		val |= (2 << 4) | (2 << 8);
@@ -306,25 +262,26 @@ static int aml_jtag_select(struct platform_device *pdev)
 #else
 
 static unsigned long __invoke_psci_fn_smc(unsigned long function_id,
-					  unsigned long arg0,
-					  unsigned long arg1,
-					  unsigned long arg2)
+			unsigned long arg0, unsigned long arg1,
+			unsigned long arg2)
 {
 	struct arm_smccc_res res;
 
 	arm_smccc_smc(function_id, arg0, arg1, arg2, 0, 0, 0, 0, &res);
+
 	return res.a0;
 }
 
+
 /*
- * setup jtag on/off, and setup jtag-a/jtag-b
+ * setup jtag on/off, and setup ao/ee jtag
  *
  * @state: must be JTAG_STATE_ON/JTAG_STATE_OFF
- * @select: mest be JTAG_DISABLE/JTAG_A/JTAG_B
+ * @select: mest be JTAG_DISABLE/JTAG_A53_AO/JTAG_A53_EE
  */
 void aml_set_jtag_state(unsigned int state, unsigned int select)
 {
-	u64 command;
+	uint64_t command;
 
 	if (state == AMLOGIC_JTAG_STATE_ON)
 		command = AMLOGIC_JTAG_ON;
@@ -338,45 +295,23 @@ void aml_set_jtag_state(unsigned int state, unsigned int select)
 static int aml_jtag_select(struct platform_device *pdev)
 {
 	struct aml_jtag_dev *jdev = platform_get_drvdata(pdev);
-	unsigned int select;
+	unsigned int select = jdev->select;
 	unsigned int state = AMLOGIC_JTAG_STATE_OFF;
-	struct jtag_id_desc *tmp = NULL;
+	struct cpumask org_cpumask;
 
-	if (jdev->select != AMLOGIC_JTAG_DISABLE)
+	if (select != AMLOGIC_JTAG_DISABLE)
 		state = AMLOGIC_JTAG_STATE_ON;
 
-	if (jdev->cluster != 0)
-		jdev->select = CLUSTER_TYPE_UPDATE(jdev->select,
-						    jdev->cluster);
-	select = jdev->select;
+	if (jdev->cluster != CLUSTER_DISABLE)
+		select |= jdev->cluster << CLUSTER_BIT;
 
-	tmp = select_to_name(jdev->select);
-	if (tmp)
-		pr_info("select %s,%s, alias:%s\n",
-			tmp->core_type, tmp->jtag_type, tmp->alias);
-	else
-		pr_info("select disable\n");
-
+	pr_info("select %s\n", select_to_name(select));
+	cpumask_copy(&org_cpumask, &current->cpus_allowed);
 	set_cpus_allowed_ptr(current, cpumask_of(0));
-	if (select == AMLOGIC_JTAG_DISABLE &&
-	    jdev->old_select != AMLOGIC_JTAG_DISABLE)
-		select = jdev->old_select;
 	aml_set_jtag_state(state, select);
-	set_cpus_allowed_ptr(current, cpu_all_mask);
+	set_cpus_allowed_ptr(current, &org_cpumask);
 
 	return 0;
-}
-
-static void jtag_send_irq_to_bl31(void)
-{
-	asm __volatile__("" : : : "memory");
-	__invoke_psci_fn_smc(AMLOGIC_JTAG_ON, JTAG_IRQ_CMD, 0, 0);
-}
-
-static irqreturn_t jtag_irq_handler(int irq, void *data)
-{
-	jtag_send_irq_to_bl31();
-	return IRQ_HANDLED;
 }
 
 #endif
@@ -399,11 +334,11 @@ static int aml_jtag_setup(struct aml_jtag_dev *jdev)
 	}
 	/* set pinmux */
 	switch (select) {
-	case JTAG_SELECT_ID(AP, JTAG_A, 0):
-		s = pinctrl_lookup_state(jdev->jtag_pinctrl, "jtag_a_pins");
+	case AMLOGIC_JTAG_APAO:
+		s = pinctrl_lookup_state(jdev->jtag_pinctrl, "jtag_apao_pins");
 		if (IS_ERR_OR_NULL(s)) {
 			dev_err(&jdev->pdev->dev,
-				"could not get jtag_a_pins state\n");
+					"could not get jtag_apao_pins state\n");
 			return -EINVAL;
 		}
 		ret = pinctrl_select_state(jdev->jtag_pinctrl, s);
@@ -412,11 +347,11 @@ static int aml_jtag_setup(struct aml_jtag_dev *jdev)
 			return -EINVAL;
 		}
 		break;
-	case JTAG_SELECT_ID(AP, JTAG_B, 0):
-		s = pinctrl_lookup_state(jdev->jtag_pinctrl, "jtag_b_pins");
+	case AMLOGIC_JTAG_APEE:
+		s = pinctrl_lookup_state(jdev->jtag_pinctrl, "jtag_apee_pins");
 		if (IS_ERR_OR_NULL(s)) {
 			dev_err(&jdev->pdev->dev,
-				"could not get jtag_b_pins state\n");
+					"could not get jtag_apee_pins state\n");
 			return -EINVAL;
 		}
 		ret = pinctrl_select_state(jdev->jtag_pinctrl, s);
@@ -425,12 +360,12 @@ static int aml_jtag_setup(struct aml_jtag_dev *jdev)
 			return -EINVAL;
 		}
 		break;
-	case JTAG_SELECT_ID(AP, SWD_A, 0):
+	case AMLOGIC_SWD_APAO:
 		s = pinctrl_lookup_state(jdev->jtag_pinctrl,
-					 "swd_a_pins");
+					 "jtag_swd_apao_pins");
 		if (IS_ERR_OR_NULL(s)) {
 			dev_err(&jdev->pdev->dev,
-				"could not get swd_a_pins state\n");
+					"could not get swd_apao_pins state\n");
 			return -EINVAL;
 		}
 		ret = pinctrl_select_state(jdev->jtag_pinctrl, s);
@@ -455,42 +390,30 @@ static int aml_jtag_setup(struct aml_jtag_dev *jdev)
 	return 0;
 }
 
-static ssize_t select_show(struct class *cls,
-			   struct class_attribute *attr, char *buf)
+static ssize_t jtag_select_show(struct class *cls,
+			struct class_attribute *attr, char *buf)
 {
 	unsigned int len = 0;
-	struct jtag_id_desc *tmp = NULL;
 
-	tmp = select_to_name(global_select);
-	if (tmp)
-		len += sprintf(buf + len,
-			"current select: %s,%s, alias:%s\n\n",
-			tmp->core_type, tmp->jtag_type, tmp->alias);
-	else
-		len += sprintf(buf + len, "current select: disable\n\n");
+	len += sprintf(buf + len, "current select: %s\n\n",
+			select_to_name(global_select));
 	len += sprintf(buf + len, "usage:\n");
-	len += sprintf(buf + len,
-				   " echo <core_type>,<jtag_type>{,[0|1]} > select\n");
-	len += sprintf(buf + len, " core_type:ap\n");
-	len += sprintf(buf + len, " jtag_type:jtag_a|jtag_b|swd_a\n");
+	len += sprintf(buf + len, "    echo [apao|apee|swd_apao] > select\n");
+	len += sprintf(buf + len, "    echo [apao|apee]{,[0|1]} > select\n");
 
 	return len;
 }
 
-static ssize_t select_store(struct class *cls,
-			    struct class_attribute *attr,
-			    const char *buffer, size_t count)
+static ssize_t jtag_select_store(struct class *cls,
+			 struct class_attribute *attr,
+			 const char *buffer, size_t count)
 {
 	struct aml_jtag_dev *jdev;
 	int ret;
-	char tmp[MAX_PARAM_LENGTH] = {0};
 
 	jdev = container_of(cls, struct aml_jtag_dev, cls);
-	count = min_t(size_t, MAX_PARAM_LENGTH, count);
-	strncpy(tmp, buffer, count - 1);
-	aml_jtag_option_parse(tmp, &jtag_select, &jtag_cluster);
-	jdev->select = jtag_select;
-	jdev->cluster = jtag_cluster;
+	aml_jtag_option_parse(jdev, buffer);
+
 	ret = aml_jtag_setup(jdev);
 	if (ret < 0)
 		return ret;
@@ -498,14 +421,10 @@ static ssize_t select_store(struct class *cls,
 	return count;
 }
 
-static CLASS_ATTR_RW(select);
-
-static struct attribute *aml_jtag_attrs[] = {
-	&class_attr_select.attr,
-	NULL
+static struct class_attribute aml_jtag_attrs[] = {
+	__ATTR(select,  0644, jtag_select_show, jtag_select_store),
+	__ATTR_NULL,
 };
-
-ATTRIBUTE_GROUPS(aml_jtag);
 
 static int aml_jtag_dt_parse(struct platform_device *pdev)
 {
@@ -521,8 +440,7 @@ static int aml_jtag_dt_parse(struct platform_device *pdev)
 		pr_err("select not configured\n");
 		return -EINVAL;
 	}
-	aml_jtag_option_parse(tmp, &jdev->select, &jdev->cluster);
-
+	jdev->select = name_to_select(tmp);
 	return 0;
 }
 
@@ -530,32 +448,18 @@ static int aml_jtag_probe(struct platform_device *pdev)
 {
 	struct aml_jtag_dev *jdev;
 	int ret;
-	int irq;
 
 	/* kzalloc device */
-	jdev = devm_kzalloc(&pdev->dev, sizeof(*jdev), GFP_KERNEL);
-	if (!jdev)
-		return -ENOMEM;
+	jdev = devm_kzalloc(&pdev->dev,
+			    sizeof(struct aml_jtag_dev), GFP_KERNEL);
 
 	/* set driver data */
 	jdev->pdev = pdev;
 	platform_set_drvdata(pdev, jdev);
-
 	ret = aml_jtag_dt_parse(pdev);
 	if (ret)
 		return -EINVAL;
-#ifndef CONFIG_MACH_MESON8B
-	if (of_property_read_bool(pdev->dev.of_node, "interrupts")) {
-		irq = platform_get_irq(pdev, 0);
-		ret = devm_request_irq(&pdev->dev,
-				       irq, jtag_irq_handler,
-				       IRQ_TYPE_EDGE_RISING, "jtag", NULL);
-		if (ret) {
-			dev_err(&pdev->dev, "Requesting jtag irq failed!\n");
-			return -EINVAL;
-		}
-	}
-#endif
+
 	jdev->old_select = AMLOGIC_JTAG_DISABLE;
 	/* if jtag= param is setup, use select with jtag= param */
 	if (jtag_select_setup) {
@@ -566,7 +470,7 @@ static int aml_jtag_probe(struct platform_device *pdev)
 	/* create class attributes */
 	jdev->cls.name = AML_JTAG_NAME;
 	jdev->cls.owner = THIS_MODULE;
-	jdev->cls.class_groups = aml_jtag_groups;
+	jdev->cls.class_attrs = aml_jtag_attrs;
 	ret = class_register(&jdev->cls);
 	if (ret) {
 		pr_err("couldn't register sysfs class\n");
@@ -612,8 +516,14 @@ static struct platform_driver aml_jtag_driver = {
 
 static int __init aml_jtag_init(void)
 {
-	return platform_driver_register(&aml_jtag_driver);
+	if (platform_driver_register(&aml_jtag_driver)) {
+		pr_err("failed to register driver\n");
+		return -ENODEV;
+	}
+
+	return 0;
 }
+
 /* Jtag will be setuped before device_initcall that most driver used.
  * But jtag should be after pinmux.
  * That means we must use some initcall between arch_initcall
@@ -625,6 +535,7 @@ static void __exit aml_jtag_exit(void)
 {
 	platform_driver_unregister(&aml_jtag_driver);
 }
+
 module_exit(aml_jtag_exit);
 
 MODULE_DESCRIPTION("Meson JTAG Driver");

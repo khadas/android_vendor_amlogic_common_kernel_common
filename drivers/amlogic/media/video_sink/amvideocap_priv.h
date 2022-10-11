@@ -1,4 +1,3 @@
-/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
  * drivers/amlogic/media/video_sink/amvideocap_priv.h
  *
@@ -59,7 +58,7 @@ struct amvideocap_req_data {
 
 struct amvideocap_req {
 	int (*callback)(unsigned long data, struct vframe_s *vfput,
-			int index);
+					int index);
 	unsigned long data;
 	int at_flags;		/*AT_ */
 	u64 timestamp_ms;

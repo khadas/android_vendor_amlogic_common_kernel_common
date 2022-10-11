@@ -1,9 +1,12 @@
-// SPDX-License-Identifier: GPL-2.0-only
 /*
  *  linux/drivers/pinctrl/pinmux-xway.c
  *  based on linux/drivers/pinctrl/pinmux-pxa910.c
  *
- *  Copyright (C) 2012 John Crispin <john@phrozen.org>
+ *  This program is free software; you can redistribute it and/or modify
+ *  it under the terms of the GNU General Public License version 2 as
+ *  publishhed by the Free Software Foundation.
+ *
+ *  Copyright (C) 2012 John Crispin <blogic@openwrt.org>
  *  Copyright (C) 2015 Martin Schiller <mschiller@tdt.de>
  */
 
@@ -1025,7 +1028,7 @@ static const struct ltq_pin_group xrx200_grps[] = {
 	GRP_MUX("spi_cs5", SPI, xrx200_pins_spi_cs5),
 	GRP_MUX("spi_cs6", SPI, xrx200_pins_spi_cs6),
 	GRP_MUX("usif uart_rx", USIF, xrx200_pins_usif_uart_rx),
-	GRP_MUX("usif uart_tx", USIF, xrx200_pins_usif_uart_tx),
+	GRP_MUX("usif uart_rx", USIF, xrx200_pins_usif_uart_tx),
 	GRP_MUX("usif uart_rts", USIF, xrx200_pins_usif_uart_rts),
 	GRP_MUX("usif uart_cts", USIF, xrx200_pins_usif_uart_cts),
 	GRP_MUX("usif uart_dtr", USIF, xrx200_pins_usif_uart_dtr),
@@ -1724,18 +1727,22 @@ static int pinmux_xway_probe(struct platform_device *pdev)
 	xway_chip.ngpio = xway_soc->pin_count;
 
 	/* load our pad descriptors */
-	xway_info.pads = devm_kcalloc(&pdev->dev,
-			xway_chip.ngpio, sizeof(struct pinctrl_pin_desc),
+	xway_info.pads = devm_kzalloc(&pdev->dev,
+			sizeof(struct pinctrl_pin_desc) * xway_chip.ngpio,
 			GFP_KERNEL);
-	if (!xway_info.pads)
+	if (!xway_info.pads) {
+		dev_err(&pdev->dev, "Failed to allocate pads\n");
 		return -ENOMEM;
-
+	}
 	for (i = 0; i < xway_chip.ngpio; i++) {
-		char *name = devm_kasprintf(&pdev->dev, GFP_KERNEL, "io%d", i);
+		/* strlen("ioXY") + 1 = 5 */
+		char *name = devm_kzalloc(&pdev->dev, 5, GFP_KERNEL);
 
-		if (!name)
+		if (!name) {
+			dev_err(&pdev->dev, "Failed to allocate pad name\n");
 			return -ENOMEM;
-
+		}
+		snprintf(name, 5, "io%d", i);
 		xway_info.pads[i].number = GPIO0 + i;
 		xway_info.pads[i].name = name;
 	}

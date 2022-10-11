@@ -1,15 +1,26 @@
-/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * sound/soc/amlogic/auge/earc_hw.h
+ *
+ * Copyright (C) 2019 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
-
 #ifndef __EARC_HW_H__
 #define __EARC_HW_H__
 
 #include "regs.h"
 #include "iomap.h"
-#include "../common/iomapres.h"
-#include "../common/iec_info.h"
+#include <linux/amlogic/media/sound/iomapres.h>
+#include <linux/amlogic/media/sound/iec_info.h>
 
 /* For earc spdifout mask lane register offset V1:
  * EARCTX_SPDIFOUT_CTRL0, offset: 4 - 11
@@ -246,14 +257,13 @@ void earcrx_pll_refresh(struct regmap *top_map,
 			enum pll_rst_src rst_src,
 			bool level);
 void earcrx_cmdc_int_mask(struct regmap *top_map);
-void earcrx_cmdc_init(struct regmap *top_map, bool en, bool rx_dmac_sync_int, bool rterm_on);
+void earcrx_cmdc_init(struct regmap *top_map, bool en, bool rx_dmac_sync_int);
 void earcrx_cmdc_arc_connect(struct regmap *cmdc_map, bool init);
 void earcrx_cmdc_hpd_detect(struct regmap *cmdc_map, bool st);
 void earcrx_dmac_sync_int_enable(struct regmap *top_map, int enable);
 void earcrx_dmac_init(struct regmap *top_map,
 		      struct regmap *dmac_map,
-		      bool unstable_tick_sel,
-		      bool chnum_mult_mode);
+		      bool rx_dmac_sync_int);
 void earcrx_arc_init(struct regmap *dmac_map);
 unsigned int earcrx_get_cs_iec958(struct regmap *dmac_map);
 unsigned int earcrx_get_cs_ca(struct regmap *dmac_map);
@@ -276,7 +286,7 @@ void earcrx_enable(struct regmap *cmdc_map,
 		   struct regmap *dmac_map, bool enable);
 void earctx_cmdc_int_mask(struct regmap *top_map);
 
-void earctx_cmdc_init(struct regmap *top_map, bool en, bool rterm_on);
+void earctx_cmdc_init(struct regmap *top_map, bool en);
 void earctx_cmdc_set_timeout(struct regmap *cmdc_map, int no_timeout);
 void earctx_cmdc_arc_connect(struct regmap *cmdc_map, bool init);
 void earctx_cmdc_hpd_detect(struct regmap *top_map,
@@ -284,9 +294,7 @@ void earctx_cmdc_hpd_detect(struct regmap *top_map,
 			    int earc_port, bool st);
 void earctx_dmac_init(struct regmap *top_map,
 		      struct regmap *dmac_map,
-		      int earc_spdifout_lane_mask,
-		      unsigned int chmask,
-		      unsigned int swap_masks);
+		      int earc_spdifout_lane_mask);
 void earctx_dmac_set_format(struct regmap *dmac_map,
 			    int frddr_idx, int msb, int frddr_type);
 int earctx_get_cs_iec958(struct regmap *dmac_map);
@@ -311,8 +319,7 @@ void earctx_enable(struct regmap *top_map,
 		   struct regmap *cmdc_map,
 		   struct regmap *dmac_map,
 		   enum audio_coding_types coding_type,
-		   bool enable,
-		   bool rterm_on);
+		   bool enable);
 bool get_earctx_enable(struct regmap *cmdc_map, struct regmap *dmac_map);
 void earcrx_cmdc_get_latency(struct regmap *cmdc_map, u8 *latency);
 void earcrx_cmdc_set_latency(struct regmap *cmdc_map, u8 *latency);

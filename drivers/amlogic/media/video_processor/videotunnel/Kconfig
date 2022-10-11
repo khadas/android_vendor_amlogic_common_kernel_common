@@ -1,5 +1,5 @@
 #
-# Amlogic videotunnel device configuration
+# Amlogic videotunnel device configuation
 #
 
 menu "Amlogic video tunnel support"
@@ -8,7 +8,7 @@ config AMLOGIC_VIDEO_TUNNEL
 	tristate "Amlogic video tunnel device support"
 	default n
 
-	help
+	---help---
 		Select to enable "Amlogic videotunnel device support.
 
 endmenu

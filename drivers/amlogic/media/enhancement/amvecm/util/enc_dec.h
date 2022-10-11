@@ -1,4 +1,3 @@
-/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
  * drivers/amlogic/media/enhancement/amvecm/util/enc_dec.h
  *
@@ -22,13 +21,15 @@
 #define SAFE_SIZE(s) ((unsigned long)((s) * 2))
 #define DECHUFF_MAXLEN (4913 * 3 * 4)
 
-unsigned long huff64_encode(unsigned int *in, unsigned int inlen,
-			    char *out);
+unsigned long huff64_encode(
+		unsigned int *in, unsigned int inlen,
+		char *out);
 
 /*
  * return values is out length
  */
-unsigned long huff64_decode(char *in, unsigned int inlen,
-			    unsigned int *out, unsigned int outlen);
+unsigned long huff64_decode(
+		char *in, unsigned int inlen,
+		unsigned int *out, unsigned int outlen);
 
 #endif /* ENC_DEC_H */

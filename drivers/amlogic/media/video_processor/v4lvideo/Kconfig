@@ -1,5 +1,5 @@
 #
-# Amlogic v4lvideo device configuration
+# Amlogic v4lvideo device configuation
 #
 
 menu "Amlogic v4l video support"
@@ -13,7 +13,7 @@ config AMLOGIC_V4L_VIDEO3
 	depends on DMA_SHARED_BUFFER
 	default n
 
-	help
+	---help---
 		Select to enable "Amlogic v4l video3 device support.
 
 endmenu

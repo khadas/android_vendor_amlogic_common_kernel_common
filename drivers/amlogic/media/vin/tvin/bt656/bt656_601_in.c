@@ -1,6 +1,18 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/amlogic/media/vin/tvin/bt656/bt656_601_in.c
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
 #include <linux/kernel.h>
@@ -10,7 +22,6 @@
 #include <linux/interrupt.h>
 #include <linux/timer.h>
 #include <linux/platform_device.h>
-#include <linux/of_device.h>
 #include <linux/workqueue.h>
 #include <linux/dma-mapping.h>
 #include <linux/delay.h>
@@ -50,8 +61,6 @@
 static dev_t am656in_devno;
 static struct class *am656in_clsp;
 static unsigned char hw_cnt;
-static struct meson_bt656in_data bt656_data;
-static struct meson_bt656in_data *am_bt656_data;
 static struct am656in_dev_s *am656in_devp[BT656_MAX_DEVS];
 
 #ifdef HANDLE_BT656IN_IRQ
@@ -62,8 +71,8 @@ static struct mutex bt656_mutex;
 
 /* bt656 debug function */
 static ssize_t reg_store(struct device *dev,
-			 struct device_attribute *attr,
-			 const char *buff, size_t count)
+		struct device_attribute *attr,
+		const char *buff, size_t count)
 {
 	unsigned int argn = 0, addr = 0, value = 0, end = 0;
 	char *p, *para, *buf_work, cmd = 0;
@@ -81,7 +90,7 @@ static ssize_t reg_store(struct device *dev,
 
 	for (argn = 0; argn < 3; argn++) {
 		para = strsep(&p, " ");
-		if (!para)
+		if (para == NULL)
 			break;
 		argv[argn] = para;
 	}
@@ -95,21 +104,21 @@ static ssize_t reg_store(struct device *dev,
 	case 'R':
 		if (argn < 2) {
 			pr_err("syntax error.\n");
-		} else {
+		} else{
 			/* addr = simple_strtol(argv[1], NULL, 16); */
 			if (kstrtol(argv[1], 16, &val) < 0)
 				break;
 			addr = val;
 			value = bt656_rd(devp->index, addr);
 			pr_info("reg[%d:0x%2x]=0x%08x\n",
-				devp->index, addr, value);
+					devp->index, addr, value);
 		}
 		break;
 	case 'w':
 	case 'W':
 		if (argn < 3) {
 			pr_err("syntax error.\n");
-		} else {
+		} else{
 			/* value = simple_strtol(argv[1], NULL, 16); */
 			if (kstrtol(argv[1], 16, &val) < 0)
 				break;
@@ -156,22 +165,21 @@ reg_store_exit:
 }
 
 static ssize_t reg_show(struct device *dev,
-			struct device_attribute *attr, char *buff)
+		struct device_attribute *attr, char *buff)
 {
 	ssize_t len = 0;
 
-	len += sprintf(buff + len, "Usage:\n");
-	len += sprintf(buff + len,
+	len += sprintf(buff+len, "Usage:\n");
+	len += sprintf(buff+len,
 		"\techo [read|write <data>] addr > reg;\n");
-	len += sprintf(buff + len,
+	len += sprintf(buff+len,
 		"\techo dump > reg; Dump regs.\n");
-	len += sprintf(buff + len, "Address format:\n");
-	len += sprintf(buff + len,
-		       "\taddr : 0xXXXX, 8 bits register address\n");
+	len += sprintf(buff+len, "Address format:\n");
+	len += sprintf(buff+len, "\taddr : 0xXXXX, 8 bits register address\n");
 
 	return len;
 }
-static DEVICE_ATTR_RW(reg);
+static DEVICE_ATTR(reg, 0644, reg_show, reg_store);
 
 static void init_656in_dec_parameter(struct am656in_dev_s *devp)
 {
@@ -182,8 +190,8 @@ static void init_656in_dec_parameter(struct am656in_dev_s *devp)
 	fmt_info_p = tvin_get_fmt_info(fmt);
 
 	if (!fmt_info_p) {
-		BT656ERR("bt656[%d] %s:invalid fmt %d.\n",
-			 devp->index, __func__, fmt);
+		BT656ERR("bt656[%d] %s:invaild fmt %d.\n",
+				devp->index, __func__, fmt);
 		return;
 	}
 
@@ -206,8 +214,8 @@ static void init_656in_dec_hdmi_parameter(struct am656in_dev_s *devp)
 	fmt_info_p = tvin_get_fmt_info(fmt);
 
 	if (!fmt_info_p) {
-		BT656ERR("bt656[%d] %s:invalid fmt %d.\n",
-			 devp->index, __func__, fmt);
+		BT656ERR("bt656[%d] %s:invaild fmt %d.\n",
+				devp->index, __func__, fmt);
 		return;
 	}
 
@@ -241,15 +249,6 @@ static void reset_bt656in_module(struct am656in_dev_s *devp)
 	bt656_wr(offset, BT_CTRL, temp_data);
 }
 
-static int bt656_cpu_type(void)
-{
-	if (!am_bt656_data) {
-		BT656ERR("[%s:%d] am_bt656_data is null", __func__, __LINE__);
-		return -1;
-	}
-	return am_bt656_data->cpu_id;
-}
-
 /*
  * NTSC or PAL input(interlace mode): CLOCK + D0~D7(with SAV + EAV )
  */
@@ -268,6 +267,7 @@ static void reinit_bt656in_dec(struct am656in_dev_s *devp)
 	/* So we don't need to configure the port. */
 	/* data itself is 8 bits. */
 	bt656_wr(offset, BT_PORT_CTRL, 1 << BT_D8B);
+
 
 	bt656_wr(offset, BT_SWAP_CTRL, (4 << 0) |  /* POS_Y1_IN */
 			(5 << 4) |        /* POS_Cr0_IN */
@@ -365,6 +365,7 @@ static void reinit_bt656in_dec(struct am656in_dev_s *devp)
 			(1 << BT_FMT_MODE_BIT));   /* input format is NTSC */
 		/* wr(VDIN_WR_V_START_END, 239 | */
 		/* (0 << 16));     */
+
 	}
 }
 
@@ -478,6 +479,7 @@ static void reinit_bt601in_dec(struct am656in_dev_s *devp)
 				(1 << BT_XCLK27_EN_BIT));
 		/* bt656_wr(VDIN_WR_V_START_END, 239 |   */
 		/* (0 << 16));  */
+
 	}
 }
 
@@ -495,8 +497,15 @@ static void reinit_camera_dec(struct am656in_dev_s *devp)
 	unsigned int h_active      = devp->para.h_active;
 	unsigned int v_active      = devp->para.v_active;
 
+	if (is_meson_m8b_cpu()) {
+		/* top reset for bt656 */
+		/* WRITE_CBUS_REG_BITS(RESET1_REGISTER, 1, 5, 1); */
+		/* WRITE_CBUS_REG_BITS(RESET1_REGISTER, 0, 5, 1); */
+		aml_cbus_update_bits(RESET1_REGISTER, 0x1<<5, 1);
+		aml_cbus_update_bits(RESET1_REGISTER, 0x1<<5, 0);
+	}
 	/* disable 656,reset */
-	bt656_wr(offset, BT_CTRL, 1 << 31);
+	bt656_wr(offset, BT_CTRL, 1<<31);
 
 	/*wr(BT_VIDEOSTART, 1 | (1 << 16));
 	 *  //Line number of the first video start line in field 0/1.
@@ -526,10 +535,10 @@ static void reinit_camera_dec(struct am656in_dev_s *devp)
 	bt656_wr(offset, BT_601_CTRL2, (10 << 16));
 
 	bt656_wr(offset, BT_SWAP_CTRL,
-		 (5 << 0) |        /* POS_Cb0_IN */
-		 (4 << 4) |        /* POS_Y0_IN */
-		 (7 << 8) |        /* POS_Cr0_IN */
-		 (6 << 12));       /* POS_Y1_IN */
+			(5 << 0) |        /* POS_Cb0_IN */
+			(4 << 4) |        /* POS_Y0_IN */
+			(7 << 8) |        /* POS_Cr0_IN */
+			(6 << 12));       /* POS_Y1_IN */
 
 	/* horizontal active data start offset, *2 for 422 sampling */
 	bt656_wr(offset, BT_LINECTRL, (1 << 31) |
@@ -576,8 +585,8 @@ static void reinit_camera_dec(struct am656in_dev_s *devp)
 	 */
 	/* Line number of the last video line in field 0 */
 	bt656_wr(offset, BT_VIDEOEND,
-		 ((v_active + vs_bp - 1) |
-		 ((v_active + vs_bp - 1) << 16)));
+		((v_active + vs_bp - 1) |
+		((v_active + vs_bp - 1) << 16)));
 
 	bt656_wr(offset, BT_DELAY_CTRL, 0x22222222);
 
@@ -585,53 +594,53 @@ static void reinit_camera_dec(struct am656in_dev_s *devp)
 	if (devp->para.isp_fe_port == TVIN_PORT_CAMERA) {
 		temp_data = (1 << BT_EN_BIT) /* enable BT moduale. */
 			/* timing reference is from bit stream. */
-			| (0 << BT_REF_MODE_BIT)
-			| (0 << BT_FMT_MODE_BIT)      /* PAL */
-			| (0 << BT_SLICE_MODE_BIT)   /* no ancillay flag. */
+			|(0 << BT_REF_MODE_BIT)
+			|(0 << BT_FMT_MODE_BIT)      /* PAL */
+			|(0 << BT_SLICE_MODE_BIT)   /* no ancillay flag. */
 			/* BT656 standard interface. */
-			| (0 << BT_MODE_BIT)
-			| (1 << BT_CLOCK_ENABLE)	/* enable 656 clock. */
-			| (0 << BT_FID_EN_BIT)	/* use external fid pin. */
+			|(0 << BT_MODE_BIT)
+			|(1 << BT_CLOCK_ENABLE)	/* enable 656 clock. */
+			|(0 << BT_FID_EN_BIT)	/* use external fid pin. */
 			/* xclk27 is input. change to Raw_mode setting from M8*/
 			/* |(0 << BT_XCLK27_EN_BIT)      */
-			| (0 << BT_PROG_MODE)
-			| (0 << BT_AUTO_FMT)
-			| (0 << BT_CAMERA_MODE)     /* enable camera mode */
-			| (1 << BT_656CLOCK_RESET)
-			| (1 << BT_SYSCLOCK_RESET)
-			| (1 << BT_RAW_MODE) /* enable raw data output */
-			| (1 << BT_RAW_ISP) /* enable raw data to isp */
-			| (0 << 28) /* enable csi2 pin */
+			|(0 << BT_PROG_MODE)
+			|(0 << BT_AUTO_FMT)
+			|(0 << BT_CAMERA_MODE)     /* enable camera mode */
+			|(1 << BT_656CLOCK_RESET)
+			|(1 << BT_SYSCLOCK_RESET)
+			|(1 << BT_RAW_MODE) /* enable raw data output */
+			|(1 << BT_RAW_ISP) /* enable raw data to isp */
+			|(0 << 28) /* enable csi2 pin */
 		    ;
 	} else {
 		temp_data =
 			/* BT656 standard interface. */
 			(0 << BT_MODE_BIT)
 			/* camera mode */
-			| (1 << BT_CAMERA_MODE)
+			|(1 << BT_CAMERA_MODE)
 			/* enable BT data input */
-			| (1 << BT_EN_BIT)
+			|(1 << BT_EN_BIT)
 			/* timing reference is from bit stream. */
-			| (0 << BT_REF_MODE_BIT)
-			| (0 << BT_FMT_MODE_BIT)     /* NTSC */
-			| (0 << BT_SLICE_MODE_BIT)
+			|(0 << BT_REF_MODE_BIT)
+			|(0 << BT_FMT_MODE_BIT)     /* NTSC */
+			|(0 << BT_SLICE_MODE_BIT)
 			/* use external fid pin. */
-			| (0 << BT_FID_EN_BIT)
+			|(0 << BT_FID_EN_BIT)
 			/* enable bt656 clock input */
-			| (1 << 7)
-			| (0 << 18)              /* eol_delay //4 */
-			| (1 << 16) /* update status for debug */
+			|(1 << 7)
+			|(0 << 18)              /* eol_delay //4 */
+			|(1 << 16) /* update status for debug */
 			/* enable sys clock input */
-			| (1 << BT_XCLK27_EN_BIT)
-			| (0x60000000);   /* out of reset for BT_CTRL. */
+			|(1 << BT_XCLK27_EN_BIT)
+			|(0x60000000);   /* out of reset for BT_CTRL. */
 	}
-	if (devp->para.bt_path == BT_PATH_GPIO ||
-	    devp->para.bt_path == BT_PATH_GPIO_B) {
-		temp_data &= (~(1 << 28));
+	if ((devp->para.bt_path == BT_PATH_GPIO) ||
+	    (devp->para.bt_path == BT_PATH_GPIO_B)) {
+		temp_data &= (~(1<<28));
 		bt656_wr(offset, BT_CTRL, temp_data);
 	} else if (devp->para.bt_path == BT_PATH_CSI2) {
 #ifdef CONFIG_TVIN_ISP
-		temp_data |= (1 << 28);
+		temp_data |= (1<<28);
 		bt656_wr(offset, BT_CTRL, temp_data);
 		/* power on mipi csi phy */
 		aml_write_cbus(HHI_CSI_PHY_CNTL0, 0xfdc1ff81);
@@ -659,8 +668,19 @@ static void reinit_bt601_hdmi_dec(struct am656in_dev_s *devp)
 	unsigned int v_active      = devp->para.v_active;
 	unsigned int fid_check_cnt = devp->para.fid_check_cnt;
 
+#if 0
+	pr_info("para hsync_phase:   %d\n"
+		"para vsync_phase:   %d\n"
+		"para hs_bp:         %d\n"
+		"para vs_bp:         %d\n"
+		"para h_active:      %d\n"
+		"para v_active:      %d\n",
+		hsync_enable, vsync_enable,
+		hs_bp, vs_bp, h_active, v_active);
+#endif
+
 	/* disable 656,reset */
-	bt656_wr(offset, BT_CTRL, 1 << 31);
+	bt656_wr(offset, BT_CTRL, 1<<31);
 
 	bt656_wr(offset, BT_PORT_CTRL, (0 << BT_IDQ_EN)   |
 			(0 << BT_IDQ_PHASE)     |
@@ -678,10 +698,10 @@ static void reinit_bt601_hdmi_dec(struct am656in_dev_s *devp)
 	bt656_wr(offset, BT_601_CTRL2, (fid_check_cnt << 16));
 
 	bt656_wr(offset, BT_SWAP_CTRL,
-		 (4 << 0) |        /* POS_Cb0_IN */
-		 (5 << 4) |        /* POS_Y0_IN */
-		 (6 << 8) |        /* POS_Cr0_IN */
-		 (7 << 12));       /* POS_Y1_IN */
+			(4 << 0) |        /* POS_Cb0_IN */
+			(5 << 4) |        /* POS_Y0_IN */
+			(6 << 8) |        /* POS_Cr0_IN */
+			(7 << 12));       /* POS_Y1_IN */
 
 	/* horizontal active data start offset, *2 for 422 sampling */
 	bt656_wr(offset, BT_LINECTRL, (1 << 31) |
@@ -721,8 +741,8 @@ static void reinit_bt601_hdmi_dec(struct am656in_dev_s *devp)
 	 */
 	/* Line number of the last video line in field 0 */
 	bt656_wr(offset, BT_VIDEOEND,
-		 ((v_active + vs_bp - 1) |
-		 ((v_active + vs_bp - 1) << 16)));
+		((v_active + vs_bp - 1) |
+		((v_active + vs_bp - 1) << 16)));
 
 	bt656_wr(offset, BT_DELAY_CTRL, 0x22222222);
 
@@ -731,24 +751,24 @@ static void reinit_bt601_hdmi_dec(struct am656in_dev_s *devp)
 		/* BT656 standard interface. */
 		(0 << BT_MODE_BIT)
 		/* camera mode */
-		| (1 << BT_CAMERA_MODE)
+		|(1 << BT_CAMERA_MODE)
 		/* enable BT data input */
-		| (1 << BT_EN_BIT)
+		|(1 << BT_EN_BIT)
 		/* timing reference is from bit stream. */
-		| (0 << BT_REF_MODE_BIT)
-		| (0 << BT_FMT_MODE_BIT)
-		| (0 << BT_SLICE_MODE_BIT)
+		|(0 << BT_REF_MODE_BIT)
+		|(0 << BT_FMT_MODE_BIT)
+		|(0 << BT_SLICE_MODE_BIT)
 		/* use external fid pin. */
-		| (0 << BT_FID_EN_BIT)
+		|(0 << BT_FID_EN_BIT)
 		/* enable bt656 clock input */
-		| (1 << 7)
-		| (0 << 18)              /* eol_delay */
-		| (1 << 16) /* update status for debug */
+		|(1 << 7)
+		|(0 << 18)              /* eol_delay */
+		|(1 << 16) /* update status for debug */
 		/* enable sys clock input */
-		| (1 << BT_XCLK27_EN_BIT)
-		| (0x60000000);   /* out of reset for BT_CTRL. */
+		|(1 << BT_XCLK27_EN_BIT)
+		|(0x60000000);   /* out of reset for BT_CTRL. */
 
-	temp_data &= (~(1 << 28));
+	temp_data &= (~(1<<28));
 	bt656_wr(offset, BT_CTRL, temp_data);
 }
 
@@ -790,7 +810,7 @@ static void start_amvdec_656_601_camera_in(struct am656in_dev_s *devp)
 		devp->para.fmt  = TVIN_SIG_FMT_NULL;
 		devp->para.port = TVIN_PORT_NULL;
 		BT656ERR("%s: input is not selected, please try again.\n",
-			 __func__);
+			__func__);
 		return;
 	}
 	BT656PR("bt656[%d](%s): %s input port: %s fmt: %s.\n",
@@ -816,39 +836,39 @@ static void am656_clktree_control(struct am656in_dev_s *devp, int flag)
 	if (flag) { /* clk enable */
 		if (IS_ERR(devp->gate_bt656)) {
 			BT656ERR("bt656[%d] %s: gate_bt656\n",
-				 devp->index, __func__);
+				devp->index, __func__);
 		} else {
 			clk_prepare_enable(devp->gate_bt656);
 		}
 		if (IS_ERR(devp->gate_bt656_pclk)) {
 			BT656ERR("bt656[%d] %s: gate_bt656_pclk\n",
-				 devp->index, __func__);
+				devp->index, __func__);
 		} else {
 			clk_prepare_enable(devp->gate_bt656_pclk);
 		}
 		if (IS_ERR(devp->bt656_clk)) {
 			BT656ERR("bt656[%d] %s: bt656_clk\n",
-				 devp->index, __func__);
+				devp->index, __func__);
 		} else {
 			clk_prepare_enable(devp->bt656_clk);
 		}
-		usleep_range(100, 150);
+		udelay(100);
 	} else { /* clk disable */
 		if (IS_ERR(devp->bt656_clk)) {
 			BT656ERR("bt656[%d] %s: bt656_clk\n",
-				 devp->index, __func__);
+				devp->index, __func__);
 		} else {
 			clk_disable_unprepare(devp->bt656_clk);
 		}
 		if (IS_ERR(devp->gate_bt656_pclk)) {
 			BT656ERR("bt656[%d] %s: gate_bt656_pclk\n",
-				 devp->index, __func__);
+				devp->index, __func__);
 		} else {
 			clk_disable_unprepare(devp->gate_bt656_pclk);
 		}
 		if (IS_ERR(devp->gate_bt656)) {
 			BT656ERR("bt656[%d] %s: gate_bt656\n",
-				 devp->index, __func__);
+				devp->index, __func__);
 		} else {
 			clk_disable_unprepare(devp->gate_bt656);
 		}
@@ -866,14 +886,12 @@ static bool am656_check_skip_frame(struct tvin_frontend_s *fe)
 	if (devp->skip_vdin_frame_count > 0) {
 		devp->skip_vdin_frame_count--;
 		return true;
-	} else {
+	} else
 		return false;
-	}
 }
-
 int am656in_support(struct tvin_frontend_s *fe, enum tvin_port_e port)
 {
-	if (port < TVIN_PORT_BT656 || port > TVIN_PORT_BT601_HDMI)
+	if ((port < TVIN_PORT_BT656) || (port > TVIN_PORT_BT601_HDMI))
 		return -1;
 	else
 		return 0;
@@ -895,7 +913,6 @@ static int am656in_open(struct inode *node, struct file *file)
 
 	return 0;
 }
-
 static int am656in_release(struct inode *node, struct file *file)
 {
 	/* struct vdin_dev_s *devp = file->private_data; */
@@ -912,8 +929,8 @@ static const struct file_operations am656in_fops = {
 	.open     = am656in_open,
 	.release  = am656in_release,
 };
-
 /*called by vdin && sever for v4l2 framework*/
+
 void am656in_start(struct tvin_frontend_s *fe, enum tvin_sig_fmt_e fmt)
 {
 	struct am656in_dev_s *devp;
@@ -923,15 +940,15 @@ void am656in_start(struct tvin_frontend_s *fe, enum tvin_sig_fmt_e fmt)
 	mutex_lock(&bt656_mutex);
 	start_amvdec_656_601_camera_in(devp);
 	mutex_unlock(&bt656_mutex);
-}
 
+}
 static void am656in_stop(struct tvin_frontend_s *fe, enum tvin_port_e port)
 {
 	struct am656in_dev_s *devp;
 
 	devp = container_of(fe, struct am656in_dev_s, frontend);
-	if (port < TVIN_PORT_BT656 || port > TVIN_PORT_BT601_HDMI) {
-		BT656ERR("%s: invalid port %d.\n", __func__, port);
+	if ((port < TVIN_PORT_BT656) || (port > TVIN_PORT_BT601_HDMI)) {
+		BT656ERR("%s: invaild port %d.\n", __func__, port);
 		return;
 	}
 
@@ -940,9 +957,8 @@ static void am656in_stop(struct tvin_frontend_s *fe, enum tvin_port_e port)
 	BT656PR("bt656[%d] %s stop device stop ok.\n", devp->index, __func__);
 	mutex_unlock(&bt656_mutex);
 }
-
 static void am656in_get_sig_property(struct tvin_frontend_s *fe,
-				     struct tvin_sig_property_s *prop)
+		struct tvin_sig_property_s *prop)
 {
 	struct am656in_dev_s *devp;
 
@@ -999,9 +1015,9 @@ static int am656in_feopen(struct tvin_frontend_s *fe, enum tvin_port_e port)
 
 	devp = container_of(fe, struct am656in_dev_s, frontend);
 
-	if (port < TVIN_PORT_BT656 || port > TVIN_PORT_BT601_HDMI) {
-		BT656ERR("bt656[%d] %s:invalid port %d.\n",
-			 devp->index, __func__, port);
+	if ((port < TVIN_PORT_BT656) || (port > TVIN_PORT_BT601_HDMI)) {
+		BT656ERR("bt656[%d] %s:invaild port %d.\n",
+				devp->index, __func__, port);
 		return -1;
 	}
 	if (port == TVIN_PORT_CAMERA)
@@ -1026,21 +1042,21 @@ static int am656in_feopen(struct tvin_frontend_s *fe, enum tvin_port_e port)
 
 	return 0;
 }
-
 /*
  *power off the 656 module,clear the parameters
  */
 static void am656in_feclose(struct tvin_frontend_s *fe)
 {
+
 	struct am656in_dev_s *devp = NULL;
 	enum tvin_port_e port = 0;
 
 	devp = container_of(fe, struct am656in_dev_s, frontend);
 	port = devp->para.port;
 
-	if (port < TVIN_PORT_BT656 || port > TVIN_PORT_BT601_HDMI) {
-		BT656ERR("bt656[%d] %s:invalid port %d.\n",
-			 devp->index, __func__, port);
+	if ((port < TVIN_PORT_BT656) || (port > TVIN_PORT_BT601_HDMI)) {
+		BT656ERR("bt656[%d] %s:invaild port %d.\n",
+				devp->index, __func__, port);
 		return;
 	}
 
@@ -1049,7 +1065,6 @@ static void am656in_feclose(struct tvin_frontend_s *fe)
 	/* bt656 clock disable */
 	am656_clktree_control(devp, 0);
 }
-
 static struct tvin_state_machine_ops_s am656_machine_ops = {
 	.nosig               = NULL,
 	.fmt_changed         = NULL,
@@ -1062,7 +1077,6 @@ static struct tvin_state_machine_ops_s am656_machine_ops = {
 	.vga_get_param       = NULL,
 	.check_frame_skip    = am656_check_skip_frame,
 };
-
 static struct tvin_decoder_ops_s am656_decoder_ops_s = {
 	.support                = am656in_support,
 	.open                   = am656in_feopen,
@@ -1072,61 +1086,8 @@ static struct tvin_decoder_ops_s am656_decoder_ops_s = {
 	.decode_isr             = am656in_isr,
 };
 
-#ifdef CONFIG_OF
-struct meson_bt656in_data meson_g12a_bt656in_data = {
-	.cpu_id = BT656_CPU_TYPE_G12A,
-	.name = "meson-g12a-bt656in",
-};
-
-struct meson_bt656in_data meson_g12b_bt656in_data = {
-	.cpu_id = BT656_CPU_TYPE_G12B,
-	.name = "meson-g12b-bt656in",
-};
-
-#ifndef CONFIG_AMLOGIC_REMOVE_OLD
-struct meson_bt656in_data meson_tl1_bt656in_data = {
-	.cpu_id = BT656_CPU_TYPE_TL1,
-	.name = "meson-tl1-bt656in",
-};
-#endif
-
-struct meson_bt656in_data meson_sm1_bt656in_data = {
-	.cpu_id = BT656_CPU_TYPE_SM1,
-	.name = "meson-sm1-bt656in",
-};
-
-struct meson_bt656in_data meson_tm2_bt656in_data = {
-	.cpu_id = BT656_CPU_TYPE_TM2,
-	.name = "meson-tm2-bt656in",
-};
-
-static const struct of_device_id meson_bt656in_dt_match[] = {
-	{
-		.compatible = "amlogic, bt656in-g12a",
-		.data		= &meson_g12a_bt656in_data,
-	}, {
-		.compatible = "amlogic, bt656in-g12b",
-		.data		= &meson_g12b_bt656in_data,
-	},
-#ifndef CONFIG_AMLOGIC_REMOVE_OLD
-	{
-		.compatible = "amlogic, bt656in-tl1",
-		.data		= &meson_tl1_bt656in_data,
-	},
-#endif
-	{
-		.compatible = "amlogic, bt656in-sm1",
-		.data		= &meson_sm1_bt656in_data,
-	}, {
-		.compatible = "amlogic, bt656in-tm2",
-		.data		= &meson_tm2_bt656in_data,
-	},
-	{},
-};
-#endif
-
 static int bt656_add_cdev(struct cdev *cdevp,
-			  const struct file_operations *fops, int minor)
+		const struct file_operations *fops, int minor)
 {
 	int ret;
 	dev_t devno = MKDEV(MAJOR(am656in_devno), minor);
@@ -1156,7 +1117,6 @@ static int amvdec_656in_probe(struct platform_device *pdev)
 {
 	int ret = 0;
 	struct am656in_dev_s *devp = NULL;
-	const struct of_device_id *match;
 	int bt656_rate;
 	struct resource *res = 0;
 	int size = 0;
@@ -1167,23 +1127,13 @@ static int amvdec_656in_probe(struct platform_device *pdev)
 
 	BT656PR("%s: start probe .\n", __func__);
 
-	am_bt656_data = &bt656_data;
-	match = of_match_device(meson_bt656in_dt_match, &pdev->dev);
-	if (!match) {
-		BT656PR("%s,no matched table\n", __func__);
-		return -1;
-	}
-
-	am_bt656_data = (struct meson_bt656in_data *)match->data;
-	BT656PR("%s, cpu_id:%d,name:%s\n", __func__,
-		am_bt656_data->cpu_id, am_bt656_data->name);
-
-	if (bt656_cpu_type() == BT656_CPU_TYPE_G12A ||
-	    bt656_cpu_type() == BT656_CPU_TYPE_G12B ||
-	    bt656_cpu_type() == BT656_CPU_TYPE_TL1  ||
-	    bt656_cpu_type() == BT656_CPU_TYPE_SM1  ||
-	    bt656_cpu_type() == BT656_CPU_TYPE_TM2) {
+	if (is_meson_gxtvbb_cpu() || is_meson_gxl_cpu() ||
+		is_meson_gxm_cpu() || is_meson_g12a_cpu() ||
+		is_meson_g12b_cpu() || is_meson_tl1_cpu() ||
+		is_meson_tm2_cpu()) {
 		hw_cnt = 1;
+	} else if (is_meson_gxbb_cpu()) {
+		hw_cnt = 2;
 	} else {
 		hw_cnt = 0;
 	}
@@ -1216,16 +1166,16 @@ static int amvdec_656in_probe(struct platform_device *pdev)
 			BT656ERR("%s: don't find  bt656 id.\n", __func__);
 			goto fail_kmalloc_dev;
 		}
-		if (index == 0 || index > 2) {
+		if ((index == 0) || (index > 2)) {
 			BT656ERR("%s: invalid bt656 index %d.\n",
-				 __func__, index);
+				__func__, index);
 			goto fail_kmalloc_dev;
 		}
 
 		ret = of_property_read_string(child, "status", &str);
 		if (ret) {
 			BT656ERR("%s: bt656[%d] don't find status, disabled\n",
-				 __func__, index);
+				__func__, index);
 			continue;
 		} else {
 			if (strncmp(str, "okay", 2))
@@ -1233,16 +1183,15 @@ static int amvdec_656in_probe(struct platform_device *pdev)
 		}
 
 		/* malloc dev */
-		am656in_devp[index - 1] =
+		am656in_devp[index-1] =
 			kmalloc(sizeof(struct am656in_dev_s), GFP_KERNEL);
-		if (!am656in_devp[index - 1]) {
+		if (!am656in_devp[index-1]) {
 			BT656ERR("%s: devp malloc error\n", __func__);
 			goto fail_kmalloc_dev;
 		}
-		memset(am656in_devp[index - 1], 0,
-		       sizeof(struct am656in_dev_s));
+		memset(am656in_devp[index-1], 0, sizeof(struct am656in_dev_s));
 
-		devp = am656in_devp[index - 1];
+		devp = am656in_devp[index-1];
 		devp->index = index;
 		BT656PR("%s: bt656 devp->index =%d\n", __func__, devp->index);
 
@@ -1274,10 +1223,10 @@ static int amvdec_656in_probe(struct platform_device *pdev)
 			/*clk_put(devp->bt656_clk);*/
 			BT656PR("%s: bt656[%d] clock is %d MHZ\n",
 				__func__,
-				devp->index, bt656_rate / 1000000);
+				devp->index, bt656_rate/1000000);
 		} else {
 			BT656ERR("%s: bt656[%d] cannot get %s !!!\n",
-				 __func__, devp->index, bt656_clk_name);
+				__func__, devp->index, bt656_clk_name);
 			ret = -ENOENT;
 			goto fail_get_clktree;
 		}
@@ -1285,16 +1234,16 @@ static int amvdec_656in_probe(struct platform_device *pdev)
 		devp->gate_bt656 = clk_get(&pdev->dev, "clk_gate_bt656");
 		if (IS_ERR(devp->gate_bt656)) {
 			BT656ERR("%s: cannot get clk_gate_bt656 !!!\n",
-				 __func__);
+				__func__);
 			ret = -ENOENT;
 			goto fail_get_clktree;
 		}
 
 		devp->gate_bt656_pclk = clk_get(&pdev->dev,
-						"clk_gate_bt656_pclk1");
+				"clk_gate_bt656_pclk1");
 		if (IS_ERR(devp->gate_bt656_pclk)) {
 			BT656ERR("%s: cannot get clk_gate_bt656_pclk1 !!!\n",
-				 __func__);
+				__func__);
 			//ret = -ENOENT;
 			//goto fail_get_clktree;
 		}
@@ -1302,7 +1251,7 @@ static int amvdec_656in_probe(struct platform_device *pdev)
 		BT656PR("%s: bt656[%d] start get ioremap .\n",
 			__func__, devp->index);
 		res = platform_get_resource(pdev, IORESOURCE_MEM,
-					    (devp->index - 1));
+				(devp->index - 1));
 		if (!res) {
 			BT656ERR("missing memory resource\n");
 			ret = -ENOMEM;
@@ -1310,16 +1259,16 @@ static int amvdec_656in_probe(struct platform_device *pdev)
 		}
 
 		size = resource_size(res);
-		bt656_reg_base[devp->index - 1] =
+		bt656_reg_base[devp->index-1] =
 			devm_ioremap_nocache(&pdev->dev, res->start, size);
-		if (!bt656_reg_base[devp->index - 1]) {
+		if (!bt656_reg_base[devp->index-1]) {
 			BT656ERR("bt656[%d] ioremap failed\n", devp->index);
 			ret = -ENOMEM;
 			goto fail_get_clktree;
 		}
 		BT656PR("%s: bt656[%d] mapped reg_base=0x%p, size=0x%x\n",
 			__func__, devp->index,
-			bt656_reg_base[devp->index - 1], size);
+			bt656_reg_base[devp->index-1], size);
 
 		/* set drvdata */
 		dev_set_drvdata(devp->dev, devp);
@@ -1331,12 +1280,12 @@ static int amvdec_656in_probe(struct platform_device *pdev)
 		 * &am656_decoder_ops_s, &am656_machine_ops, pdev->id);
 		 */
 		if (!tvin_frontend_init(&devp->frontend, &am656_decoder_ops_s,
-					&am656_machine_ops, devp->index - 1)) {
+			&am656_machine_ops, devp->index-1)) {
 			BT656PR("%s: tvin_frontend_init done :%d\n",
 				__func__, devp->index);
 			if (tvin_reg_frontend(&devp->frontend)) {
 				BT656ERR("%s register frontend error\n",
-					 __func__);
+					__func__);
 			}
 		}
 	}
@@ -1371,7 +1320,7 @@ static int amvdec_656in_remove(struct platform_device *pdev)
 
 	for (index = 0; index < hw_cnt; index++) {
 		devp = am656in_devp[index];
-		if (!devp)
+		if (devp == NULL)
 			continue;
 		device_remove_file(devp->dev, &dev_attr_reg);
 		tvin_unreg_frontend(&devp->frontend);
@@ -1392,7 +1341,7 @@ static int amvdec_656in_resume(struct platform_device *pdev)
 }
 
 static int amvdec_656in_suspend(struct platform_device *pdev,
-				pm_message_t state)
+		pm_message_t state)
 {
 	struct am656in_dev_s *devp;
 	int index;
@@ -1401,7 +1350,7 @@ static int amvdec_656in_suspend(struct platform_device *pdev,
 	BT656PR("%s\n", __func__);
 	for (index = 0; index < hw_cnt; index++) {
 		devp = am656in_devp[index];
-		if (!devp)
+		if (devp == NULL)
 			continue;
 		if (devp->dec_status & TVIN_AM656_RUNNING) {
 			reset_bt656in_module(devp);
@@ -1421,7 +1370,7 @@ static void amvdec_656in_shutdown(struct platform_device *pdev)
 	BT656PR("%s\n", __func__);
 	for (index = 0; index < hw_cnt; index++) {
 		devp = am656in_devp[index];
-		if (!devp)
+		if (devp == NULL)
 			continue;
 		if (devp->dec_status & TVIN_AM656_RUNNING) {
 			reset_bt656in_module(devp);
@@ -1430,6 +1379,16 @@ static void amvdec_656in_shutdown(struct platform_device *pdev)
 		}
 	}
 }
+
+
+#ifdef CONFIG_OF
+static const struct of_device_id bt656_dt_match[] = {
+	{
+		.compatible = "amlogic, amvdec_656in",
+	},
+	{},
+};
+#endif
 
 static struct platform_driver amvdec_656in_driver = {
 	.probe  = amvdec_656in_probe,
@@ -1441,12 +1400,12 @@ static struct platform_driver amvdec_656in_driver = {
 		.name           = BT656_DRV_NAME,
 		.owner          = THIS_MODULE,
 #ifdef CONFIG_OF
-		.of_match_table = meson_bt656in_dt_match,
+		.of_match_table = bt656_dt_match,
 #endif
 	}
 };
 
-int amvdec_656in_init_module(void)
+static int __init amvdec_656in_init_module(void)
 {
 	int ret = 0;
 
@@ -1459,12 +1418,15 @@ int amvdec_656in_init_module(void)
 	return 0;
 }
 
-void amvdec_656in_exit_module(void)
+static void __exit amvdec_656in_exit_module(void)
 {
 	platform_driver_unregister(&amvdec_656in_driver);
 }
 
-//MODULE_DESCRIPTION("AMLOGIC BT656_601 input driver");
-//MODULE_LICENSE("GPL");
-//MODULE_VERSION("2.0.0");
+module_init(amvdec_656in_init_module);
+module_exit(amvdec_656in_exit_module);
+
+MODULE_DESCRIPTION("AMLOGIC BT656_601 input driver");
+MODULE_LICENSE("GPL");
+MODULE_VERSION("2.0.0");
 

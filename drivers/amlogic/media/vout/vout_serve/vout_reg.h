@@ -1,10 +1,23 @@
-/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/amlogic/media/vout/vout_serve/vout_reg.h
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
 #ifndef _VOUT_REG_H_
 #define _VOUT_REG_H_
+#include <linux/platform_device.h>
 #include <linux/amlogic/iomap.h>
 #ifdef CONFIG_AMLOGIC_VPU
 #include <linux/amlogic/media/vpu/vpu.h>
@@ -232,12 +245,6 @@
 #define ENCP_VIDEO_MATRIX_CR                       0x1bbc
 #define ENCP_VIDEO_RGBIN_CTRL                      0x1bbd
 
-#define VPU_VENC_CTRL                              0x1cef
-
-#define VPP_VDO_MEAS_CTRL                          0x1da8
-#define VPP_VDO_MEAS_VS_COUNT_HI                   0x1da9
-#define VPP_VDO_MEAS_VS_COUNT_LO                   0x1daa
-
 /* HIU */
 #define HHI_VIID_CLK_DIV                           0x4a
 #define DAC0_CLK_SEL           28
@@ -293,11 +300,12 @@
 #define CLKCTRL_VIID_CLK_DIV                       0x0033
 #define CLKCTRL_VIID_CLK_CTRL                      0x0034
 
-unsigned int vout_clk_read(unsigned int _reg);
-void vout_clk_write(unsigned int _reg, unsigned int _value);
-void vout_clk_setb(unsigned int _reg, unsigned int _value,
+int vout_ioremap(struct platform_device *pdev);
+unsigned int vout_hiu_read(unsigned int _reg);
+void vout_hiu_write(unsigned int _reg, unsigned int _value);
+void vout_hiu_setb(unsigned int _reg, unsigned int _value,
 		   unsigned int _start, unsigned int _len);
-unsigned int vout_clk_getb(unsigned int reg,
+unsigned int vout_hiu_getb(unsigned int reg,
 			   unsigned int _start, unsigned int _len);
 
 unsigned int vout_vcbus_read(unsigned int _reg);

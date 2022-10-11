@@ -1,12 +1,25 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/amlogic/media/vout/hdmitx/hdmi_tx_20/hdmi_tx_scdc.c
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
 #include <linux/delay.h>
 #include <linux/amlogic/media/vout/hdmi_tx/hdmi_tx_module.h>
 #include <linux/amlogic/media/vout/hdmi_tx/hdmi_tx_ddc.h>
 #include "hw/common.h"
+#include "hdmi_tx_calibration.h"
 
 void scdc_config(struct hdmitx_dev *hdev)
 {
@@ -43,13 +56,13 @@ static int scdc_ced_cnt(struct hdmitx_dev *hdev)
 		pr_info("ced check sum error\n");
 	if (ced->ch0_cnt)
 		pr_info("ced: ch0_cnt = %d %s\n", ced->ch0_cnt,
-			ced->ch0_valid ? "" : "invalid");
+			ced->ch0_valid ? "" : "unvalid");
 	if (ced->ch1_cnt)
 		pr_info("ced: ch1_cnt = %d %s\n", ced->ch1_cnt,
-			ced->ch1_valid ? "" : "invalid");
+			ced->ch1_valid ? "" : "unvalid");
 	if (ced->ch2_cnt)
 		pr_info("ced: ch2_cnt = %d %s\n", ced->ch2_cnt,
-			ced->ch2_valid ? "" : "invalid");
+			ced->ch2_valid ? "" : "unvalid");
 
 	return chksum != 0;
 }
@@ -71,8 +84,11 @@ int scdc_status_flags(struct hdmitx_dev *hdev)
 	}
 	if (st & CED_UPDATE)
 		scdc_ced_cnt(hdev);
-	if (st & (STATUS_UPDATE | CED_UPDATE))
+
+	if (st & (STATUS_UPDATE | CED_UPDATE)) {
+		cedst_store_buf(hdev);
 		scdc_wr_sink(UPDATE_0, st & (STATUS_UPDATE | CED_UPDATE));
+	}
 	if (!hdev->chlocked_st.clock_detected)
 		pr_info("ced: clock undetected\n");
 	if (!hdev->chlocked_st.ch0_locked)

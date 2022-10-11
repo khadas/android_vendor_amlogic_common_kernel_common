@@ -1,4 +1,3 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
  * drivers/amlogic/media/vout/cvbs/enc_clk_config.c
  *
@@ -22,7 +21,7 @@
 #include <linux/mutex.h>
 
 /* Amlogic Headers */
-#include <linux/amlogic/media/registers/cpu_version.h>
+#include <linux/amlogic/cpu_version.h>
 #include <linux/amlogic/media/vout/vinfo.h>
 #include <linux/amlogic/iomap.h>
 
@@ -40,7 +39,7 @@ static int pll_wait_lock(unsigned int reg, unsigned int lock_bit)
 	int ret = 0;
 
 	do {
-		usleep_range(50, 60);
+		udelay(50);
 		pll_lock = cvbs_out_ana_getb(reg, lock_bit, 1);
 		wait_loop--;
 	} while ((pll_lock == 0) && (wait_loop > 0));
@@ -62,7 +61,7 @@ static void disable_vid1_clk_out(void)
 	cvbs_out_hiu_setb(cvbs_data->reg_vid_clk_ctrl, 0, VCLK_EN0, 1);
 
 	/* close pll_div gate */
-	cvbs_out_vid_pll_set(cvbs_data->reg_vid_pll_clk_div, 0, 19, 1);
+	cvbs_out_ana_setb(cvbs_data->reg_vid_pll_clk_div, 0, 19, 1);
 }
 
 static void disable_vid2_clk_out(void)
@@ -78,7 +77,7 @@ static void disable_vid2_clk_out(void)
 	cvbs_out_hiu_setb(cvbs_data->reg_vid2_clk_ctrl, 0, VCLK2_EN, 1);
 
 	/* close pll_div gate */
-	cvbs_out_vid_pll_set(cvbs_data->reg_vid_pll_clk_div, 0, 19, 1);
+	cvbs_out_ana_setb(cvbs_data->reg_vid_pll_clk_div, 0, 19, 1);
 }
 
 static void cvbs_set_vid1_clk(unsigned int src_pll)
@@ -95,12 +94,12 @@ static void cvbs_set_vid1_clk(unsigned int src_pll)
 	if (src_pll == 0) { /* hpll */
 		/* divider: 1 */
 		/* Disable the div output clock */
-		cvbs_out_vid_pll_set(cvbs_data->reg_vid_pll_clk_div, 0, 19, 1);
-		cvbs_out_vid_pll_set(cvbs_data->reg_vid_pll_clk_div, 0, 15, 1);
+		cvbs_out_ana_setb(cvbs_data->reg_vid_pll_clk_div, 0, 19, 1);
+		cvbs_out_ana_setb(cvbs_data->reg_vid_pll_clk_div, 0, 15, 1);
 
-		cvbs_out_vid_pll_set(cvbs_data->reg_vid_pll_clk_div, 1, 18, 1);
+		cvbs_out_ana_setb(cvbs_data->reg_vid_pll_clk_div, 1, 18, 1);
 		/* Enable the final output clock */
-		cvbs_out_vid_pll_set(cvbs_data->reg_vid_pll_clk_div, 1, 19, 1);
+		cvbs_out_ana_setb(cvbs_data->reg_vid_pll_clk_div, 1, 19, 1);
 
 		sel = 0;
 	} else { /* gp0_pll */
@@ -110,10 +109,10 @@ static void cvbs_set_vid1_clk(unsigned int src_pll)
 	/* xd: 55 */
 	/* setup the XD divider value */
 	cvbs_out_hiu_setb(cvbs_data->reg_vid_clk_div, (55 - 1), VCLK_XD0, 8);
-	usleep_range(5, 7);
+	udelay(5);
 	cvbs_out_hiu_setb(cvbs_data->reg_vid_clk_ctrl, sel, VCLK_CLK_IN_SEL, 1);
 	cvbs_out_hiu_setb(cvbs_data->reg_vid_clk_ctrl, 1, VCLK_EN0, 1);
-	usleep_range(2, 5);
+	udelay(2);
 
 	/* vclk: 27M */
 	/* [31:28]=0 enci_clk_sel, select vclk_div1 */
@@ -124,13 +123,13 @@ static void cvbs_set_vid1_clk(unsigned int src_pll)
 	cvbs_out_hiu_setb(cvbs_data->reg_vid2_clk_div, 0, 28, 4);
 	/* release vclk_div_reset and enable vclk_div */
 	cvbs_out_hiu_setb(cvbs_data->reg_vid_clk_div, 1, VCLK_XD_EN, 2);
-	usleep_range(5, 7);
+	udelay(5);
 
 	cvbs_out_hiu_setb(cvbs_data->reg_vid_clk_ctrl, 1, VCLK_DIV1_EN, 1);
 	cvbs_out_hiu_setb(cvbs_data->reg_vid_clk_ctrl, 1, VCLK_SOFT_RST, 1);
-	usleep_range(10, 15);
+	udelay(10);
 	cvbs_out_hiu_setb(cvbs_data->reg_vid_clk_ctrl, 0, VCLK_SOFT_RST, 1);
-	usleep_range(5, 7);
+	udelay(5);
 }
 
 static void cvbs_set_vid2_clk(unsigned int src_pll)
@@ -147,12 +146,12 @@ static void cvbs_set_vid2_clk(unsigned int src_pll)
 	if (src_pll == 0) { /* hpll */
 		/* divider: 1 */
 		/* Disable the div output clock */
-		cvbs_out_vid_pll_set(cvbs_data->reg_vid_pll_clk_div, 0, 19, 1);
-		cvbs_out_vid_pll_set(cvbs_data->reg_vid_pll_clk_div, 0, 15, 1);
+		cvbs_out_ana_setb(cvbs_data->reg_vid_pll_clk_div, 0, 19, 1);
+		cvbs_out_ana_setb(cvbs_data->reg_vid_pll_clk_div, 0, 15, 1);
 
-		cvbs_out_vid_pll_set(cvbs_data->reg_vid_pll_clk_div, 1, 18, 1);
+		cvbs_out_ana_setb(cvbs_data->reg_vid_pll_clk_div, 1, 18, 1);
 		/* Enable the final output clock */
-		cvbs_out_vid_pll_set(cvbs_data->reg_vid_pll_clk_div, 1, 19, 1);
+		cvbs_out_ana_setb(cvbs_data->reg_vid_pll_clk_div, 1, 19, 1);
 
 		sel = 0;
 	} else { /* gp0_pll */
@@ -162,12 +161,12 @@ static void cvbs_set_vid2_clk(unsigned int src_pll)
 	/* xd: 55 */
 	/* setup the XD divider value */
 	cvbs_out_hiu_setb(cvbs_data->reg_vid2_clk_div, (55 - 1), VCLK2_XD, 8);
-	usleep_range(5, 7);
+	udelay(5);
 	/* Bit[18:16] - v2_cntl_clk_in_sel */
-		cvbs_out_hiu_setb(cvbs_data->reg_vid2_clk_ctrl,
-				  sel, VCLK2_CLK_IN_SEL, 3);
+	cvbs_out_hiu_setb(cvbs_data->reg_vid2_clk_ctrl,
+			  sel, VCLK2_CLK_IN_SEL, 3);
 	cvbs_out_hiu_setb(cvbs_data->reg_vid2_clk_ctrl, 1, VCLK2_EN, 1);
-	usleep_range(2, 4);
+	udelay(2);
 
 	/* vclk: 27M */
 	/* [31:28]=8 enci_clk_sel, select vclk2_div1 */
@@ -178,13 +177,13 @@ static void cvbs_set_vid2_clk(unsigned int src_pll)
 	cvbs_out_hiu_setb(cvbs_data->reg_vid2_clk_div, 8, 28, 4);
 	/* release vclk2_div_reset and enable vclk2_div */
 	cvbs_out_hiu_setb(cvbs_data->reg_vid2_clk_div, 1, VCLK2_XD_EN, 2);
-	usleep_range(5, 7);
+	udelay(5);
 
 	cvbs_out_hiu_setb(cvbs_data->reg_vid2_clk_ctrl, 1, VCLK2_DIV1_EN, 1);
 	cvbs_out_hiu_setb(cvbs_data->reg_vid2_clk_ctrl, 1, VCLK2_SOFT_RST, 1);
-	usleep_range(10, 15);
+	udelay(10);
 	cvbs_out_hiu_setb(cvbs_data->reg_vid2_clk_ctrl, 0, VCLK2_SOFT_RST, 1);
-	usleep_range(5, 7);
+	udelay(5);
 }
 
 void set_vmode_clk(void)
@@ -196,11 +195,11 @@ void set_vmode_clk(void)
 	if (!cvbs_data)
 		return;
 
-	pr_info("%s start\n",  __func__);
+	pr_info("set_vmode_clk start\n");
 	mutex_lock(&setclk_mutex);
 	if (cvbs_cpu_type() == CVBS_CPU_TYPE_G12A ||
-	    cvbs_cpu_type() == CVBS_CPU_TYPE_G12B ||
-	    cvbs_cpu_type() == CVBS_CPU_TYPE_SM1) {
+			cvbs_cpu_type() == CVBS_CPU_TYPE_G12B ||
+			cvbs_cpu_type() == CVBS_CPU_TYPE_SM1) {
 		if (cvbs_clk_path & 0x1) {
 			pr_info("config g12a gp0_pll\n");
 			cvbs_out_ana_write(HHI_GP0_PLL_CNTL0, 0x180204f7);
@@ -211,7 +210,7 @@ void set_vmode_clk(void)
 			cvbs_out_ana_write(HHI_GP0_PLL_CNTL5, 0x39272000);
 			cvbs_out_ana_write(HHI_GP0_PLL_CNTL6, 0x56540000);
 			cvbs_out_ana_write(HHI_GP0_PLL_CNTL0, 0x380204f7);
-			usleep_range(100, 150);
+			udelay(100);
 			cvbs_out_ana_write(HHI_GP0_PLL_CNTL0, 0x180204f7);
 			ret = pll_wait_lock(HHI_GP0_PLL_CNTL0, 31);
 		} else {
@@ -224,7 +223,7 @@ void set_vmode_clk(void)
 			cvbs_out_ana_write(HHI_HDMI_PLL_CNTL6, 0x39272000);
 			cvbs_out_ana_write(HHI_HDMI_PLL_CNTL7, 0x56540000);
 			cvbs_out_ana_write(HHI_HDMI_PLL_CNTL, 0x3a0504f7);
-			usleep_range(100, 150);
+			udelay(100);
 			cvbs_out_ana_write(HHI_HDMI_PLL_CNTL, 0x1a0504f7);
 			ret = pll_wait_lock(HHI_HDMI_PLL_CNTL, 31);
 		}
@@ -232,51 +231,49 @@ void set_vmode_clk(void)
 			pr_info("[error]:hdmi_pll lock failed\n");
 	} else if (cvbs_cpu_type() == CVBS_CPU_TYPE_TL1) {
 		cvbs_out_ana_write(HHI_TCON_PLL_CNTL0,	0x202f04f7);
-		usleep_range(100, 150);
+		udelay(100);
 		cvbs_out_ana_write(HHI_TCON_PLL_CNTL0,	0x302f04f7);
-		usleep_range(100, 150);
+		udelay(100);
 		cvbs_out_ana_write(HHI_TCON_PLL_CNTL1,	0x10110000);
 		cvbs_out_ana_write(HHI_TCON_PLL_CNTL2,	0x00001108);
 		cvbs_out_ana_write(HHI_TCON_PLL_CNTL3,	0x10051400);
 		cvbs_out_ana_write(HHI_TCON_PLL_CNTL4,	0x010100c0);
-		usleep_range(100, 150);
+		udelay(100);
 		cvbs_out_ana_write(HHI_TCON_PLL_CNTL4,	0x038300c0);
-		usleep_range(100, 150);
+		udelay(100);
 		cvbs_out_ana_write(HHI_TCON_PLL_CNTL0,	0x342f04f7);
-		usleep_range(100, 150);
+		udelay(100);
 		cvbs_out_ana_write(HHI_TCON_PLL_CNTL0,	0x142f04f7);
-		usleep_range(100, 150);
+		udelay(100);
 		cvbs_out_ana_write(HHI_TCON_PLL_CNTL2,	0x00003008);
-		usleep_range(100, 150);
+		udelay(100);
 		ret = pll_wait_lock(HHI_TCON_PLL_CNTL0, 31);
 		if (ret)
 			pr_info("[error]:tl1 tcon_pll lock failed\n");
 	} else if (cvbs_cpu_type() == CVBS_CPU_TYPE_TM2) {
 		cvbs_out_ana_write(HHI_TCON_PLL_CNTL0,	0x202f04f7);
-		usleep_range(100, 150);
+		udelay(100);
 		cvbs_out_ana_write(HHI_TCON_PLL_CNTL0,	0x302f04f7);
-		usleep_range(100, 150);
+		udelay(100);
 		cvbs_out_ana_write(HHI_TCON_PLL_CNTL1,	0x10110000);
 		cvbs_out_ana_write(HHI_TCON_PLL_CNTL2,	0x00001108);
 		cvbs_out_ana_write(HHI_TCON_PLL_CNTL3,	0x10051400);
 		cvbs_out_ana_write(HHI_TCON_PLL_CNTL4,	0x010100c0);
-		usleep_range(100, 150);
+		udelay(100);
 		cvbs_out_ana_write(HHI_TCON_PLL_CNTL4,	0x038300c0);
-		usleep_range(100, 150);
+		udelay(100);
 		cvbs_out_ana_write(HHI_TCON_PLL_CNTL0,	0x342f04f7);
-		usleep_range(100, 150);
+		udelay(100);
 		cvbs_out_ana_write(HHI_TCON_PLL_CNTL0,	0x142f04f7);
-		usleep_range(100, 150);
+		udelay(100);
 		cvbs_out_ana_write(HHI_TCON_PLL_CNTL2,	0x00003008);
-		usleep_range(100, 150);
+		udelay(100);
 		ret = pll_wait_lock(HHI_TCON_PLL_CNTL0, 31);
 		if (ret)
 			pr_info("[error]:tl1 tcon_pll lock failed\n");
 		/* mux tcon pll */
 		cvbs_out_ana_setb(HHI_LVDS_TX_PHY_CNTL1_TL1, 0, 29, 1);
-	} else if (cvbs_cpu_type() == CVBS_CPU_TYPE_SC2 ||
-		   cvbs_cpu_type() == CVBS_CPU_TYPE_S4 ||
-		   cvbs_cpu_type() == CVBS_CPU_TYPE_S4D) {
+	} else if (cvbs_cpu_type() == CVBS_CPU_TYPE_SC2) {
 		cvbs_out_ana_write(ANACTRL_HDMIPLL_CTRL0, 0x3b01047b);
 		cvbs_out_ana_write(ANACTRL_HDMIPLL_CTRL1, 0x00018000);
 		cvbs_out_ana_write(ANACTRL_HDMIPLL_CTRL2, 0x00000000);
@@ -311,6 +308,7 @@ void set_vmode_clk(void)
 		ret = pll_wait_lock(HHI_TCON_PLL_CNTL0, 31);
 		if (ret)
 			pr_info("[error]:tl1 tcon_pll lock failed\n");
+		/* mux tcon pll */
 		cvbs_out_ana_setb(HHI_LVDS_TX_PHY_CNTL1_TL1, 0, 29, 1);
 	} else {
 		pr_info("config eqafter gxl hdmi pll\n");
@@ -328,8 +326,8 @@ void set_vmode_clk(void)
 	}
 
 	if (cvbs_cpu_type() == CVBS_CPU_TYPE_G12A ||
-	    cvbs_cpu_type() == CVBS_CPU_TYPE_G12B ||
-	    cvbs_cpu_type() == CVBS_CPU_TYPE_SM1) {
+		cvbs_cpu_type() == CVBS_CPU_TYPE_G12B ||
+		cvbs_cpu_type() == CVBS_CPU_TYPE_SM1) {
 		if (cvbs_clk_path & 0x2)
 			cvbs_set_vid1_clk(cvbs_clk_path & 0x1);
 		else
@@ -350,7 +348,7 @@ void set_vmode_clk(void)
 	cvbs_out_hiu_setb(cvbs_data->reg_vid_clk_ctrl2, 1, 4, 1);
 
 	mutex_unlock(&setclk_mutex);
-	pr_info("%s DONE\n", __func__);
+	pr_info("set_vmode_clk DONE\n");
 }
 
 void disable_vmode_clk(void)
@@ -366,8 +364,8 @@ void disable_vmode_clk(void)
 	cvbs_out_hiu_setb(cvbs_data->reg_vid_clk_ctrl2, 0, 4, 1);
 
 	if (cvbs_cpu_type() == CVBS_CPU_TYPE_G12A ||
-	    cvbs_cpu_type() == CVBS_CPU_TYPE_G12B ||
-	    cvbs_cpu_type() == CVBS_CPU_TYPE_SM1) {
+		cvbs_cpu_type() == CVBS_CPU_TYPE_G12B ||
+		cvbs_cpu_type() == CVBS_CPU_TYPE_SM1) {
 		if (cvbs_clk_path & 0x2)
 			disable_vid1_clk_out();
 		else
@@ -378,8 +376,7 @@ void disable_vmode_clk(void)
 			cvbs_out_ana_setb(HHI_GP0_PLL_CNTL0, 0, 28, 1);
 		else
 			cvbs_out_ana_setb(HHI_HDMI_PLL_CNTL, 0, 28, 1);
-	} else if (cvbs_cpu_type() == CVBS_CPU_TYPE_SC2 ||
-		   cvbs_cpu_type() >= CVBS_CPU_TYPE_S4) {
+	} else if (cvbs_cpu_type() == CVBS_CPU_TYPE_SC2) {
 		disable_vid2_clk_out();
 		/* disable pll */
 		cvbs_out_ana_setb(ANACTRL_HDMIPLL_CTRL0, 0, 28, 1);
@@ -389,23 +386,3 @@ void disable_vmode_clk(void)
 		cvbs_out_ana_setb(HHI_HDMI_PLL_CNTL, 0, 30, 1);
 	}
 }
-
-void cvbs_out_vid_pll_set(unsigned int _reg, unsigned int _value,
-			  unsigned int _start, unsigned int _len)
-{
-	if (cvbs_cpu_type() == CVBS_CPU_TYPE_T5 ||
-	    cvbs_cpu_type() == CVBS_CPU_TYPE_T5D)
-		cvbs_out_ana_setb(_reg, _value, _start, _len);
-	else
-		cvbs_out_hiu_setb(_reg, _value, _start, _len);
-}
-
-unsigned int cvbs_out_vid_pll_read(unsigned int _reg)
-{
-	if (cvbs_cpu_type() == CVBS_CPU_TYPE_T5 ||
-	    cvbs_cpu_type() == CVBS_CPU_TYPE_T5D)
-		return cvbs_out_ana_read(_reg);
-	else
-		return cvbs_out_hiu_read(_reg);
-}
-

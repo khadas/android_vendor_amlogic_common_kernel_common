@@ -64,7 +64,7 @@ MODULE_ALIAS("arusb_lnx");
  * http://wireless.kernel.org/en/users/Drivers/ar9170/devices ),
  * whenever you add a new device.
  */
-static const struct usb_device_id carl9170_usb_ids[] = {
+static struct usb_device_id carl9170_usb_ids[] = {
 	/* Atheros 9170 */
 	{ USB_DEVICE(0x0cf3, 0x9170) },
 	/* Atheros TG121N */
@@ -1107,10 +1107,12 @@ static int carl9170_usb_probe(struct usb_interface *intf,
 static void carl9170_usb_disconnect(struct usb_interface *intf)
 {
 	struct ar9170 *ar = usb_get_intfdata(intf);
+	struct usb_device *udev;
 
 	if (WARN_ON(!ar))
 		return;
 
+	udev = ar->udev;
 	wait_for_completion(&ar->fw_load_wait);
 
 	if (IS_INITIALIZED(ar)) {

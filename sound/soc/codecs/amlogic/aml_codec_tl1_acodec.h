@@ -1,6 +1,9 @@
-/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * aml_codec_tl1_acodec.h
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
  */
 
 #ifndef _TL1_ACODEC_H
@@ -11,6 +14,7 @@
 /* AML TL1 CODEC register space (in decimal to match datasheet) */
 //#define ACODEC_BASE_ADD    0xFF632000
 #define ACODEC_TOP_ADDR(x) (x)
+
 
 /* AML TL1 CODEC register define */
 #define ACODEC_0   ACODEC_TOP_ADDR(0x00)
@@ -109,6 +113,8 @@
 #define DAC2R_EN					4
 #define DACL_EN					    1
 #define DACR_EN					    0
+
+
 
 // bitfield def of ACODEC_6
 #define DAC2_SOFT_MUTE				31

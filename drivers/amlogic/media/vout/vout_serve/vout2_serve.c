@@ -1,9 +1,19 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/amlogic/media/vout/vout_serve/vout2_serve.c
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
-
- #define pr_fmt(fmt) "vout: " fmt
 
 /* Linux Headers */
 #include <linux/version.h>
@@ -23,10 +33,12 @@
 #include <linux/of.h>
 #include <linux/major.h>
 #include <linux/uaccess.h>
+#include <linux/extcon.h>
 #include <linux/cdev.h>
+#include <linux/poll.h>
+#include <linux/workqueue.h>
 #include <linux/clk.h>
 #include <linux/clk-provider.h>
-#include <linux/amlogic/gki_module.h>
 
 /* Amlogic Headers */
 #include <linux/amlogic/media/vout/vout_notify.h>
@@ -53,6 +65,14 @@ static char vout2_mode_uboot[VMODE_NAME_LEN_MAX] = "null";
 static unsigned int vout2_init_vmode = VMODE_INIT_NULL;
 static int uboot_display;
 static unsigned int bist_mode2;
+
+static char vout2_axis[64];
+
+static struct extcon_dev *vout2_excton_setmode;
+static const unsigned int vout2_cable[] = {
+	EXTCON_TYPE_DISP,
+	EXTCON_NONE,
+};
 
 static struct vout_cdev_s *vout2_cdev;
 static struct device *vout2_dev;
@@ -81,7 +101,7 @@ static struct vinfo_s nulldisp_vinfo[] = {
 		.vtotal            = 1125,
 		.fr_adj_type       = VOUT_FR_ADJ_NONE,
 		.viu_color_fmt     = COLOR_FMT_RGB444,
-		.viu_mux           = ((3 << 4) | VIU_MUX_MAX),
+		.viu_mux           = VIU_MUX_MAX,
 		.vout_device       = NULL,
 	},
 	{
@@ -100,12 +120,12 @@ static struct vinfo_s nulldisp_vinfo[] = {
 		.vtotal            = 1125,
 		.fr_adj_type       = VOUT_FR_ADJ_NONE,
 		.viu_color_fmt     = COLOR_FMT_RGB444,
-		.viu_mux           = ((3 << 4) | VIU_MUX_MAX),
+		.viu_mux           = VIU_MUX_MAX,
 		.vout_device       = NULL,
-	}
+	},
 };
 
-static struct vinfo_s *nulldisp_get_current_info(void *data)
+static struct vinfo_s *nulldisp_get_current_info(void)
 {
 	if (nulldisp_index >= ARRAY_SIZE(nulldisp_vinfo))
 		return NULL;
@@ -113,13 +133,12 @@ static struct vinfo_s *nulldisp_get_current_info(void *data)
 	return &nulldisp_vinfo[nulldisp_index];
 }
 
-static int nulldisp_set_current_vmode(enum vmode_e mode, void *data)
+static int nulldisp_set_current_vmode(enum vmode_e mode)
 {
 	return 0;
 }
 
-static enum vmode_e nulldisp_validate_vmode(char *name, unsigned int frac,
-					    void *data)
+static enum vmode_e nulldisp_validate_vmode(char *name, unsigned int frac)
 {
 	enum vmode_e vmode = VMODE_MAX;
 	int i;
@@ -138,7 +157,7 @@ static enum vmode_e nulldisp_validate_vmode(char *name, unsigned int frac,
 	return vmode;
 }
 
-static int nulldisp_vmode_is_supported(enum vmode_e mode, void *data)
+static int nulldisp_vmode_is_supported(enum vmode_e mode)
 {
 	int i;
 
@@ -149,25 +168,25 @@ static int nulldisp_vmode_is_supported(enum vmode_e mode, void *data)
 	return false;
 }
 
-static int nulldisp_disable(enum vmode_e cur_vmod, void *data)
+static int nulldisp_disable(enum vmode_e cur_vmod)
 {
 	return 0;
 }
 
 static int nulldisp_vout_state;
-static int nulldisp_vout_set_state(int bit, void *data)
+static int nulldisp_vout_set_state(int bit)
 {
 	nulldisp_vout_state |= (1 << bit);
 	return 0;
 }
 
-static int nulldisp_vout_clr_state(int bit, void *data)
+static int nulldisp_vout_clr_state(int bit)
 {
 	nulldisp_vout_state &= ~(1 << bit);
 	return 0;
 }
 
-static int nulldisp_vout_get_state(void *data)
+static int nulldisp_vout_get_state(void)
 {
 	return nulldisp_vout_state;
 }
@@ -185,7 +204,6 @@ static struct vout_server_s nulldisp_vout2_server = {
 		.get_state          = nulldisp_vout_get_state,
 		.set_bist           = NULL,
 	},
-	.data = NULL,
 };
 
 /* ********************************************************** */
@@ -206,10 +224,8 @@ static int vout2_set_uevent(unsigned int vout_event, int val)
 	if (vout_event != VOUT_EVENT_MODE_CHANGE)
 		return 0;
 
-	if (!vout2_dev) {
-		VOUTERR("no vout2_dev\n");
+	if (!vout2_dev)
 		return -1;
-	}
 
 	memset(env, 0, sizeof(env));
 	envp[0] = env;
@@ -219,6 +235,12 @@ static int vout2_set_uevent(unsigned int vout_event, int val)
 	ret = kobject_uevent_env(&vout2_dev->kobj, KOBJ_CHANGE, envp);
 
 	return ret;
+}
+
+static inline void vout2_setmode_wakeup_queue(void)
+{
+	if (vout2_cdev)
+		wake_up(&vout2_cdev->setmode_queue);
 }
 
 static int set_vout2_mode(char *name)
@@ -246,6 +268,7 @@ static int set_vout2_mode(char *name)
 		return -1;
 	}
 
+	extcon_set_state_sync(vout2_excton_setmode, EXTCON_TYPE_DISP, 1);
 	vout2_set_uevent(VOUT_EVENT_MODE_CHANGE, 1);
 
 	vout2_notifier_call_chain(VOUT_EVENT_MODE_CHANGE_PRE, &mode);
@@ -259,7 +282,9 @@ static int set_vout2_mode(char *name)
 	}
 	vout2_notifier_call_chain(VOUT_EVENT_MODE_CHANGE, &mode);
 
+	extcon_set_state_sync(vout2_excton_setmode, EXTCON_TYPE_DISP, 0);
 	vout2_set_uevent(VOUT_EVENT_MODE_CHANGE, 0);
+	vout2_setmode_wakeup_queue();
 
 	return ret;
 }
@@ -276,7 +301,8 @@ static int set_vout2_init_mode(void)
 
 	vout2_init_vmode = validate_vmode2(local_name, frac);
 	if (vout2_init_vmode >= VMODE_MAX) {
-		VOUTERR("vout2: no matched vout2_init mode %s, force to invalid\n",
+		VOUTERR(
+		"vout2: no matched vout2_init mode %s, force to invalid\n",
 			vout2_mode_uboot);
 		nulldisp_index = 1;
 		vout2_init_vmode = nulldisp_vinfo[nulldisp_index].mode;
@@ -292,9 +318,9 @@ static int set_vout2_init_mode(void)
 		vmode = vout2_init_vmode;
 
 	if ((vmode & VMODE_MODE_BIT_MASK) < VMODE_NULL) {
-		if (IS_ERR_OR_NULL(vpu_clkc)) {
+		if (IS_ERR_OR_NULL(vpu_clkc))
 			VOUTERR("vout2: vpu_clkc\n");
-		} else {
+		else {
 			if (vpu_clkc_state == 0) {
 				VOUTPR("vout2: enable vpu_clkc\n");
 				clk_prepare_enable(vpu_clkc);
@@ -315,8 +341,73 @@ static int set_vout2_init_mode(void)
 	return ret;
 }
 
+static int parse_para(const char *para, int para_num, int *result)
+{
+	char *token = NULL;
+	char *params, *params_base;
+	int *out = result;
+	int len = 0, count = 0;
+	int res = 0;
+	int ret = 0;
+
+	if (!para)
+		return 0;
+
+	params = kstrdup(para, GFP_KERNEL);
+	params_base = params;
+	token = params;
+	len = strlen(token);
+	do {
+		token = strsep(&params, " ");
+		while (token && (isspace(*token)
+				|| !isgraph(*token)) && len) {
+			token++;
+			len--;
+		}
+		if ((!token) || (*token == '\n') || (len == 0))
+			break;
+		ret = kstrtoint(token, 0, &res);
+		if (ret < 0)
+			break;
+		len = strlen(token);
+		*out++ = res;
+		count++;
+	} while ((token) && (count < para_num) && (len > 0));
+
+	kfree(params_base);
+	return count;
+}
+
+#define OSD_COUNT 2
+static void set_vout2_axis(char *para)
+{
+	static struct disp_rect_s disp_rect[OSD_COUNT];
+	/* char count = OSD_COUNT * 4; */
+	int *pt = &disp_rect[0].x;
+	int parsed[MAX_NUMBER_PARA] = {};
+
+	/* parse window para */
+	if (parse_para(para, 8, parsed) >= 4) {
+		pt = &disp_rect[0].x;
+		memcpy(pt, &parsed[0], sizeof(struct disp_rect_s));
+		pt = &disp_rect[1].x;
+		memcpy(pt, &parsed[4], sizeof(struct disp_rect_s));
+	}
+	/* if ((count >= 4) && (count < 8))
+	 *	disp_rect[1] = disp_rect[0];
+	 */
+
+	VOUTPR("vout2: osd0=> x:%d,y:%d,w:%d,h:%d\n"
+		"osd1=> x:%d,y:%d,w:%d,h:%d\n",
+			disp_rect[0].x, disp_rect[0].y,
+			disp_rect[0].w, disp_rect[0].h,
+			disp_rect[1].x, disp_rect[1].y,
+			disp_rect[1].w, disp_rect[1].h);
+	vout2_notifier_call_chain(VOUT_EVENT_OSD_DISP_AXIS, &disp_rect[0]);
+}
+
 static ssize_t vout2_mode_show(struct class *class,
-			       struct class_attribute *attr, char *buf)
+		struct class_attribute *attr, char *buf)
 {
 	int ret = 0;
 
@@ -326,8 +417,7 @@ static ssize_t vout2_mode_show(struct class *class,
 }
 
 static ssize_t vout2_mode_store(struct class *class,
-				struct class_attribute *attr,
-				const char *buf, size_t count)
+		struct class_attribute *attr, const char *buf, size_t count)
 {
 	char mode[64];
 
@@ -338,8 +428,27 @@ static ssize_t vout2_mode_store(struct class *class,
 	return count;
 }
 
+static ssize_t vout2_axis_show(struct class *class,
+		struct class_attribute *attr, char *buf)
+{
+	int ret = 0;
+
+	ret = snprintf(buf, 64, "%s\n", vout2_axis);
+	return ret;
+}
+
+static ssize_t vout2_axis_store(struct class *class,
+		struct class_attribute *attr, const char *buf, size_t count)
+{
+	mutex_lock(&vout2_serve_mutex);
+	snprintf(vout2_axis, 64, "%s", buf);
+	set_vout2_axis(vout2_axis);
+	mutex_unlock(&vout2_serve_mutex);
+	return count;
+}
+
 static ssize_t vout2_fr_policy_show(struct class *class,
-				    struct class_attribute *attr, char *buf)
+		struct class_attribute *attr, char *buf)
 {
 	int policy;
 	int ret = 0;
@@ -351,8 +460,7 @@ static ssize_t vout2_fr_policy_show(struct class *class,
 }
 
 static ssize_t vout2_fr_policy_store(struct class *class,
-				     struct class_attribute *attr,
-				     const char *buf, size_t count)
+		struct class_attribute *attr, const char *buf, size_t count)
 {
 	int policy;
 	int ret = 0;
@@ -404,7 +512,7 @@ static ssize_t vout2_fr_hint_store(struct class *class,
 }
 
 static ssize_t vout2_bist_show(struct class *class,
-			       struct class_attribute *attr, char *buf)
+		struct class_attribute *attr, char *buf)
 {
 	int ret = 0;
 
@@ -414,8 +522,7 @@ static ssize_t vout2_bist_show(struct class *class,
 }
 
 static ssize_t vout2_bist_store(struct class *class,
-				struct class_attribute *attr,
-				const char *buf, size_t count)
+		struct class_attribute *attr, const char *buf, size_t count)
 {
 	int ret = 0;
 
@@ -435,15 +542,14 @@ static ssize_t vout2_bist_store(struct class *class,
 }
 
 static ssize_t vout2_vinfo_show(struct class *class,
-				struct class_attribute *attr, char *buf)
+		struct class_attribute *attr, char *buf)
 {
 	const struct vinfo_s *info = NULL;
 	ssize_t len = 0;
 	unsigned int i, j;
-	unsigned char val;
 
 	info = get_current_vinfo2();
-	if (!info)
+	if (info == NULL)
 		return sprintf(buf, "current vinfo2 is null\n");
 
 	len = sprintf(buf, "current vinfo2:\n"
@@ -463,7 +569,7 @@ static ssize_t vout2_vinfo_show(struct class *class,
 		"    vtotal:                %d\n"
 		"    video_clk:             %d\n"
 		"    viu_color_fmt:         %d\n"
-		"    viu_mux:               0x%x\n\n",
+		"    viu_mux:               %d\n\n",
 		info->name, info->mode, info->frac,
 		info->width, info->height, info->field_height,
 		info->aspect_ratio_num, info->aspect_ratio_den,
@@ -471,7 +577,7 @@ static ssize_t vout2_vinfo_show(struct class *class,
 		info->screen_real_width, info->screen_real_height,
 		info->htotal, info->vtotal,
 		info->video_clk, info->viu_color_fmt, info->viu_mux);
-	len += sprintf(buf + len, "master_display_info:\n"
+	len += sprintf(buf+len, "master_display_info:\n"
 		"    present_flag          %d\n"
 		"    features              0x%x\n"
 		"    primaries             0x%x, 0x%x\n"
@@ -491,7 +597,7 @@ static ssize_t vout2_vinfo_show(struct class *class,
 		info->master_display_info.white_point[1],
 		info->master_display_info.luminance[0],
 		info->master_display_info.luminance[1]);
-	len += sprintf(buf + len, "hdr_static_info:\n"
+	len += sprintf(buf+len, "hdr_static_info:\n"
 		"    hdr_support           %d\n"
 		"    lumi_max              %d\n"
 		"    lumi_avg              %d\n"
@@ -500,30 +606,32 @@ static ssize_t vout2_vinfo_show(struct class *class,
 		info->hdr_info.lumi_max,
 		info->hdr_info.lumi_avg,
 		info->hdr_info.lumi_min);
-	len += sprintf(buf + len, "hdr_dynamic_info:");
+	len += sprintf(buf+len, "hdr_dynamic_info:");
 	for (i = 0; i < 4; i++) {
-		len += sprintf(buf + len,
+		len += sprintf(buf+len,
 			"\n    metadata_version:  %x\n"
 			"    support_flags:     %x\n",
 			info->hdr_info.dynamic_info[i].type,
 			info->hdr_info.dynamic_info[i].support_flags);
-		len += sprintf(buf + len, "    optional_fields:  ");
-		for (j = 0; j < info->hdr_info.dynamic_info[i].of_len; j++) {
-			val = info->hdr_info.dynamic_info[i].optional_fields[j];
-			len += sprintf(buf + len, " %x", val);
+		len += sprintf(buf+len, "    optional_fields:  ");
+		for (j = 0; j < info->
+			hdr_info.dynamic_info[i].of_len; j++) {
+			len += sprintf(buf+len, " %x",
+				info->hdr_info.dynamic_info[i].
+				optional_fields[j]);
 		}
 	}
-	len += sprintf(buf + len, "\n");
-	len += sprintf(buf + len, "hdr10+:\n");
-	len += sprintf(buf + len, "    ieeeoui: %x\n",
-		       info->hdr_info.hdr10plus_info.ieeeoui);
-	len += sprintf(buf + len, "    application_version: %x\n",
-		       info->hdr_info.hdr10plus_info.application_version);
+	len += sprintf(buf+len, "\n");
+	len += sprintf(buf+len, "hdr10+:\n");
+	len += sprintf(buf+len, "    ieeeoui: %x\n",
+		info->hdr_info.hdr10plus_info.ieeeoui);
+	len += sprintf(buf+len, "    application_version: %x\n",
+		info->hdr_info.hdr10plus_info.application_version);
 	return len;
 }
 
 static ssize_t vout2_cap_show(struct class *class,
-			      struct class_attribute *attr, char *buf)
+			     struct class_attribute *attr, char *buf)
 {
 	int ret;
 
@@ -536,8 +644,9 @@ static ssize_t vout2_cap_show(struct class *class,
 
 static struct class_attribute vout2_class_attrs[] = {
 	__ATTR(mode,      0644, vout2_mode_show, vout2_mode_store),
+	__ATTR(axis,      0644, vout2_axis_show, vout2_axis_store),
 	__ATTR(fr_policy, 0644,
-	       vout2_fr_policy_show, vout2_fr_policy_store),
+		vout2_fr_policy_show, vout2_fr_policy_store),
 	__ATTR(fr_hint,   0644, vout2_fr_hint_show, vout2_fr_hint_store),
 	__ATTR(bist,      0644, vout2_bist_show, vout2_bist_store),
 	__ATTR(vinfo,     0444, vout2_vinfo_show, NULL),
@@ -573,7 +682,7 @@ static int vout2_attr_remove(void)
 {
 	int i;
 
-	if (!vout2_class)
+	if (vout2_class == NULL)
 		return 0;
 
 	for (i = 0; i < ARRAY_SIZE(vout2_class_attrs); i++)
@@ -615,17 +724,17 @@ static long vout2_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 
 	mcd_nr = _IOC_NR(cmd);
 	VOUTPR("%s: cmd_dir = 0x%x, cmd_nr = 0x%x\n",
-	       __func__, _IOC_DIR(cmd), mcd_nr);
+		__func__, _IOC_DIR(cmd), mcd_nr);
 
 	argp = (void __user *)arg;
 	switch (mcd_nr) {
 	case VOUT_IOC_NR_GET_VINFO:
 		info = get_current_vinfo2();
-		if (!info) {
+		if (info == NULL)
 			ret = -EFAULT;
-		} else if (info->mode == VMODE_INIT_NULL) {
+		else if (info->mode == VMODE_INIT_NULL)
 			ret = -EFAULT;
-		} else {
+		else {
 			baseinfo.mode = info->mode;
 			baseinfo.width = info->width;
 			baseinfo.height = info->height;
@@ -639,7 +748,7 @@ static long vout2_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 			baseinfo.video_clk = info->video_clk;
 			baseinfo.viu_color_fmt = info->viu_color_fmt;
 			if (copy_to_user(argp, &baseinfo,
-					 sizeof(struct vinfo_base_s)))
+				sizeof(struct vinfo_base_s)))
 				ret = -EFAULT;
 		}
 		break;
@@ -653,7 +762,7 @@ static long vout2_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 
 #ifdef CONFIG_COMPAT
 static long vout2_compat_ioctl(struct file *file, unsigned int cmd,
-			       unsigned long arg)
+		unsigned long arg)
 {
 	unsigned long ret;
 
@@ -663,6 +772,17 @@ static long vout2_compat_ioctl(struct file *file, unsigned int cmd,
 }
 #endif
 
+static unsigned int vout2_poll(struct file *file, poll_table *wait)
+{
+	struct vout_cdev_s *vcdev = file->private_data;
+	unsigned int mask = 0;
+
+	poll_wait(file, &vcdev->setmode_queue, wait);
+	mask = (POLLIN | POLLRDNORM);
+
+	return mask;
+}
+
 static const struct file_operations vout2_fops = {
 	.owner          = THIS_MODULE,
 	.open           = vout2_io_open,
@@ -671,13 +791,14 @@ static const struct file_operations vout2_fops = {
 #ifdef CONFIG_COMPAT
 	.compat_ioctl   = vout2_compat_ioctl,
 #endif
+	.poll = vout2_poll,
 };
 
 static int vout2_fops_create(void)
 {
 	int ret = 0;
 
-	vout2_cdev = kmalloc(sizeof(*vout2_cdev), GFP_KERNEL);
+	vout2_cdev = kmalloc(sizeof(struct vout_cdev_s), GFP_KERNEL);
 	if (!vout2_cdev) {
 		VOUTERR("vout2: failed to allocate vout2_cdev\n");
 		return -1;
@@ -698,12 +819,14 @@ static int vout2_fops_create(void)
 	}
 
 	vout2_cdev->dev = device_create(vout2_class, NULL, vout2_cdev->devno,
-					NULL, VOUT_CDEV_NAME);
+			NULL, VOUT_CDEV_NAME);
 	if (IS_ERR(vout2_cdev->dev)) {
 		ret = PTR_ERR(vout2_cdev->dev);
 		VOUTERR("vout2: failed to create vout2 device: %d\n", ret);
 		goto vout2_fops_err3;
 	}
+
+	init_waitqueue_head(&vout2_cdev->setmode_queue);
 
 	/*VOUTPR("vout2: %s OK\n", __func__);*/
 	return 0;
@@ -725,14 +848,12 @@ static void vout2_fops_remove(void)
 	kfree(vout2_cdev);
 	vout2_cdev = NULL;
 }
-
 /* ************************************************************* */
 
 #ifdef CONFIG_PM
 static int aml_vout2_suspend(struct platform_device *pdev, pm_message_t state)
 {
 #ifdef CONFIG_AMLOGIC_LEGACY_EARLY_SUSPEND
-
 	if (early_suspend_flag)
 		return 0;
 
@@ -744,7 +865,6 @@ static int aml_vout2_suspend(struct platform_device *pdev, pm_message_t state)
 static int aml_vout2_resume(struct platform_device *pdev)
 {
 #ifdef CONFIG_AMLOGIC_LEGACY_EARLY_SUSPEND
-
 	if (early_suspend_flag)
 		return 0;
 
@@ -774,14 +894,12 @@ static int aml_vout2_restore(struct device *dev)
 
 	return 0;
 }
-
 static int aml_vout2_pm_suspend(struct device *dev)
 {
 	struct platform_device *pdev = to_platform_device(dev);
 
 	return aml_vout2_suspend(pdev, PMSG_SUSPEND);
 }
-
 static int aml_vout2_pm_resume(struct device *dev)
 {
 	struct platform_device *pdev = to_platform_device(dev);
@@ -810,28 +928,57 @@ static void aml_vout2_late_resume(struct early_suspend *h)
 }
 #endif
 
+static void aml_vout2_extcon_register(struct platform_device *pdev)
+{
+	struct extcon_dev *edev;
+	int ret;
+
+	/*set display mode*/
+	edev = extcon_dev_allocate(vout2_cable);
+	if (IS_ERR(edev)) {
+		VOUTERR("failed to allocate vout2 extcon setmode\n");
+		return;
+	}
+
+	edev->dev.parent = &pdev->dev;
+	edev->name = "vout2_excton_setmode";
+	dev_set_name(&edev->dev, "setmode2");
+	ret = extcon_dev_register(edev);
+	if (ret) {
+		VOUTERR("failed to register vout2 extcon setmode\n");
+		return;
+	}
+	vout2_excton_setmode = edev;
+}
+
+static void aml_vout2_extcon_free(void)
+{
+	extcon_dev_free(vout2_excton_setmode);
+	vout2_excton_setmode = NULL;
+}
+
 /*****************************************************************
  **
  **	vout driver interface
  **
  ******************************************************************/
 static int vout2_clk_on_notifier(struct notifier_block *nb,
-				 unsigned long event, void *data)
+		unsigned long event, void *data)
 {
 	int *vmod;
 
 	if ((event & VOUT_EVENT_MODE_CHANGE_PRE) == 0)
 		return NOTIFY_DONE;
 
-	if (!data) {
+	if (data == NULL) {
 		VOUTERR("%s: data is NULL\n", __func__);
 		return NOTIFY_DONE;
 	}
 	vmod = (int *)data;
 	if (*vmod < VMODE_NULL) {
-		if (IS_ERR_OR_NULL(vpu_clkc)) {
+		if (IS_ERR_OR_NULL(vpu_clkc))
 			VOUTERR("vout2: vpu_clkc\n");
-		} else {
+		else {
 			if (vpu_clkc_state == 0) {
 				VOUTPR("vout2: enable vpu_clkc\n");
 				clk_prepare_enable(vpu_clkc);
@@ -848,22 +995,22 @@ static struct notifier_block vout2_clk_on_nb = {
 };
 
 static int vout2_clk_off_notifier(struct notifier_block *nb,
-				  unsigned long event, void *data)
+		unsigned long event, void *data)
 {
 	int *vmod;
 
 	if ((event & VOUT_EVENT_MODE_CHANGE) == 0)
 		return NOTIFY_DONE;
 
-	if (!data) {
+	if (data == NULL) {
 		VOUTERR("%s: data is NULL\n", __func__);
 		return NOTIFY_DONE;
 	}
 	vmod = (int *)data;
 	if (*vmod >= VMODE_NULL) {
-		if (IS_ERR_OR_NULL(vpu_clkc)) {
+		if (IS_ERR_OR_NULL(vpu_clkc))
 			VOUTERR("vout2: vpu_clkc\n");
-		} else {
+		else {
 			if (vpu_clkc_state) {
 				VOUTPR("vout2: disable vpu_clkc\n");
 				clk_disable_unprepare(vpu_clkc);
@@ -910,14 +1057,14 @@ static void vout2_clktree_init(struct device *dev)
 	vpu_clkc0 = devm_clk_get(dev, "vpu_clkc0");
 	vpu_clkc = devm_clk_get(dev, "vpu_clkc");
 	if ((IS_ERR_OR_NULL(vpu_clkc0)) ||
-	    (IS_ERR_OR_NULL(vpu_clkc))) {
-		VOUTERR("vout2: %s: vpu_clkc failed\n", __func__);
+		(IS_ERR_OR_NULL(vpu_clkc))) {
+		VOUTERR("vout2: %s: vpu_clkc\n", __func__);
 	} else {
-		WARN_ON(clk_set_rate(vpu_clkc0, 200000000));
-		WARN_ON(clk_set_parent(vpu_clkc, vpu_clkc0));
+		clk_set_rate(vpu_clkc0, 200000000);
+		clk_set_parent(vpu_clkc, vpu_clkc0);
 	}
 
-	pr_debug("vout2: clktree_init\n");
+	VOUTPR("vout2: clktree_init\n");
 }
 
 static void aml_vout2_get_dt_info(struct platform_device *pdev)
@@ -956,6 +1103,7 @@ static int aml_vout2_probe(struct platform_device *pdev)
 
 	vout2_clktree_init(&pdev->dev);
 	vout2_register_server(&nulldisp_vout2_server);
+	aml_vout2_extcon_register(pdev);
 	vout2_notifier_register();
 
 	set_vout2_init_mode();
@@ -971,6 +1119,7 @@ static int aml_vout2_remove(struct platform_device *pdev)
 #endif
 	vout2_notifier_unregister();
 
+	aml_vout2_extcon_free();
 	vout2_attr_remove();
 	vout2_fops_remove();
 	vout2_unregister_server(&nulldisp_vout2_server);
@@ -1016,15 +1165,25 @@ static struct platform_driver vout2_driver = {
 	},
 };
 
-int __init vout2_init_module(void)
+static int __init vout2_init_module(void)
 {
-	return platform_driver_register(&vout2_driver);
+	int ret = 0;
+
+	if (platform_driver_register(&vout2_driver)) {
+		VOUTERR("vout2: failed to register VOUT2 driver\n");
+		ret = -ENODEV;
+	}
+
+	return ret;
 }
 
-__exit void vout2_exit_module(void)
+static __exit void vout2_exit_module(void)
 {
 	platform_driver_unregister(&vout2_driver);
 }
+
+module_init(vout2_init_module);
+module_exit(vout2_exit_module);
 
 static int str2lower(char *str)
 {
@@ -1073,7 +1232,7 @@ static void vout2_init_mode_parse(char *str)
 	VOUTPR("vout2: %s\n", vout2_mode_uboot);
 }
 
-static int get_vout2_init_mode(char *str)
+static int __init get_vout2_init_mode(char *str)
 {
 	char *ptr = str;
 	char sep[2];
@@ -1081,7 +1240,7 @@ static int get_vout2_init_mode(char *str)
 	int count = 3;
 	char find = 0;
 
-	if (!str)
+	if (str == NULL)
 		return -EINVAL;
 
 	do {
@@ -1106,6 +1265,6 @@ static int get_vout2_init_mode(char *str)
 }
 __setup("vout2=", get_vout2_init_mode);
 
-//MODULE_AUTHOR("Platform-BJ <platform.bj@amlogic.com>");
-//MODULE_DESCRIPTION("VOUT2 Server Module");
-//MODULE_LICENSE("GPL");
+MODULE_AUTHOR("Platform-BJ <platform.bj@amlogic.com>");
+MODULE_DESCRIPTION("VOUT2 Server Module");
+MODULE_LICENSE("GPL");

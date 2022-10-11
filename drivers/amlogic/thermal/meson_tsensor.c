@@ -1,6 +1,18 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/amlogic/thermal/meson_tsensor.c
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
 #include <linux/clk.h>
@@ -14,11 +26,12 @@
 #include <linux/platform_device.h>
 #include <linux/regulator/consumer.h>
 #include <linux/cpu_cooling.h>
-#include <linux/pm_runtime.h>
-#include <linux/pm_domain.h>
-#include <linux/arm-smccc.h>
-#include <linux/amlogic/secmon.h>
+
 #include "../../thermal/thermal_core.h"
+
+//#define MESON_G12_PTM
+
+#define MESON_TS_DEBUG_INFO
 
 /*r1p1 thermal sensor version*/
 #define R1P1_TS_CFG_REG1	(0x1 * 4)
@@ -46,6 +59,7 @@
 #define R1P1_TS_IRQ_MASK	0xff
 
 #define R1P1_TS_IRQ_LOGIC_EN_SHIT	15
+
 #define R1P1_TS_IRQ_FALL3_EN_SHIT	31
 #define R1P1_TS_IRQ_FALL2_EN_SHIT	30
 #define R1P1_TS_IRQ_FALL1_EN_SHIT	29
@@ -85,14 +99,6 @@
 #define MAX_TS_NUM	3
 #define	TS_DEF_RTEMP	125
 #define	TEMP_CAL	1
-#define	R1P1_CAL_NUM	4
-#define	R1P1_TS_MAX	0x3500
-#define	R1P1_TS_MIN	0x1500
-#define	R1P1_TS_CLK_RATE	500000
-#define R1P1_TS_WAIT		5
-#define R1P1_PM_MIN_TIMEOUT	5
-#define R1P1_PM_MAX_TIMEOUT	250
-#define TSENSOR_CALI_READ	0x82000047
 
 enum soc_type {
 	SOC_ARCH_TS_R1P0 = 1,
@@ -108,8 +114,11 @@ enum soc_type {
  */
 struct meson_tsensor_platform_data {
 	u32 cal_type;
-	int tsensor_id;
-	u32 cal_coeff[4];
+	int cal_a;
+	int cal_b;
+	int cal_c;
+	int cal_d;
+	int ctl_data;
 	int reboot_temp;
 };
 
@@ -119,25 +128,23 @@ struct meson_tsensor_platform_data {
  */
 struct meson_tsensor_data {
 	int id;
-	struct device		*dev;
 	struct meson_tsensor_platform_data *pdata;
 	void __iomem *base_c;
 	void __iomem *base_e;
 	int irq;
 	enum soc_type soc;
 	struct work_struct irq_work;
-	struct mutex lock;/*mutex lock for set tsensor reg*/
+	struct mutex lock;
 	struct clk *clk;
 	u32	trim_info;
 	struct thermal_zone_device *tzd;
 	unsigned int ntrip;
-	int (*tsensor_hw_initialize)(struct platform_device *pdev);
-	int (*tsensor_trips_initialize)(struct platform_device *pdev);
+	int (*tsensor_initialize)(struct platform_device *pdev);
 	void (*tsensor_control)(struct platform_device *pdev,
-				bool on);
+					bool on);
 	int (*tsensor_read)(struct meson_tsensor_data *data);
 	void (*tsensor_set_emulation)(struct meson_tsensor_data *data,
-				      int temp);
+					int temp);
 	void (*tsensor_clear_irqs)(struct meson_tsensor_data *data);
 	void (*tsensor_update_irqs)(struct meson_tsensor_data *data);
 };
@@ -194,20 +201,21 @@ static u32 temp_to_code(struct meson_tsensor_data *data, int temp, bool trend)
 	/*u_readl = (T + 274.7) / 727.8 - u_efuse / (1 << 16)*/
 	/*Yout =  (u_readl / (5.05 - 4.05u_readl)) *(1 << 16)*/
 	cal_type = pdata->cal_type;
-	cal_a = pdata->cal_coeff[0];
-	cal_b = pdata->cal_coeff[1];
-	cal_c = pdata->cal_coeff[2];
-	cal_d = pdata->cal_coeff[3];
-	switch (cal_type & 0xf) {
+	cal_a = pdata->cal_a;
+	cal_b = pdata->cal_b;
+	cal_c = pdata->cal_c;
+	cal_d = pdata->cal_d;
+	switch (cal_type) {
 	case 0x1:
 		div_tmp2 = cal_c;
 		div_tmp2 = div_tmp2 + temp * 10;
 		div_tmp2 = (1 << 16) * div_tmp2;
 		div_tmp2 = div_s64(div_tmp2, cal_d);
-		if (uefuse & 0x8000)
+		if (uefuse & 0x8000) {
 			div_tmp2 = div_tmp2 + (uefuse & 0x7fff);
-		else
+		} else {
 			div_tmp2 = div_tmp2 - (uefuse & 0x7fff);
+		}
 		div_tmp1 = cal_a * div_tmp2;
 		div_tmp1 = div_s64(div_tmp1, 1 << 16);
 		div_tmp1 = cal_b - div_tmp1;
@@ -241,11 +249,11 @@ static int code_to_temp(struct meson_tsensor_data *data, int temp_code)
 	uefuse = uefuse & 0xffff;
 	temp = temp_code;
 
-	cal_type = (pdata->cal_type) & 0xf;
-	cal_a = pdata->cal_coeff[0];
-	cal_b = pdata->cal_coeff[1];
-	cal_c = pdata->cal_coeff[2];
-	cal_d = pdata->cal_coeff[3];
+	cal_type = pdata->cal_type;
+	cal_a = pdata->cal_a;
+	cal_b = pdata->cal_b;
+	cal_c = pdata->cal_c;
+	cal_d = pdata->cal_d;
 	switch (cal_type) {
 	case 0x1:
 		/* T = 727.8*(u_real+u_efuse/(1<<16)) - 274.7 */
@@ -257,7 +265,7 @@ static int code_to_temp(struct meson_tsensor_data *data, int temp_code)
 		div_tmp2 = temp * cal_b;
 		div_tmp2 = div_s64(div_tmp2, 100);
 		div_tmp2 = div_tmp2 * (1 << 16);
-		div_tmp2 = div_s64(div_tmp2, (1 << 16) + div_tmp1);
+		div_tmp2 = div_s64(div_tmp2, (1<<16) + div_tmp1);
 		if (uefuse & 0x8000) {
 			div_tmp1 = (div_tmp2 - (uefuse & (0x7fff))) * cal_d;
 			div_tmp1 = div_s64(div_tmp1, 1 << 16);
@@ -276,31 +284,21 @@ static int code_to_temp(struct meson_tsensor_data *data, int temp_code)
 	return temp;
 }
 
-static int meson_tsensor_hw_initialize(struct platform_device *pdev)
+static int meson_tsensor_initialize(struct platform_device *pdev)
 {
 	struct meson_tsensor_data *data = platform_get_drvdata(pdev);
 	int ret;
 
-	mutex_lock(&data->lock);
-	ret = data->tsensor_hw_initialize(pdev);
-	mutex_unlock(&data->lock);
-	return ret;
-}
-
-static int meson_tsensor_trips_initialize(struct platform_device *pdev)
-{
-	struct meson_tsensor_data *data = platform_get_drvdata(pdev);
-	int ret;
 
 	if (of_thermal_get_ntrips(data->tzd) > data->ntrip) {
-		dev_info_once(&pdev->dev,
+		dev_info(&pdev->dev,
 			 "More trip points than supported by this tsensor.\n");
-		dev_info_once(&pdev->dev,
+		dev_info(&pdev->dev,
 			 "%d trip points should be configured in polling mode.\n",
 			 (of_thermal_get_ntrips(data->tzd) - data->ntrip));
 	}
 	mutex_lock(&data->lock);
-	ret = data->tsensor_trips_initialize(pdev);
+	ret = data->tsensor_initialize(pdev);
 	mutex_unlock(&data->lock);
 	return ret;
 }
@@ -317,26 +315,20 @@ static void meson_tsensor_control(struct platform_device *pdev, bool on)
 static void r1p1_tsensor_control(struct platform_device *pdev, bool on)
 {
 	struct meson_tsensor_data *data = platform_get_drvdata(pdev);
+	struct thermal_zone_device *tz = data->tzd;
 	unsigned int con;
-	int ret;
 
 	con = readl(data->base_c + R1P1_TS_CFG_REG1);
 
 	if (on) {
+		con |= (of_thermal_is_trip_valid(tz, 0)
+			<< R1P1_TS_IRQ_RISE0_EN_SHIT);
 		con |= (0x1 << R1P1_TS_IRQ_LOGIC_EN_SHIT);
 		con |= (R1P1_TS_FILTER_EN | R1P1_TS_VCM_EN | R1P1_TS_VBG_EN
 			| R1P1_TS_DEM_EN | R1P1_TS_CH_SEL);
-		con &= ~(R1P1_TS_RSET_VBG | R1P1_TS_RSET_ADC);
-		ret = clk_set_rate(data->clk, R1P1_TS_CLK_RATE);
-		if (ret)
-			dev_err(&pdev->dev,
-				"Failed to set clk rate: %d\n", ret);
-		ret = clk_prepare_enable(data->clk);
-		if (ret)
-			dev_err(&pdev->dev,
-				"Failed to perpare clk enable: %d\n", ret);
+		clk_enable(data->clk);
 	} else {
-		clk_disable_unprepare(data->clk);
+		clk_disable(data->clk);
 		con &= ~((1 << R1P1_TS_IRQ_LOGIC_EN_SHIT)
 			| (R1P1_TS_IRQ_ALL_CLR));
 		con &= ~(R1P1_TS_FILTER_EN | R1P1_TS_VCM_EN | R1P1_TS_VBG_EN
@@ -345,47 +337,45 @@ static void r1p1_tsensor_control(struct platform_device *pdev, bool on)
 	writel(con, data->base_c + R1P1_TS_CFG_REG1);
 }
 
-static int r1p1_tsensor_hw_initialize(struct platform_device *pdev)
+
+static int r1p1_tsensor_initialize(struct platform_device *pdev)
 {
 	struct meson_tsensor_data *data = platform_get_drvdata(pdev);
 	struct meson_tsensor_platform_data *pdata = data->pdata;
+	struct thermal_zone_device *tz = data->tzd;
+	u32 trim_info = 0;
+	u32 rising_threshold = 0, falling_threshold = 0;
 	u32 reboot_reg = 0xffff, con = 0;
-	int ret = 0, reboot_temp;
+	int ret = 0, threshold_code, i;
+	int temp, temp_hist, reboot_temp;
+	unsigned int reg_off, bit_off;
 	int ver;
 
 	/*frist get the r1p1 trim info*/
-	ver = (data->trim_info >> 24) & 0xff;
+	trim_info = readl(data->base_e + R1P1_TRIM_INFO);
+	pr_info("tsensor trim info: 0x%x!\n", trim_info);
+	ver = (trim_info >> 24) & 0xff;
 	/*r1p1 tsensor ver to doing*/
-	if (((ver & 0xf) >> 2) == 0)
-		return -EINVAL;
-	if ((ver & 0x80)  == 0)
-		return -EINVAL;
+	if (((ver & 0xf) >> 2) == 0) {
+		ret = ERANGE;
+		pr_info("thermal calibration type not support: 0x%x!\n", ver);
+		goto out;
+	}
+	if ((ver & 0x80)  == 0) {
+		ret = ERANGE;
+		pr_info("thermal calibration data not valid: 0x%x!\n", ver);
+		goto out;
+	}
+	data->trim_info = trim_info;
 
 	/*r1p1 init the ts reboot soc function*/
 	reboot_temp = pdata->reboot_temp;
-	if (reboot_temp) {
-		reboot_reg = temp_to_code(data, reboot_temp / MCELSIUS, true);
-		con = (readl(data->base_c + R1P1_TS_CFG_REG2) |
-			(reboot_reg << 4));
-		con |= (R1P1_TS_HITEMP_EN | R1P1_TS_REBOOT_ALL_EN);
-		con |= (R1P1_TS_REBOOT_TIME);
-		writel(con, data->base_c + R1P1_TS_CFG_REG2);
-	} else {
-		pr_info("tsensor rtemp is zore no enable hireboot\n");
-	}
-
-	return ret;
-}
-
-static int r1p1_tsensor_trips_initialize(struct platform_device *pdev)
-{
-	struct meson_tsensor_data *data = platform_get_drvdata(pdev);
-	struct thermal_zone_device *tz = data->tzd;
-	u32 rising_threshold = 0, falling_threshold = 0;
-	int ret = 0, threshold_code, i;
-	int temp, temp_hist;
-	unsigned int reg_off, bit_off;
-
+	reboot_reg = temp_to_code(data, reboot_temp / MCELSIUS, true);
+	con = (readl(data->base_c + R1P1_TS_CFG_REG2) | (reboot_reg << 4));
+	con |= (R1P1_TS_HITEMP_EN | R1P1_TS_REBOOT_ALL_EN);
+	con |= (R1P1_TS_REBOOT_TIME);
+	pr_info("tsensor hireboot: 0x%x\n", con);
+	writel(con, data->base_c + R1P1_TS_CFG_REG2);
 	/*
 	 * Write temperature code for rising and falling threshold
 	 * On r1p1 tsensor there are 4 rising and 4 falling threshold
@@ -409,7 +399,7 @@ static int r1p1_tsensor_trips_initialize(struct platform_device *pdev)
 	 * [23:12] - fall_th2
 	 * [11:0] - fall_th3
 	 */
-	for (i = (data->ntrip - 1); i >= 0; i--) {
+	for (i = (of_thermal_get_ntrips(tz) - 1); i >= 0; i--) {
 		reg_off = (i / 2) << 2;
 		bit_off = ((i + 1) % 2);
 		tz->ops->get_trip_temp(tz, i, &temp);
@@ -424,21 +414,21 @@ static int r1p1_tsensor_trips_initialize(struct platform_device *pdev)
 		rising_threshold &= ~(R1P1_TS_TEMP_MASK << (12 * bit_off));
 		rising_threshold |= threshold_code << (12 * bit_off);
 		writel(rising_threshold,
-		       data->base_c + R1P1_TS_CFG_REG4 + reg_off);
+			data->base_c + R1P1_TS_CFG_REG4 + reg_off);
 
 		/* Set 12-bit temperature code for falling threshold levels */
 		threshold_code = temp_to_code(data, temp_hist, false);
 		falling_threshold = readl(data->base_c +
-					  R1P1_TS_CFG_REG6 + reg_off);
+				R1P1_TS_CFG_REG6 + reg_off);
 		falling_threshold &= ~(R1P1_TS_TEMP_MASK << (12 * bit_off));
 		falling_threshold |= threshold_code << (12 * bit_off);
 		writel(falling_threshold,
-		       data->base_c + R1P1_TS_CFG_REG6 + reg_off);
+			data->base_c + R1P1_TS_CFG_REG6 + reg_off);
 	}
-	data->tsensor_update_irqs(data);
 	data->tsensor_clear_irqs(data);
-
+out:
 	return ret;
+
 }
 
 static int r1p1_tsensor_read(struct meson_tsensor_data *data)
@@ -448,30 +438,30 @@ static int r1p1_tsensor_read(struct meson_tsensor_data *data)
 	unsigned int value_all = 0;
 
 	/*
-	 *r1p1 tsensor get 16 times value.
+	 *r1p1 tsensor store 16 temp value.
+	 *read d0-d15 and get the average temp.
 	 */
 	for (j = 0; j < R1P1_TS_VALUE_CONT; j++) {
 		tvalue = readl(data->base_c + R1P1_TS_STAT0);
 		tvalue = tvalue & 0xffff;
-		if (tvalue >= R1P1_TS_MIN && tvalue <= R1P1_TS_MAX) {
+		if ((tvalue >= 0x1500) && (tvalue <= 0x3500)) {
 			cnt++;
 			value_all += (tvalue & 0xffff);
 		}
 	}
-
 	if (cnt) {
 		tvalue = value_all / cnt;
 		pr_debug("%s  vall: %u, cnt: %u\n",
-			 __func__, value_all, cnt);
+				__func__, value_all, cnt);
 	} else {
-		pr_info("%s  valid cnt is 0, tvalue:%d\n", __func__, tvalue);
+		pr_info("%s  valid cnt is 0\n", __func__);
 		tvalue = 0;
 	}
 	return tvalue;
 }
 
 static void r1p1_tsensor_set_emulation(struct meson_tsensor_data *data,
-				       int temp)
+					 int temp)
 {
 	pr_info("r1p1 ts no emulation\n");
 }
@@ -490,6 +480,7 @@ static void r1p1_tsensor_clear_irqs(struct meson_tsensor_data *data)
 	val_irq = (readl(data->base_c + R1P1_TS_CFG_REG1)
 			& (~R1P1_TS_IRQ_ALL_CLR));
 	writel(val_irq, data->base_c + R1P1_TS_CFG_REG1);
+
 }
 
 static void r1p1_tsensor_update_irqs(struct meson_tsensor_data *data)
@@ -498,7 +489,7 @@ static void r1p1_tsensor_update_irqs(struct meson_tsensor_data *data)
 	int temp;
 	unsigned int i, con;
 
-	/* Find the level for which trip happened */
+		/* Find the level for which trip happened */
 	for (i = 0; i < of_thermal_get_ntrips(tz); i++) {
 		tz->ops->get_trip_temp(tz, i, &temp);
 		if (tz->last_temperature < temp)
@@ -513,51 +504,24 @@ static void r1p1_tsensor_update_irqs(struct meson_tsensor_data *data)
 			<< (R1P1_TS_IRQ_FALL0_EN_SHIT + i - 1));
 	con &= ~(R1P1_TS_IRQ_ALL_CLR);
 	writel(con, data->base_c + R1P1_TS_CFG_REG1);
+	pr_debug("tsensor update irq: 0x%x, i: %d\n", con, i);
 }
 
 static int meson_get_temp(void *p, int *temp)
 {
 	struct meson_tsensor_data *data = p;
-	struct thermal_zone_device *tz = data->tzd;
-	int triptemp, ret;
 
-	if (!data->tsensor_read)
+	if (!data || !data->tsensor_read)
 		return -EINVAL;
-
-	ret = pm_runtime_get_sync(data->dev);
-	if (ret < 0)
-		goto out;
 	mutex_lock(&data->lock);
 	*temp = code_to_temp(data, data->tsensor_read(data));
 	mutex_unlock(&data->lock);
-
-	tz->ops->get_trip_temp(tz, 0, &triptemp);
-	if (tz->last_temperature < triptemp) {
-		/*
-		 *if wo use disable api, need re set runtime
-		 *pm_runtime_enable
-		 *pm_runtime_set_autosuspend_delay
-		 *pm_runtime_use_autosuspend
-		 */
-		pm_runtime_set_autosuspend_delay(data->dev,
-						 R1P1_PM_MIN_TIMEOUT);
-	} else {
-		/*
-		 *maybe we can use disable runtime api
-		 *pm_runtime_put_noidle
-		 *pm_runtime_disable
-		 */
-		pm_runtime_set_autosuspend_delay(data->dev,
-						 R1P1_PM_MAX_TIMEOUT);
-	}
-out:
-	pm_runtime_mark_last_busy(data->dev);
-	pm_runtime_put_autosuspend(data->dev);
 	return 0;
 }
 
 static void meson_tsensor_work(struct work_struct *work)
 {
+
 	struct meson_tsensor_data *data = container_of(work,
 			struct meson_tsensor_data, irq_work);
 
@@ -568,6 +532,7 @@ static void meson_tsensor_work(struct work_struct *work)
 	data->tsensor_clear_irqs(data);
 	mutex_unlock(&data->lock);
 	enable_irq(data->irq);
+
 }
 
 static irqreturn_t meson_tsensor_irq(int irq, void *id)
@@ -582,7 +547,7 @@ static irqreturn_t meson_tsensor_irq(int irq, void *id)
 
 static const struct of_device_id meson_tsensor_match[] = {
 	{ .compatible = "amlogic, r1p1-tsensor", },
-	{ /* sentinel */ }
+	{ /* sentinel */ },
 };
 MODULE_DEVICE_TABLE(of, meson_tsensor_match);
 
@@ -594,33 +559,50 @@ static int meson_of_get_soc_type(struct device_node *np)
 }
 
 static int meson_of_sensor_conf(struct platform_device *pdev,
-				struct meson_tsensor_platform_data *pdata)
+				 struct meson_tsensor_platform_data *pdata)
 {
-	if (of_property_read_u32(pdev->dev.of_node, "tsensor_id",
-				 &pdata->tsensor_id)) {
-		pdata->tsensor_id = -1;
-	}
 	if (of_property_read_u32(pdev->dev.of_node, "cal_type",
-				 &pdata->cal_type)) {
+						&pdata->cal_type)) {
 		dev_warn(&pdev->dev,
 			 "Missing cal_type using default %d\n",
 			 0x0);
 		pdata->cal_type = 0x0;
 	}
-	if (of_property_read_u32_array(pdev->dev.of_node, "cal_coeff",
-				       &pdata->cal_coeff[0], R1P1_CAL_NUM)) {
+	if (of_property_read_u32(pdev->dev.of_node, "cal_a",
+						&pdata->cal_a)) {
 		dev_warn(&pdev->dev,
-			 "Missing cal_coeff using default %d\n",
+			 "Missing cal_a using default %d\n",
 			 0x0);
+		pdata->cal_a = 0x0;
+	}
+	if (of_property_read_u32(pdev->dev.of_node, "cal_b",
+						&pdata->cal_b)) {
+		dev_warn(&pdev->dev,
+			 "Missing ctldata using default %d\n",
+			 0x0);
+		pdata->cal_b = 0x0;
+	}
+	if (of_property_read_u32(pdev->dev.of_node, "cal_c",
+						&pdata->cal_c)) {
+		dev_warn(&pdev->dev,
+			 "Missing cal_c using default %d\n",
+			 0x0);
+		pdata->cal_c = 0x0;
+	}
+	if (of_property_read_u32(pdev->dev.of_node, "cal_d",
+						&pdata->cal_d)) {
+		dev_warn(&pdev->dev,
+			 "Missing cal_d using default %d\n",
+			 0x0);
+		pdata->cal_d = 0x0;
 	}
 	if (of_property_read_u32(pdev->dev.of_node, "rtemp",
-				 &pdata->reboot_temp)) {
+						&pdata->reboot_temp)) {
 		dev_warn(&pdev->dev,
 			 "Missing rtemp using default %d\n",
 			 TS_DEF_RTEMP);
-		pdata->reboot_temp = TS_DEF_RTEMP;
+		pdata->ctl_data = TS_DEF_RTEMP;
 	}
-	pr_info("tsensor rtemp :%d\n", pdata->reboot_temp);
 	return 0;
 }
 
@@ -629,8 +611,6 @@ static int meson_map_dt_data(struct platform_device *pdev)
 	struct meson_tsensor_data *data = platform_get_drvdata(pdev);
 	struct meson_tsensor_platform_data *pdata;
 	struct resource res;
-	struct arm_smccc_res smc_res;
-	void *sharemem_outbuf_base;
 
 	if (!data || !pdev->dev.of_node)
 		return -ENODEV;
@@ -656,52 +636,26 @@ static int meson_map_dt_data(struct platform_device *pdev)
 		return -EADDRNOTAVAIL;
 	}
 
+	if (of_address_to_resource(pdev->dev.of_node, 1, &res)) {
+		dev_err(&pdev->dev, "failed to get Resource 1\n");
+		return -ENODEV;
+	}
+	data->base_e = devm_ioremap(&pdev->dev, res.start, resource_size(&res));
+	if (!data->base_e) {
+		dev_err(&pdev->dev, "Failed to ioremap memory\n");
+		return -ENOMEM;
+	}
 	pdata = devm_kzalloc(&pdev->dev,
 			     sizeof(struct meson_tsensor_platform_data),
 			     GFP_KERNEL);
 	if (!pdata)
 		return -ENOMEM;
 	meson_of_sensor_conf(pdev, pdata);
-
-	if (!(pdata->cal_type & 0xf0)) {
-		if (of_address_to_resource(pdev->dev.of_node, 1, &res)) {
-			dev_err(&pdev->dev, "failed to get Resource 1\n");
-			return -ENODEV;
-		}
-		data->base_e = devm_ioremap(&pdev->dev, res.start, resource_size(&res));
-		if (!data->base_e) {
-			dev_err(&pdev->dev, "Failed to ioremap memory\n");
-			return -ENOMEM;
-		}
-		data->trim_info = readl(data->base_e + R1P1_TRIM_INFO);
-	} else {
-		if (pdata->tsensor_id == -1) {
-			dev_err(&pdev->dev, "Failed to get tsensor id\n");
-			return -EINVAL;
-		}
-
-		arm_smccc_smc(TSENSOR_CALI_READ, pdata->tsensor_id, 0, 0, 0, 0, 0, 0, &smc_res);
-		if (smc_res.a0) {
-			dev_err(&pdev->dev, "Failed to get thermal cali data from bl31\n");
-			return -EINVAL;
-		}
-
-		meson_sm_mutex_lock();
-		sharemem_outbuf_base = get_meson_sm_output_base();
-		meson_sm_mutex_unlock();
-		if (!sharemem_outbuf_base) {
-			dev_err(&pdev->dev, "Failed to get thermal cali data address\n");
-			return -EINVAL;
-		}
-		memcpy(&data->trim_info, (const void *)sharemem_outbuf_base, 4);
-	}
-
 	data->pdata = pdata;
 	data->soc = meson_of_get_soc_type(pdev->dev.of_node);
 	switch (data->soc) {
 	case SOC_ARCH_TS_R1P1:
-		data->tsensor_hw_initialize = r1p1_tsensor_hw_initialize;
-		data->tsensor_trips_initialize = r1p1_tsensor_trips_initialize;
+		data->tsensor_initialize = r1p1_tsensor_initialize;
 		data->tsensor_control = r1p1_tsensor_control;
 		data->tsensor_read = r1p1_tsensor_read;
 		data->tsensor_set_emulation = r1p1_tsensor_set_emulation;
@@ -727,61 +681,60 @@ static int meson_tsensor_probe(struct platform_device *pdev)
 	int ret;
 
 	pr_info("meson ts init\n");
-	data = devm_kzalloc(&pdev->dev, sizeof(*data), GFP_KERNEL);
+	data = devm_kzalloc(&pdev->dev, sizeof(struct meson_tsensor_data),
+					GFP_KERNEL);
 	if (!data)
 		return -ENOMEM;
-	data->dev = &pdev->dev;
 	platform_set_drvdata(pdev, data);
 	mutex_init(&data->lock);
+
 	data->clk = devm_clk_get(&pdev->dev, "ts_comp");
 	if (IS_ERR(data->clk)) {
 		dev_err(&pdev->dev, "Failed to get tsclock\n");
 		ret = PTR_ERR(data->clk);
-		return ret;
+		goto err_clk;
+	}
+
+	ret = clk_prepare(data->clk);
+	if (ret) {
+		dev_err(&pdev->dev, "Failed to prepare tsclock\n");
+		goto err_clk;
 	}
 
 	ret = meson_map_dt_data(pdev);
 	if (ret)
-		return ret;
+		goto err_clk;
 
 	INIT_WORK(&data->irq_work, meson_tsensor_work);
 
-	data->tzd = devm_thermal_zone_of_sensor_register(&pdev->dev,
-							 data->id,
-							 data,
-							 &meson_sensor_ops);
+	data->tzd = devm_thermal_zone_of_sensor_register(
+				&pdev->dev, data->id, data, &meson_sensor_ops);
 	if (IS_ERR(data->tzd)) {
 		ret = PTR_ERR(data->tzd);
 		dev_err(&pdev->dev, "Failed to register tsensor: %d\n", ret);
 		goto err_thermal;
 	}
 
-	pm_runtime_enable(data->dev);
-	pm_runtime_set_autosuspend_delay(data->dev, R1P1_PM_MAX_TIMEOUT);
-	pm_runtime_use_autosuspend(data->dev);
-	ret = pm_runtime_get_sync(data->dev);
-	if (ret < 0) {
+	ret = meson_tsensor_initialize(pdev);
+	if (ret) {
 		dev_err(&pdev->dev, "Failed to initialize tsensor\n");
 		goto err_thermal;
 	}
 
 	ret = devm_request_irq(&pdev->dev, data->irq, meson_tsensor_irq,
-			       IRQF_TRIGGER_RISING | IRQF_SHARED,
-			       dev_name(&pdev->dev), data);
+		IRQF_TRIGGER_RISING | IRQF_SHARED, dev_name(&pdev->dev), data);
 	if (ret) {
 		dev_err(&pdev->dev, "Failed to request irq: %d\n", data->irq);
 		goto err_thermal;
 	}
 
-	pm_runtime_mark_last_busy(data->dev);
-	pm_runtime_put_autosuspend(data->dev);
-
+	meson_tsensor_control(pdev, true);
 	return 0;
 
 err_thermal:
-	pm_runtime_put_noidle(data->dev);
-	pm_runtime_disable(data->dev);
 	thermal_zone_of_sensor_unregister(&pdev->dev, data->tzd);
+err_clk:
+	clk_unprepare(data->clk);
 
 	return ret;
 }
@@ -798,60 +751,43 @@ static int meson_tsensor_remove(struct platform_device *pdev)
 	return 0;
 }
 
-static int __maybe_unused meson_tsensor_runtime_suspend(struct device *dev)
+#ifdef CONFIG_PM_SLEEP
+static int meson_tsensor_suspend(struct device *dev)
 {
 	meson_tsensor_control(to_platform_device(dev), false);
 
 	return 0;
 }
 
-static int __maybe_unused meson_tsensor_runtime_resume(struct device *dev)
-{
-	/*if power domain power down, need hw/trips init when resume*/
-	meson_tsensor_hw_initialize(to_platform_device(dev));
-	meson_tsensor_trips_initialize(to_platform_device(dev));
-
-	/*if no pm pd only need enable control*/
-	meson_tsensor_control(to_platform_device(dev), true);
-	/*wait tsensor work*/
-	msleep(R1P1_TS_WAIT);
-
-	return 0;
-}
-
-#ifdef CONFIG_PM_SLEEP
-static int meson_tsensor_suspend(struct device *dev)
-{
-	if (!pm_runtime_status_suspended(dev))
-		meson_tsensor_runtime_suspend(dev);
-
-	return 0;
-}
-
 static int meson_tsensor_resume(struct device *dev)
 {
-	if (!pm_runtime_status_suspended(dev))
-		meson_tsensor_runtime_resume(dev);
+	struct platform_device *pdev = to_platform_device(dev);
 
-	pm_runtime_mark_last_busy(dev);
-	pm_request_autosuspend(dev);
+	meson_tsensor_initialize(pdev);
+	meson_tsensor_control(pdev, true);
 
 	return 0;
 }
-#endif
-static const struct dev_pm_ops meson_tsensor_pm_ops = {
-	SET_SYSTEM_SLEEP_PM_OPS(meson_tsensor_suspend,
-				meson_tsensor_resume)
-	SET_RUNTIME_PM_OPS(meson_tsensor_runtime_suspend,
-			   meson_tsensor_runtime_resume, NULL)
-};
 
-struct platform_driver meson_tsensor_driver = {
+static SIMPLE_DEV_PM_OPS(meson_tsensor_pm,
+			 meson_tsensor_suspend, meson_tsensor_resume);
+#define MESON_TSENSOR_PM	(&meson_tsensor_pm)
+#else
+#define MESON_TSENSOR_PM	NULL
+#endif
+
+static struct platform_driver meson_tsensor_driver = {
 	.driver = {
 		.name   = "meson-tsensor",
-		.pm     = &meson_tsensor_pm_ops,
+		.pm     = MESON_TSENSOR_PM,
 		.of_match_table = meson_tsensor_match,
 	},
 	.probe	= meson_tsensor_probe,
 	.remove	= meson_tsensor_remove,
 };
+module_platform_driver(meson_tsensor_driver);
+
+MODULE_DESCRIPTION("MESON Tsensor Driver");
+MODULE_AUTHOR("Huan Biao <huan.biao@amlogic.com>");
+MODULE_LICENSE("GPL");
+MODULE_ALIAS("platform:meson-tsensor");

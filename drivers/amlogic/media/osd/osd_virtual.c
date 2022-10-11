@@ -1,6 +1,18 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/amlogic/media/osd/osd_virtual.c
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
 /* Linux Headers */
@@ -28,13 +40,12 @@
 #include <linux/of_reserved_mem.h>
 #include <linux/uaccess.h>
 #include <linux/dma-mapping.h>
-#include <linux/ion.h>
-#include <dev_ion.h>
+#include <ion/ion.h>
+#include <meson_ion.h>
 #include <linux/fs.h>
 #include <linux/cma.h>
 #include <linux/dma-contiguous.h>
 #include <linux/delay.h>
-#include <linux/meson_ion.h>
 
 /* Amlogic Headers */
 #include <linux/amlogic/media/vout/vinfo.h>
@@ -64,8 +75,8 @@
 #define HW_VSYNC
 #endif
 
-#define DEFAULT_FPS   (HZ / 25)
-static size_t fb_memsize;
+#define DEFAULT_FPS   (HZ/25)
+static u32 fb_memsize;
 static __u32 var_screeninfo[5];
 static bool b_reserved_mem;
 static int ready_post;
@@ -73,6 +84,7 @@ static int start_post;
 static struct fb_virtual_dev_s *fb_vir_dev;
 static struct virt_fb_para_s virt_fb;
 static struct fb_var_screeninfo fb_def_var = {
+
 	.xres            = 240,
 	.yres            = 320,
 	.xres_virtual    = 240,
@@ -130,10 +142,12 @@ static int lcd_set_format(int color_format)
 {
 	/* COLOR_INDEX_16_565 */
 	return 0;
+
 }
 
 static void lcd_enable(int blank)
 {
+
 }
 
 static void fb_get_fps(u32 index, u32 *osd_fps)
@@ -162,8 +176,8 @@ static void fb_set_fps(u32 index, u32 osd_fps_start)
 }
 
 static ssize_t show_fb_fps(struct device *device,
-			   struct device_attribute *attr,
-			   char *buf)
+				struct device_attribute *attr,
+				char *buf)
 {
 	struct fb_info *fb_info = dev_get_drvdata(device);
 	u32 fb_fps;
@@ -174,8 +188,8 @@ static ssize_t show_fb_fps(struct device *device,
 }
 
 static ssize_t store_fb_fps(struct device *device,
-			    struct device_attribute *attr,
-			    const char *buf, size_t count)
+			   struct device_attribute *attr,
+			   const char *buf, size_t count)
 {
 	struct fb_info *fb_info = dev_get_drvdata(device);
 	int res = 0;
@@ -188,15 +202,15 @@ static ssize_t store_fb_fps(struct device *device,
 }
 
 static ssize_t show_log_level(struct device *device,
-			      struct device_attribute *attr,
-			      char *buf)
+			  struct device_attribute *attr,
+			  char *buf)
 {
 	return snprintf(buf, 40, "%d\n", osd_log_level);
 }
 
 static ssize_t store_log_level(struct device *device,
-			       struct device_attribute *attr,
-			       const char *buf, size_t count)
+			   struct device_attribute *attr,
+			   const char *buf, size_t count)
 {
 	int res = 0;
 	int ret = 0;
@@ -209,15 +223,15 @@ static ssize_t store_log_level(struct device *device,
 }
 
 static ssize_t show_log_module(struct device *device,
-			       struct device_attribute *attr,
-			       char *buf)
+			  struct device_attribute *attr,
+			  char *buf)
 {
 	return snprintf(buf, 40, "0x%x\n", osd_log_module);
 }
 
 static ssize_t store_log_module(struct device *device,
-				struct device_attribute *attr,
-				const char *buf, size_t count)
+			   struct device_attribute *attr,
+			   const char *buf, size_t count)
 {
 	int res = 0;
 	int ret = 0;
@@ -230,7 +244,7 @@ static ssize_t store_log_module(struct device *device,
 }
 
 static int virt_osd_check_var(struct fb_var_screeninfo *var,
-			      struct fb_info *info)
+	struct fb_info *info)
 {
 	struct fb_fix_screeninfo *fix;
 	struct fb_virtual_dev_s *fbdev = (struct fb_virtual_dev_s *)info->par;
@@ -238,7 +252,7 @@ static int virt_osd_check_var(struct fb_var_screeninfo *var,
 
 	fix = &info->fix;
 	color_format_pt = _find_color_format(var);
-	if (!color_format_pt || color_format_pt->color_index == 0)
+	if (color_format_pt == NULL || color_format_pt->color_index == 0)
 		return -EFAULT;
 
 	osd_log_dbg(MODULE_BASE, "select color format :index %d, bpp %d\n",
@@ -267,16 +281,14 @@ static int virt_osd_check_var(struct fb_var_screeninfo *var,
 	/* adjust memory length. */
 	fix->line_length = var->xres_virtual * var->bits_per_pixel / 8;
 	osd_log_dbg(MODULE_BASE, "xvirtual=%d, bpp:%d, line_length=%d\n",
-		    var->xres_virtual, var->bits_per_pixel, fix->line_length);
+		var->xres_virtual, var->bits_per_pixel, fix->line_length);
 
 	if (var->xres_virtual < var->xres)
 		var->xres_virtual = var->xres;
 	if (var->yres_virtual < var->yres)
 		var->yres_virtual = var->yres;
-	var->left_margin = 0;
-	var->right_margin = 0;
-	var->upper_margin = 0;
-	var->lower_margin = 0;
+	var->left_margin = var->right_margin = 0;
+	var->upper_margin = var->lower_margin = 0;
 	if (var->xres + var->xoffset > var->xres_virtual)
 		var->xoffset = var->xres_virtual - var->xres;
 	if (var->yres + var->yoffset > var->yres_virtual)
@@ -301,7 +313,7 @@ static int virt_osd_set_par(struct fb_info *info)
 	virt_fb.offset = 0;
 	virt_fb.stride = stride;
 	color_format_pt = _find_color_format(&info->var);
-	if (!color_format_pt || color_format_pt->color_index == 0)
+	if (color_format_pt == NULL || color_format_pt->color_index == 0)
 		return -EFAULT;
 	fbdev->color = color_format_pt;
 	lcd_set_format(fbdev->color->color_index);
@@ -309,16 +321,16 @@ static int virt_osd_set_par(struct fb_info *info)
 }
 
 static int virt_osd_check_fbsize(struct fb_var_screeninfo *var,
-				 struct fb_info *info)
+	struct fb_info *info)
 {
 	struct fb_virtual_dev_s *fbdev = (struct fb_virtual_dev_s *)info->par;
 
 	if (var->xres_virtual * var->yres_virtual *
 			var->bits_per_pixel / 8 > fbdev->fb_len) {
 		osd_log_err("no enough memory for %d*%d*%d\n",
-			    var->xres,
-			    var->yres,
-			    var->bits_per_pixel);
+				var->xres,
+				var->yres,
+				var->bits_per_pixel);
 		return  -ENOMEM;
 	}
 	return 0;
@@ -334,18 +346,19 @@ s64 virt_osd_wait_vsync_event(void)
 	timeout = msecs_to_jiffies(2000);
 	/* waiting for 1s. */
 	ret = wait_for_completion_timeout(&fb_vir_dev->fb_com,
-					  timeout);
+				timeout);
 	if (ret == 0)
 		pr_err("software vsync timeout\n");
 	stime = ktime_get();
 	osd_log_dbg(MODULE_BASE, "%s\n", __func__);
 
-	return stime;
+	return stime.tv64;
 }
 
-static void sw_vsync_timer_func(struct timer_list *t)
+static void sw_vsync_timer_func(unsigned long arg)
 {
-	struct fb_virtual_dev_s *fbdev = from_timer(fbdev, t, timer);
+	struct fb_virtual_dev_s *fbdev =
+		(struct fb_virtual_dev_s *)arg;
 
 	/* gen complete signal*/
 	complete(&fbdev->timer_com);
@@ -393,8 +406,8 @@ static void lcd_post_frame(u32 addr)
 	/* gen complete signal*/
 	complete(&fb_vir_dev->post_com);
 	/*start_post = 0; */
-	osd_log_dbg(MODULE_BASE, "%s:=>addr 0x%x\n",
-		    __func__, addr);
+	osd_log_dbg(MODULE_BASE, "lcd_post_frame:=>addr 0x%x\n",
+		    addr);
 }
 
 static int fb_monitor_thread(void *data)
@@ -405,15 +418,14 @@ static int fb_monitor_thread(void *data)
 	osd_log_info("fb monitor start\n");
 	while (fbdev->fb_monitor_run) {
 		ret = wait_for_completion_timeout(&fb_vir_dev->timer_com,
-						  msecs_to_jiffies(2000));
+					msecs_to_jiffies(2000));
 		if (ret == 0)
 			pr_err("timer post frame timeout\n");
 
 		if (start_post) {
 			/* waiting for 1s. */
-			ret = wait_for_completion_timeout
-				(&fb_vir_dev->post_com,
-				 msecs_to_jiffies(200));
+			ret = wait_for_completion_timeout(&fb_vir_dev->post_com,
+						msecs_to_jiffies(200));
 			if (ret == 0)
 				pr_err("post frame timeout\n");
 		}
@@ -425,7 +437,7 @@ static int fb_monitor_thread(void *data)
 		add_timer(&fbdev->timer);
 		start_post = 0;
 	}
-	osd_log_info("exit %s\n", __func__);
+	osd_log_info("exit fb_monitor_thread\n");
 	return 0;
 }
 
@@ -451,7 +463,7 @@ s64 virt_osd_wait_vsync_event(void)
 	stime = ktime_get();
 	osd_log_dbg(MODULE_BASE, "%s\n", __func__);
 
-	return stime;
+	return stime.tv64;
 }
 
 static void lcd_post_frame(u32 addr)
@@ -490,8 +502,8 @@ static void lcd_post_frame(u32 addr)
 	if (time_write > spi_write_max)
 		spi_write_max = time_write;
 #endif
-	osd_log_dbg(MODULE_BASE, "%s:=>addr 0x%x\n",
-		    __func__, addr);
+	osd_log_dbg(MODULE_BASE, "lcd_post_frame:=>addr 0x%x\n",
+		    addr);
 }
 
 static int fb_monitor_thread(void *data)
@@ -508,13 +520,13 @@ static int fb_monitor_thread(void *data)
 		/* gen complete signal*/
 		complete(&fbdev->fb_com);
 	}
-	osd_log_info("exit %s\n", __func__);
+	osd_log_info("exit fb_monitor_thread\n");
 	return 0;
 }
 
 int te_cb(void)
 {
-	if (ready_post && start_post == 0) {
+	if (ready_post && (start_post == 0)) {
 		/* gen complete signal*/
 		complete(&fb_vir_dev->post_com);
 		ready_post = 0;
@@ -532,7 +544,7 @@ static int virt_fb_start_monitor(void)
 	osd_log_info("virt fb start monitor\n");
 	fbdev->fb_monitor_run = 1;
 	fbdev->fb_thread = kthread_run(fb_monitor_thread,
-				       &fbdev, "fb_monitor");
+		&fbdev, "fb_monitor");
 	if (IS_ERR(fbdev->fb_thread)) {
 		ret = PTR_ERR(fbdev->fb_thread);
 		osd_log_err("osd failed to start kthread (%d)\n", ret);
@@ -574,13 +586,13 @@ static void *aml_mm_vmap(phys_addr_t phys, unsigned long size)
 	vaddr = vmap(pages, npages, VM_MAP, pgprot);
 	if (!vaddr) {
 		pr_err("vmaped fail, size: %d\n",
-		       npages << PAGE_SHIFT);
+			npages << PAGE_SHIFT);
 		vfree(pages);
 		return NULL;
 	}
 	vfree(pages);
 	osd_log_info("[HIGH-MEM-MAP] pa(%lx) to va(%p), size: %d\n",
-		     (unsigned long)phys, vaddr, npages << PAGE_SHIFT);
+		(unsigned long)phys, vaddr, npages << PAGE_SHIFT);
 	return vaddr;
 }
 
@@ -596,6 +608,7 @@ static void *aml_map_phyaddr_to_virt(dma_addr_t phys, unsigned long size)
 
 static int malloc_fb_memory(struct fb_info *info)
 {
+	int ret = 0;
 	u32 fb_index, stride, fb_len;
 	struct fb_virtual_dev_s *fbdev;
 	struct fb_fix_screeninfo *fix = NULL;
@@ -603,12 +616,14 @@ static int malloc_fb_memory(struct fb_info *info)
 	struct platform_device *pdev = NULL;
 	phys_addr_t base = 0;
 	unsigned long size = 0;
-	size_t fb_memsize_total  = 0;
+	unsigned long fb_memsize_total  = 0;
 	struct cma *cma = NULL;
 
 	static void __iomem *fb_rmem_vaddr;
 	static phys_addr_t fb_rmem_paddr;
 	static struct page *fb_page;
+	static struct ion_client *fb_ion_client;
+	static struct ion_handle *fb_ion_handle;
 
 	cma = dev_get_cma_area(info->device);
 	if (cma) {
@@ -618,61 +633,67 @@ static int malloc_fb_memory(struct fb_info *info)
 	}
 
 	osd_log_info("%s, %d, base:%pa, size:%ld\n",
-		     __func__, __LINE__, &base, size);
+		__func__, __LINE__, &base, size);
 	fbdev = (struct fb_virtual_dev_s *)info->par;
 	pdev = fbdev->dev;
 	fb_index = fbdev->fb_index;
 	fix = &info->fix;
 	var = &info->var;
+	fb_ion_client = meson_ion_client_create(-1, "meson-fb");
 	fb_memsize_total = fb_memsize;
 	/* read cma/fb-reserved memory first */
-	if (b_reserved_mem &&
-	    fb_memsize_total <= size &&
-	    fb_memsize > 0) {
-		pr_info("%s, %d, fb_index=%d,fb_rmem_size=%zu\n",
+	if ((b_reserved_mem == true) &&
+		(fb_memsize_total <= size) &&
+		(fb_memsize > 0)) {
+		pr_info("%s, %d, fb_index=%d,fb_rmem_size=%d\n",
 			__func__, __LINE__, fb_index,
 			fb_memsize);
-		fb_page = dma_alloc_from_contiguous(info->device,
-						    fb_memsize >> PAGE_SHIFT,
-						    0, 0);
+		fb_page = dma_alloc_from_contiguous(
+					info->device,
+					fb_memsize >> PAGE_SHIFT,
+					0);
 		if (!fb_page) {
-			pr_err("allocate buffer failed:%zu\n", fb_memsize);
+			pr_err("allocate buffer failed:%d\n", fb_memsize);
 			return -ENOMEM;
 		}
 		fb_rmem_paddr = page_to_phys(fb_page);
 		fb_rmem_vaddr =
 			aml_map_phyaddr_to_virt(fb_rmem_paddr, fb_memsize);
-		osd_log_dbg(MODULE_BASE, "fb_index=%d dma_alloc=0x%zx\n",
-			    fb_index, fb_memsize);
+		osd_log_dbg(MODULE_BASE, "fb_index=%d dma_alloc=0x%x\n",
+			fb_index, fb_memsize);
 	} else {
 #ifdef CONFIG_AMLOGIC_ION
-		int ion_fd = -1;
-		struct dma_buf *dmabuf = NULL;
-
 		pr_info("use ion buffer for fb memory, fb_index=%d\n",
 			fb_index);
-		dmabuf = ion_alloc(fb_memsize,
-				   (1 << ION_HEAP_TYPE_DMA),
-				   ION_FLAG_EXTEND_MESON_HEAP);
-		ion_fd = dma_buf_fd(dmabuf, O_CLOEXEC);
-		if (ion_fd < 0) {
-			osd_log_err("%s: size=0x%zx, FAILED.\n",
-				    __func__, fb_memsize);
+		fb_ion_handle =
+			ion_alloc(fb_ion_client,
+				fb_memsize,
+				0,
+				(1 << ION_HEAP_TYPE_DMA),
+				0);
+		if (IS_ERR(fb_ion_handle)) {
+			osd_log_err("%s: size=%x, FAILED.\n",
+				__func__, fb_memsize);
 			return -ENOMEM;
 		}
-		if (meson_ion_share_fd_to_phys(ion_fd, &fb_rmem_paddr,
-					       &fb_memsize_total))
-			osd_log_err("fd_to_phys failed\n");
-		fb_rmem_vaddr = aml_map_phyaddr_to_virt(fb_rmem_paddr,
-							fb_memsize_total);
+		ret = ion_phys(fb_ion_client,
+			fb_ion_handle,
+			(ion_phys_addr_t *)
+			&fb_rmem_paddr,
+			(size_t *)&fb_memsize_total);
+		fb_rmem_vaddr =
+			ion_map_kernel(fb_ion_client,
+				fb_ion_handle);
 		dev_notice(&pdev->dev,
-			   "fd=%d\n", ion_fd);
+			"create ion_client %p, handle=%p\n",
+			fb_ion_client,
+			fb_ion_handle);
 		dev_notice(&pdev->dev,
-			   "ion memory(%d): created fb at 0x%p, size %ld MiB\n",
-			   fb_index,
-			   (void *)fb_rmem_paddr,
-			   (unsigned long)
-			   fb_memsize / SZ_1M);
+			"ion memory(%d): created fb at 0x%p, size %ld MiB\n",
+			fb_index,
+			(void *)fb_rmem_paddr,
+			(unsigned long)
+			fb_memsize / SZ_1M);
 #endif
 	}
 	fbdev->fb_len = fb_memsize;
@@ -684,15 +705,15 @@ static int malloc_fb_memory(struct fb_info *info)
 	}
 	osd_log_info("Frame buffer memory assigned at");
 	osd_log_info(" %d, phy: 0x%p, vir:0x%p, size=%dK\n\n",
-		     fb_index, (void *)fbdev->fb_mem_paddr,
-		     fbdev->fb_mem_vaddr, fbdev->fb_len >> 10);
+		fb_index, (void *)fbdev->fb_mem_paddr,
+		fbdev->fb_mem_vaddr, fbdev->fb_len >> 10);
 	stride = var->xres * (var->bits_per_pixel >> 3);
-	fb_len = stride * var->yres;
+	fb_len = stride * var->yres_virtual;
 	fix->smem_start = fbdev->fb_mem_paddr;
 	if (fb_len > fbdev->fb_len)
 		fb_len = fbdev->fb_len;
-	osd_log_info(" %d, stride=%d,var->yres=%d,fb_len=%d\n",
-		     fb_index, stride, var->yres, fb_len);
+	osd_log_info(" %d, stride=%d,var->yres_virtual=%d,fb_len=%d\n",
+		fb_index, stride, var->yres_virtual, fb_len);
 	fix->smem_len = fb_len;
 	info->screen_base = (char __iomem *)fbdev->fb_mem_vaddr;
 	info->screen_size = fb_len;
@@ -707,7 +728,7 @@ static int malloc_fb_memory(struct fb_info *info)
 		return -ENOMEM;
 	/* clear osd buffer */
 	osd_log_info("---------------clear fb%d memory %p\n",
-		     fb_index, fbdev->fb_mem_vaddr);
+		fb_index, fbdev->fb_mem_vaddr);
 	if (fbdev->fb_mem_vaddr)
 		memset(fbdev->fb_mem_vaddr, 0x0, fb_len);
 	return 0;
@@ -721,11 +742,11 @@ static int virt_osd_open(struct fb_info *info, int arg)
 	fbdev = (struct fb_virtual_dev_s *)info->par;
 	fbdev->open_count++;
 	osd_log_dbg(MODULE_BASE, "osd_open index=%d,open_count=%d\n",
-		    fbdev->fb_index, fbdev->open_count);
-	if (info->screen_base)
+		fbdev->fb_index, fbdev->open_count);
+	if (info->screen_base != NULL)
 		return 0;
 
-	if (!info->screen_base) {
+	if (info->screen_base == NULL) {
 		ret = malloc_fb_memory(info);
 		if (ret < 0)
 			return ret;
@@ -760,19 +781,19 @@ static int virt_osd_mmap(struct fb_info *info, struct vm_area_struct *vma)
 int virt_osd_blank(int blank_mode, struct fb_info *info)
 {
 	osd_log_dbg(MODULE_BASE, "blank_mode=%d\n",
-		    blank_mode);
+		blank_mode);
 	lcd_enable((blank_mode != 0) ? 0 : 1);
 	return 0;
 }
 
 static int virt_osd_pan_display(struct fb_var_screeninfo *var,
-				struct fb_info *fbi)
+			   struct fb_info *fbi)
 {
 	long diff_x, diff_y;
 	u32 offset = 0, size = 0, stride = 0;
 
-	if (var->xoffset != virt_fb.pandata.x_start ||
-	    var->yoffset != virt_fb.pandata.y_start) {
+	if (var->xoffset != virt_fb.pandata.x_start
+	    || var->yoffset != virt_fb.pandata.y_start) {
 		diff_x = var->xoffset - virt_fb.pandata.x_start;
 		diff_y = var->yoffset - virt_fb.pandata.y_start;
 		virt_fb.pandata.x_start += diff_x;
@@ -788,11 +809,11 @@ static int virt_osd_pan_display(struct fb_var_screeninfo *var,
 		virt_fb.size = size;
 		ready_post = 1;
 		osd_log_dbg(MODULE_BASE, "offset[%d-%d]x[%d-%d]y[%d-%d]\n",
-			    var->xoffset, var->yoffset,
-			    virt_fb.pandata.x_start,
-			    virt_fb.pandata.x_end,
-			    virt_fb.pandata.y_start,
-			    virt_fb.pandata.y_end);
+				var->xoffset, var->yoffset,
+				virt_fb.pandata.x_start,
+				virt_fb.pandata.x_end,
+				virt_fb.pandata.y_start,
+				virt_fb.pandata.y_end);
 #ifdef SOFTWARE_VSYNC
 		lcd_post_frame(offset);
 #endif
@@ -800,21 +821,22 @@ static int virt_osd_pan_display(struct fb_var_screeninfo *var,
 	return 0;
 }
 
+
 static int virt_osd_release(struct fb_info *info, int arg)
 {
-	struct fb_virtual_dev_s *fbdev;
+	struct osd_fb_dev_s *fbdev;
 	int err = 0;
 
-	fbdev = (struct fb_virtual_dev_s *)info->par;
+	fbdev = (struct osd_fb_dev_s *)info->par;
 
 	if (!fbdev->open_count) {
 		err = -EINVAL;
 		osd_log_info("osd already released. index=%d\n",
-			     fbdev->fb_index);
+			fbdev->fb_index);
 		goto done;
 	} else if (fbdev->open_count == 1) {
-		osd_log_info("osd_release now.index=%d,open_count=%d\n",
-			     fbdev->fb_index, fbdev->open_count);
+	osd_log_info("osd_release now.index=%d,open_count=%d\n",
+		fbdev->fb_index, fbdev->open_count);
 	}
 	fbdev->open_count--;
 done:
@@ -822,7 +844,7 @@ done:
 }
 
 static int virt_osd_ioctl(struct fb_info *info,
-			  unsigned int cmd, unsigned long arg)
+	unsigned int cmd, unsigned long arg)
 {
 	void __user *argp = (void __user *)arg;
 	u32 blank = 0;
@@ -840,7 +862,7 @@ static int virt_osd_ioctl(struct fb_info *info,
 		break;
 	default:
 		osd_log_err("command 0x%x not supported (%s)\n",
-			    cmd, current->comm);
+			cmd, current->comm);
 		return -1;
 	}
 	return  ret;
@@ -848,7 +870,7 @@ static int virt_osd_ioctl(struct fb_info *info,
 
 #ifdef CONFIG_COMPAT
 static int virt_osd_compat_ioctl(struct fb_info *info,
-				 unsigned int cmd, unsigned long arg)
+		unsigned int cmd, unsigned long arg)
 {
 	unsigned long ret;
 
@@ -867,9 +889,16 @@ static void fbdev_virt_set_default(struct fb_virtual_dev_s *fbdev, int index)
 }
 
 static struct device_attribute virt_fb_attrs[] = {
-	__ATTR(log_level, 0644, show_log_level, store_log_level),
-	__ATTR(log_module, 0644, show_log_module, store_log_module),
-	__ATTR(fps, 0644, show_fb_fps, store_fb_fps),
+	#if 0
+	__ATTR(debug, 0644,
+			show_debug, store_debug),
+	#endif
+	__ATTR(log_level, 0644,
+			show_log_level, store_log_level),
+	__ATTR(log_module, 0644,
+			show_log_module, store_log_module),
+	__ATTR(fps, 0644,
+			show_fb_fps, store_fb_fps),
 };
 
 /* fb_ops structures */
@@ -903,14 +932,14 @@ int amlfb_virtual_probe(struct platform_device *pdev)
 
 	/* get buffer size from dt */
 	ret = of_property_read_u32(pdev->dev.of_node,
-				   "mem_size", (u32 *)&fb_memsize);
+			"mem_size", &fb_memsize);
 	if (ret) {
 		osd_log_err("not found mem_size from dtd\n");
 		goto failed1;
 	}
 	if (!fb_memsize)
 		goto failed1;
-	osd_log_info("fb_memsize=0x%zx\n", fb_memsize);
+	osd_log_info("fb_memsize=0x%x\n", fb_memsize);
 	/* init reserved memory */
 	ret = of_reserved_mem_device_init(&pdev->dev);
 	if (ret != 0) {
@@ -921,7 +950,7 @@ int amlfb_virtual_probe(struct platform_device *pdev)
 	}
 	/* register frame buffer memory */
 	fbi = framebuffer_alloc(sizeof(struct fb_virtual_dev_s),
-				&pdev->dev);
+			&pdev->dev);
 	if (!fbi) {
 		ret = -ENOMEM;
 		goto failed1;
@@ -939,11 +968,11 @@ int amlfb_virtual_probe(struct platform_device *pdev)
 	fbdev->fb_mem_vaddr = 0;
 	/* setup fb0 display size */
 	ret = of_property_read_u32_array(pdev->dev.of_node,
-					 "display_size_default",
-					 &var_screeninfo[0], 5);
-	if (ret) {
+				"display_size_default",
+				&var_screeninfo[0], 5);
+	if (ret)
 		osd_log_info("not found display_size_default\n");
-	} else {
+	else {
 		fb_def_var.xres = var_screeninfo[0];
 		fb_def_var.yres = var_screeninfo[1];
 		fb_def_var.xres_virtual =
@@ -953,13 +982,13 @@ int amlfb_virtual_probe(struct platform_device *pdev)
 		fb_def_var.bits_per_pixel =
 			var_screeninfo[4];
 		osd_log_info("init fbdev bpp is:%d\n",
-			     fb_def_var.bits_per_pixel);
+			fb_def_var.bits_per_pixel);
 		if (fb_def_var.bits_per_pixel > 32)
 			fb_def_var.bits_per_pixel = 32;
 	}
 
 	fbdev_virt_set_default(fbdev, index);
-	if (!fbdev->color) {
+	if (fbdev->color == NULL) {
 		osd_log_err("fbdev->color NULL\n");
 		ret = -ENOENT;
 		goto failed1;
@@ -988,11 +1017,11 @@ int amlfb_virtual_probe(struct platform_device *pdev)
 	fbi->screen_size = fix->smem_len;
 	virt_osd_check_var(var, fbi);
 	/* register frame buffer */
-	if (register_framebuffer(fbi))
-		osd_log_err("%s reg_fb failed\n", __func__);
+	register_framebuffer(fbi);
 	/* create device attribute files */
 	for (i = 0; i < ARRAY_SIZE(virt_fb_attrs); i++)
-		ret = device_create_file(fbi->dev, &virt_fb_attrs[i]);
+		ret = device_create_file(
+			fbi->dev, &virt_fb_attrs[i]);
 
 	init_completion(&fbdev->fb_com);
 	init_completion(&fbdev->post_com);
@@ -1003,7 +1032,8 @@ int amlfb_virtual_probe(struct platform_device *pdev)
 	virt_fb_start_monitor();
 	#ifdef SOFTWARE_VSYNC
 	/* add timer to simulate software vsync */
-	timer_setup(&fbdev->timer, sw_vsync_timer_func, 0);
+	init_timer(&fbdev->timer);
+	fbdev->timer.data = (ulong) fbdev;
 	fbdev->timer.function = sw_vsync_timer_func;
 	fbdev->timer.expires = jiffies + DEFAULT_FPS;
 	add_timer(&fbdev->timer);

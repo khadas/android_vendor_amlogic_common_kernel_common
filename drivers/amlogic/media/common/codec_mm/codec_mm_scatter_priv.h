@@ -1,7 +1,19 @@
-/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
- */
+ * drivers/amlogic/media/common/codec_mm/codec_mm_scatter_priv.h
+ *
+ * Copyright (C) 2016 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
+*/
 
 #ifndef CODEC_MM_SCATTER_PRIV_HEADER
 #define CODEC_MM_SCATTER_PRIV_HEADER
@@ -25,7 +37,6 @@ struct codec_mm_slot {
 	int sid;
 	int isroot;
 	int on_alloc_free;
-	/* spin lock */
 	spinlock_t lock;
 	struct list_head sid_list;
 	struct list_head free_list;
@@ -54,6 +65,7 @@ int codec_mm_scatter_mgt_get_config(char *buf);
 int codec_mm_scatter_mgt_set_config(const char *buf, size_t size);
 
 int codec_mm_scatter_free_all_ignorecache(int flags);
+
 
 void codec_mm_clear_alloc_infos(void);
 

@@ -1,9 +1,19 @@
-// SPDX-License-Identifier: GPL-2.0
 /*
- * Copyright (C) 2019 Amlogic, Inc. All rights reserved.
+ * sound/soc/amlogic/auge/effect_hw.c
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
  *
  */
-
 #include <linux/delay.h>
 
 #include "effects_hw.h"
@@ -34,9 +44,10 @@ int init_EQ_DRC_module(void)
 	return 0;
 }
 
-int set_internal_EQ_volume(unsigned int master_volume,
-			   unsigned int channel_1_volume,
-			   unsigned int channel_2_volume)
+int set_internal_EQ_volume(
+	unsigned int master_volume,
+	unsigned int channel_1_volume,
+	unsigned int channel_2_volume)
 {
 	eqdrc_write(AED_EQ_VOLUME_G12X, (0 << 30) /* volume step: 0.125dB*/
 			| (master_volume << 16) /* master volume: 0dB*/
@@ -115,7 +126,7 @@ void aed_set_eq(int enable, int params_len, unsigned int *params)
 }
 
 void aed_set_drc(int enable, int drc_len, unsigned int *drc_params,
-		 int drc_tko_len, unsigned int *drc_tko_params)
+	int drc_tko_len, unsigned int *drc_tko_params)
 {
 	if (enable) {
 		unsigned int *param_ptr;
@@ -150,9 +161,8 @@ int aml_aed_format_set(int frddr_dst)
 	} else if (frddr_dst < 3 && frddr_dst >= 0) {
 		/* TDMOUT A/B/C */
 		aml_tdmout_get_aed_info(frddr_dst, &width, &frddr_type);
-	} else {
+	} else
 		pr_err("unknown function for AED\n");
-	}
 
 	if (width < 0 || frddr_type < 0) {
 		pr_err(" Fetch wrong info for AED\n");
@@ -161,7 +171,7 @@ int aml_aed_format_set(int frddr_dst)
 	}
 
 	eqdrc_update_bits(AED_TOP_CTL_G12X, 0x7 << 11 | 0x1f << 6,
-			  frddr_type << 11 | width << 6);
+		frddr_type << 11 | width << 6);
 
 	return 0;
 }
@@ -175,17 +185,16 @@ void aed_src_select(bool enable, int frddr_dst, int fifo_id)
 	} else if (frddr_dst < 3 && frddr_dst >= 0) {
 		/* TDMOUT A/B/C */
 		aml_tdmout_select_aed(enable, frddr_dst);
-	} else {
+	} else
 		pr_err("unknown function for AED\n");
-	}
 
 	/* AED module, req */
 	aed_req_sel(enable, 0, frddr_dst);
 
 	/* AED module, sel & enable */
 	eqdrc_update_bits(AED_TOP_CTL_G12X,
-			  0x3 << 4 | 0x1 << 0,
-			  fifo_id << 4 | enable << 0);
+		0x3 << 4 | 0x1 << 0,
+		fifo_id << 4 | enable << 0);
 }
 
 void aed_set_lane(int lane_mask)

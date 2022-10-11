@@ -1,9 +1,19 @@
-// SPDX-License-Identifier: GPL-2.0
 /*
- * Copyright (C) 2019 Amlogic, Inc. All rights reserved.
+ * sound/soc/amlogic/auge/resample_hw.c
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
  *
  */
-
 #include <linux/clk.h>
 #include <linux/amlogic/iomap.h>
 #include <linux/math64.h>
@@ -356,7 +366,8 @@ void resample_enable(enum resample_idx id, bool enable)
 
 	if (enable == 1) {
 		/*don't change this flow*/
-		audiobus_update_bits(reg, 0x1 << 31 | 0x1 << 28,
+		audiobus_update_bits(
+			reg, 0x1 << 31 | 0x1 << 28,
 			0 << 31 | 0x0 << 28);
 
 		audiobus_update_bits(reg, 0x1 << 31, 1 << 31);
@@ -378,27 +389,27 @@ bool resample_get_status(enum resample_idx id)
 
 int resample_init(enum resample_idx id, int input_sr)
 {
-	u16 avg_cnt_init = 0;
+	u16 Avg_cnt_init = 0;
 	unsigned int clk_rate = 167000000;//clk81;
 	int offset = EE_AUDIO_RESAMPLEB_CTRL0 - EE_AUDIO_RESAMPLEA_CTRL0;
 	int reg = EE_AUDIO_RESAMPLEA_CTRL0 + offset * id;
 
 	if (input_sr)
-		avg_cnt_init = (u16)(clk_rate * 4 / input_sr);
+		Avg_cnt_init = (u16)(clk_rate * 4 / input_sr);
 	else
 		pr_err("unsupport input sample rate:%d\n", input_sr);
 
-	pr_debug("resample id:%c, clk_rate = %u, input_sr = %d, avg_cnt_init = %u\n",
+	pr_debug("resample id:%c, clk_rate = %u, input_sr = %d, Avg_cnt_init = %u\n",
 		 (id == 0) ? 'a' : 'b',
 		 clk_rate,
 		 input_sr,
-		avg_cnt_init);
+		Avg_cnt_init);
 
 	audiobus_update_bits(reg,
 		0x3 << 26 | 0x3ff << 16 | 0xffff,
 		0x0 << 26 | /* method0 */
 		RESAMPLE_CNT_CONTROL << 16 |
-		avg_cnt_init);
+		Avg_cnt_init);
 
 	return 0;
 }

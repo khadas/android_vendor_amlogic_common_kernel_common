@@ -1,9 +1,19 @@
-// SPDX-License-Identifier: GPL-2.0
 /*
+ * sound/soc/amlogic/auge/earc_hw.c
+ *
  * Copyright (C) 2019 Amlogic, Inc. All rights reserved.
  *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
-
 #define DEBUG
 
 #include <linux/types.h>
@@ -16,7 +26,6 @@ void earcrx_pll_refresh(struct regmap *top_map,
 			enum pll_rst_src rst_src,
 			bool level)
 {
-	pr_info("%s, level %d\n", __func__, level);
 	if (rst_src == RST_BY_SELF) {
 		/* pll tdc mode */
 		mmio_update_bits(top_map, EARCRX_PLL_CTRL3,
@@ -66,33 +75,18 @@ void earcrx_cmdc_int_mask(struct regmap *top_map)
 		  );
 }
 
-void earcrx_cmdc_init(struct regmap *top_map, bool en, bool rx_dmac_sync_int, bool rterm_on)
+void earcrx_cmdc_init(struct regmap *top_map, bool en, bool rx_dmac_sync_int)
 {
-	if (rterm_on) {
-		mmio_write(top_map, EARCRX_ANA_CTRL0,
-			   en  << 31 | /* earcrx_en_d2a */
-			   0x10 << 25 | /* earcrx_cmdcrx_reftrim */
-			   0x10  << 20 | /* earcrx_idr_trim */
-			   0x10 << 15 | /* earcrx_rterm_trim */
-			   0x4  << 12 | /* earcrx_cmdctx_ack_hystrim */
-			   0x10 << 7  | /* earcrx_cmdctx_ack_reftrim */
-			   0x1  << 4  | /* earcrx_cmdcrx_rcfilter_sel */
-			   0x4  << 0    /* earcrx_cmdcrx_hystrim */
-			  );
-		mmio_write(top_map, EARCRX_ANA_CTRL1,
-				 0x1 << 11 | 0x1 << 10 | 0x8 << 4 | 0x8 << 0);
-	} else {
-		mmio_write(top_map, EARCRX_ANA_CTRL0,
-			   en  << 31 | /* earcrx_en_d2a */
-			   0x10 << 24 | /* earcrx_cmdcrx_reftrim */
-			   0x8  << 20 | /* earcrx_idr_trim */
-			   0x10 << 15 | /* earcrx_rterm_trim */
-			   0x4  << 12 | /* earcrx_cmdctx_ack_hystrim */
-			   0x10 << 7  | /* earcrx_cmdctx_ack_reftrim */
-			   0x1  << 4  | /* earcrx_cmdcrx_rcfilter_sel */
-			   0x4  << 0    /* earcrx_cmdcrx_hystrim */
-			  );
-	}
+	mmio_write(top_map, EARCRX_ANA_CTRL0,
+		   en  << 31 | /* earcrx_en_d2a */
+		   0x10 << 24 | /* earcrx_cmdcrx_reftrim */
+		   0x8  << 20 | /* earcrx_idr_trim */
+		   0x10 << 15 | /* earcrx_rterm_trim */
+		   0x4  << 12 | /* earcrx_cmdctx_ack_hystrim */
+		   0x10 << 7  | /* earcrx_cmdctx_ack_reftrim */
+		   0x1  << 4  | /* earcrx_cmdcrx_rcfilter_sel */
+		   0x4  << 0    /* earcrx_cmdcrx_hystrim */
+		  );
 
 	mmio_write(top_map, EARCRX_PLL_CTRL3,
 		   0x2 << 20 | /* earcrx_pll_bias_adj */
@@ -105,16 +99,18 @@ void earcrx_cmdc_init(struct regmap *top_map, bool en, bool rx_dmac_sync_int, bo
 		   0x1 << 23 | /* earcrx_pll_dmacrx_sqout_rstn_sel */
 		   0x1 << 10   /* earcrx_pll_n */
 		  );
-	mmio_write(top_map,
-		EARCRX_PLL_CTRL1,
-		0x1410a8);
-	mmio_update_bits(top_map,
-		EARCRX_PLL_CTRL2,
-		0x3,
-		0x2);
-	mmio_write(top_map,
-		EARCRX_PLL_CTRL3,
-		0x20046000);
+
+	if (rx_dmac_sync_int) {
+		mmio_update_bits(top_map,
+				 EARCRX_PLL_CTRL2,
+				 0x3,
+				 0x2);
+
+		mmio_update_bits(top_map,
+				 EARCRX_PLL_CTRL3,
+				 0x3 << 28,
+				 0x3 << 28);
+	}
 }
 
 void earcrx_cmdc_arc_connect(struct regmap *cmdc_map, bool init)
@@ -174,35 +170,51 @@ void earcrx_dmac_sync_int_enable(struct regmap *top_map, int enable)
 
 void earcrx_dmac_init(struct regmap *top_map,
 		      struct regmap *dmac_map,
-		      bool unstable_tick_sel,
-		      bool chnum_mult_mode)
+		      bool rx_dmac_sync_int)
 {
-	/* can't open bit 5 as it will cause stuck on t7 chips */
 	mmio_update_bits(top_map, EARCRX_DMAC_INT_MASK,
 			 0x3FFFF,
-			 (0x1 << 17) | /* earcrx_ana_rst c_new_format_set */
-			 (0x1 << 16) | /* earcrx_ana_rst c_earcrx_div2_hold_set */
-			 (0x1 << 15) | /* earcrx_err_correct c_bcherr_int_set */
-			 (0x0 << 14) | /* earcrx_err_correct r_afifo_overflow_set */
-			 (0x0 << 13) | /* earcrx_err_correct r_fifo_overflow_set */
-			 (0x0 << 12) | /* earcrx_user_bit_check r_fifo_overflow */
-			 (0x0 << 11) | /* earcrx_user_bit_check c_fifo_thd_pass */
-			 (0x0 << 10) | /* earcrx_user_bit_check c_u_pk_lost_int_set */
-			 (0x0 << 9)	| /* arcrx_user_bit_check c_iu_pk_end */
-			 (0x0 << 8)	| /* arcrx_biphase_decode c_chst_mute_clr */
-			 (0x1 << 7)	| /* arcrx_biphase_decode c_find_papb */
-			 (0x1 << 6)	| /* arcrx_biphase_decode c_valid_change */
-			 (0x0 << 5)	| /* arcrx_biphase_decode c_find_nonpcm2pcm */
-			 (0x1 << 4)	| /* arcrx_biphase_decode c_pcpd_change */
-			 (0x1 << 3)	| /* arcrx_biphase_decode c_ch_status_change */
-			 (0x1 << 2)	| /* arcrx_biphase_decode sample_mod_change */
-			 (0x1 << 1)	| /* arcrx_biphase_decode r_parity_err */
-			 (0x0 << 0)	  /* arcrx_dmac_sync afifo_overflow */
-		  );
+			 (0x1 << 17) |
+			 /* earcrx_ana_rst c_new_format_set */
+			 (0x1 << 16) |
+			 /* earcrx_ana_rst c_earcrx_div2_hold_set */
+			 (0x1 << 15) |
+			 /* earcrx_err_correct c_bcherr_int_set */
+			 (0x0 << 14) |
+			 /* earcrx_err_correct r_afifo_overflow_set */
+			 (0x0 << 13) |
+			 /* earcrx_err_correct r_fifo_overflow_set */
+			 (0x0 << 12) |
+			 /* earcrx_user_bit_check r_fifo_overflow */
+			 (0x0 << 11) |
+			 /* earcrx_user_bit_check c_fifo_thd_pass */
+			 (0x0 << 10) |
+			 /* earcrx_user_bit_check c_u_pk_lost_int_set */
+			 (0x0 << 9)	|
+			 /* arcrx_user_bit_check c_iu_pk_end */
+			 (0x0 << 8)	|
+			 /* arcrx_biphase_decode c_chst_mute_clr */
+			 (0x1 << 7)	|
+			 /* arcrx_biphase_decode c_find_papb */
+			 (0x1 << 6)	|
+			 /* arcrx_biphase_decode c_valid_change */
+			 (0x1 << 5)	|
+			 /* arcrx_biphase_decode c_find_nonpcm2pcm */
+			 (0x1 << 4)	|
+			 /* arcrx_biphase_decode c_pcpd_change */
+			 (0x1 << 3)	|
+			 /* arcrx_biphase_decode c_ch_status_change */
+			 (0x1 << 2)	|
+			 /* arcrx_biphase_decode sample_mod_change */
+			 (0x1 << 1)	|
+			 /* arcrx_biphase_decode r_parity_err */
+			 (0x0 << 0)
+			 /* arcrx_dmac_sync afifo_overflow */
+			 );
 
 	mmio_write(dmac_map, EARCRX_DMAC_SYNC_CTRL0,
-		   (1 << 16)	|	 /* reg_ana_buf_data_sel_en */
-		   (3 << 12)	|	 /* reg_ana_buf_data_sel */
+			(1 << 16)	|	 /* reg_ana_buf_data_sel_en */
+			(3 << 12)	|	 /* reg_ana_buf_data_sel */
 		   (7 << 8)	|	 /* reg_ana_clr_cnt */
 		   (7 << 4)		 /* reg_ana_set_cnt */
 		  );
@@ -212,14 +224,6 @@ void earcrx_dmac_init(struct regmap *top_map,
 		   (29 << 0)	/* reg_data_bit */
 		  );
 	mmio_write(dmac_map, EARCRX_ANA_RST_CTRL0, 1 << 31 | 2000 << 0);
-	if (chnum_mult_mode)
-		mmio_update_bits(dmac_map, EARCRX_SPDIFIN_CTRL6, 0x1 << 27, 0x1 << 27);
-	if (unstable_tick_sel) {
-		mmio_update_bits(top_map, EARCRX_DMAC_INT_MASK, 0x1 << 28, 0x1 << 28);
-		mmio_write(dmac_map, EARCRX_DMAC_SYNC_CTRL3, 0x1 << 19 | 0x2 << 16 | 0x64 << 0);
-		mmio_write(dmac_map, EARCRX_DMAC_SYNC_CTRL4, 0x1 << 19 | 0x2 << 16 | 0x32 << 0);
-		mmio_write(dmac_map, EARCRX_DMAC_SYNC_CTRL5, 0x1 << 19 | 0x2 << 16 | 0x32 << 0);
-	}
 }
 
 void earcrx_arc_init(struct regmap *dmac_map)
@@ -426,7 +430,7 @@ unsigned int earcrx_get_cs_fmt(struct regmap *dmac_map, enum attend_type type)
 	if (unlikely((val & 0x30) == 0x30)) {
 		unsigned int val1 = earcrx_get_cs_bits(dmac_map, 0x32, 0x7);
 
-		if (val1 == 0x0 &&
+		if ((val1 == 0x0) &&
 		    (((val & 0x3b) == 0x30) || ((val & 0x3b) == 0x3a))) {
 			int layout = earcrx_get_cs_bits(dmac_map,
 				IEC_CS_AUDIO_LAYOUT_OFFSET,
@@ -459,7 +463,7 @@ unsigned int earcrx_get_cs_fmt(struct regmap *dmac_map, enum attend_type type)
 				coding_type = AUDIO_CODING_TYPE_AC3_LAYOUT_B;
 			} else {
 				int pcpd = earcrx_get_cs_pcpd(dmac_map,
-								  type == ATNDTYP_EARC);
+							type == ATNDTYP_EARC);
 				int pc_v = (pcpd >> 16) & 0xffff;
 
 				/* compressed audio  type */
@@ -585,9 +589,9 @@ enum attend_type earcrx_cmdc_get_attended_type(struct regmap *cmdc_map)
 	enum cmdc_st state = (enum cmdc_st)(val & 0x7);
 	enum attend_type type = ATNDTYP_DISCNCT;
 
-	if ((val & (1 << 0x3)) && state == CMDC_ST_ARC)
+	if ((val & (1 << 0x3)) && (state == CMDC_ST_ARC))
 		type = ATNDTYP_ARC;
-	else if ((val & (1 << 0x4)) && state == CMDC_ST_EARC)
+	else if ((val & (1 << 0x4)) && (state == CMDC_ST_EARC))
 		type = ATNDTYP_EARC;
 
 	return type;
@@ -724,32 +728,19 @@ void earctx_cmdc_int_mask(struct regmap *top_map)
 		  );
 }
 
-void earctx_cmdc_init(struct regmap *top_map, bool en, bool rterm_on)
+void earctx_cmdc_init(struct regmap *top_map, bool en)
 {
 	/* ana */
-	if (rterm_on)
-		mmio_write(top_map, EARCTX_ANA_CTRL0,
-			   en << 31   |  /* earctx_en_d2a */
-			   0x1 << 28  |  /* earctx_cmdcrx_rcfilter_sel */
-			   0x4 << 24  |  /* earctx_cmdcrx_hystrim */
-			   0x10 << 19 |  /* earctx_idr_trim */
-			   0x1 << 17  |  /* earctx_rterm_on */
-			   0x10 << 12 |  /* earctx_rterm_trim */
-			   0x4 << 8   |  /* earctx_dmac_slew_con */
-			   0x4 << 5   |  /* earctx_cmdctx_ack_hystrim */
-			   0x10 << 0     /* earctx_cmdctx_ack_reftrim */
-			  );
-	else
-		mmio_write(top_map, EARCTX_ANA_CTRL0,
-			   en << 31   |  /* earctx_en_d2a */
-			   0x1 << 28  |  /* earctx_cmdcrx_rcfilter_sel */
-			   0x4 << 24  |  /* earctx_cmdcrx_hystrim */
-			   0x8 << 20  |  /* earctx_idr_trim */
-			   0x10 << 12 |  /* earctx_rterm_trim */
-			   0x4 << 8   |  /* earctx_dmac_slew_con */
-			   0x4 << 5   |  /* earctx_cmdctx_ack_hystrim */
-			   0x10 << 0     /* earctx_cmdctx_ack_reftrim */
-			  );
+	mmio_write(top_map, EARCTX_ANA_CTRL0,
+		   en << 31   |  /* earctx_en_d2a */
+		   0x1 << 28  |  /* earctx_cmdcrx_rcfilter_sel */
+		   0x4 << 26  |  /* earctx_cmdcrx_hystrim */
+		   0x8 << 20  |  /* earctx_idr_trim */
+		   0x10 << 12 |  /* earctx_rterm_trim */
+		   0x4 << 8   |  /* earctx_dmac_slew_con */
+		   0x4 << 5   |  /* earctx_cmdctx_ack_hystrim */
+		   0x10 << 0     /* earctx_cmdctx_ack_reftrim */
+		  );
 }
 
 void earctx_cmdc_set_timeout(struct regmap *cmdc_map, int no_timeout)
@@ -797,7 +788,7 @@ void earctx_cmdc_hpd_detect(struct regmap *top_map,
 			 0x1 << 11 | 0x3 << 8 | 0x3 << 4,
 			 0x1 << 11 |       /* hdmi_hpd invent */
 			 earc_port << 8 |  /* hdmi_hpd mux, port 0/1/2 */
-			 /* earctx_hd_hdp mux,3:register value 2:gpiow_5 1:gpiow_9 0:gpiow_1 */
+	/* earctx_hd_hdp mux,3:register value 2:gpiow_5 1:gpiow_9 0:gpiow_1 */
 			 earc_port << 4
 			);
 
@@ -851,9 +842,7 @@ void earctx_cmdc_hpd_detect(struct regmap *top_map,
 
 void earctx_dmac_init(struct regmap *top_map,
 		      struct regmap *dmac_map,
-		      int earc_spdifout_lane_mask,
-		      unsigned int chmask,
-		      unsigned int swap_masks)
+		      int earc_spdifout_lane_mask)
 {
 	mmio_update_bits(dmac_map, EARCTX_SPDIFOUT_CTRL0,
 			 0x3 << 28,
@@ -879,12 +868,12 @@ void earctx_dmac_init(struct regmap *top_map,
 	if (earc_spdifout_lane_mask == EARC_SPDIFOUT_LANE_MASK_V2)
 		mmio_update_bits(dmac_map, EARCTX_SPDIFOUT_CTRL2,
 				 0xffff,   /* lane mask */
-				 chmask);     /*  ODO: lane 0 now */
+				 0x3);     /*  ODO: lane 0 now */
 	else
 		mmio_update_bits(dmac_map, EARCTX_SPDIFOUT_CTRL0,
 				 0xff << 4,   /* lane mask */
-				 chmask << 4);   /*  ODO: lane 0 now */
-	mmio_update_bits(dmac_map, EARCTX_SPDIFOUT_SWAP, 0xff, swap_masks);
+				 0x3 << 4);   /*  ODO: lane 0 now */
+
 	mmio_update_bits(dmac_map, EARCTX_ERR_CORRT_CTRL0,
 			 0x1 << 23 | /* reg_bch_in_reverse */
 			 0x1 << 21 | /* reg_bch_out_data_reverse */
@@ -1152,10 +1141,10 @@ void earctx_set_cs_info(struct regmap *dmac_map,
 	bool is_multich = false;
 	unsigned int ca;
 
-	if (coding_type == AUDIO_CODING_TYPE_MULTICH_32CH_LPCM ||
-	    coding_type == AUDIO_CODING_TYPE_MULTICH_16CH_LPCM ||
-	    coding_type == AUDIO_CODING_TYPE_MULTICH_8CH_LPCM ||
-	    coding_type == AUDIO_CODING_TYPE_MULTICH_2CH_LPCM) {
+	if ((coding_type == AUDIO_CODING_TYPE_MULTICH_32CH_LPCM) ||
+	    (coding_type == AUDIO_CODING_TYPE_MULTICH_16CH_LPCM) ||
+	    (coding_type == AUDIO_CODING_TYPE_MULTICH_8CH_LPCM) ||
+	    (coding_type == AUDIO_CODING_TYPE_MULTICH_2CH_LPCM)) {
 		is_multich = true;
 
 		if (*lpcm_ca) {
@@ -1198,7 +1187,7 @@ enum attend_type earctx_cmdc_get_attended_type(struct regmap *cmdc_map)
 	enum cmdc_st state = (enum cmdc_st)(val & 0x7);
 	enum attend_type tx_type = ATNDTYP_DISCNCT;
 
-	if ((val & (1 << 0x3)) && state == CMDC_ST_ARC)
+	if ((val & (1 << 0x3)) && (state == CMDC_ST_ARC))
 		tx_type = ATNDTYP_ARC;
 	else if ((val & (1 << 0x4)) && (state == CMDC_ST_EARC))
 		tx_type = ATNDTYP_EARC;
@@ -1267,7 +1256,7 @@ bool get_earctx_enable(struct regmap *cmdc_map, struct regmap *dmac_map)
 	if (type == ATNDTYP_DISCNCT)
 		return false;
 
-	if (mmio_read(dmac_map, EARCTX_SPDIFOUT_CTRL0) & 0x1 << 28)
+	if (mmio_read(dmac_map, EARCTX_SPDIFOUT_CTRL0) & 0x1 << 31)
 		return true;
 
 	return false;
@@ -1277,8 +1266,7 @@ void earctx_enable(struct regmap *top_map,
 		   struct regmap *cmdc_map,
 		   struct regmap *dmac_map,
 		   enum audio_coding_types coding_type,
-		   bool enable,
-		   bool rterm_on)
+		   bool enable)
 {
 	enum attend_type type = earctx_cmdc_get_attended_type(cmdc_map);
 
@@ -1286,27 +1274,16 @@ void earctx_enable(struct regmap *top_map,
 		return;
 
 	if (enable) {
-		int offset, mask, val;
-
-		if (rterm_on) {
-			offset = 19;
-			mask = 0x1f;
-			val = 0x10;
-		} else {
-			offset = 20;
-			mask = 0xf;
-			val = 0x8;
-		}
 		if (type == ATNDTYP_ARC) {
 			mmio_update_bits(top_map,
 					 EARCTX_ANA_CTRL0,
-					 mask << offset,
-					 (val + 1) << offset);
+					 0xf << 20,
+					 9 << 20);
 		} else if (type == ATNDTYP_EARC) {
 			mmio_update_bits(top_map,
 					 EARCTX_ANA_CTRL0,
-					 mask << offset,
-					 val << offset);
+					 0xf << 20,
+					 8 << 20);
 		}
 
 		mmio_update_bits(dmac_map, EARCTX_SPDIFOUT_CTRL0,

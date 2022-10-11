@@ -1,13 +1,25 @@
-/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/amlogic/media/gdc/inc/api/gdc_api.h
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
 #ifndef __GDC_API_H__
 #define __GDC_API_H__
 
 #include <linux/of_address.h>
-#include <linux/amlogic/media/gdc/gdc.h>
+#include <linux/dma-direction.h>
 
 enum gdc_memtype_s {
 	AML_GDC_MEM_ION,
@@ -16,8 +28,23 @@ enum gdc_memtype_s {
 };
 
 struct gdc_buf_cfg {
-	u32 type;
+	uint32_t type;
 	unsigned long len;
+};
+
+// each configuration addresses and size
+struct gdc_config_s {
+	uint32_t format;
+	uint32_t config_addr;   //gdc config address
+	uint32_t config_size;   //gdc config size in 32bit
+	uint32_t input_width;  //gdc input width resolution
+	uint32_t input_height; //gdc input height resolution
+	uint32_t input_y_stride; //gdc input y stride resolution
+	uint32_t input_c_stride; //gdc input uv stride
+	uint32_t output_width;  //gdc output width resolution
+	uint32_t output_height; //gdc output height resolution
+	uint32_t output_y_stride; //gdc output y stride
+	uint32_t output_c_stride; //gdc output uv stride
 };
 
 struct gdc_buffer_info {
@@ -36,53 +63,53 @@ struct gdc_buffer_info {
 
 // overall gdc settings and state
 struct gdc_settings {
-	u32 magic;
+	uint32_t magic;
 	//writing/reading to gdc base address, currently not read by api
-	u32 base_gdc;
+	uint32_t base_gdc;
 	 //array of gdc configuration and sizes
 	struct gdc_config_s gdc_config;
 	//update this index for new config
 	//int gdc_config_total;
 	//start memory to write gdc output framse
-	u32 buffer_addr;
+	uint32_t buffer_addr;
 	//size of memory output frames to determine
 	//if it is enough and can do multiple write points
-	u32 buffer_size;
+	uint32_t buffer_size;
 	//current output address of gdc
-	u32 current_addr;
+	uint32_t current_addr;
 	//set when expecting an interrupt from gdc
-	s32 is_waiting_gdc;
+	int32_t is_waiting_gdc;
 
-	s32 in_fd;  //input buffer's share fd
-	s32 out_fd; //output buffer's share fd
+	int32_t in_fd;  //input buffer's share fd
+	int32_t out_fd; //output buffer's share fd
 
 	//input address for y and u, v planes
-	u32 y_base_addr;
+	uint32_t y_base_addr;
 	union {
-		u32 uv_base_addr;
-		u32 u_base_addr;
+		uint32_t uv_base_addr;
+		uint32_t u_base_addr;
 	};
-	u32 v_base_addr;
+	uint32_t v_base_addr;
 	//opaque address in ddr added with offset to
 	//write the gdc config sequence
 	void *ddr_mem;
 	//when inititialised this callback will be called
 	//to update frame buffer addresses and offsets
-	void (*get_frame_buffer)(u32 y_base_addr,
-				 u32 uv_base_addr,
-				 u32 y_line_offset,
-				 u32 uv_line_offset);
+	void (*get_frame_buffer)(uint32_t y_base_addr,
+			uint32_t uv_base_addr,
+			uint32_t y_line_offset,
+			uint32_t uv_line_offset);
 	void *fh;
-	s32 y_base_fd;
+	int32_t y_base_fd;
 	union {
-		s32 uv_base_fd;
-		s32 u_base_fd;
+		int32_t uv_base_fd;
+		int32_t u_base_fd;
 	};
-	s32 v_base_fd;
+	int32_t v_base_fd;
 };
 
 struct gdc_settings_ex {
-	u32 magic;
+	uint32_t magic;
 	struct gdc_config_s gdc_config;
 	struct gdc_buffer_info input_buffer;
 	struct gdc_buffer_info config_buffer;
@@ -101,7 +128,6 @@ struct gdc_dmabuf_exp_s {
 	unsigned int flags;
 	int fd;
 };
-
 /* end of gdc dma buffer define */
 
 #define GDC_IOC_MAGIC  'G'
@@ -145,14 +171,60 @@ enum {
 	FW_TYPE_MAX
 };
 
+struct gdc_dma_cfg {
+	int fd;
+	void *dev;
+	void *vaddr;
+	struct dma_buf *dbuf;
+	struct dma_buf_attachment *attach;
+	struct sg_table *sg;
+	enum dma_data_direction dir;
+};
+
+struct gdc_cmd_s {
+	uint32_t outplane;
+	//writing/reading to gdc base address, currently not read by api
+	uint32_t base_gdc;
+	 //array of gdc configuration and sizes
+	struct gdc_config_s gdc_config;
+	//update this index for new config
+	//int gdc_config_total;
+	//start memory to write gdc output framse
+	uint32_t buffer_addr;
+	//size of memory output frames to determine
+	//if it is enough and can do multiple write points
+	uint32_t buffer_size;
+	//current output address of gdc
+	uint32_t current_addr;
+	//output address for  u, v planes
+	union {
+		uint32_t uv_out_base_addr;
+		uint32_t u_out_base_addr;
+	};
+	uint32_t v_out_base_addr;
+
+	//set when expecting an interrupt from gdc
+	int32_t is_waiting_gdc;
+
+	//input address for y and u, v planes
+	uint32_t y_base_addr;
+	union {
+		uint32_t uv_base_addr;
+		uint32_t u_base_addr;
+	};
+	uint32_t v_base_addr;
+
+	unsigned char wait_done_flag;
+};
+
 /* path: "/vendor/lib/firmware/gdc/" */
 #define FIRMWARE_DIR "gdc"
 
 struct fw_equisolid_s {
 	/* float */
-	char strength_x[8];
+	char strengthX[8];
 	/* float */
-	char strength_y[8];
+	char strengthY[8];
 	int rotation;
 };
 
@@ -170,13 +242,14 @@ struct fw_equidistant_s {
 	int fov_width;
 	int fov_height;
 	bool keep_ratio;
-	int cylindricity_x;
-	int cylindricity_y;
+	int cylindricityX;
+	int cylindricityY;
 };
 
 struct fw_custom_s {
 	char *fw_name;
 };
+
 
 struct fw_affine_s {
 	int rotation;
@@ -187,8 +260,8 @@ struct fw_input_info_s {
 	int height;
 	int fov;
 	int diameter;
-	int offset_x;
-	int offset_y;
+	int offsetX;
+	int offsetY;
 };
 
 union transform_u {
@@ -200,8 +273,8 @@ union transform_u {
 };
 
 struct fw_output_info_s {
-	int offset_x;
-	int offset_y;
+	int offsetX;
+	int offsetY;
 	int width;
 	int height;
 	union transform_u trans;
@@ -233,7 +306,7 @@ struct fw_info_s {
 };
 
 struct gdc_settings_with_fw {
-	u32 magic;
+	uint32_t magic;
 	struct gdc_config_s gdc_config;
 	struct gdc_buffer_info input_buffer;
 	struct gdc_buffer_info reserved;
@@ -254,7 +327,7 @@ struct gdc_settings_with_fw {
  *   @return 0 - success
  *	 -1 - fail.
  */
-int gdc_init(struct gdc_cmd_s *gdc_cmd, struct gdc_dma_cfg_t *dma_cfg);
+int gdc_init(struct gdc_cmd_s *gdc_cmd);
 /**
  *   This function stops the gdc block
  *
@@ -292,27 +365,22 @@ void gdc_start(struct gdc_cmd_s *gdc_cmd);
  *	 -1 - no interrupt from GDC.
  */
 int gdc_process(struct gdc_cmd_s *gdc_cmd,
-		u32 y_base_addr,
-		u32 uv_base_addr,
-		struct gdc_dma_cfg_t *dma_cfg);
+		uint32_t y_base_addr,
+		uint32_t uv_base_addr);
 int gdc_process_yuv420p(struct gdc_cmd_s *gdc_cmd,
-			u32 y_base_addr,
-			u32 u_base_addr,
-			u32 v_base_addr,
-			struct gdc_dma_cfg_t *dma_cfg);
+		uint32_t y_base_addr,
+		uint32_t u_base_addr,
+		uint32_t v_base_addr);
 int gdc_process_y_grey(struct gdc_cmd_s *gdc_cmd,
-		       u32 y_base_addr,
-		       struct gdc_dma_cfg_t *dma_cfg);
+		uint32_t y_base_addr);
 int gdc_process_yuv444p(struct gdc_cmd_s *gdc_cmd,
-			u32 y_base_addr,
-			u32 u_base_addr,
-			u32 v_base_addr,
-			struct gdc_dma_cfg_t *dma_cfg);
+		uint32_t y_base_addr,
+		uint32_t u_base_addr,
+		uint32_t v_base_addr);
 int gdc_process_rgb444p(struct gdc_cmd_s *gdc_cmd,
-			u32 y_base_addr,
-			u32 u_base_addr,
-			u32 v_base_addr,
-			struct gdc_dma_cfg_t *dma_cfg);
+		uint32_t y_base_addr,
+		uint32_t u_base_addr,
+		uint32_t v_base_addr);
 
 /**
  *   This function gets the GDC output frame addresses
@@ -342,10 +410,10 @@ int gdc_get_frame(struct gdc_cmd_s *gdc_cmd);
  *   @return 0 - success
  *	 -1 - no interrupt from GDC.
  */
-int gdc_run(struct gdc_cmd_s *g, struct gdc_dma_cfg_t *dma_cfg);
+int gdc_run(struct gdc_cmd_s *g);
 
-s32 init_gdc_io(struct device_node *dn, u32 dev_type);
+int32_t init_gdc_io(struct device_node *dn);
 
-int gdc_pwr_config(bool enable, u32 dev_type);
+int gdc_pwr_config(bool enable);
 
 #endif

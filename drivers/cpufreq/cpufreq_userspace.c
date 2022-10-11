@@ -1,10 +1,14 @@
-// SPDX-License-Identifier: GPL-2.0-only
 
 /*
  *  linux/drivers/cpufreq/cpufreq_userspace.c
  *
  *  Copyright (C)  2001 Russell King
  *            (C)  2002 - 2004 Dominik Brodowski <linux@brodo.de>
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
+ *
  */
 
 #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
@@ -114,7 +118,10 @@ static void cpufreq_userspace_policy_limits(struct cpufreq_policy *policy)
 	mutex_unlock(&userspace_mutex);
 }
 
-static struct cpufreq_governor cpufreq_gov_userspace = {
+#ifndef CONFIG_CPU_FREQ_DEFAULT_GOV_USERSPACE
+static
+#endif
+struct cpufreq_governor cpufreq_gov_userspace = {
 	.name		= "userspace",
 	.init		= cpufreq_userspace_policy_init,
 	.exit		= cpufreq_userspace_policy_exit,
@@ -147,7 +154,7 @@ struct cpufreq_governor *cpufreq_default_governor(void)
 	return &cpufreq_gov_userspace;
 }
 
-core_initcall(cpufreq_gov_userspace_init);
+fs_initcall(cpufreq_gov_userspace_init);
 #else
 module_init(cpufreq_gov_userspace_init);
 #endif

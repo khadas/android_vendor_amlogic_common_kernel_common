@@ -1,4 +1,3 @@
-/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
  * drivers/amlogic/media/enhancement/amvecm/amcsc.h
  *
@@ -26,12 +25,12 @@
 extern uint debug_csc;
 #define pr_csc(lvl, fmt, args...)\
 	do {\
-		if (debug_csc & (lvl))\
+		if (debug_csc & lvl)\
 			pr_info(fmt, ## args);\
 	} while (0)
 
 /* white balance value */
-void ve_ogo_param_update(void);
+extern void ve_ogo_param_update(void);
 extern struct tcon_rgb_ogo_s video_rgb_ogo;
 
 enum vpp_matrix_sel_e {
@@ -43,7 +42,6 @@ enum vpp_matrix_sel_e {
 	VPP_MATRIX_5,		/* in osd eotf - new from GXL */
 	VPP_MATRIX_6		/* vd2 matrix before pre-blend */
 };
-
 #define NUM_MATRIX 6
 
 /* matrix names */
@@ -70,7 +68,6 @@ enum vpp_lut_sel_e {
 	VPP_LUT_OETF,
 	VPP_LUT_INV_EOTF
 };
-
 #define NUM_LUT 5
 
 /* matrix registers */
@@ -97,23 +94,27 @@ enum output_format_e {
 	BT2020_PQ_DYNAMIC,
 	BT2020_HLG,
 	BT2100_IPT,
+	BT2020YUV_BT2020RGB_CUVA,
 	/* force bypass all process */
 	BT_BYPASS
 };
 
-#define POST_MTX_EN_MASK BIT(POST_MTX_EN)
-#define VD2_MTX_EN_MASK  BIT(VD2_MTX_EN)
-#define VD1_MTX_EN_MASK  BIT(VD1_MTX_EN)
-#define XVY_MTX_EN_MASK  BIT(XVY_MTX_EN)
-#define OSD1_MTX_EN_MASK BIT(OSD1_MTX_EN)
+#define POST_MTX_EN_MASK (1 << POST_MTX_EN)
+#define VD2_MTX_EN_MASK  (1 << VD2_MTX_EN)
+#define VD1_MTX_EN_MASK  (1 << VD1_MTX_EN)
+#define XVY_MTX_EN_MASK  (1 << XVY_MTX_EN)
+#define OSD1_MTX_EN_MASK (1 << OSD1_MTX_EN)
 
-#define SDR_SUPPORT		(BIT(1))
-#define HDR_SUPPORT		(BIT(2))
-#define HLG_SUPPORT		(BIT(3))
-#define HDRP_SUPPORT		(BIT(4))
-#define BT2020_SUPPORT		(BIT(5))
-#define DV_SUPPORT_SHF		(6)
+#define SDR_SUPPORT		(1 << 1)
+#define HDR_SUPPORT		(1 << 2)
+#define HLG_SUPPORT		(1 << 3)
+#define HDRP_SUPPORT	(1 << 4)
+#define BT2020_SUPPORT	(1 << 5)
+#define DV_SUPPORT_SHF	(6)
 #define DV_SUPPORT		(3 << DV_SUPPORT_SHF)
+//#define CUVA_SUPPORT	(1 << 8)
+#define CUVA_SUPPORT	BIT(8)
+
 
 bool is_vinfo_available(const struct vinfo_s *vinfo);
 int is_sink_cap_changed(const struct vinfo_s *vinfo,
@@ -137,6 +138,10 @@ int is_video_turn_on(bool *vd_on, enum vd_path_e vd_path);
 #define SIG_OUTPUT_MODE_CHG	0x2000
 #define SIG_HDR_OOTF_CHG 0x4000
 #define SIG_FORCE_CHG 0x8000
+#define SIG_RANGE_CHG 0x10000
+#define SIG_BS_CHG 0x20000
+#define SIG_CUVA_HDR_MODE	0x40000
+#define SIG_CUVA_HLG_MODE	0x80000
 
 #define LUT_289_SIZE	289
 extern unsigned int lut_289_mapping[LUT_289_SIZE];
@@ -174,6 +179,14 @@ extern uint cur_hdr_process_mode[VD_PATH_MAX];
 extern uint hdr10_plus_process_mode[VD_PATH_MAX];
 extern uint cur_hdr10_plus_process_mode[VD_PATH_MAX];
 
+/* 0: bypass, 1:cuva_hdr->hdr, 2:cuva_hdr->sdr, 3:cuva_hdr->hlg */
+extern uint cuva_hdr_process_mode[VD_PATH_MAX];
+extern uint cur_cuva_hdr_process_mode[VD_PATH_MAX];
+
+/* 0: bypass, 1:cuva_hdr->hdr, 2:cuva_hdr->sdr, 3:cuva_hdr->hlg */
+extern uint cuva_hlg_process_mode[VD_PATH_MAX];
+extern uint cur_cuva_hlg_process_mode[VD_PATH_MAX];
+
 /* 0: hlg->hlg, 1:hlg->sdr 2:hlg->hdr*/
 extern uint hlg_process_mode[VD_PATH_MAX];
 extern uint cur_hlg_process_mode[VD_PATH_MAX];
@@ -187,26 +200,25 @@ extern uint tx_hdr10_plus_support;
 
 extern struct master_display_info_s dbg_hdr_send;
 
-int amvecm_matrix_process(struct vframe_s *vf, struct vframe_s *vf_rpt, int flags,
-			  enum vd_path_e vd_path);
-int amvecm_hdr_dbg(u32 sel);
+extern int amvecm_matrix_process(
+	struct vframe_s *vf, struct vframe_s *vf_rpt, int flags,
+	enum vd_path_e vd_path);
+extern int amvecm_hdr_dbg(u32 sel);
 
-u32 get_video_enabled(void);
-u32 get_videopip_enabled(void);
-u32 get_videopip2_enabled(void);
+extern u32 get_video_enabled(void);
+extern u32 get_videopip_enabled(void);
 
 void set_video_mute(bool on);
 int get_video_mute(void);
 
-void get_cur_vd_signal_type(enum vd_path_e vd_path);
-enum color_primary_e get_color_primary(void);
+extern void get_cur_vd_signal_type(enum vd_path_e vd_path);
+extern enum color_primary_e get_color_primary(void);
 /*hdr*/
 /*#define DBG_BUF_SIZE (1024)*/
 
 struct hdr_cfg_t {
 	unsigned int en_osd_lut_100;
 };
-
 struct hdr_data_t {
 	struct hdr_cfg_t hdr_cfg;
 
@@ -216,21 +228,21 @@ struct hdr_data_t {
 
 };
 
-void hdr_init(struct hdr_data_t *phdr_data);
-void hdr_exit(void);
-void hdr_set_cfg_osd_100(int val);
-void hdr_osd_off(void);
-void hdr_vd1_off(void);
+extern void hdr_init(struct hdr_data_t *phdr_data);
+extern void hdr_exit(void);
+extern void hdr_set_cfg_osd_100(int val);
+extern void hdr_osd_off(void);
+extern void hdr_vd1_off(void);
 void hdr_vd2_off(void);
 void hdr_vd1_iptmap(void);
-bool is_video_layer_on(enum vd_path_e vd_path);
+extern bool is_video_layer_on(enum vd_path_e vd_path);
 
 #define HDR_MODULE_OFF		0
 #define HDR_MODULE_ON		1
 #define HDR_MODULE_BYPASS	2
-void set_hdr_module_status(enum vd_path_e vd_path, int status);
-int get_hdr_module_status(enum vd_path_e vd_path);
-int get_primaries_type(struct vframe_master_display_colour_s *p_mdc);
+extern void set_hdr_module_status(enum vd_path_e vd_path, int status);
+extern int get_hdr_module_status(enum vd_path_e vd_path);
+extern int get_primaries_type(struct vframe_master_display_colour_s *p_mdc);
 
 #define PROC_BYPASS			0
 /* to backward compatible */
@@ -239,28 +251,52 @@ int get_primaries_type(struct vframe_master_display_colour_s *p_mdc);
 /* sdr */
 #define PROC_SDR_TO_HDR		1
 #define PROC_SDR_TO_HLG		2
+#define PROC_SDR_TO_CUVA	3
+#define PROC_SDR_TO_TRG		4
+
 /* hdr */
 #define PROC_HDR_TO_SDR		1
 #define PROC_HDR_TO_HLG		2
+#define PROC_HDR_TO_CUVA	3
 /* hlg */
 #define PROC_HLG_TO_SDR		1
 #define PROC_HLG_TO_HDR		2
+#define PROC_HLG_TO_CUVA	3
 /* hdr+ */
 #define PROC_HDRP_TO_HDR	1
 #define PROC_HDRP_TO_SDR	2
 #define PROC_HDRP_TO_HLG	3
+#define PROC_HDRP_TO_CUVA	4
 
-uint get_hdr10_plus_pkt_delay(void);
-void update_hdr10_plus_pkt(bool enable,
-			   void *hdr10plus_params,
-			   void *send_info);
-void send_hdr10_plus_pkt(enum vd_path_e vd_path);
+/* cuva */
+#define PROC_CUVA_TO_SDR	1
+#define PROC_CUVA_TO_HDR	2
+#define PROC_CUVA_TO_HLG	3
+#define PROC_CUVA_TO_HDR10P	4
+
+extern uint get_hdr10_plus_pkt_delay(void);
+extern void update_hdr10_plus_pkt(bool enable,
+	void *hdr10plus_params,
+	void *send_info);
+extern void send_hdr10_plus_pkt(enum vd_path_e vd_path);
+void send_cuva_pkt(enum vd_path_e vd_path);
 
 #define HDRPLUS_PKT_UPDATE	2
 #define HDRPLUS_PKT_REPEAT	1
 #define HDRPLUS_PKT_IDLE	0
 
-void hdr10_plus_process_update(int force_source_lumin, enum vd_path_e vd_path);
+uint get_cuva_pkt_delay(void);
+void update_cuva_pkt(bool enable,
+	void *cuva_params,
+	void *edms_params,
+	void *send_info);
+
+#define CUVA_PKT_UPDATE	2
+#define CUVA_PKT_REPEAT	1
+#define CUVA_PKT_IDLE	0
+
+void hdr10_plus_process_update(
+	int force_source_lumin, enum vd_path_e vd_path);
 extern int customer_hdr_clipping;
 
 /* api to get sink capability */

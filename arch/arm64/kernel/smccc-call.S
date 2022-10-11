@@ -1,12 +1,19 @@
-/* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2015, Linaro Limited
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License Version 2 as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU General Public License for more details.
+ *
  */
 #include <linux/linkage.h>
 #include <linux/arm-smccc.h>
-
 #include <asm/asm-offsets.h>
-#include <asm/assembler.h>
 
 	.macro SMCCC instr
 	.cfi_startproc
@@ -20,10 +27,7 @@
 	cmp	x9, #ARM_SMCCC_QUIRK_QCOM_A6
 	b.ne	1f
 	str	x6, [x4, ARM_SMCCC_QUIRK_STATE_OFFS]
-1:
-#ifndef CONFIG_AMLOGIC_DEBUG_LOCKUP
-	ret
-#endif
+1:	ret
 	.cfi_endproc
 	.endm
 
@@ -34,28 +38,8 @@
  *		  struct arm_smccc_quirk *quirk)
  */
 ENTRY(__arm_smccc_smc)
-#ifdef CONFIG_AMLOGIC_DEBUG_LOCKUP
-	stp x0, x1, [sp, #-16]!
-	stp x2, x3, [sp, #-16]!
-	stp x4, x5, [sp, #-16]!
-	stp x6, x7, [sp, #-16]!
-	stp x29, x30, [sp, #-16]!
-	bl smc_trace_start
-	ldp x29, x30, [sp], #16
-	ldp x6, x7, [sp], #16
-	ldp x4, x5, [sp], #16
-	ldp x2, x3, [sp], #16
-	ldp x0, x1, [sp], #16
-#endif
 	SMCCC	smc
-#ifdef CONFIG_AMLOGIC_DEBUG_LOCKUP
-	stp x29, x30, [sp, #-16]!
-	bl smc_trace_stop
-	ldp x29, x30, [sp], #16
-	ret
-#endif
 ENDPROC(__arm_smccc_smc)
-EXPORT_SYMBOL(__arm_smccc_smc)
 
 /*
  * void arm_smccc_hvc(unsigned long a0, unsigned long a1, unsigned long a2,
@@ -66,4 +50,3 @@ EXPORT_SYMBOL(__arm_smccc_smc)
 ENTRY(__arm_smccc_hvc)
 	SMCCC	hvc
 ENDPROC(__arm_smccc_hvc)
-EXPORT_SYMBOL(__arm_smccc_hvc)

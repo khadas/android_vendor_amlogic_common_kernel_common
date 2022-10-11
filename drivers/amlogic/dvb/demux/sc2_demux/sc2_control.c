@@ -1,6 +1,18 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/amlogic/dvb/demux/sc2_demux/sc2_control.c
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
 #include <linux/kernel.h>
@@ -86,7 +98,8 @@ void tsout_config_sid_table(u32 sid, u32 begin, u32 length)
 	WRITE_CBUS_REG(sid_addr, data);
 }
 
-static void tee_tsout_config_ts_table(int pid, u32 pid_mask, u32 pid_entry, u32 buffer_id)
+static void tee_tsout_config_ts_table(int pid,
+		u32 pid_mask, u32 pid_entry, u32 buffer_id)
 {
 	struct tee_dmx_ts_table_param param = {0};
 	int ret = -1;
@@ -113,7 +126,8 @@ void tsout_config_ts_table(int pid, u32 pid_mask, u32 pid_entry, u32 buffer_id)
 	       __func__, pid, pid_mask, pid_entry, buffer_id);
 
 	if (is_security_dmx == TEE_DMX_ENABLE)
-		return tee_tsout_config_ts_table(pid, pid_mask, pid_entry, buffer_id);
+		return tee_tsout_config_ts_table(pid,
+				pid_mask, pid_entry, buffer_id);
 
 	cfg.data = 0;
 	data.data = 0;
@@ -254,38 +268,6 @@ int tsout_config_get_pcr(u32 pcr_entry, u64 *pcr)
 	return 0;
 }
 
-void tsout_config_remap_table(u32 pid_entry, u32 sid, int pid, int pid_new)
-{
-	union PID_CFG_FIELD cfg;
-	union PID_DATA_FIELD data;
-
-	cfg.data = 0;
-	data.data = 0;
-
-	if (pid_new == -1)
-		cfg.b.on_off = 0;
-	else
-		cfg.b.on_off = 1;
-
-	data.b.pid_mask = pid_new & 0x1fff;
-	data.b.pid = pid & 0x1fff;
-	cfg.b.pid_entry = pid_entry;
-	cfg.b.remap_flag = 1;
-	cfg.b.buffer_id = sid;
-	cfg.b.mode = MODE_WRITE;
-	cfg.b.ap_pending = 1;
-
-	WRITE_CBUS_REG(TS_OUTPUT_PID_DAT, data.data);
-	WRITE_CBUS_REG(TS_OUTPUT_PID_CFG, cfg.data);
-
-	pr_dbg("%s data.data:0x%0x\n", __func__, data.data);
-	pr_dbg("%s cfg.data:0x%0x\n", __func__, cfg.data);
-
-	do {
-		cfg.data = READ_CBUS_REG(TS_OUTPUT_PID_CFG);
-	} while (cfg.b.ap_pending);
-}
-
 unsigned int dsc_get_ready(int dsc_type)
 {
 	if (dsc_type == CA_DSC_COMMON_TYPE)
@@ -316,7 +298,8 @@ void dsc_config_ready(int dsc_type)
 		WRITE_CBUS_REG(TSE_PID_READY, 1);
 }
 
-static void tee_dsc_config_pid_table(struct dsc_pid_table *pid_entry, int dsc_type)
+static void tee_dsc_config_pid_table(struct dsc_pid_table *pid_entry,
+		int dsc_type)
 {
 	struct tee_dmx_pid_table_param param = {0};
 	int ret = -1;
@@ -550,34 +533,6 @@ void wdma_irq(u8 chan_id, int enable)
 		data &= (~(1 << (chan_id % 32)));
 
 	WRITE_CBUS_REG(TS_DAM_WCH_CLEAN + offset, data);
-	pr_dbg("%s data:0x%0x\n", __func__, data);
-}
-
-void tso_set(int path)
-{
-	unsigned int data;
-
-	data = READ_CBUS_REG(DEMOD_TS_O_PATH_CTRL);
-	switch (path) {
-	case 0:
-		//ts0
-		data &= 0x0;
-		break;
-	case 1:
-		//ts1
-		data &= 0x1;
-		break;
-	case 2:
-		//ts2
-		data &= 0x2;
-		break;
-	default:
-		//ts2
-		data &= 0x2;
-		break;
-	}
-
-	WRITE_CBUS_REG(DEMOD_TS_O_PATH_CTRL, data);
 	pr_dbg("%s data:0x%0x\n", __func__, data);
 }
 

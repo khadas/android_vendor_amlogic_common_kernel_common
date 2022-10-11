@@ -1,13 +1,25 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/amlogic/media/dtv_demod/dvbt_v2.c
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
  /* Enables DVBv3 compatibility bits at the headers */
 #define __DVB_CORE__	/*ary 2018-1-31*/
 
 #include "demod_func.h"
-#include "aml_demod.h"
+#include <linux/dvb/aml_demod.h>
 #include <linux/string.h>
 #include <linux/kernel.h>
 #include "acf_filter_coefficient.h"
@@ -19,14 +31,20 @@ void dvbt_write_regb(unsigned long addr, int index, unsigned long data)
 	/*to achieve write func*/
 }
 
-int dvbt_isdbt_set_ch(struct aml_dtvdemod *demod,
+int dvbt_isdbt_set_ch(struct aml_demod_sta *demod_sta,
+		/*struct aml_demod_i2c *demod_i2c,*/
 		struct aml_demod_dvbt *demod_dvbt)
 {
 	int ret = 0;
 	u8_t demod_mode = 1;
 	u8_t bw, sr, ifreq, agc_mode;
 	u32_t ch_freq;
-	struct amldtvdemod_device_s *devp = (struct amldtvdemod_device_s *)demod->priv;
+	struct amldtvdemod_device_s *devp = dtvdemod_get_dev();
+
+	if (unlikely(!devp)) {
+		PR_INFO("err: %s devp is null\n", __func__);
+		return -1;
+	}
 
 	if (devp->data->hw_ver >= DTVDEMOD_HW_T5D)
 		bw = BANDWIDTH_AUTO;
@@ -55,9 +73,9 @@ int dvbt_isdbt_set_ch(struct aml_dtvdemod *demod,
 		ret = -1;
 	}
 
-	demod->demod_status.ch_mode = 0;	/* TODO */
-	demod->demod_status.agc_mode = agc_mode;
-	demod->demod_status.ch_freq = ch_freq;
+	demod_sta->ch_mode = 0;	/* TODO */
+	demod_sta->agc_mode = agc_mode;
+	demod_sta->ch_freq = ch_freq;
 	/*   if (demod_i2c->tuner == 1) */
 	/*     demod_sta->ch_if = 36130;*/
 	/* else if (demod_i2c->tuner == 2)*/
@@ -67,10 +85,10 @@ int dvbt_isdbt_set_ch(struct aml_dtvdemod *demod,
 	/* else if (demod_i2c->tuner == 7)*/
 	/*     demod_sta->ch_if = 5000;//silab 5000kHz IF*/
 
-	demod->demod_status.ch_bw = (8 - bw) * 1000;
-	demod->demod_status.symb_rate = 0;	/* TODO */
+	demod_sta->ch_bw = (8 - bw) * 1000;
+	demod_sta->symb_rate = 0;	/* TODO */
 
-	/* bw=0; */
+/* bw=0; */
 	demod_mode = 1;
 	/* for si2176 IF:5M   sr 28.57 */
 	sr = 4;
@@ -107,8 +125,7 @@ static unsigned int calcul_src_gain_m(int bw, int s_r)
 {
 	unsigned int src_gain = 0;
 
-//	src_gain = (4096 * 4 * 64 * bw) / (7 * 8 * s_r * 2);
-	src_gain = ((1 << 20) * bw) / (56 * s_r);
+	src_gain = (4096 * 4 * 64 * bw) / (7 * 8 * s_r * 2);
 
 	return src_gain;
 }
@@ -827,11 +844,16 @@ struct st_chip_register_t reset368_dvbt2_val[] = {
 	{R368TER_P1_SYMBCFG2, 0x55}
 };
 
-void dvbt2_init(struct aml_dtvdemod *demod, struct dvb_frontend *fe)
+void dvbt2_init(void)
 {
 	/* bandwidth: 1=8M,2=7M,3=6M,4=5M,5=1.7M */
 	int i;
-	struct amldtvdemod_device_s *devp = (struct amldtvdemod_device_s *)demod->priv;
+	struct amldtvdemod_device_s *devp = dtvdemod_get_dev();
+
+	if (unlikely(!devp)) {
+		PR_ERR("dvbt2_init, devp is NULL\n");
+		return;
+	}
 
 	dvbt_t2_wrb(0x0004, 0xff);
 	dvbt_t2_wrb(0x0005, 0xff);
@@ -872,17 +894,6 @@ void dvbt2_init(struct aml_dtvdemod *demod, struct dvb_frontend *fe)
 	dvbt_t2_wrb(0x80e, 0xff);
 	dvbt_t2_wrb(0x80f, 0xff);
 	dvbt_t2_wrb(0x01a, 0x14);
-
-	if (!strncmp(fe->ops.tuner_ops.info.name, "r842", 4)) {
-		PR_INFO("r842 tuner,set r842 dvbt2 config\n");
-		dvbt_t2_wrb(0x821, 0x70);
-		dvbt_t2_wrb(0x824, 0xa0);
-		dvbt_t2_wrb(0x825, 0x10);
-		dvbt_t2_wrb(0x827, 0x50);
-	} else {
-		PR_INFO("not r842 tuner,set default dvbt2 config\n");
-	}
-
 	dvbt_t2_wrb(0x1560, 0x50);
 	dvbt_t2_wrb(0x1561, 0x29);
 	dvbt_t2_wrb(0x1563, 0x56);
@@ -915,7 +926,7 @@ void dvbt2_init(struct aml_dtvdemod *demod, struct dvb_frontend *fe)
 	dvbt_t2_wrb(0x360e, (devp->mem_start >> 16) & 0xff);
 	dvbt_t2_wrb(0x360f, (devp->mem_start >> 24) & 0xff);
 
-	dtvdemod_set_plpid(demod->plp_id);
+	dtvdemod_set_plpid(devp->plp_id);
 
 	/* test bus addr4 */
 	dvbt_t2_wr_byte_bits(0xe5, 0x1, 0, 6);
@@ -960,111 +971,34 @@ const unsigned int iir_tab_coef1[28][6] = {
 
 struct st_chip_register_t reset368dvbt_val[] =	 /*init minimum setting STV368+TDA18212 RF=474MHz*/
 {
-//	{R368TER_P1AGC_TARG, 0x64 },/* P1AGC_TARG */
-//	{R368TER_CAS_CONF1, 0x94 },/* CAS_CONF1 */
-//	{R368TER_CAS_CCSMU, 0x33 },/* CAS_CCSMU */
-//	{R368TER_CAS_CCDCCI, 0x7f },/* CAS_CCDCCI */
-//	{R368TER_CAS_CCDNOCCI, 0x1a },/* CAS_CCDNOCCI */
-//	/* BZ49942:This is to improve the performances of 2kFFT mode in presence of Rayleigh echo */
-//	{R368TER_FFT_FACTOR_2K_S2, 0x02 },
-//	{R368TER_FFT_FACTOR_8K_S2, 0x02 },
-//	{R368TER_P1_CTRL, 0x20 },/* P1_CTRL */
-//	{R368TER_P1_DIV, 0xc0 },/* P1_DIV */
-//	{R368TER_DVBT_CTRL, 0x20 },/* DVBT_CTRL */
-//	{R368TER_SCENARII_CFG, 0x0a },/* SCENARII_CFG */
-//	{R368TER_SYMBOL_TEMPO, 0x08 },/* SYMBOL_TEMPO */
-//	{R368TER_CHC_TI0, 0xb0 },/* CHC_TI0 */
-//	{R368TER_CHC_TRIG0, 0x58 },/* CHC_TRIG0 */
-//	{R368TER_CHC_TRIG1, 0x44 },/* CHC_TRIG1 */
-//	{R368TER_CHC_TRIG2, 0x70 },/* CHC_TRIG2 */
-//	{R368TER_CHC_TRIG3, 0x88 },/* CHC_TRIG2 */
-//	{R368TER_CHC_TRIG4, 0x40 },/* CHC_TRIG4 */
-//	{R368TER_CHC_TRIG5, 0x8b },/* CHC_TRIG5 */
-//	{R368TER_CHC_TRIG6, 0x89 },/* CHC_TRIG6 */
-//	{R368TER_CHC_SNR10, 0xc9 },/* CHC_SNR10 */
-//	{R368TER_CHC_SNR11, 0x0c },  /* CHC_SNR11 */
-//	{R368TER_NSCALE_DVBT_0, 0x64 },/* NSCALE_DVBT_0 */
-//	{R368TER_NSCALE_DVBT_1, 0x8c },/* NSCALE_DVBT_1 */
-//	{R368TER_NSCALE_DVBT_2, 0xc8 },/* NSCALE_DVBT_2 */
-//	{R368TER_NSCALE_DVBT_3, 0x78 },/* NSCALE_DVBT_3 */
-//	{R368TER_NSCALE_DVBT_4, 0x75 },/* NSCALE_DVBT_4 */
-//	{R368TER_NSCALE_DVBT_5, 0xaa },/* NSCALE_DVBT_5 */
-//	{R368TER_NSCALE_DVBT_6, 0xaa },/* NSCALE_DVBT_6 */
-//	{R368TER_IDM_RD_DVBT_1, 0x55 },/* IDM_RD_DVBT_1 */
-//	{R368TER_IDM_RD_DVBT_2, 0x15 } /* IDM_RD_DVBT_2 */
-
-	{R368TER_IQFE_AGC_CONF0, 0x48 },/* IQFE_AGC_CONF0 */
-	{R368TER_IQFE_AGC_CONF1, 0x8C },/* IQFE_AGC_CONF0 */
-	{R368TER_IQFE_AGC_CONF2, 0x60 },/* IQFE_AGC_CONF2 */
-	{R368TER_IQFE_AGC_CONF3, 0x76 },/* IQFE_AGC_CONF3 */
-	{R368TER_IQFE_AGC_CONF4, 0x38 },/* IQFE_AGC_CONF4 */
-	{R368TER_AGC_TARGETI0, 0xbe },/* AGC_TARGETI0 */
-	{R368TER_AGC_TARGETI1, 0x00 },/* AGC_TARGETI0 */
-	{R368TER_AGC_TARGETQ0, 0xbe },/* AGC_TARGETQ0 */
-	{R368TER_AGC_TARGETQ1, 0x00 },/* AGC_TARGETQ0 */
-	{R368TER_AGC_CONF5, 0x66 },/* AGC_CONF5 */
-	{R368TER_AGC_CONF6, 0x70 },/* AGC_CONF6 */
-	{R368TER_LOCK_DET1_0, 0x20 },/* LOCK_DET1_0 */
-	{R368TER_LOCK_DET1_1, 0x00 },/* LOCK_DET1_1 */
-	{R368TER_LOCK_DET2_0, 0x20 },/* LOCK_DET2_0 */
-	{R368TER_LOCK_DET2_1, 0x00 },/* LOCK_DET2_1 */
-	{R368TER_LOCK_DET3_0, 0x20 },/* LOCK_DET3_0 */
-	{R368TER_LOCK_DET3_1, 0x00 },/* LOCK_DET3_1 */
-	{R368TER_LOCK_DET4_0, 0x20 },/* LOCK_DET4_0 */
-	{R368TER_LOCK_DET4_1, 0x00 },/* LOCK_DET4_1 */
-	{R368TER_LOCK_N, 0x50 },/* LOCK_N */
-//	{R368TER_INC_CONF0, 0x05 },/* INC_is 'ON' */
-//	{R368TER_INC_CONF1, 0xff },/* INC_is 'ON' */
-//	{R368TER_INC_CONF2, 0x23 },/* INC_is 'ON' */
-//	{R368TER_INC_CONF3, 0x0a },/* INC_is 'ON' */
-//	{R368TER_INC_CONF4, 0x3f },/* INC_is 'ON' */
-//	{R368TER_INC_BRSTCNT0, 0x6c },/* INC_BRSTCNT0 */
-//	{R368TER_INC_BRSTCNT1, 0x0c },/* INC_BRSTCNT1 */
-	{R368TER_DCCOMP, 0x03 },/* DCCOMP */
-	{R368TER_SRC_CONF1, 0x1a },/* SRC_CONF1 */
 	{R368TER_P1AGC_TARG, 0x64 },/* P1AGC_TARG */
 	{R368TER_CAS_CONF1, 0x94 },/* CAS_CONF1 */
 	{R368TER_CAS_CCSMU, 0x33 },/* CAS_CCSMU */
 	{R368TER_CAS_CCDCCI, 0x7f },/* CAS_CCDCCI */
 	{R368TER_CAS_CCDNOCCI, 0x1a },/* CAS_CCDNOCCI */
-	{R368TER_FFT_FACTOR_2K_S2, 0x02 },/* FFT_FACTOR_2K_S2 */
+	/* BZ49942:This is to improve the performances of 2kFFT mode in presence of Rayleigh echo */
+	{R368TER_FFT_FACTOR_2K_S2, 0x02 },
 	{R368TER_FFT_FACTOR_8K_S2, 0x02 },
 	{R368TER_P1_CTRL, 0x20 },/* P1_CTRL */
 	{R368TER_P1_DIV, 0xc0 },/* P1_DIV */
-	{R368TER_TFO_GAIN, 0x20 },/* TFO_GAIN */
-	{R368TER_TFO_GAIN_CONV, 0x80 },/* TFO_GAIN_CONV */
-	{R368TER_CFO_GAIN, 0x20 },/* CFO_GAIN */
-	{R368TER_CFO_GAIN_CONV, 0x0a },/* CFO_GAIN_CONV */
-	{R368TER_TFO_COEFF0, 0x7f },/* TFO_COEFF0 */
-	{R368TER_TFO_COEFF1, 0x00 },/* TFO_COEFF1 */
-	{R368TER_TFO_COEFF2, 0x00 },/* TFO_COEFF2 */
-	{R368TER_CFO_COEFF0, 0x7f },/* CFO_COEFF0 */
-	{R368TER_CFO_COEFF1, 0x00 },/* CFO_COEFF1 */
-	{R368TER_CFO_COEFF2, 0x00 },/* CFO_COEFF2 */
 	{R368TER_DVBT_CTRL, 0x20 },/* DVBT_CTRL */
-	{R368TER_CORREL_CTL, 0x11 },/* CORREL_CTL */
 	{R368TER_SCENARII_CFG, 0x0a },/* SCENARII_CFG */
 	{R368TER_SYMBOL_TEMPO, 0x08 },/* SYMBOL_TEMPO */
 	{R368TER_CHC_TI0, 0xb0 },/* CHC_TI0 */
 	{R368TER_CHC_TRIG0, 0x58 },/* CHC_TRIG0 */
 	{R368TER_CHC_TRIG1, 0x44 },/* CHC_TRIG1 */
-	{R368TER_CHC_TRIG2, 0x00 },/* CHC_TRIG2 */
+	{R368TER_CHC_TRIG2, 0x70 },/* CHC_TRIG2 */
 	{R368TER_CHC_TRIG3, 0x88 },/* CHC_TRIG2 */
 	{R368TER_CHC_TRIG4, 0x40 },/* CHC_TRIG4 */
 	{R368TER_CHC_TRIG5, 0x8b },/* CHC_TRIG5 */
 	{R368TER_CHC_TRIG6, 0x89 },/* CHC_TRIG6 */
-	{R368TER_CHC_TRIG7, 0x00 },/* CHC_TRIG7 */
-	{R368TER_CHC_TRIG8, 0x00 },/* CHC_TRIG8 */
-	{R368TER_CHC_TRIG9, 0x00 },/* CHC_TRIG9 */
 	{R368TER_CHC_SNR10, 0xc9 },/* CHC_SNR10 */
-	{R368TER_CHC_SNR11, 0x0c }, /* CHC_SNR11 */
-	/*PJ/DB/TA 02/2014 added for proper DVB-T operation*/
-	{R368TER_DVBT_CONF, 0x0c },/* DVBT_CONF */
+	{R368TER_CHC_SNR11, 0x0c },  /* CHC_SNR11 */
 	{R368TER_NSCALE_DVBT_0, 0x64 },/* NSCALE_DVBT_0 */
 	{R368TER_NSCALE_DVBT_1, 0x8c },/* NSCALE_DVBT_1 */
 	{R368TER_NSCALE_DVBT_2, 0xc8 },/* NSCALE_DVBT_2 */
 	{R368TER_NSCALE_DVBT_3, 0x78 },/* NSCALE_DVBT_3 */
-	{R368TER_NSCALE_DVBT_4, 0x97 },/* NSCALE_DVBT_4 */
+	{R368TER_NSCALE_DVBT_4, 0x75 },/* NSCALE_DVBT_4 */
 	{R368TER_NSCALE_DVBT_5, 0xaa },/* NSCALE_DVBT_5 */
 	{R368TER_NSCALE_DVBT_6, 0xaa },/* NSCALE_DVBT_6 */
 	{R368TER_IDM_RD_DVBT_1, 0x55 },/* IDM_RD_DVBT_1 */
@@ -1077,7 +1011,7 @@ unsigned int write_riscv_ram(void)
 	unsigned int addr = 0;
 	int value;
 	unsigned int ret = 0;
-	struct amldtvdemod_device_s *devp = dtvdemod_get_dev();
+	struct amldtvdemod_device_s *devp = dtvdd_devp;
 
 	demod_top_write_reg(DEMOD_TOP_CFG_REG_4, 0xa0);
 
@@ -1126,16 +1060,14 @@ static void download_fw_to_sram(struct amldtvdemod_device_s *devp)
 	}
 }
 
-void dvbt2_riscv_init(struct aml_dtvdemod *demod, struct dvb_frontend *fe)
+void dvbt2_riscv_init(struct amldtvdemod_device_s *devp)
 {
-	struct amldtvdemod_device_s *devp = (struct amldtvdemod_device_s *)demod->priv;
-
 	demod_top_write_reg(DEMOD_TOP_REGC, 0x11);
-	usleep_range(1000, 1001);
+	usleep_range(1000, 2000);
 	demod_top_write_reg(DEMOD_TOP_REGC, 0x000010);
 
 	demod_top_write_reg(DEMOD_TOP_REGC, 0x000011);
-	usleep_range(1000, 1001);
+	usleep_range(1000, 2000);
 	demod_top_write_reg(DEMOD_TOP_REGC, 0x110011);
 	demod_top_write_reg(DEMOD_TOP_CFG_REG_4, 0x0);
 	front_write_bits(AFIFO_ADC, 0x80, AFIFO_NCO_RATE_BIT,
@@ -1154,9 +1086,9 @@ void dvbt2_riscv_init(struct aml_dtvdemod *demod, struct dvb_frontend *fe)
 		download_fw_to_sram(devp);
 
 	demod_top_write_reg(DEMOD_TOP_CFG_REG_4, 0x182);
-	dvbt2_init(demod, fe);
+	dvbt2_init();
 
-	switch (demod->bw) {
+	switch (devp->bw) {
 	case BANDWIDTH_8_MHZ:
 		dvbt_t2_wrb(0x1c, 0x8);
 		dvbt_t2_wrb(0x2835, 0x0e);
@@ -1175,21 +1107,9 @@ void dvbt2_riscv_init(struct aml_dtvdemod *demod, struct dvb_frontend *fe)
 
 	demod_top_write_reg(DEMOD_TOP_CFG_REG_4, 0x97);
 	riscv_ctl_write_reg(0x30, 0);
-
-	switch (devp->data->hw_ver) {
-	case DTVDEMOD_HW_T5D:
-	case DTVDEMOD_HW_T5D_B:
-		dtvdemod_ddr_reg_write(0x148, dtvdemod_ddr_reg_read(0x148) & 0xefffffff);
-		usleep_range(5000, 6000);
-		dtvdemod_ddr_reg_write(0x148, dtvdemod_ddr_reg_read(0x148) | 0x10000000);
-		break;
-
-	case DTVDEMOD_HW_T3:
-		break;
-
-	default:
-		break;
-	}
+	dtvdemod_ddr_reg_write(0x148, dtvdemod_ddr_reg_read(0x148) & 0xefffffff);
+	usleep_range(5000, 6000);
+	dtvdemod_ddr_reg_write(0x148, dtvdemod_ddr_reg_read(0x148) | 0x10000000);
 
 	if (demod_is_t5d_cpu(devp))
 		demod_top_write_reg(DEMOD_TOP_CFG_REG_4, 0x0);
@@ -1197,20 +1117,17 @@ void dvbt2_riscv_init(struct aml_dtvdemod *demod, struct dvb_frontend *fe)
 		demod_top_write_reg(DEMOD_TOP_CFG_REG_4, 0x182);
 }
 
-void dvbt2_reset(struct aml_dtvdemod *demod, struct dvb_frontend *fe)
+void dvbt2_reset(struct amldtvdemod_device_s *devp)
 {
-	dvbt2_riscv_init(demod, fe);
+	dvbt2_riscv_init(devp);
 }
 
-void dvbt_reg_initial(unsigned int bw, struct dvb_frontend *fe)
+void dvbt_reg_initial(unsigned int bw)
 {
 	/* bandwidth: 1=8M,2=7M,3=6M,4=5M,5=1.7M */
 	int bw_cov, i;
 	enum channel_bw_e bandwidth;
 	unsigned int s_r, if_tuner_freq, tmp;
-	unsigned int temp_bw = 0;
-	int temp_bw1 = 0;
-	int temp_bw2 = 0;
 
 	/* 24M */
 	s_r = 54;
@@ -1265,42 +1182,31 @@ void dvbt_reg_initial(unsigned int bw, struct dvb_frontend *fe)
 	dvbt_t2_wrb(0x0009, 0x00);
 	dvbt_t2_wrb(0x000a, 0x00);
 	dvbt_t2_wrb(0x19, 0x32);
-
-	if (!strncmp(fe->ops.tuner_ops.info.name, "r842", 4)) {
-		PR_INFO("r842 tuner,set r842 dvbt config\n");
-		dvbt_t2_wrb(0x821, 0x70);
-		dvbt_t2_wrb(0x824, 0xf0);
-		dvbt_t2_wrb(0x825, 0x10);
-		dvbt_t2_wrb(0x827, 0x50);
-	} else {
-		PR_INFO("not r842 tuner,set default dvbt config\n");
-		dvbt_t2_wrb(0x824, 0xa0);
-		dvbt_t2_wrb(0x825, 0x70);
-		dvbt_t2_wrb(0x827, 0x00);
-	}
-
+	dvbt_t2_wrb(0x824, 0xa0);
+	dvbt_t2_wrb(0x825, 0x70);
+	dvbt_t2_wrb(0x827, 0x00);
 	dvbt_t2_wrb(0x841, 0x08);
 	dvbt_t2_wrb(0x1590, 0x80);
 	dvbt_t2_wrb(0x1593, 0x80);
-	dvbt_t2_wrb(0x1594, 0x01);
-	//dvbt_t2_wrb(0x15b0, 0x55);
-	//dvbt_t2_wrb(0x15b1, 0x35);
-	//dvbt_t2_wrb(0x15b2, 0x30);
-	//dvbt_t2_wrb(0x15b3, 0x0c);
-	//dvbt_t2_wrb(0x2830, 0x20);
-	//dvbt_t2_wrb(0x2890, 0xc3);
-	//dvbt_t2_wrb(0x2891, 0x30);
-	//dvbt_t2_wrb(0x2892, 0x0c);
-	//dvbt_t2_wrb(0x2893, 0x03);
+	dvbt_t2_wrb(0x1594, 0x00);
+	dvbt_t2_wrb(0x15b0, 0x55);
+	dvbt_t2_wrb(0x15b1, 0x35);
+	dvbt_t2_wrb(0x15b2, 0x30);
+	dvbt_t2_wrb(0x15b3, 0x0c);
+	dvbt_t2_wrb(0x2830, 0x20);
+	dvbt_t2_wrb(0x2890, 0xc3);
+	dvbt_t2_wrb(0x2891, 0x30);
+	dvbt_t2_wrb(0x2892, 0x0c);
+	dvbt_t2_wrb(0x2893, 0x03);
 	/* increase agc target to make signal strong enouth for locking */
 	dvbt_t2_wrb(0x15d6, 0xa0);
-	//dvbt_t2_wrb(0x2751, 0xf0);
-	//dvbt_t2_wrb(0x2752, 0x3c);
-	//dvbt_t2_wrb(0x2815, 0x03);
-	//dvbt_t2_wr_byte_bits(0x2906, 0, 3, 4);
+	dvbt_t2_wrb(0x2751, 0xf0);
+	dvbt_t2_wrb(0x2752, 0x3c);
+	dvbt_t2_wrb(0x2815, 0x03);
+	dvbt_t2_wr_byte_bits(0x2906, 0, 3, 4);
 
-	//dvbt_t2_wrb(0x2900, 0x00);
-	//dvbt_t2_wrb(0x2900, 0x20);
+	dvbt_t2_wrb(0x2900, 0x00);
+	dvbt_t2_wrb(0x2900, 0x20);
 
 	if (bandwidth == CHAN_BW_1M7) {
 		dvbt_t2_wrb(0x15a0, (dvbt_t2_rdb(0x15a0) & 0xef) | (1 << 4));
@@ -1309,10 +1215,6 @@ void dvbt_reg_initial(unsigned int bw, struct dvb_frontend *fe)
 		dvbt_t2_wrb(0x15a0, (dvbt_t2_rdb(0x15a0) & 0xef));
 		dvbt_t2_wrb(0x15b3, (dvbt_t2_rdb(0x15b3) & 0xcf));
 	}
-
-	/* T3 chip close dccomp*/
-	if (is_meson_t3_cpu())
-		dvbt_t2_wrb(0x15a8, 0x02);
 
 	setsrcgain(calcul_src_gain_m(bandwidth, s_r));
 	settrl(calcul_tr_inominal_rate_m(bandwidth, s_r));
@@ -1408,59 +1310,19 @@ void dvbt_reg_initial(unsigned int bw, struct dvb_frontend *fe)
 	for (i = 0; i < (sizeof(reset368dvbt_val) / sizeof(struct st_chip_register_t)); i++)
 		dvbt_t2_wrb(reset368dvbt_val[i].addr, reset368dvbt_val[i].value);
 
-	dvbt_t2_wrb(0x2815, 0x03);
-	dvbt_t2_wrb(0x2751, 0xf0);
-	dvbt_t2_wrb(0x2752, 0x3c);
-	dvbt_t2_wrb(0x53c, 0x6f);
-	dvbt_t2_wrb(0x2906, (dvbt_t2_rdb(0x2906) & 0xfe) | (1));
-	dvbt_t2_wrb(0x28fd, 0x00);
-	dvbt_t2_wrb(0x1500, 0x00);
-	dvbt_t2_wrb(R368TER_FEPATH_CONF0, (dvbt_t2_rdb(R368TER_FEPATH_CONF0) & 0xfe) | (1));
-
-	temp_bw1 = (((1 << 11) * 100) / (914 * bandwidth));
-	temp_bw2 = 125 - (100 * bandwidth / 2);
-
-	switch (bandwidth) {
-	case 6:
-		temp_bw = 2;
-		break;
-
-	case 7:
-		temp_bw = 3;
-		break;
-
-	case 8:
-	default:
-		temp_bw = 4;
-		break;
-	}
-
-	dvbt_t2_wrb(0x15d0, (dvbt_t2_rdb(0x15d0) & 0xfd) | (1 << 1));
-	dvbt_t2_wrb(0x15d0, (dvbt_t2_rdb(0x15d0) & 0xef));
-	dvbt_t2_wrb(0x15d1, (dvbt_t2_rdb(0x15d1) & 0x7f) | (1 << 7));
-	dvbt_t2_wrb(0x15d2, (unsigned char)((temp_bw1 * temp_bw2) / 100));
-	dvbt_t2_wrb(0x15d4, (unsigned char)((temp_bw1 * temp_bw2) / 100));
-	dvbt_t2_wrb(0x15d1, (dvbt_t2_rdb(0x15d1) & 0xf8) | (temp_bw));
-	dvbt_t2_wrb(0x15d8, 0x7f);
-	dvbt_t2_wrb(0x15d9, 0x1a);
-	dvbt_t2_wrb(0x2a2a, dvbt_t2_rdb(0x2a2a) & 0x0f);
-//	dvbt_t2_wrb(0x15a3, 0x0a);
-	dvbt_t2_wrb(0x15d6, 0xa0);
-	dvbt_t2_wrb(0x2906, dvbt_t2_rdb(0x2906) & 0x87);
-
-	dvbt_t2_wrb(0x2830, 0x20);
-	dvbt_t2_wrb(R368TER_DVBT_CTRL, 0x00);
-	dvbt_t2_wrb(R368TER_DVBT_CTRL, 0x20);
 	PR_DVBT("DVB-T init ok.\n");
 }
 
-unsigned int dvbt_set_ch(struct aml_dtvdemod *demod,
-		struct aml_demod_dvbt *demod_dvbt, struct dvb_frontend *fe)
+unsigned int dvbt_set_ch(struct aml_demod_sta *demod_sta, struct aml_demod_dvbt *demod_dvbt)
 {
 	int ret = 0;
 	u8_t demod_mode = 1;
 	u8_t bw, sr, ifreq, agc_mode;
 	u32_t ch_freq;
+	struct amldtvdemod_device_s *devp = dtvdemod_get_dev();
+
+	if (unlikely(!devp))
+		return -1;
 
 	bw = demod_dvbt->bw;
 	sr = demod_dvbt->sr;
@@ -1483,11 +1345,11 @@ unsigned int dvbt_set_ch(struct aml_dtvdemod *demod,
 		ret = -1;
 	}
 
-	demod->demod_status.ch_mode = 0;	/* TODO */
-	demod->demod_status.agc_mode = agc_mode;
-	demod->demod_status.ch_freq = ch_freq;
-	demod->demod_status.ch_bw = (8 - bw) * 1000;
-	demod->demod_status.symb_rate = 0;
+	demod_sta->ch_mode = 0;	/* TODO */
+	demod_sta->agc_mode = agc_mode;
+	demod_sta->ch_freq = ch_freq;
+	demod_sta->ch_bw = (8 - bw) * 1000;
+	demod_sta->symb_rate = 0;
 
 	demod_mode = 1;
 	/* for si2176 IF:5M   sr 28.57 */
@@ -1499,18 +1361,18 @@ unsigned int dvbt_set_ch(struct aml_dtvdemod *demod,
 	if (bw == BANDWIDTH_AUTO)
 		demod_mode = 2;
 
-	demod->bw = bw;
-	dvbt_reg_initial(bw, fe);
+	devp->bw = bw;
+	dvbt_reg_initial(bw);
 	PR_DVBT("DVBT mode\n");
 
 	return ret;
 }
 
-int dvbt2_set_ch(struct aml_dtvdemod *demod, struct dvb_frontend *fe)
+int dvbt2_set_ch(struct amldtvdemod_device_s *devp)
 {
 	int ret = 0;
 
-	dvbt2_riscv_init(demod, fe);
+	dvbt2_riscv_init(devp);
 
 	return ret;
 }
@@ -1595,8 +1457,8 @@ void dtvdemod_get_plp(struct amldtvdemod_device_s *devp, struct dtv_property *tv
 
 	/* val[29-24]:0x805, plp num */
 	if (demod_is_t5d_cpu(devp)) {
-		val = front_read_reg(0x3e);
-		plp_num = (val >> 24) & 0x3f;
+	val = front_read_reg(0x3e);
+	plp_num = (val >> 24) & 0x3f;
 	} else {
 		plp_num = dvbt_t2_rdb(0x805);
 		PR_INFO("read 0x805: %d\n", plp_num);
@@ -1748,7 +1610,7 @@ static int get_per_val(void)
 	return per;
 }
 
-void dvbt_info(struct aml_dtvdemod *demod, struct seq_file *seq)
+void dvbt_info(struct amldtvdemod_device_s *devp, struct seq_file *seq)
 {
 	unsigned int sm = dvbt_t2_rdb(0x2901);
 	unsigned int sm_st = sm >> 4;
@@ -1767,7 +1629,7 @@ void dvbt_info(struct aml_dtvdemod *demod, struct seq_file *seq)
 	unsigned int punc = dvbt_t2_rdb(0x53a) & 0x1f;
 	char *str_sm_st, *str_sm_cst, *str_gi, *str_giq, *str_punc;
 
-	switch (demod->bw) {
+	switch (devp->bw) {
 	case BANDWIDTH_6_MHZ:
 		cfo = ((cfo * 3000) / 7) >> 14;
 		break;

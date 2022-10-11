@@ -1,4 +1,3 @@
-// SPDX-License-Identifier: GPL-2.0-only
 /*
  * Device driver for MFD hi655x PMIC
  *
@@ -7,6 +6,10 @@
  * Authors:
  * Chen Feng <puck.chen@hisilicon.com>
  * Fei  Wang <w.f@huawei.com>
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
  */
 
 #include <linux/gpio.h>
@@ -74,8 +77,7 @@ static const struct mfd_cell hi655x_pmic_devs[] = {
 		.num_resources	= ARRAY_SIZE(pwrkey_resources),
 		.resources	= &pwrkey_resources[0],
 	},
-	{	.name		= "hi655x-regulator",	},
-	{	.name		= "hi655x-clk",		},
+	{	.name		= "hi655x-regulator", },
 };
 
 static void hi655x_local_irq_clear(struct regmap *map)
@@ -169,7 +171,6 @@ static const struct of_device_id hi655x_pmic_match[] = {
 	{ .compatible = "hisilicon,hi655x-pmic", },
 	{},
 };
-MODULE_DEVICE_TABLE(of, hi655x_pmic_match);
 
 static struct platform_driver hi655x_pmic_driver = {
 	.driver	= {

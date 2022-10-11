@@ -1,6 +1,18 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/amlogic/media/common/arch/clk/gp_pll.c
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
 #include <linux/module.h>
@@ -30,13 +42,13 @@ static void gp_pll_user_consolidate(void)
 	request = NULL;
 
 	list_for_each_entry(pos, &gp_pll_user_list, list) {
-		if (!request &&
+		if ((request == NULL) &&
 		    (pos->flag & GP_PLL_USER_FLAG_REQUEST) &&
 		    ((pos->flag & GP_PLL_USER_FLAG_GRANTED) == 0)) {
 			request = pos;
 		}
 
-		if (!grant &&
+		if ((grant == NULL) &&
 		    (pos->flag & GP_PLL_USER_FLAG_GRANTED)) {
 			grant = pos;
 		}
@@ -59,8 +71,7 @@ static void gp_pll_user_consolidate(void)
 	mutex_unlock(&gp_mutex);
 }
 
-struct gp_pll_user_handle_s *gp_pll_user_register
-	(const char *name,
+struct gp_pll_user_handle_s *gp_pll_user_register(const char *name,
 	u32 priority,
 	int (*callback)(struct gp_pll_user_handle_s *, int))
 {
@@ -94,6 +105,7 @@ EXPORT_SYMBOL(gp_pll_user_register);
 
 void gp_pll_user_unregister(struct gp_pll_user_handle_s *user)
 {
+
 	mutex_lock(&gp_mutex);
 
 	list_del(&user->list);
@@ -102,7 +114,6 @@ void gp_pll_user_unregister(struct gp_pll_user_handle_s *user)
 
 	if (user->flag & GP_PLL_USER_FLAG_GRANTED)
 		up(&sem);
-	kfree(user);
 }
 EXPORT_SYMBOL(gp_pll_user_unregister);
 
@@ -137,10 +148,11 @@ static int gp_pll_thread(void *data)
 	return 0;
 }
 
-int __init gp_pll_init(void)
+static int __init gp_pll_init(void)
 {
 	kthread_run(gp_pll_thread, NULL, "gp_pll");
 
 	return 0;
 }
 
+fs_initcall(gp_pll_init);

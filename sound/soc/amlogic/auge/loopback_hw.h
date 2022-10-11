@@ -1,6 +1,18 @@
-/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * sound/soc/amlogic/auge/loopback_hw.h
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
 #ifndef __AML_LOOPBACK_HW_H__
@@ -54,20 +66,32 @@ struct data_cfg {
 	struct mux_conf *tdmin_lb_srcs;
 };
 
-void tdminlb_set_clk(enum datalb_src lb_src, int sclk_div, int ratio, bool enable);
-void tdminlb_set_format(int i2s_fmt);
+void tdminlb_set_clk(enum datalb_src lb_src,
+		     int sclk_div, int ratio, bool slave, bool enable);
+
+extern void tdminlb_set_format(int i2s_fmt);
+
 void tdminlb_set_ctrl(enum datalb_src src);
-void tdminlb_enable(int tdm_index, int in_enable);
-void tdminlb_fifo_enable(int is_enable);
-void tdminlb_set_format(int i2s_fmt);
+
+extern void tdminlb_enable(int tdm_index, int in_enable);
+
+extern void tdminlb_fifo_enable(int is_enable);
+
+extern void tdminlb_set_format(int i2s_fmt);
 void tdminlb_set_lanemask_and_chswap
 	(int swap, int lane_mask, unsigned int mask);
 
-void tdminlb_set_src(int src);
-void lb_set_datain_src(int id, int src);
-void lb_set_datain_cfg(int id, struct data_cfg *datain_cfg);
-void lb_set_datalb_cfg(int id, struct data_cfg *datalb_cfg, bool multi_bits_lbsrcs);
+void tdmin_frame_revert(int tdm_index, bool revert);
+void tdminlb_frame_revert(bool revert);
+
+extern void tdminlb_set_src(int src);
+extern void lb_set_datain_src(int id, int src);
+
+extern void lb_set_datain_cfg(int id, struct data_cfg *datain_cfg);
+void lb_set_datalb_cfg(int id, struct data_cfg *datalb_cfg, int version);
+
 void lb_enable(int id, bool enable, bool chnum_en);
+
 void lb_set_chnum_en(int id, bool en, bool chnum_en);
 
 enum lb_out_rate {

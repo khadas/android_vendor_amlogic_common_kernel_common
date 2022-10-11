@@ -27,8 +27,6 @@ MODULE_AUTHOR("Jaya Kumar <jayakumar.lkml@gmail.com>");
 MODULE_DESCRIPTION(DRIVER_DESC);
 MODULE_LICENSE("GPL");
 
-#define W8001_MAX_PHYS		42
-
 #define W8001_MAX_LENGTH	13
 #define W8001_LEAD_MASK		0x80
 #define W8001_LEAD_BYTE		0x80
@@ -91,7 +89,7 @@ struct w8001 {
 	unsigned char response_type;
 	unsigned char response[W8001_MAX_LENGTH];
 	unsigned char data[W8001_MAX_LENGTH];
-	char phys[W8001_MAX_PHYS];
+	char phys[32];
 	int type;
 	unsigned int pktlen;
 	u16 max_touch_x;
@@ -683,7 +681,7 @@ fail1:
 	return err;
 }
 
-static const struct serio_device_id w8001_serio_ids[] = {
+static struct serio_device_id w8001_serio_ids[] = {
 	{
 		.type	= SERIO_RS232,
 		.proto	= SERIO_W8001,

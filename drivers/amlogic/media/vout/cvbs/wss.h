@@ -1,4 +1,3 @@
-/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
  * drivers/amlogic/media/vout/cvbs/wss.h
  *
@@ -35,6 +34,7 @@
 	#define WSS_576I_BITS_AR_BOX_OVER_169_CENTRE	0xb
 	#define WSS_576I_BITS_AR_FULL_43_SHOOT			0x7
 	#define WSS_576I_BITS_AR_FULL_169				0xe
+
 
 #define WSS_576I_MODE_START						0x4
 #define WSS_576I_MODE_LENGTH					0x1
@@ -181,10 +181,9 @@ struct wss_info_t {
 };
 
 ssize_t aml_CVBS_attr_wss_show(struct class *class,
-			       struct class_attribute *attr, char *buf);
+			struct class_attribute *attr, char *buf);
 ssize_t  aml_CVBS_attr_wss_store(struct class *class,
-				 struct class_attribute *attr,
-				 const char *buf, size_t count);
+	struct class_attribute *attr, const char *buf, size_t count);
 /*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
 
 #endif

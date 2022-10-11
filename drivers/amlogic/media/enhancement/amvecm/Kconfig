@@ -10,6 +10,5 @@ config AMLOGIC_MEDIA_ENHANCEMENT_VECM
         bool "Amlogic amvecm driver"
         default n
         help
-            Amlogic amvecm module init
-            select to enable amlogic pq driver
+            "Amlogic amvecm module init"
 endmenu

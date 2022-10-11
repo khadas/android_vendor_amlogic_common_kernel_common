@@ -1,6 +1,18 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/amlogic/media/vin/tvin/vdin/vdin_v4l2_dbg.c
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
 /* Standard Linux Headers */
@@ -42,15 +54,13 @@ static void vdin_v4l2_status(struct vdin_dev_s *devp)
 	pr_info("streaming:%d\n", devp->vbqueue.streaming);
 	pr_info("buf_struct_size:%d\n", devp->vbqueue.buf_struct_size);
 	pr_info("min_buffers_needed:%d\n", devp->vbqueue.min_buffers_needed);
-	pr_info("v4l_support_en:%d\n", devp->v4l_support_en);
 	pr_info("dbg_v4l_done_cnt:%d\n", devp->dbg_v4l_done_cnt);
 	pr_info("dbg_v4l_que_cnt:%d\n", devp->dbg_v4l_que_cnt);
 	pr_info("dbg_v4l_dque_cnt:%d\n", devp->dbg_v4l_dque_cnt);
 }
 
 static ssize_t v4ldbg_show(struct device *dev,
-			   struct device_attribute *attr,
-			   char *buf)
+		struct device_attribute *attr, char *buf)
 {
 	/*struct vdin_dev_s *devp = dev_get_drvdata(dev);*/
 	ssize_t len = 0;
@@ -64,8 +74,7 @@ static ssize_t v4ldbg_show(struct device *dev,
 }
 
 static ssize_t v4ldbg_store(struct device *dev,
-			    struct device_attribute *attr,
-			    const char *buf, size_t len)
+		struct device_attribute *attr, const char *buf, size_t len)
 {
 	char *parm[47] = {NULL};
 	char *buf_orig = kstrdup(buf, GFP_KERNEL);
@@ -96,20 +105,19 @@ static ssize_t v4ldbg_store(struct device *dev,
 
 	return len;
 }
-static DEVICE_ATTR_RW(v4ldbg);
 
-static ssize_t v4l_work_mode_show(struct device *dev,
-				  struct device_attribute *attr,
-				  char *buf)
+static DEVICE_ATTR(v4ldbg, 0664, v4ldbg_show, v4ldbg_store);
+
+static ssize_t vdin_v4l_work_mode_show(struct device *dev,
+		struct device_attribute *attr, char *buf)
 {
 	struct vdin_dev_s *devp = dev_get_drvdata(dev);
 
 	return sprintf(buf, "0x%x\n", devp->work_mode);
 }
 
-static ssize_t v4l_work_mode_store(struct device *dev,
-				   struct device_attribute *attr,
-				   const char *buf, size_t len)
+static ssize_t vdin_v4l_work_mode_store(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t len)
 {
 	struct vdin_dev_s *devp = dev_get_drvdata(dev);
 	int cnt, val;
@@ -122,7 +130,8 @@ static ssize_t v4l_work_mode_store(struct device *dev,
 
 	return len;
 }
-static DEVICE_ATTR_RW(v4l_work_mode);
+static DEVICE_ATTR(v4l_work_mode, 0664, vdin_v4l_work_mode_show,
+			 vdin_v4l_work_mode_store);
 
 void vdin_v4l2_create_device_files(struct device *dev)
 {

@@ -1,4 +1,3 @@
-/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
  * drivers/amlogic/media/vin/tvin/vdin/vdin_trace.h
  *
@@ -26,35 +25,36 @@
 
 /* single lifecycle events */
 DECLARE_EVENT_CLASS(vdin_event_class,
-		    TP_PROTO(const char *name, int field_cnt,
-			     unsigned long time),
-		    TP_ARGS(name, field_cnt, time),
-		    TP_STRUCT__entry(__string(name, name)
-				     __field(int, field_cnt)
-				     __field(unsigned long, time)),
-		    TP_fast_assign(__assign_str(name, name);
-				   __entry->field_cnt = field_cnt;
-				   __entry->time = time;),
+	TP_PROTO(const char *name, int field_cnt, unsigned long time),
+	TP_ARGS(name, field_cnt, time),
+	TP_STRUCT__entry(
+		__string(name, name)
+		__field(int, field_cnt)
+		__field(unsigned long, time)
+	),
+	TP_fast_assign(
+		__assign_str(name, name);
+		__entry->field_cnt = field_cnt;
+		__entry->time = time;
+	),
 	TP_printk("[%s-%dth-%lums]",  __get_str(name),
-		  __entry->field_cnt, __entry->time)
+			__entry->field_cnt, __entry->time)
 );
 
-#define DEFINE_VDIN_EVENT(name_) \
-		(typeof(name_) name = name_; \
-		 DEFINE_EVENT(vdin_event_class, (name), \
-			      TP_PROTO(const char *name, int field_cnt, \
-				       unsigned long time), \
-			      TP_ARGS(name, field_cnt, time)))
+#define DEFINE_VDIN_EVENT(name) \
+DEFINE_EVENT(vdin_event_class, name, \
+	TP_PROTO(const char *name, int field_cnt, unsigned long time), \
+	TP_ARGS(name, field_cnt, time))
 
 DEFINE_VDIN_EVENT(vdin_afbc);
 #endif /* _VDEC_TRACE_H */
 
-#ifdef VDIN_TRACE_EN
+#if 0
 #define CREATE_TRACE_POINTS
 #include "vdin_trace.h"
 #undef TRACE_INCLUDE_PATH
 #undef TRACE_INCLUDE_FILE
-#define TRACE_INCLUDE_PATH ../../drivers/amlogic/media/vin/tvin/vdin
+#define TRACE_INCLUDE_PATH .
 #define TRACE_INCLUDE_FILE vdin_trace
 #include <trace/define_trace.h>
 
@@ -62,6 +62,7 @@ DEFINE_VDIN_EVENT(vdin_afbc);
 #ifdef VDIN_TRACE
 trace_vdin_afbc("vdin-afbc", devp->afbce_mode, devp->frame_cnt);
 #endif
+
 #endif
 
 /*

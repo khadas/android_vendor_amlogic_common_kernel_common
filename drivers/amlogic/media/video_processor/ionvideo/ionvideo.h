@@ -1,6 +1,18 @@
-/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/amlogic/media/video_processor/ionvideo/ionvideo.h
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
 #ifndef _IONVIDEO_H
@@ -23,8 +35,7 @@
 #include <media/v4l2-fh.h>
 #include <media/v4l2-event.h>
 #include <media/v4l2-common.h>
-/* media module used media/registers/cpu_version.h since kernel 5.4 */
-#include <linux/amlogic/media/registers/cpu_version.h>
+#include <linux/amlogic/cpu_version.h>
 
 #include <linux/mm.h>
 /* #include <mach/mod_gate.h> */
@@ -37,7 +48,6 @@
 
 #include <linux/amlogic/media/frame_sync/timestamp.h>
 #include <linux/amlogic/media/frame_sync/tsync.h>
-#include <linux/amlogic/media/canvas/canvas_mgr.h>
 
 /* Wake up at about 30 fps */
 #define WAKE_NUMERATOR 30
@@ -48,18 +58,22 @@
 
 #define IONVIDEO_POOL_SIZE 32
 
-#define IONVID_INFO(fmt, args...) pr_info("ionvid: info: " fmt " ", ## args)
-#define IONVID_DBG(fmt, args...) pr_debug("ionvid: dbg: " fmt " ", ## args)
-#define IONVID_ERR(fmt, args...) pr_err("ionvid: err: " fmt " ", ## args)
+#define IONVID_INFO(fmt, args...) pr_info("ionvid: info: "fmt"", ## args)
+#define IONVID_DBG(fmt, args...) pr_debug("ionvid: dbg: "fmt"", ## args)
+#define IONVID_ERR(fmt, args...) pr_err("ionvid: err: "fmt"", ## args)
+
+#define DUR2PTS(x) ((x) - ((x) >> 4))
 
 #define dprintk(dev, level, fmt, arg...)                    \
-v4l2_dbg((level), debug, &(dev)->v4l2_dev, fmt, ## arg)
+v4l2_dbg(level, debug, &dev->v4l2_dev, fmt, ## arg)
 
 #define ppmgr2_printk(level, fmt, arg...)                   \
 do {                                                    \
-	if (get_ionvideo_debug() >= (level))                  \
+	if (get_ionvideo_debug() >= level)                  \
 		pr_debug("ppmgr2-dev: " fmt, ## arg);  \
 } while (0)
+
+#define PPMGR2_CANVAS_INDEX_SRC (PPMGR2_CANVAS_INDEX + 3)
 
 /* v4l2_amlogic_parm must < u8[200] */
 struct v4l2_amlogic_parm {
@@ -77,17 +91,11 @@ struct v4l2q_s {
 	struct v4l2_buffer **pool;
 };
 
-static inline u32 dur2pts(u32 duration)
-{
-	return (duration - (duration >> 4));
-}
-
 static inline void v4l2q_lookup_start(struct v4l2q_s *q)
 {
 	q->pre_rp = q->rp;
 	q->pre_wp = q->wp;
 }
-
 static inline void v4l2q_lookup_end(struct v4l2q_s *q)
 {
 	q->rp = q->pre_rp;
@@ -95,10 +103,9 @@ static inline void v4l2q_lookup_end(struct v4l2q_s *q)
 }
 
 static inline void v4l2q_init(struct v4l2q_s *q, u32 size,
-			      struct v4l2_buffer **pool)
+		struct v4l2_buffer **pool)
 {
-	q->rp = 0;
-	q->wp = 0;
+	q->rp = q->wp = 0;
 	q->size = size;
 	q->pool = pool;
 }
@@ -213,7 +220,7 @@ struct ppmgr2_device {
 	int interlaced_num;
 	int bottom_first;
 
-	struct mutex *ge2d_canvas_mutex; /* */
+	struct mutex *ge2d_canvas_mutex;
 };
 
 #define ION_VF_RECEIVER_NAME_SIZE 32
@@ -234,7 +241,7 @@ struct ion_buffer {
 	unsigned long private_flags;
 	size_t size;
 	void *priv_virt;
-	struct mutex lock; /* */
+	struct mutex lock;
 	int kmap_cnt;
 	void *vaddr;
 	int dmap_cnt;
@@ -254,8 +261,8 @@ struct ionvideo_dev {
 	int fd_num;
 	int ionvideo_v4l_num;
 
-	spinlock_t slock; /* */
-	struct mutex mutex; /* */
+	spinlock_t slock;
+	struct mutex mutex;
 
 	struct ionvideo_dmaqueue vidq;
 
@@ -282,7 +289,7 @@ struct ionvideo_dev {
 	u32 skip;
 	int once_record;
 	u8 is_omx_video_started;
-	int activated;
+	int is_actived;
 	u64 last_pts_us64;
 	unsigned int freerun_mode;
 	unsigned int skip_frames;
@@ -301,8 +308,8 @@ struct ionvideo_dev {
 	struct v4l2q_s output_queue;
 	struct v4l2_buffer *ionvideo_input_queue[IONVIDEO_POOL_SIZE + 1];
 	struct v4l2_buffer *ionvideo_output_queue[IONVIDEO_POOL_SIZE + 1];
-	struct mutex mutex_input;  /* */
-	struct mutex mutex_output; /* */
+	struct mutex mutex_input;
+	struct mutex mutex_output;
 	struct v4l2_buffer ionvideo_input[IONVIDEO_POOL_SIZE + 1];
 	bool wait_ge2d_timeout;
 	struct v4l2_amlogic_parm am_parm;
@@ -310,15 +317,13 @@ struct ionvideo_dev {
 
 int get_ionvideo_debug(void);
 
-void ionvideo_alloc_canvas(void);
-void ionvideo_free_canvas(void);
 int ppmgr2_init(struct ppmgr2_device *ppd);
 int ppmgr2_canvas_config(struct ppmgr2_device *ppd, int index);
 int ppmgr2_process(struct vframe_s *vf, struct ppmgr2_device *ppd, int index);
 int ppmgr2_top_process(struct vframe_s *vf, struct ppmgr2_device *ppd,
-		       int index);
+			int index);
 int ppmgr2_bottom_process(struct vframe_s *vf, struct ppmgr2_device *ppd,
-			  int index);
+				int index);
 void ppmgr2_release(struct ppmgr2_device *ppd);
 void ppmgr2_set_angle(struct ppmgr2_device *ppd, int angle);
 void ppmgr2_set_mirror(struct ppmgr2_device *ppd, int mirror);

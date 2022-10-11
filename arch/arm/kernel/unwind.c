@@ -1,8 +1,21 @@
-// SPDX-License-Identifier: GPL-2.0-only
 /*
  * arch/arm/kernel/unwind.c
  *
  * Copyright (C) 2008 ARM Limited
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
+ *
  *
  * Stack unwinding support for ARM
  *
@@ -240,11 +253,7 @@ static int unwind_pop_register(struct unwind_ctrl_block *ctrl,
 		if (*vsp >= (unsigned long *)ctrl->sp_high)
 			return -URC_FAILURE;
 
-	/* Use READ_ONCE_NOCHECK here to avoid this memory access
-	 * from being tracked by KASAN.
-	 */
-	ctrl->vrs[reg] = READ_ONCE_NOCHECK(*(*vsp));
-	(*vsp)++;
+	ctrl->vrs[reg] = *(*vsp)++;
 	return URC_OK;
 }
 
@@ -380,7 +389,7 @@ error:
  * Unwind a single frame starting with *sp for the symbol at *pc. It
  * updates the *pc and *sp with the new values.
  */
-int notrace unwind_frame(struct stackframe *frame)
+int unwind_frame(struct stackframe *frame)
 {
 	unsigned long low;
 	const struct unwind_idx *idx;
@@ -398,7 +407,13 @@ int notrace unwind_frame(struct stackframe *frame)
 
 	idx = unwind_find_idx(frame->pc);
 	if (!idx) {
+	#ifdef CONFIG_AMLOGIC_KASAN32
+		/* avoid FUCKING close source ko print too many here */
+		if (frame->pc > PAGE_OFFSET)
+			pr_warn("unwind: Index not found %08lx\n", frame->pc);
+	#else
 		pr_warn("unwind: Index not found %08lx\n", frame->pc);
+	#endif
 		return -URC_FAILURE;
 	}
 
@@ -522,7 +537,7 @@ void unwind_backtrace(struct pt_regs *regs, struct task_struct *tsk)
 
 			cpu = raw_smp_processor_id();
 			/* continue search for irq stack */
-			if (on_vmap_irq_stack(frame.sp, cpu)) {
+			if (on_irq_stack(frame.sp, cpu)) {
 				unsigned long sp_irq;
 
 				keep = 1;

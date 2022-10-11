@@ -1,8 +1,11 @@
-// SPDX-License-Identifier: GPL-2.0-only
 /*
  *  linux/arch/arm/kernel/setup.c
  *
  *  Copyright (C) 1995-2001 Russell King
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
  */
 #include <linux/efi.h>
 #include <linux/export.h>
@@ -13,12 +16,12 @@
 #include <linux/utsname.h>
 #include <linux/initrd.h>
 #include <linux/console.h>
+#include <linux/bootmem.h>
 #include <linux/seq_file.h>
 #include <linux/screen_info.h>
 #include <linux/of_platform.h>
 #include <linux/init.h>
 #include <linux/kexec.h>
-#include <linux/libfdt.h>
 #include <linux/of_fdt.h>
 #include <linux/cpu.h>
 #include <linux/interrupt.h>
@@ -62,13 +65,14 @@
 #ifdef CONFIG_AMLOGIC_VMAP
 #include <linux/amlogic/vmap_stack.h>
 #endif
+#ifdef CONFIG_AMLOGIC_CPU_INFO
+#include <linux/amlogic/cpu_version.h>
+#endif
+#ifdef CONFIG_AMLOGIC_KASAN32
 #include <asm/kasan.h>
-
+#endif
 #include "atags.h"
 
-#ifdef CONFIG_AMLOGIC_CPU_INFO
-#include <linux/amlogic/cpu_info.h>
-#endif
 
 #if defined(CONFIG_FPE_NWFPE) || defined(CONFIG_FPE_FASTFPE)
 char fpe_type[8];
@@ -84,7 +88,7 @@ __setup("fpe=", fpe_setup);
 
 extern void init_default_cache_policy(unsigned long);
 extern void paging_init(const struct machine_desc *desc);
-extern void early_mm_init(const struct machine_desc *);
+extern void early_paging_init(const struct machine_desc *);
 extern void adjust_lowmem_bounds(void);
 extern enum reboot_mode reboot_mode;
 extern void setup_dma_zone(const struct machine_desc *desc);
@@ -324,7 +328,7 @@ static void __init cacheid_init(void)
 	if (arch >= CPU_ARCH_ARMv6) {
 		unsigned int cachetype = read_cpuid_cachetype();
 
-		if ((arch == CPU_ARCH_ARMv7M) && !(cachetype & 0xf000f)) {
+		if ((arch == CPU_ARCH_ARMv7M) && !cachetype) {
 			cacheid = 0;
 		} else if ((cachetype & (7 << 29)) == 4 << 29) {
 			/* ARMv7 register format */
@@ -782,7 +786,7 @@ int __init arm_add_memory(u64 start, u64 size)
 	else
 		size -= aligned_start - start;
 
-#ifndef CONFIG_PHYS_ADDR_T_64BIT
+#ifndef CONFIG_ARCH_PHYS_ADDR_T_64BIT
 	if (aligned_start > ULONG_MAX) {
 		pr_crit("Ignoring memory at 0x%08llx outside 32-bit physical address space\n",
 			(long long)start);
@@ -885,10 +889,7 @@ static void __init request_standard_resources(const struct machine_desc *mdesc)
 		 */
 		boot_alias_start = phys_to_idmap(start);
 		if (arm_has_idmap_alias() && boot_alias_start != IDMAP_INVALID_ADDR) {
-			res = memblock_alloc(sizeof(*res), SMP_CACHE_BYTES);
-			if (!res)
-				panic("%s: Failed to allocate %zu bytes\n",
-				      __func__, sizeof(*res));
+			res = memblock_virt_alloc(sizeof(*res), 0);
 			res->name = "System RAM (boot alias)";
 			res->start = boot_alias_start;
 			res->end = phys_to_idmap(end);
@@ -896,10 +897,7 @@ static void __init request_standard_resources(const struct machine_desc *mdesc)
 			request_resource(&iomem_resource, res);
 		}
 
-		res = memblock_alloc(sizeof(*res), SMP_CACHE_BYTES);
-		if (!res)
-			panic("%s: Failed to allocate %zu bytes\n", __func__,
-			      sizeof(*res));
+		res = memblock_virt_alloc(sizeof(*res), 0);
 		res->name  = "System RAM";
 		res->start = start;
 		res->end = end;
@@ -1021,9 +1019,6 @@ static void __init reserve_crashkernel(void)
 
 	if (crash_base <= 0) {
 		unsigned long long crash_max = idmap_to_phys((u32)~0);
-		unsigned long long lowmem_max = __pa(high_memory - 1) + 1;
-		if (crash_max > lowmem_max)
-			crash_max = lowmem_max;
 		crash_base = memblock_find_in_range(CRASH_ALIGN, crash_max,
 						    crash_size, CRASH_ALIGN);
 		if (!crash_base) {
@@ -1095,46 +1090,14 @@ void __init hyp_mode_check(void)
 #endif
 }
 
-static void (*__arm_pm_restart)(enum reboot_mode reboot_mode, const char *cmd);
-
-static int arm_restart(struct notifier_block *nb, unsigned long action,
-		       void *data)
-{
-	__arm_pm_restart(action, data);
-	return NOTIFY_DONE;
-}
-
-static struct notifier_block arm_restart_nb = {
-	.notifier_call = arm_restart,
-	.priority = 128,
-};
-
 void __init setup_arch(char **cmdline_p)
 {
-	const struct machine_desc *mdesc = NULL;
-	void *atags_vaddr = NULL;
-
-	if (__atags_pointer)
-		atags_vaddr = FDT_VIRT_BASE(__atags_pointer);
+	const struct machine_desc *mdesc;
 
 	setup_processor();
-	if (atags_vaddr) {
-		mdesc = setup_machine_fdt(atags_vaddr);
-		if (mdesc)
-			memblock_reserve(__atags_pointer,
-					 fdt_totalsize(atags_vaddr));
-	}
+	mdesc = setup_machine_fdt(__atags_pointer);
 	if (!mdesc)
-		mdesc = setup_machine_tags(atags_vaddr, __machine_arch_type);
-	if (!mdesc) {
-		early_print("\nError: invalid dtb and unrecognized/unsupported machine ID\n");
-		early_print("  r1=0x%08x, r2=0x%08x\n", __machine_arch_type,
-			    __atags_pointer);
-		if (__atags_pointer)
-			early_print("  r2[]=%*ph\n", 16, atags_vaddr);
-		dump_machine_table();
-	}
-
+		mdesc = setup_machine_tags(__atags_pointer, __machine_arch_type);
 	machine_desc = mdesc;
 	machine_name = mdesc->name;
 	dump_stack_set_arch_desc("%s", mdesc->name);
@@ -1157,7 +1120,7 @@ void __init setup_arch(char **cmdline_p)
 	parse_early_param();
 
 #ifdef CONFIG_MMU
-	early_mm_init(mdesc);
+	early_paging_init(mdesc);
 #endif
 	setup_dma_zone(mdesc);
 	xen_early_init();
@@ -1174,13 +1137,13 @@ void __init setup_arch(char **cmdline_p)
 	early_ioremap_reset();
 
 	paging_init(mdesc);
+#ifdef CONFIG_AMLOGIC_KASAN32
 	kasan_init();
+#endif
 	request_standard_resources(mdesc);
 
-	if (mdesc->restart) {
-		__arm_pm_restart = mdesc->restart;
-		register_restart_handler(&arm_restart_nb);
-	}
+	if (mdesc->restart)
+		arm_pm_restart = mdesc->restart;
 
 	unflatten_device_tree();
 
@@ -1204,7 +1167,7 @@ void __init setup_arch(char **cmdline_p)
 
 	reserve_crashkernel();
 
-#ifdef CONFIG_GENERIC_IRQ_MULTI_HANDLER
+#ifdef CONFIG_MULTI_IRQ_HANDLER
 	handle_arch_irq = mdesc->handle_irq;
 #endif
 
@@ -1290,6 +1253,7 @@ static int c_show(struct seq_file *m, void *v)
 #ifdef CONFIG_AMLOGIC_CPU_INFO
 	unsigned char chipid[CHIPID_LEN];
 #endif
+
 	for_each_online_cpu(i) {
 		/*
 		 * glibc reads /proc/cpuinfo to determine the number of
@@ -1343,18 +1307,20 @@ static int c_show(struct seq_file *m, void *v)
 		}
 		seq_printf(m, "CPU revision\t: %d\n\n", cpuid & 15);
 	}
+
 #ifdef CONFIG_AMLOGIC_CPU_INFO
 	cpuinfo_get_chipid(chipid, CHIPID_LEN);
 	seq_puts(m, "Serial\t\t: ");
 	for (i = 0; i < 16; i++)
 		seq_printf(m, "%02x", chipid[i]);
 	seq_puts(m, "\n");
-	seq_printf(m, "Hardware\t: %s\n", "Amlogic");
+	seq_printf(m, "Hardware\t: %s\n\n", "Amlogic");
 #else
 	seq_printf(m, "Hardware\t: %s\n", machine_name);
 	seq_printf(m, "Revision\t: %04x\n", system_rev);
 	seq_printf(m, "Serial\t\t: %s\n", system_serial);
 #endif
+
 	return 0;
 }
 

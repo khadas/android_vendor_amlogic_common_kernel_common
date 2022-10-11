@@ -263,8 +263,6 @@ struct dcntr_core_s {
 	const unsigned int	*reg_mif_tab[DCNTR_NUB_MIF];
 	const struct regs_t	*reg_mif_bits_tab;
 	const struct reg_t	*reg_contr_bits;
-	struct dcntr_mem_s *p_in_cfg; /* for move dct */
-	struct di_ch_s *pch;	/* for move dct */
 };
 
 void dbg_dct_core_other(struct dcntr_core_s *pcore)
@@ -560,7 +558,7 @@ static unsigned int get_mif_addr(unsigned int mif_index,
 	unsigned int reg_addr = DCNTR_DIVR_RMIF_CTRL4;
 	const unsigned int *reg;
 
-	if (!di_dcnt.flg_int || mif_index >= DCNTR_NUB_MIF) {
+	if ((!di_dcnt.flg_int) || (mif_index >= DCNTR_NUB_MIF)) {
 		PR_ERR("%s:%d:%d\n", __func__, di_dcnt.flg_int, mif_index);
 		return reg_addr;
 	}
@@ -1052,7 +1050,8 @@ static void dcntr_update(void)
 	}
 
 	dim_print("rd:0x%x,0x%x\n",
-		  DCNTR_GRID_RMIF_CTRL2 + off, op->rd(DCNTR_GRID_RMIF_CTRL2 + off));
+		  DCNTR_GRID_RMIF_CTRL2 + off,
+		  op->rd(DCNTR_GRID_RMIF_CTRL2 + off));
 
 	if ((dbg_dct & DI_BIT0) == 0) {
 		if ((dbg_dct & DI_BIT2) == 0)
@@ -1112,9 +1111,11 @@ void dcntr_dynamic_setting(struct dim_rpt_s *rpt)
 	map_15 = rpt->dct_map_15;
 	bld_2 = rpt->dct_bld_2;
 	map_count = (map_0 + map_1 + map_2 + map_3) * 10000;
-	dbg_pq("bits[0x%x],mp0-3[%lld,%lld,%lld,%lld],mp15[%lld],count[%lld],bld[0x%x]\n",
-		rpt->spt_bits,  map_0, map_1, map_2, map_3, map_15,
-		map_count,  rpt->dct_bld_2 << 16);
+	dbg_pq("bits[0x%x],mp0-3[%lld,%lld,%lld,%lld],\n",
+		rpt->spt_bits,  map_0, map_1, map_2, map_3);
+	dbg_pq("mp15[%lld],count[%lld],bld[0x%x]\n",
+			map_15,
+			map_count,  rpt->dct_bld_2 << 16);
 
 	if (map_count < thr * map_15) {
 		if (bld_2 == target)
@@ -1129,7 +1130,7 @@ void dcntr_dynamic_setting(struct dim_rpt_s *rpt)
 	} else {
 		if (bld_2 == val_db)
 			return;
-		/*db value default 0, function: bld2 = db_val*a + (10-a)*bld_2 */
+		/*db value default 0,function: bld2 = db_val*a + (10-a)*bld_2 */
 		bld_2 = val_db * alpha + (10 - alpha) * bld_2;
 		pdate[0] = (bld_2 / 10);
 
@@ -1175,10 +1176,6 @@ void dcntr_dis(void)
 		pcfg->st_pause	= 0;
 		pcfg->n_rp	= 1;
 	}
-	if (pcfg->p_in_cfg && get_datal()->dct_op) {
-		get_datal()->dct_op->mem_put_free(pcfg->p_in_cfg);
-		pcfg->p_in_cfg = NULL;
-	}
 }
 
 void dcntr_set(void)
@@ -1210,33 +1207,25 @@ void dcntr_set(void)
 		pcfg->n_demo = 0;
 	}
 	if (pcfg->n_set) {
-		dbg_dctp("%s:set\n", __func__);
 		dcntr_post();
 		pcfg->st_pause	= 1;
 	} else if (pcfg->n_up) {
-		dbg_dctp("%s:update\n", __func__);
 		dcntr_update();
 		pcfg->st_pause	= 1;
 	}
 }
 
-void dim_dbg_dct_info(struct dcntr_mem_s *pprecfg)
+static void dbg_pre_cfg(struct dcntr_mem_s *pprecfg)
 {
 	if (!pprecfg)
 		return;
-	dim_print("index[%d],free[%d]\n",
-		  pprecfg->index, pprecfg->free);
 
 	dim_print("use_org[%d],ration[%d]\n",
 		  pprecfg->use_org, pprecfg->ds_ratio);
-	dim_print("grd_addr[0x%lx],y_addr[0x%lx], c_addr[0x%lx]\n",
+	dim_print("grd_addr[0x%x],y_addr[0x%x], c_addr[0x%x]\n",
 		  pprecfg->grd_addr,
 		  pprecfg->yds_addr,
 		  pprecfg->cds_addr);
-	dim_print("grd_size[%d],yds_size[%d], cds_size[%d]\n",
-		  pprecfg->grd_size,
-		  pprecfg->yds_size,
-		  pprecfg->cds_size);
 	dim_print("out_fmt[0x%x],y_len[%d],c_len[%d]\n",
 		  pprecfg->pre_out_fmt,
 		  pprecfg->yflt_wrmif_length,
@@ -1248,12 +1237,6 @@ void dim_dbg_dct_info(struct dcntr_mem_s *pprecfg)
 		  pprecfg->cds_little_endian,
 		  pprecfg->grd_swap_64bit,
 		  pprecfg->grd_little_endian);
-	dim_print("yds_canvas_mode[%d],cds_canvas_mode[%d]\n",
-		pprecfg->yds_canvas_mode,
-		pprecfg->cds_canvas_mode);
-	dim_print("ori_w[%d],ori_h[%d]\n",
-		pprecfg->ori_w,
-		pprecfg->ori_h);
 }
 
 struct linear_para_s {
@@ -1310,7 +1293,7 @@ void dcntr_check(struct vframe_s *vfm)
 	//unsigned int grd_num_mode;
 	unsigned int divrsmap_blk0_sft, yflt_wrmif_length, cflt_wrmif_length;
 	unsigned int xy, demo;
-	unsigned long ds_addy = 0, ds_addc = 0, grd_add = 0;
+	unsigned int ds_addy = 0, ds_addc = 0, grd_add = 0;
 	unsigned int cvs_y, cvs_uv;
 	struct di_cvs_s *cvss;
 	unsigned int cvs_w;
@@ -1319,12 +1302,9 @@ void dcntr_check(struct vframe_s *vfm)
 	//pdcn = (struct dcntr_mem_s *)vfm->vf_ext;
 	pdcn = (struct dcntr_mem_s *)vfm->decontour_pre;
 
-	if (!pcfg->flg_int) {
-		if (pdcn && get_datal()->dct_op)
-			get_datal()->dct_op->mem_put_free(pdcn);
-
+	if (!pcfg->flg_int)
 		return;
-	}
+
 	/*dbg*/
 	if (dbg_dct & DI_BIT4)
 		pcfg->in.grid_use_fix = 1;
@@ -1339,31 +1319,24 @@ void dcntr_check(struct vframe_s *vfm)
 		pcfg->st_off = 0;
 		PR_INF("dt:on\n");
 	}
-	if (!pdcn || pcfg->st_off) {
-		if (pdcn && get_datal()->dct_op)
-			get_datal()->dct_op->mem_put_free(pdcn);
-
-		pcfg->p_in_cfg = NULL;
+	if (!pdcn || pcfg->st_off)
 		return;
-	}
 
-	dim_dbg_dct_info(pdcn);
+	dbg_pre_cfg(pdcn);
 	memcpy(&pcfg->in_cfg, pdcn, sizeof(pcfg->in_cfg));
-
-	pcfg->p_in_cfg = pdcn;
 
 	if (IS_COMP_MODE(vfm->type)) {
 		x = vfm->compWidth;
 		y = vfm->compHeight;
 
 	} else {
-		x = pdcn->ori_w;//vfm->width;
-		y = pdcn->ori_h;//vfm->height;
+		x = vfm->width;//vfm->width;
+		y = vfm->height;//vfm->height;
 	}
 
 	if (pdcn->use_org) {
-		ds_x = pdcn->ori_w;//vfm->width;
-		ds_y = pdcn->ori_h;//vfm->height;
+		ds_x = vfm->width;//vfm->width;
+		ds_y = vfm->height;//vfm->height;
 		if (DIM_IS_IC(T5)) {
 			pcfg->in.use_cvs = 1;
 		} else if (cfgg(LINEAR)) {
@@ -1383,8 +1356,8 @@ void dcntr_check(struct vframe_s *vfm)
 			check_burst = true;
 		}
 	} else {
-		ds_x = pdcn->ori_w >> pdcn->ds_ratio;
-		ds_y = pdcn->ori_h >> pdcn->ds_ratio;
+		ds_x = vfm->width >> pdcn->ds_ratio;
+		ds_y = vfm->height >> pdcn->ds_ratio;
 
 		ds_addy = pdcn->yds_addr;
 		ds_addc = pdcn->cds_addr;
@@ -1419,13 +1392,13 @@ void dcntr_check(struct vframe_s *vfm)
 	else
 		pcfg->n_bypass = 0;
 
-	if (ds_x == x && ds_y == y)
+	if ((ds_x == x) && (ds_y == y))
 		pcfg->in.sig_path = 1;
 
-	if (pcfg->l_xsize != x ||
-	    pcfg->l_ysize != y ||
-	    pcfg->l_ds_x  != ds_x ||
-	    pcfg->l_ds_y  != ds_y) {
+	if ((pcfg->l_xsize != x) ||
+	    (pcfg->l_ysize != y) ||
+	    (pcfg->l_ds_x  != ds_x) ||
+	    (pcfg->l_ds_y  != ds_y)) {
 		chg = true;
 		pcfg->in.x_size = x;
 		pcfg->in.y_size = y;
@@ -1440,7 +1413,8 @@ void dcntr_check(struct vframe_s *vfm)
 
 		if (pcfg->in.use_cvs) {
 			cvss = &get_datal()->cvs;
-			cvs_y = cvss->post_idx[1][1]; //note: use by copy function
+			cvs_y = cvss->post_idx[1][1];
+		//note: use by copy function
 			cvs_uv = cvss->post_idx[1][5];
 			pcfg->cvs_y = (unsigned char)cvs_y;
 			pcfg->cvs_uv = (unsigned char)cvs_uv;
@@ -1448,7 +1422,7 @@ void dcntr_check(struct vframe_s *vfm)
 	}
 
 	demo = (dbg_dct & 0x300) >> 8;
-	if (pcfg->demo != demo || chg) {
+	if ((pcfg->demo != demo) || chg) {
 		pcfg->demo = demo;
 		pcfg->n_demo = 1;
 	}
@@ -1511,27 +1485,19 @@ void dcntr_check(struct vframe_s *vfm)
 
 	if (!pcfg->in.use_cvs) {
 		if (DIM_IS_IC_EF(T7)) {
-			pcfg->in.addr[ECNTR_MIF_IDX_DIVR] =
-				(unsigned int)(ds_addy >> 4);
-			pcfg->in.addr[ECNTR_MIF_IDX_YFLT] =
-				(unsigned int)(ds_addy >> 4);
-			pcfg->in.addr[ECNTR_MIF_IDX_CFLT] =
-				(unsigned int)(ds_addc >> 4);
+			pcfg->in.addr[ECNTR_MIF_IDX_DIVR] = ds_addy >> 4;
+			pcfg->in.addr[ECNTR_MIF_IDX_YFLT] = ds_addy >> 4;
+			pcfg->in.addr[ECNTR_MIF_IDX_CFLT] = ds_addc >> 4;
 		} else {
-			pcfg->in.addr[ECNTR_MIF_IDX_DIVR] =
-				(unsigned int)ds_addy;
-			pcfg->in.addr[ECNTR_MIF_IDX_YFLT] =
-				(unsigned int)ds_addy;
-			pcfg->in.addr[ECNTR_MIF_IDX_CFLT] =
-				(unsigned int)ds_addc;
+			pcfg->in.addr[ECNTR_MIF_IDX_DIVR] = ds_addy;
+			pcfg->in.addr[ECNTR_MIF_IDX_YFLT] = ds_addy;
+			pcfg->in.addr[ECNTR_MIF_IDX_CFLT] = ds_addc;
 		}
 	}
 	if (DIM_IS_IC_EF(T7))
-		pcfg->in.addr[ECNTR_MIF_IDX_GRID] =
-			(unsigned int)(grd_add >> 4);
+		pcfg->in.addr[ECNTR_MIF_IDX_GRID] = grd_add >> 4;
 	else
-		pcfg->in.addr[ECNTR_MIF_IDX_GRID] =
-			(unsigned int)grd_add;
+		pcfg->in.addr[ECNTR_MIF_IDX_GRID] = grd_add;
 
 	if (pcfg->n_bypass) {
 		pcfg->n_set	= 0;

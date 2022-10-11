@@ -4,7 +4,7 @@
  */
 
 #include <linux/arm-smccc.h>
-#include <linux/amlogic/power_domain.h>
+#include <linux/amlogic/pwr_ctrl.h>
 
 unsigned long pwr_ctrl_psci_smc(int power_domain, bool power_control)
 {
@@ -37,7 +37,6 @@ unsigned long vpu_mempd_psci_smc(int mempd_id, bool power_control)
 
 	return ret;
 }
-EXPORT_SYMBOL(vpu_mempd_psci_smc);
 
 unsigned long pwr_ctrl_irq_set(u64 irq, u64 irq_mask, u64 irq_invert)
 {
@@ -47,5 +46,4 @@ unsigned long pwr_ctrl_irq_set(u64 irq, u64 irq_mask, u64 irq_invert)
 		      0, 0, 0, 0, &res);
 	return res.a0;
 }
-EXPORT_SYMBOL(pwr_ctrl_irq_set);
 

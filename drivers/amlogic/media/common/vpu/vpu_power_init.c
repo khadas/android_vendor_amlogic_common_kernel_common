@@ -1,6 +1,18 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * drivers/amlogic/media/common/vpu/vpu_power_init.c
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
 #include <linux/init.h>
@@ -9,30 +21,32 @@
 #include <linux/slab.h>
 #include <linux/err.h>
 #include <linux/delay.h>
-#ifdef CONFIG_AMLOGIC_POWER
-#include <linux/amlogic/power_domain.h>
-#endif
+#include <linux/amlogic/pwr_ctrl.h>
 #include <linux/amlogic/media/vpu/vpu.h>
 #include "vpu_reg.h"
 #include "vpu.h"
 
 void vpu_mem_pd_init_off(void)
 {
+	return;
+
+	VPUPR("%s\n", __func__);
 }
 
 void vpu_module_init_config(void)
 {
 	struct vpu_ctrl_s *ctrl_table;
 	unsigned int _reg, _val, _bit, _len;
-	int i = 0;
+	int i = 0, cnt;
 
 	VPUPR("%s\n", __func__);
 
 	/* vpu clk gate init off */
+	cnt = vpu_conf.data->module_init_table_cnt;
 	ctrl_table = vpu_conf.data->module_init_table;
 	if (ctrl_table) {
 		i = 0;
-		while (i < VPU_MOD_INIT_CNT_MAX) {
+		while (i < cnt) {
 			if (ctrl_table[i].reg == VPU_REG_END)
 				break;
 			_reg = ctrl_table[i].reg;
@@ -48,7 +62,7 @@ void vpu_module_init_config(void)
 	vpu_vcbus_write(VPU_RDARB_MODE_L1C1, 0x210000);
 	vpu_vcbus_write(VPU_RDARB_MODE_L1C2, 0x10000);
 	vpu_vcbus_write(VPU_RDARB_MODE_L2C1, 0x900000);
-	/*from vlsi feijun*/
+  	/*from vlsi feijun*/
 	vpu_vcbus_write(VPU_WRARB_MODE_L2C1, 0x170000/*0x20000*/);
 
 	if (vpu_debug_print_flag)
@@ -60,11 +74,11 @@ void vpu_power_on(void)
 	struct vpu_ctrl_s *ctrl_table;
 	struct vpu_reset_s *reset_table;
 	unsigned int _reg, _val, _bit, _len, mask;
-	int i = 0;
+	int i = 0, cnt;
 
-	VPUPR("%s\n", __func__);
+	VPUPR("vpu_power_on\n");
 
-	/* power on VPU_HDMI power */
+	/* power on VPU_HDMI ISO */
 	ctrl_table = vpu_conf.data->power_table;
 	if (ctrl_table) {
 		i = 0;
@@ -79,27 +93,28 @@ void vpu_power_on(void)
 			i++;
 		}
 	}
-	usleep_range(20, 25);
+	udelay(20);
 
 	/* power up memories */
+	cnt = vpu_conf.data->mem_pd_table_cnt;
 	ctrl_table = vpu_conf.data->mem_pd_table;
 	if (ctrl_table) {
 		i = 0;
-		while (i < VPU_MEM_PD_CNT_MAX) {
+		while (i < cnt) {
 			if (ctrl_table[i].vmod == VPU_MOD_MAX)
 				break;
 			_reg = ctrl_table[i].reg;
 			_bit = ctrl_table[i].bit;
 			_len = ctrl_table[i].len;
-			vpu_clk_setb(_reg, 0x0, _bit, _len);
-			usleep_range(5, 10);
+			vpu_hiu_setb(_reg, 0x0, _bit, _len);
+			udelay(5);
 			i++;
 		}
 		for (i = 8; i < 16; i++) {
-			vpu_clk_setb(HHI_MEM_PD_REG0, 0, i, 1);
-			usleep_range(5, 10);
+			vpu_hiu_setb(HHI_MEM_PD_REG0, 0, i, 1);
+			udelay(5);
 		}
-		usleep_range(20, 25);
+		usleep_range(20, 21);
 	}
 
 	/* Reset VIU + VENC */
@@ -116,7 +131,7 @@ void vpu_power_on(void)
 			vpu_cbus_clr_mask(_reg, mask);
 			i++;
 		}
-		usleep_range(5, 10);
+		udelay(5);
 		/* release Reset */
 		i = 0;
 		while (i < VPU_RESET_CNT_MAX) {
@@ -153,9 +168,9 @@ void vpu_power_off(void)
 {
 	struct vpu_ctrl_s *ctrl_table;
 	unsigned int _val, _reg, _bit, _len;
-	int i = 0;
+	int i = 0, cnt;
 
-	VPUPR("%s\n", __func__);
+	VPUPR("vpu_power_off\n");
 
 	/* Power down VPU_HDMI */
 	/* Enable Isolation */
@@ -173,13 +188,14 @@ void vpu_power_off(void)
 			i++;
 		}
 	}
-	usleep_range(20, 25);
+	usleep_range(20, 21);
 
 	/* power down memories */
+	cnt = vpu_conf.data->mem_pd_table_cnt;
 	ctrl_table = vpu_conf.data->mem_pd_table;
 	if (ctrl_table) {
 		i = 0;
-		while (i < VPU_MEM_PD_CNT_MAX) {
+		while (i < cnt) {
 			if (ctrl_table[i].vmod == VPU_MOD_MAX)
 				break;
 			_reg = ctrl_table[i].reg;
@@ -189,15 +205,15 @@ void vpu_power_off(void)
 				_val = 0xffffffff;
 			else
 				_val = (1 << _len) - 1;
-			vpu_clk_setb(_reg, _val, _bit, _len);
-			usleep_range(5, 10);
+			vpu_hiu_setb(_reg, _val, _bit, _len);
+			udelay(5);
 			i++;
 		}
 		for (i = 8; i < 16; i++) {
-			vpu_clk_setb(HHI_MEM_PD_REG0, 0x1, i, 1);
-			usleep_range(5, 10);
+			vpu_hiu_setb(HHI_MEM_PD_REG0, 0x1, i, 1);
+			udelay(5);
 		}
-		usleep_range(20, 25);
+		usleep_range(20, 21);
 	}
 
 	/* Power down VPU domain */
@@ -223,21 +239,8 @@ void vpu_power_off(void)
 void vpu_power_on_new(void)
 {
 #ifdef CONFIG_AMLOGIC_POWER
-	unsigned int pwr_id;
-	int i = 0;
-
-	if (!vpu_conf.data->pwrctrl_id_table)
-		return;
-
-	while (i < VPU_PWR_ID_MAX) {
-		pwr_id = vpu_conf.data->pwrctrl_id_table[i];
-		if (pwr_id == VPU_PWR_ID_END)
-			break;
-		if (vpu_debug_print_flag)
-			VPUPR("%s: pwr_id=%d\n", __func__, pwr_id);
-		pwr_ctrl_psci_smc(pwr_id, 1);
-		i++;
-	}
+	if (vpu_conf.data->pwrctrl_id < VPU_PWR_ID_INVALID)
+		pwr_ctrl_psci_smc(vpu_conf.data->pwrctrl_id, 1);
 	VPUPR("%s\n", __func__);
 #else
 	VPUERR("%s: no CONFIG_AMLOGIC_POWER\n", __func__);
@@ -250,22 +253,9 @@ void vpu_power_on_new(void)
 void vpu_power_off_new(void)
 {
 #ifdef CONFIG_AMLOGIC_POWER
-	unsigned int pwr_id;
-	int i = 0;
-
+	if (vpu_conf.data->pwrctrl_id < VPU_PWR_ID_INVALID)
+		pwr_ctrl_psci_smc(vpu_conf.data->pwrctrl_id, 0);
 	VPUPR("%s\n", __func__);
-	if (!vpu_conf.data->pwrctrl_id_table)
-		return;
-
-	while (i < VPU_PWR_ID_MAX) {
-		pwr_id = vpu_conf.data->pwrctrl_id_table[i];
-		if (pwr_id == VPU_PWR_ID_END)
-			break;
-		if (vpu_debug_print_flag)
-			VPUPR("%s: pwr_id=%d\n", __func__, pwr_id);
-		pwr_ctrl_psci_smc(pwr_id, 0);
-		i++;
-	}
 #else
 	VPUERR("%s: no CONFIG_AMLOGIC_POWER\n", __func__);
 #endif

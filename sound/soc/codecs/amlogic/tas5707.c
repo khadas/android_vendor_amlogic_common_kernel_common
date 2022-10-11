@@ -1,6 +1,16 @@
-// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
 #include <linux/module.h>
@@ -14,9 +24,9 @@
 #include <sound/pcm_params.h>
 #include <sound/soc.h>
 #include <sound/tlv.h>
+#include <sound/tas57xx.h>
 #include <linux/amlogic/aml_gpio_consumer.h>
 
-#include "tas57xx.h"
 #include "tas5707.h"
 
 #define DEV_NAME	"tas5707"
@@ -139,10 +149,10 @@ static u8 tas5707_drc1_table[TAS5707_DRC_LENGTH] = {
 	0x00, 0x08, 0x42, 0x10,
 };
 
-/* component private data */
+/* codec private data */
 struct tas5707_priv {
 	struct regmap *regmap;
-	struct snd_soc_component *component;
+	struct snd_soc_codec *codec;
 	struct tas57xx_platform_data *pdata;
 
 	/*Platform provided EQ configuration */
@@ -191,7 +201,6 @@ static const struct snd_kcontrol_new tas5707_snd_controls[] = {
 	SOC_SINGLE("Ch1 Switch", DDX_SOFT_MUTE, 0, 1, 1),
 	SOC_SINGLE("Ch2 Switch", DDX_SOFT_MUTE, 1, 1, 1),
 	SOC_SINGLE("Shutdown Switch", DDX_SYS_CTL_2, 6, 1, 1),
-	SOC_SINGLE("Mute", DDX_SYS_CTL_2, 6, 1, 1),
 	SOC_SINGLE_RANGE("Fine Master Volume", DDX_CHANNEL3_VOL, 0,
 			   0x80, 0x83, 0),
 	SOC_SINGLE_BOOL_EXT("Set EQ Enable", 0,
@@ -207,15 +216,15 @@ static const struct snd_kcontrol_new tas5707_snd_controls[] = {
 static int tas5707_set_dai_sysclk(struct snd_soc_dai *codec_dai,
 				  int clk_id, unsigned int freq, int dir)
 {
-	struct snd_soc_component *component = codec_dai->component;
-	struct tas5707_priv *tas5707 = snd_soc_component_get_drvdata(component);
+	struct snd_soc_codec *codec = codec_dai->codec;
+	struct tas5707_priv *tas5707 = snd_soc_codec_get_drvdata(codec);
 
 	tas5707->mclk = freq;
 	/* 0x74 = 512fs; 0x6c = 256fs */
 	if (freq == 512 * 48000)
-		snd_soc_component_write(component, DDX_CLOCK_CTL, 0x74);
+		snd_soc_write(codec, DDX_CLOCK_CTL, 0x74);
 	else
-		snd_soc_component_write(component, DDX_CLOCK_CTL, 0x6c);
+		snd_soc_write(codec, DDX_CLOCK_CTL, 0x6c);
 	return 0;
 }
 
@@ -262,8 +271,7 @@ static int tas5707_hw_params(struct snd_pcm_substream *substream,
 	case SNDRV_PCM_FORMAT_S24_LE:
 	case SNDRV_PCM_FORMAT_S24_BE:
 		pr_debug("24bit\n");
-
-		break;
+	/* fall through */
 	case SNDRV_PCM_FORMAT_S32_LE:
 	case SNDRV_PCM_FORMAT_S20_3LE:
 	case SNDRV_PCM_FORMAT_S20_3BE:
@@ -282,7 +290,7 @@ static int tas5707_hw_params(struct snd_pcm_substream *substream,
 	return 0;
 }
 
-static int tas5707_set_bias_level(struct snd_soc_component *component,
+static int tas5707_set_bias_level(struct snd_soc_codec *codec,
 				  enum snd_soc_bias_level level)
 {
 	pr_debug("level = %d\n", level);
@@ -302,7 +310,7 @@ static int tas5707_set_bias_level(struct snd_soc_component *component,
 		/* The chip runs through the power down sequence for us. */
 		break;
 	}
-	component->dapm.bias_level = level;
+	codec->component.dapm.bias_level = level;
 
 	return 0;
 }
@@ -325,17 +333,18 @@ static struct snd_soc_dai_driver tas5707_dai = {
 	.ops = &tas5707_dai_ops,
 };
 
-static int tas5707_set_master_vol(struct snd_soc_component *component)
+static int tas5707_set_master_vol(struct snd_soc_codec *codec)
 {
-	struct tas57xx_platform_data *pdata = dev_get_platdata(component->dev);
+	struct tas57xx_platform_data *pdata = dev_get_platdata(codec->dev);
 
 	/* using user BSP defined master vol config; */
 	if (pdata && pdata->custom_master_vol) {
-		pr_debug("%s::%d\n", __func__, pdata->custom_master_vol);
-		snd_soc_component_write(component, DDX_MASTER_VOLUME,
+		pr_debug("tas5707_set_master_vol::%d\n",
+			pdata->custom_master_vol);
+		snd_soc_write(codec, DDX_MASTER_VOLUME,
 			      (0xff - pdata->custom_master_vol));
 	} else {
-		snd_soc_component_write(component, DDX_MASTER_VOLUME, 0x11);
+		snd_soc_write(codec, DDX_MASTER_VOLUME, 0x11);
 	}
 
 	return 0;
@@ -345,7 +354,8 @@ static int tas5707_set_DRC_param(struct snd_kcontrol *kcontrol,
 				   struct snd_ctl_elem_value *ucontrol)
 {
 	struct snd_soc_component *component = snd_kcontrol_chip(kcontrol);
-	struct tas5707_priv *tas5707 = snd_soc_component_get_drvdata(component);
+	struct snd_soc_codec *codec = snd_soc_component_to_codec(component);
+	struct tas5707_priv *tas5707 = snd_soc_codec_get_drvdata(codec);
 	struct soc_bytes_ext *params = (void *)kcontrol->private_value;
 	void *data;
 	u8 *val, *p = &tas5707_drc1_table[0];
@@ -379,8 +389,8 @@ static int tas5707_get_DRC_param(struct snd_kcontrol *kcontrol,
 					struct snd_ctl_elem_value *ucontrol)
 {
 	/*struct snd_soc_component *component = snd_kcontrol_chip(kcontrol);
-	 *
-	 *struct tas5707_priv *tas5707 = snd_soc_component_get_drvdata(component);
+	 *struct snd_soc_codec *codec = snd_soc_component_to_codec(component);
+	 *struct tas5707_priv *tas5707 = snd_soc_codec_get_drvdata(codec);
 	 */
 	unsigned int i, addr;
 	u8 *val, *p = &tas5707_drc1_table[0];
@@ -411,7 +421,8 @@ static int tas5707_set_EQ_param(struct snd_kcontrol *kcontrol,
 				   struct snd_ctl_elem_value *ucontrol)
 {
 	struct snd_soc_component *component = snd_kcontrol_chip(kcontrol);
-	struct tas5707_priv *tas5707 = snd_soc_component_get_drvdata(component);
+	struct snd_soc_codec *codec = snd_soc_component_to_codec(component);
+	struct tas5707_priv *tas5707 = snd_soc_codec_get_drvdata(codec);
 	struct soc_bytes_ext *params = (void *)kcontrol->private_value;
 	void *data;
 	u8 *val, *p = &tas5707_EQ_table[0];
@@ -440,8 +451,8 @@ static int tas5707_get_EQ_param(struct snd_kcontrol *kcontrol,
 					struct snd_ctl_elem_value *ucontrol)
 {
 	/*struct snd_soc_component *component = snd_kcontrol_chip(kcontrol);
-	 *
-	 *struct tas5707_priv *tas5707 = snd_soc_component_get_drvdata(component);
+	 *struct snd_soc_codec *codec = snd_soc_component_to_codec(component);
+	 *struct tas5707_priv *tas5707 = snd_soc_codec_get_drvdata(codec);
 	 */
 	unsigned int i, addr;
 	u8 *val = (u8 *)ucontrol->value.bytes.data;
@@ -463,7 +474,8 @@ static int tas5707_set_EQ_enum(struct snd_kcontrol *kcontrol,
 				   struct snd_ctl_elem_value *ucontrol)
 {
 	struct snd_soc_component *component = snd_kcontrol_chip(kcontrol);
-	struct tas5707_priv *tas5707 = snd_soc_component_get_drvdata(component);
+	struct snd_soc_codec *codec = snd_soc_component_to_codec(component);
+	struct tas5707_priv *tas5707 = snd_soc_codec_get_drvdata(codec);
 	u8 tas5707_eq_ctl_table[] = { 0x00, 0x00, 0x00, 0x80 };
 
 	tas5707->EQ_enum_value = ucontrol->value.integer.value[0];
@@ -482,7 +494,8 @@ static int tas5707_get_EQ_enum(struct snd_kcontrol *kcontrol,
 					struct snd_ctl_elem_value *ucontrol)
 {
 	struct snd_soc_component *component = snd_kcontrol_chip(kcontrol);
-	struct tas5707_priv *tas5707 = snd_soc_component_get_drvdata(component);
+	struct snd_soc_codec *codec = snd_soc_component_to_codec(component);
+	struct tas5707_priv *tas5707 = snd_soc_codec_get_drvdata(codec);
 	bool enable = (bool)tas5707->EQ_enum_value & 0x1;
 
 	ucontrol->value.integer.value[0] = enable;
@@ -493,7 +506,8 @@ static int tas5707_set_DRC_enum(struct snd_kcontrol *kcontrol,
 				   struct snd_ctl_elem_value *ucontrol)
 {
 	struct snd_soc_component *component = snd_kcontrol_chip(kcontrol);
-	struct tas5707_priv *tas5707 = snd_soc_component_get_drvdata(component);
+	struct snd_soc_codec *codec = snd_soc_component_to_codec(component);
+	struct tas5707_priv *tas5707 = snd_soc_codec_get_drvdata(codec);
 	u8 tas5707_drc_ctl_table[] = { 0x00, 0x00, 0x00, 0x00 };
 
 	tas5707->DRC_enum_value = ucontrol->value.integer.value[0];
@@ -511,31 +525,31 @@ static int tas5707_get_DRC_enum(struct snd_kcontrol *kcontrol,
 					struct snd_ctl_elem_value *ucontrol)
 {
 	struct snd_soc_component *component = snd_kcontrol_chip(kcontrol);
-
-	struct tas5707_priv *tas5707 = snd_soc_component_get_drvdata(component);
+	struct snd_soc_codec *codec = snd_soc_component_to_codec(component);
+	struct tas5707_priv *tas5707 = snd_soc_codec_get_drvdata(codec);
 	bool enable = (bool)tas5707->DRC_enum_value & 0x1;
 
 	ucontrol->value.integer.value[0] = enable;
 	return 0;
 }
 
-static int reset_tas5707_GPIO(struct snd_soc_component *component)
+static int reset_tas5707_GPIO(struct snd_soc_codec *codec)
 {
-	struct tas5707_priv *tas5707 = snd_soc_component_get_drvdata(component);
+	struct tas5707_priv *tas5707 = snd_soc_codec_get_drvdata(codec);
 	struct tas57xx_platform_data *pdata = tas5707->pdata;
 	int ret = 0;
 
 	if (pdata->reset_pin < 0)
 		return 0;
 
-	ret = devm_gpio_request_one(component->dev, pdata->reset_pin,
+	ret = devm_gpio_request_one(codec->dev, pdata->reset_pin,
 					    GPIOF_OUT_INIT_LOW,
 					    "tas5707-reset-pin");
 	if (ret < 0)
 		return -1;
 
 	gpio_direction_output(pdata->reset_pin, GPIOF_OUT_INIT_LOW);
-	usleep_range(900, 1000);
+	udelay(1000);
 	gpio_direction_output(pdata->reset_pin, GPIOF_OUT_INIT_HIGH);
 	mdelay(15);
 
@@ -543,9 +557,9 @@ static int reset_tas5707_GPIO(struct snd_soc_component *component)
 }
 
 /* tas5707 DRC for channel L/R */
-static int tas5707_set_drc1(struct snd_soc_component *component)
+static int tas5707_set_drc1(struct snd_soc_codec *codec)
 {
-	struct tas5707_priv *tas5707 = snd_soc_component_get_drvdata(component);
+	struct tas5707_priv *tas5707 = snd_soc_codec_get_drvdata(codec);
 	unsigned int i, addr;
 	u8 *p = &tas5707_drc1_table[0];
 
@@ -565,9 +579,9 @@ static int tas5707_set_drc1(struct snd_soc_component *component)
 	return 0;
 }
 
-static int tas5707_set_drc(struct snd_soc_component *component)
+static int tas5707_set_drc(struct snd_soc_codec *codec)
 {
-	struct tas5707_priv *tas5707 = snd_soc_component_get_drvdata(component);
+	struct tas5707_priv *tas5707 = snd_soc_codec_get_drvdata(codec);
 	char drc_mask = 0;
 	u8 tas5707_drc_ctl_table[] = { 0x00, 0x00, 0x00, 0x00 };
 
@@ -575,16 +589,16 @@ static int tas5707_set_drc(struct snd_soc_component *component)
 		tas5707_drc_ctl_table, 4);
 	drc_mask |= 0x01;
 	tas5707_drc_ctl_table[3] = drc_mask;
-	tas5707_set_drc1(component);
+	tas5707_set_drc1(codec);
 	regmap_raw_write(tas5707->regmap, DDX_DRC_CTL,
 		tas5707_drc_ctl_table, 4);
 
 	return 0;
 }
 
-static int tas5707_set_eq_biquad(struct snd_soc_component *component)
+static int tas5707_set_eq_biquad(struct snd_soc_codec *codec)
 {
-	struct tas5707_priv *tas5707 = snd_soc_component_get_drvdata(component);
+	struct tas5707_priv *tas5707 = snd_soc_codec_get_drvdata(codec);
 	int i = 0;
 	u8 addr, *p = &tas5707_EQ_table[0];
 
@@ -597,14 +611,14 @@ static int tas5707_set_eq_biquad(struct snd_soc_component *component)
 	return 0;
 }
 
-static int tas5707_set_eq(struct snd_soc_component *component)
+static int tas5707_set_eq(struct snd_soc_codec *codec)
 {
-	struct tas5707_priv *tas5707 = snd_soc_component_get_drvdata(component);
+	struct tas5707_priv *tas5707 = snd_soc_codec_get_drvdata(codec);
 	u8 tas5707_eq_ctl_table[] = { 0x00, 0x00, 0x00, 0x80 };
 
 	regmap_raw_write(tas5707->regmap, DDX_BANKSWITCH_AND_EQCTL,
 			 tas5707_eq_ctl_table, 4);
-	tas5707_set_eq_biquad(component);
+	tas5707_set_eq_biquad(codec);
 	tas5707_eq_ctl_table[3] &= 0x7F;
 	regmap_raw_write(tas5707->regmap, DDX_BANKSWITCH_AND_EQCTL,
 			 tas5707_eq_ctl_table, 4);
@@ -612,24 +626,24 @@ static int tas5707_set_eq(struct snd_soc_component *component)
 	return 0;
 }
 
-static int tas5707_init(struct snd_soc_component *component)
+static int tas5707_init(struct snd_soc_codec *codec)
 {
 	unsigned char burst_data[][4] = {
 		{ 0x00, 0x01, 0x77, 0x72 },
 		{ 0x00, 0x00, 0x42, 0x03 },
 		{ 0x01, 0x02, 0x13, 0x45 },
 	};
-	struct tas5707_priv *tas5707 = snd_soc_component_get_drvdata(component);
+	struct tas5707_priv *tas5707 = snd_soc_codec_get_drvdata(codec);
 
-	reset_tas5707_GPIO(component);
+	reset_tas5707_GPIO(codec);
 
-	dev_info(component->dev, "%s!\n", __func__);
-	snd_soc_component_write(component, DDX_OSC_TRIM, 0x00);
+	dev_info(codec->dev, "tas5707_init!\n");
+	snd_soc_write(codec, DDX_OSC_TRIM, 0x00);
 	msleep(50);
-	snd_soc_component_write(component, DDX_CLOCK_CTL, 0x6c);
-	snd_soc_component_write(component, DDX_SYS_CTL_1, 0xa0);
-	snd_soc_component_write(component, DDX_SERIAL_DATA_INTERFACE, 0x05);
-	snd_soc_component_write(component, DDX_BKND_ERR, 0x02);
+	snd_soc_write(codec, DDX_CLOCK_CTL, 0x6c);
+	snd_soc_write(codec, DDX_SYS_CTL_1, 0xa0);
+	snd_soc_write(codec, DDX_SERIAL_DATA_INTERFACE, 0x05);
+	snd_soc_write(codec, DDX_BKND_ERR, 0x02);
 
 	regmap_raw_write(tas5707->regmap, DDX_INPUT_MUX, burst_data[0], 4);
 	regmap_raw_write(tas5707->regmap, DDX_CH4_SOURCE_SELECT,
@@ -638,88 +652,91 @@ static int tas5707_init(struct snd_soc_component *component)
 
 	/*drc */
 	if (tas5707->DRC_enum_value)
-		tas5707_set_drc(component);
+		tas5707_set_drc(codec);
 	/*eq */
 	if (tas5707->EQ_enum_value)
-		tas5707_set_eq(component);
+		tas5707_set_eq(codec);
 
-	snd_soc_component_write(component, DDX_VOLUME_CONFIG, 0xD1);
-	snd_soc_component_write(component, DDX_SYS_CTL_2, 0x84);
-	snd_soc_component_write(component, DDX_START_STOP_PERIOD, 0x95);
-	snd_soc_component_write(component, DDX_PWM_SHUTDOWN_GROUP, 0x30);
-	snd_soc_component_write(component, DDX_MODULATION_LIMIT, 0x02);
+	snd_soc_write(codec, DDX_VOLUME_CONFIG, 0xD1);
+	snd_soc_write(codec, DDX_SYS_CTL_2, 0x84);
+	snd_soc_write(codec, DDX_START_STOP_PERIOD, 0x95);
+	snd_soc_write(codec, DDX_PWM_SHUTDOWN_GROUP, 0x30);
+	snd_soc_write(codec, DDX_MODULATION_LIMIT, 0x02);
 
 	/*normal operation */
-	if ((tas5707_set_master_vol(component)) < 0)
-		dev_err(component->dev, "fail to set tas5707 master vol!\n");
+	if ((tas5707_set_master_vol(codec)) < 0)
+		dev_err(codec->dev, "fail to set tas5707 master vol!\n");
 
-	snd_soc_component_write(component, DDX_CHANNEL1_VOL, 0x0);
-	snd_soc_component_write(component, DDX_CHANNEL2_VOL, 0x0);
-	snd_soc_component_write(component, DDX_SOFT_MUTE, 0x00);
-	snd_soc_component_write(component, DDX_CHANNEL3_VOL, 0x80);
+	snd_soc_write(codec, DDX_CHANNEL1_VOL, 0x0);
+	snd_soc_write(codec, DDX_CHANNEL2_VOL, 0x0);
+	snd_soc_write(codec, DDX_SOFT_MUTE, 0x00);
+	snd_soc_write(codec, DDX_CHANNEL3_VOL, 0x80);
 
 	return 0;
 }
 
-static int tas5707_probe(struct snd_soc_component *component)
+static int tas5707_probe(struct snd_soc_codec *codec)
 {
+
 #ifdef CONFIG_HAS_EARLYSUSPEND
 	tas5707->early_suspend.level = EARLY_SUSPEND_LEVEL_BLANK_SCREEN;
 	tas5707->early_suspend.suspend = tas5707_early_suspend;
 	tas5707->early_suspend.resume = tas5707_late_resume;
-	tas5707->early_suspend.param = component;
-	register_early_suspend(&tas5707->early_suspend);
+	tas5707->early_suspend.param = codec;
+	register_early_suspend(&(tas5707->early_suspend));
 #endif
 
-	tas5707_init(component);
+	tas5707_init(codec);
 
 	return 0;
 }
 
-static void tas5707_remove(struct snd_soc_component *component)
+static int tas5707_remove(struct snd_soc_codec *codec)
 {
 #ifdef CONFIG_HAS_EARLYSUSPEND
-	struct tas5707_priv *tas5707 = snd_soc_component_get_drvdata(component);
+	struct tas5707_priv *tas5707 = snd_soc_codec_get_drvdata(codec);
 
-	unregister_early_suspend(&tas5707->early_suspend);
+	unregister_early_suspend(&(tas5707->early_suspend));
 #endif
+
+	return 0;
 }
 
 #ifdef CONFIG_PM
-static int tas5707_suspend(struct snd_soc_component *component)
+static int tas5707_suspend(struct snd_soc_codec *codec)
 {
-	struct tas5707_priv *tas5707 = snd_soc_component_get_drvdata(component);
-	struct tas57xx_platform_data *pdata = dev_get_platdata(component->dev);
+	struct tas5707_priv *tas5707 = snd_soc_codec_get_drvdata(codec);
+	struct tas57xx_platform_data *pdata = dev_get_platdata(codec->dev);
 
-	dev_info(component->dev, "%s!\n", __func__);
+	dev_info(codec->dev, "tas5707_suspend!\n");
 
 	if (pdata && pdata->suspend_func)
 		pdata->suspend_func();
 
 	/*save volume */
-	tas5707->Ch1_vol = snd_soc_component_read32(component, DDX_CHANNEL1_VOL);
-	tas5707->Ch2_vol = snd_soc_component_read32(component, DDX_CHANNEL2_VOL);
-	tas5707->master_vol = snd_soc_component_read32(component, DDX_MASTER_VOLUME);
-	tas5707_set_bias_level(component, SND_SOC_BIAS_OFF);
+	tas5707->Ch1_vol = snd_soc_read(codec, DDX_CHANNEL1_VOL);
+	tas5707->Ch2_vol = snd_soc_read(codec, DDX_CHANNEL2_VOL);
+	tas5707->master_vol = snd_soc_read(codec, DDX_MASTER_VOLUME);
+	tas5707_set_bias_level(codec, SND_SOC_BIAS_OFF);
 
 	return 0;
 }
 
-static int tas5707_resume(struct snd_soc_component *component)
+static int tas5707_resume(struct snd_soc_codec *codec)
 {
-	struct tas5707_priv *tas5707 = snd_soc_component_get_drvdata(component);
-	struct tas57xx_platform_data *pdata = dev_get_platdata(component->dev);
+	struct tas5707_priv *tas5707 = snd_soc_codec_get_drvdata(codec);
+	struct tas57xx_platform_data *pdata = dev_get_platdata(codec->dev);
 
-	dev_info(component->dev, "%s!\n", __func__);
+	dev_info(codec->dev, "tas5707_resume!\n");
 
 	if (pdata && pdata->resume_func)
 		pdata->resume_func();
 
-	tas5707_init(component);
-	snd_soc_component_write(component, DDX_CHANNEL1_VOL, tas5707->Ch1_vol);
-	snd_soc_component_write(component, DDX_CHANNEL2_VOL, tas5707->Ch2_vol);
-	snd_soc_component_write(component, DDX_MASTER_VOLUME, tas5707->master_vol);
-	tas5707_set_bias_level(component, SND_SOC_BIAS_STANDBY);
+	tas5707_init(codec);
+	snd_soc_write(codec, DDX_CHANNEL1_VOL, tas5707->Ch1_vol);
+	snd_soc_write(codec, DDX_CHANNEL2_VOL, tas5707->Ch2_vol);
+	snd_soc_write(codec, DDX_MASTER_VOLUME, tas5707->master_vol);
+	tas5707_set_bias_level(codec, SND_SOC_BIAS_STANDBY);
 
 	return 0;
 }
@@ -742,16 +759,18 @@ static const struct snd_soc_dapm_widget tas5707_dapm_widgets[] = {
 	SND_SOC_DAPM_DAC("DAC", "HIFI Playback", SND_SOC_NOPM, 0, 0),
 };
 
-static const struct snd_soc_component_driver soc_codec_dev_tas5707 = {
+static const struct snd_soc_codec_driver soc_codec_dev_tas5707 = {
 	.probe = tas5707_probe,
 	.remove = tas5707_remove,
 	.suspend = tas5707_suspend,
 	.resume = tas5707_resume,
 	.set_bias_level = tas5707_set_bias_level,
-	.controls = tas5707_snd_controls,
-	.num_controls = ARRAY_SIZE(tas5707_snd_controls),
-	.dapm_widgets = tas5707_dapm_widgets,
-	.num_dapm_widgets = ARRAY_SIZE(tas5707_dapm_widgets),
+	.component_driver = {
+		.controls = tas5707_snd_controls,
+		.num_controls = ARRAY_SIZE(tas5707_snd_controls),
+		.dapm_widgets = tas5707_dapm_widgets,
+		.num_dapm_widgets = ARRAY_SIZE(tas5707_dapm_widgets),
+	}
 };
 
 static const struct regmap_config tas5707_regmap = {
@@ -764,7 +783,8 @@ static const struct regmap_config tas5707_regmap = {
 	.cache_type = REGCACHE_RBTREE,
 };
 
-static int tas5707_parse_dt(struct tas5707_priv *tas5707,
+static int tas5707_parse_dt(
+	struct tas5707_priv *tas5707,
 	struct device_node *np)
 {
 	int ret = 0;
@@ -831,7 +851,7 @@ static int tas5707_i2c_probe(struct i2c_client *i2c,
 	if (of_property_read_string(i2c->dev.of_node,
 			"codec_name",
 				&codec_name)) {
-		pr_info("no component name\n");
+		pr_info("no codec name\n");
 		//ret = -1;
 	}
 	pr_info("aux name = %s\n", codec_name);
@@ -840,17 +860,17 @@ static int tas5707_i2c_probe(struct i2c_client *i2c,
 
 	i2c_set_clientdata(i2c, tas5707);
 
-	ret = snd_soc_register_component(&i2c->dev, &soc_codec_dev_tas5707,
+	ret = snd_soc_register_codec(&i2c->dev, &soc_codec_dev_tas5707,
 				     &tas5707_dai, 1);
 	if (ret != 0)
-		dev_err(&i2c->dev, "Failed to register component (%d)\n", ret);
+		dev_err(&i2c->dev, "Failed to register codec (%d)\n", ret);
 
 	return ret;
 }
 
 static int tas5707_i2c_remove(struct i2c_client *client)
 {
-	snd_soc_unregister_component(&client->dev);
+	snd_soc_unregister_codec(&client->dev);
 
 	return 0;
 }

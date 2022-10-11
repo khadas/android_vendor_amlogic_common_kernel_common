@@ -1,8 +1,5 @@
-// SPDX-License-Identifier: GPL-2.0
 /*
  * message.c - synchronous message handling
- *
- * Released under the GPLv2 only.
  */
 
 #include <linux/pci.h>	/* for scatterlist macros */
@@ -18,7 +15,6 @@
 #include <linux/usb/cdc.h>
 #include <linux/usb/quirks.h>
 #include <linux/usb/hcd.h>	/* for usbcore internals */
-#include <linux/usb/of.h>
 #include <asm/byteorder.h>
 
 #include "usb.h"
@@ -137,11 +133,12 @@ static int usb_internal_control_msg(struct usb_device *usb_dev,
  * This function sends a simple control message to a specified endpoint and
  * waits for the message to complete, or timeout.
  *
- * Don't use this function from within an interrupt context. If you need
- * an asynchronous message, or need to send a message from within interrupt
- * context, use usb_submit_urb(). If a thread in your driver uses this call,
- * make sure your disconnect() method can wait for it to complete. Since you
- * don't have a handle on the URB used, you can't cancel the request.
+ * Don't use this function from within an interrupt context, like a bottom half
+ * handler.  If you need an asynchronous message, or need to send a message
+ * from within interrupt context, use usb_submit_urb().
+ * If a thread in your driver uses this call, make sure your disconnect()
+ * method can wait for it to complete.  Since you don't have a handle on the
+ * URB used, you can't cancel the request.
  *
  * Return: If successful, the number of bytes transferred. Otherwise, a negative
  * error number.
@@ -191,11 +188,12 @@ EXPORT_SYMBOL_GPL(usb_control_msg);
  * This function sends a simple interrupt message to a specified endpoint and
  * waits for the message to complete, or timeout.
  *
- * Don't use this function from within an interrupt context. If you need
- * an asynchronous message, or need to send a message from within interrupt
- * context, use usb_submit_urb() If a thread in your driver uses this call,
- * make sure your disconnect() method can wait for it to complete. Since you
- * don't have a handle on the URB used, you can't cancel the request.
+ * Don't use this function from within an interrupt context, like a bottom half
+ * handler.  If you need an asynchronous message, or need to send a message
+ * from within interrupt context, use usb_submit_urb() If a thread in your
+ * driver uses this call, make sure your disconnect() method can wait for it to
+ * complete.  Since you don't have a handle on the URB used, you can't cancel
+ * the request.
  *
  * Return:
  * If successful, 0. Otherwise a negative error number. The number of actual
@@ -224,11 +222,12 @@ EXPORT_SYMBOL_GPL(usb_interrupt_msg);
  * This function sends a simple bulk message to a specified endpoint
  * and waits for the message to complete, or timeout.
  *
- * Don't use this function from within an interrupt context. If you need
- * an asynchronous message, or need to send a message from within interrupt
- * context, use usb_submit_urb() If a thread in your driver uses this call,
- * make sure your disconnect() method can wait for it to complete. Since you
- * don't have a handle on the URB used, you can't cancel the request.
+ * Don't use this function from within an interrupt context, like a bottom half
+ * handler.  If you need an asynchronous message, or need to send a message
+ * from within interrupt context, use usb_submit_urb() If a thread in your
+ * driver uses this call, make sure your disconnect() method can wait for it to
+ * complete.  Since you don't have a handle on the URB used, you can't cancel
+ * the request.
  *
  * Because there is no usb_interrupt_msg() and no USBDEVFS_INTERRUPT ioctl,
  * users are forced to abuse this routine by using it to submit URBs for
@@ -283,11 +282,10 @@ static void sg_clean(struct usb_sg_request *io)
 
 static void sg_complete(struct urb *urb)
 {
-	unsigned long flags;
 	struct usb_sg_request *io = urb->context;
 	int status = urb->status;
 
-	spin_lock_irqsave(&io->lock, flags);
+	spin_lock(&io->lock);
 
 	/* In 2.5 we require hcds' endpoint queues not to progress after fault
 	 * reports, until the completion callback (this!) returns.  That lets
@@ -321,7 +319,7 @@ static void sg_complete(struct urb *urb)
 		 * unlink pending urbs so they won't rx/tx bad data.
 		 * careful: unlink can sometimes be synchronous...
 		 */
-		spin_unlock_irqrestore(&io->lock, flags);
+		spin_unlock(&io->lock);
 		for (i = 0, found = 0; i < io->entries; i++) {
 			if (!io->urbs[i])
 				continue;
@@ -338,7 +336,7 @@ static void sg_complete(struct urb *urb)
 			} else if (urb == io->urbs[i])
 				found = 1;
 		}
-		spin_lock_irqsave(&io->lock, flags);
+		spin_lock(&io->lock);
 	}
 
 	/* on the last completion, signal usb_sg_wait() */
@@ -347,7 +345,7 @@ static void sg_complete(struct urb *urb)
 	if (!io->count)
 		complete(&io->complete);
 
-	spin_unlock_irqrestore(&io->lock, flags);
+	spin_unlock(&io->lock);
 }
 
 
@@ -405,7 +403,7 @@ int usb_sg_init(struct usb_sg_request *io, struct usb_device *dev,
 	}
 
 	/* initialize all the urbs we'll use */
-	io->urbs = kmalloc_array(io->entries, sizeof(*io->urbs), mem_flags);
+	io->urbs = kmalloc(io->entries * sizeof(*io->urbs), mem_flags);
 	if (!io->urbs)
 		goto nomem;
 
@@ -494,7 +492,6 @@ EXPORT_SYMBOL_GPL(usb_sg_init);
  * significantly improve USB throughput.
  *
  * There are three kinds of completion for this function.
- *
  * (1) success, where io->status is zero.  The number of io->bytes
  *     transferred is as requested.
  * (2) error, where io->status is a negative errno value.  The number
@@ -803,7 +800,7 @@ static int usb_get_langid(struct usb_device *dev, unsigned char *tbuf)
 	 * deal with strings at all. Set string_langid to -1 in order to
 	 * prevent any string to be retrieved from the device */
 	if (err < 0) {
-		dev_info(&dev->dev, "string descriptor 0 read error: %d\n",
+		dev_err(&dev->dev, "string descriptor 0 read error: %d\n",
 					err);
 		dev->string_langid = -1;
 		return -EPIPE;
@@ -944,35 +941,10 @@ int usb_get_device_descriptor(struct usb_device *dev, unsigned int size)
 	return ret;
 }
 
-/*
- * usb_set_isoch_delay - informs the device of the packet transmit delay
- * @dev: the device whose delay is to be informed
- * Context: !in_interrupt()
- *
- * Since this is an optional request, we don't bother if it fails.
- */
-int usb_set_isoch_delay(struct usb_device *dev)
-{
-	/* skip hub devices */
-	if (dev->descriptor.bDeviceClass == USB_CLASS_HUB)
-		return 0;
-
-	/* skip non-SS/non-SSP devices */
-	if (dev->speed < USB_SPEED_SUPER)
-		return 0;
-
-	return usb_control_msg(dev, usb_sndctrlpipe(dev, 0),
-			USB_REQ_SET_ISOCH_DELAY,
-			USB_DIR_OUT | USB_TYPE_STANDARD | USB_RECIP_DEVICE,
-			dev->hub_delay, 0, NULL, 0,
-			USB_CTRL_SET_TIMEOUT);
-}
-
 /**
  * usb_get_status - issues a GET_STATUS call
  * @dev: the device whose status is being checked
- * @recip: USB_RECIP_*; for device, interface, or endpoint
- * @type: USB_STATUS_TYPE_*; for standard or PTM status types
+ * @type: USB_RECIP_*; for device, interface, or endpoint
  * @target: zero (for device), else interface or endpoint number
  * @data: pointer to two bytes of bitmap data
  * Context: !in_interrupt ()
@@ -991,58 +963,24 @@ int usb_set_isoch_delay(struct usb_device *dev)
  * Returns 0 and the status value in *@data (in host byte order) on success,
  * or else the status code from the underlying usb_control_msg() call.
  */
-int usb_get_status(struct usb_device *dev, int recip, int type, int target,
-		void *data)
+int usb_get_status(struct usb_device *dev, int type, int target, void *data)
 {
 	int ret;
-	void *status;
-	int length;
+	__le16 *status = kmalloc(sizeof(*status), GFP_KERNEL);
 
-	switch (type) {
-	case USB_STATUS_TYPE_STANDARD:
-		length = 2;
-		break;
-	case USB_STATUS_TYPE_PTM:
-		if (recip != USB_RECIP_DEVICE)
-			return -EINVAL;
-
-		length = 4;
-		break;
-	default:
-		return -EINVAL;
-	}
-
-	status =  kmalloc(length, GFP_KERNEL);
 	if (!status)
 		return -ENOMEM;
 
 	ret = usb_control_msg(dev, usb_rcvctrlpipe(dev, 0),
-		USB_REQ_GET_STATUS, USB_DIR_IN | recip, USB_STATUS_TYPE_STANDARD,
-		target, status, length, USB_CTRL_GET_TIMEOUT);
+		USB_REQ_GET_STATUS, USB_DIR_IN | type, 0, target, status,
+		sizeof(*status), USB_CTRL_GET_TIMEOUT);
 
-	switch (ret) {
-	case 4:
-		if (type != USB_STATUS_TYPE_PTM) {
-			ret = -EIO;
-			break;
-		}
-
-		*(u32 *) data = le32_to_cpu(*(__le32 *) status);
+	if (ret == 2) {
+		*(u16 *) data = le16_to_cpu(*status);
 		ret = 0;
-		break;
-	case 2:
-		if (type != USB_STATUS_TYPE_STANDARD) {
-			ret = -EIO;
-			break;
-		}
-
-		*(u16 *) data = le16_to_cpu(*(__le16 *) status);
-		ret = 0;
-		break;
-	default:
+	} else if (ret >= 0) {
 		ret = -EIO;
 	}
-
 	kfree(status);
 	return ret;
 }
@@ -1431,7 +1369,7 @@ int usb_set_interface(struct usb_device *dev, int interface, int alternate)
 	 * so that the xHCI driver can recalculate the U1/U2 timeouts.
 	 */
 	if (usb_disable_lpm(dev)) {
-		dev_err(&iface->dev, "%s Failed to disable LPM\n", __func__);
+		dev_err(&iface->dev, "%s Failed to disable LPM\n.", __func__);
 		mutex_unlock(hcd->bandwidth_mutex);
 		return -ENOMEM;
 	}
@@ -1575,7 +1513,7 @@ int usb_reset_configuration(struct usb_device *dev)
 	 * that the xHCI driver can recalculate the U1/U2 timeouts.
 	 */
 	if (usb_disable_lpm(dev)) {
-		dev_err(&dev->dev, "%s Failed to disable LPM\n", __func__);
+		dev_err(&dev->dev, "%s Failed to disable LPM\n.", __func__);
 		mutex_unlock(hcd->bandwidth_mutex);
 		return -ENOMEM;
 	}
@@ -1639,7 +1577,6 @@ static void usb_release_interface(struct device *dev)
 
 	kref_put(&intfc->ref, usb_release_interface_cache);
 	usb_put_dev(interface_to_usbdev(intf));
-	of_node_put(dev->of_node);
 	kfree(intf);
 }
 
@@ -1769,7 +1706,6 @@ static void __usb_queue_reset_device(struct work_struct *ws)
 	}
 	usb_put_intf(iface);	/* Undo _get_ in usb_queue_reset_device() */
 }
-
 #ifdef CONFIG_AMLOGIC_USB
 static void usb_EHtest_poll_status(struct work_struct *ws)
 {
@@ -1778,38 +1714,37 @@ static void usb_EHtest_poll_status(struct work_struct *ws)
 	struct usb_device *dev = container_of(ws,
 		struct usb_device, portstatus_work.work);
 
-	ret = usb_get_status(dev, USB_RT_PORT, USB_STATUS_TYPE_STANDARD,
-			     usb_test_port, &portstatus);
-	if ((portstatus & 0x01) && poll_status_flag != 1) {
+	ret = usb_get_status(dev, USB_RT_PORT, usb_test_port, &portstatus);
+	if ((portstatus & 0x01) && (poll_status_flag != 1)) {
 		dev_info(&dev->dev,
-			 "PORT IS CONNECT portstatus=0x%04x\n",
-				portstatus);
+			"PORT IS CONNECT portstatus=0x%04x\n", portstatus);
 		poll_status_flag = 1;
 		queue_delayed_work(system_wq,
-				   &dev->portstatus_work,
-				   msecs_to_jiffies(1000));
+					&dev->portstatus_work,
+					msecs_to_jiffies(1000));
 	} else if ((poll_status_flag == 1) && !(portstatus & 0x01)) {
 		dev_info(&dev->dev,
-			 "PORT IS disCONNECT portstatus=0x%04x\n", portstatus);
+			"PORT IS disCONNECT portstatus=0x%04x\n", portstatus);
 		queue_delayed_work(system_wq,
 				   &dev->portstatus_work,
 				   msecs_to_jiffies(1000));
 
 	} else {
 		queue_delayed_work(system_wq,
-				   &dev->portstatus_work,
-				   msecs_to_jiffies(1000));
+					&dev->portstatus_work,
+					msecs_to_jiffies(1000));
 		dev_info(&dev->dev,
-			 "status polled: portstatus=0x%04x\n", portstatus);
+			"status polled: portstatus=0x%04x\n", portstatus);
 	}
+
 }
 
 static int usb_EHtest_forceenab_mode(struct usb_device *dev)
 {
 	INIT_DELAYED_WORK(&dev->portstatus_work, usb_EHtest_poll_status);
-	queue_delayed_work(system_wq,
-			   &dev->portstatus_work,
-			   msecs_to_jiffies(1000));
+			queue_delayed_work(system_wq,
+					&dev->portstatus_work,
+					msecs_to_jiffies(1000));
 
 	return 0;
 }
@@ -1829,8 +1764,8 @@ static int usb_send_host_elect_testcmd(struct usb_device *dev)
 	if (usb_host_test_vid == dev->descriptor.idVendor) {
 					/* HSOTG Electrical Test */
 		dev_warn(&dev->dev,
-			 "VID from HSOTG Electrical Test Fixture, vid=0x%04x,pid=0x%04x\n",
-			 usb_host_test_vid, usb_host_test_pid);
+			"VID from HSOTG Electrical Test Fixture, vid=0x%04x,pid=0x%04x\n",
+		usb_host_test_vid, usb_host_test_pid);
 
 		if (dev->bus && dev->parent) {
 			struct usb_device *hdev = dev->parent;
@@ -1841,17 +1776,17 @@ static int usb_send_host_elect_testcmd(struct usb_device *dev)
 			unsigned int pipe = usb_sndctrlpipe(hdev, 0);
 
 			dev_warn(&dev->dev,
-				 "hdev:portnum=%u,dev:portnum=%u,Got PID 0x%x\n",
-				 hdev->portnum, dev->portnum,
-				 dev->descriptor.idProduct);
+				"hdev:portnum=%u,dev:portnum=%u,Got PID 0x%x\n",
+					hdev->portnum, dev->portnum,
+						dev->descriptor.idProduct);
 
 			if (hdev != dev->bus->root_hub) {
 				index = dev->portnum + 1;
 				dev_warn(&dev->dev,
-					 "Test in HUB port: %d\n", index);
+					"Test in HUB port: %d\n", index);
 			} else {
 				dev_warn(&dev->dev,
-					 "Test in RootHub %s\n", hdev->devpath);
+					"Test in RootHub %s\n", hdev->devpath);
 			}
 			switch (usb_host_test_pid) {
 			case 0x0101:	/* TEST_SE0_NAK */
@@ -1889,13 +1824,12 @@ static int usb_send_host_elect_testcmd(struct usb_device *dev)
 				timeout = HZ;
 
 				ret = usb_control_msg(hdev, pipe,
-						      USB_REQ_SET_FEATURE,
-						      USB_RT_PORT,
-						      USB_PORT_FEAT_TEST, index,
-						      NULL, 0, timeout);
+					USB_REQ_SET_FEATURE, USB_RT_PORT,
+						USB_PORT_FEAT_TEST, index,
+							NULL, 0, timeout);
 				if (ret < 0)
 					dev_warn(&dev->dev,
-						 "%s is failed\n", msg);
+						"%s is failed\n", msg);
 				usb_test_port = dev->portnum;
 				usb_EHtest_forceenab_mode(hdev);
 				break;
@@ -1905,10 +1839,9 @@ static int usb_send_host_elect_testcmd(struct usb_device *dev)
 				index |= 0x600;
 				timeout = 40 * HZ;
 				usb_control_msg(hdev, usb_sndctrlpipe(hdev, 0),
-						USB_REQ_SET_FEATURE,
-						USB_RT_PORT,
+					USB_REQ_SET_FEATURE, USB_RT_PORT,
 						USB_PORT_FEAT_TEST,
-							index | 0x600, NULL,
+							index|0x600, NULL,
 							0, 40 * HZ);
 				break;
 
@@ -1924,8 +1857,7 @@ static int usb_send_host_elect_testcmd(struct usb_device *dev)
 				timeout = 40 * HZ;
 
 				usb_control_msg(dev, usb_rcvctrlpipe(dev, 0),
-						USB_REQ_GET_DESCRIPTOR,
-						USB_DIR_IN,
+					USB_REQ_GET_DESCRIPTOR, USB_DIR_IN,
 						0x100, index, des, 18, timeout);
 				kfree(des);
 				break;
@@ -1940,8 +1872,7 @@ static int usb_send_host_elect_testcmd(struct usb_device *dev)
 				timeout = 40 * HZ;
 
 				usb_control_msg(dev, usb_rcvctrlpipe(dev, 0),
-						USB_REQ_GET_DESCRIPTOR,
-						USB_DIR_IN,
+					USB_REQ_GET_DESCRIPTOR, USB_DIR_IN,
 						0x0100, index,
 						des, 18, timeout);
 				kfree(des);
@@ -1952,39 +1883,37 @@ static int usb_send_host_elect_testcmd(struct usb_device *dev)
 				timeout = HZ;
 
 				ret = usb_control_msg(hdev, pipe,
-						      USB_REQ_CLEAR_FEATURE,
-						      USB_RT_PORT,
-						      USB_PORT_FEAT_TEST,
-						      index, NULL, 0, timeout);
+					USB_REQ_CLEAR_FEATURE, USB_RT_PORT,
+						USB_PORT_FEAT_TEST,
+						index, NULL, 0, timeout);
 				if (ret < 0)
 					dev_warn(&dev->dev,
-						 "exit test mode failed,ret =%d\n",
-						 ret);
+						"exit test mode failed,ret =%d\n",
+						ret);
 				break;
 
 			default:
 				dev_warn(&dev->dev,
-					 "error PID %X, ret =%d\n",
-					 dev->descriptor.idProduct, ret);
+					"error PID %X, ret =%d\n",
+					dev->descriptor.idProduct, ret);
 				return -1;
 			}
 
 			dev_warn(&dev->dev, "%s\n", msg);
-			if (usb_host_test_pid == 0x0101 ||
-			    usb_host_test_pid == 0x0102 ||
-			    usb_host_test_pid == 0x0103 ||
-			    usb_host_test_pid == 0x0104) {
-				usb_control_msg(hdev, pipe,
-						USB_REQ_SET_FEATURE,
-						USB_RT_PORT,
-						USB_PORT_FEAT_TEST,
-						index, NULL, 0, timeout);
+			if ((usb_host_test_pid == 0x0101)
+				|| (usb_host_test_pid == 0x0102)
+				|| (usb_host_test_pid == 0x0103)
+					|| (usb_host_test_pid == 0x0104)) {
+			usb_control_msg(hdev, pipe,
+				USB_REQ_SET_FEATURE, USB_RT_PORT,
+					USB_PORT_FEAT_TEST,
+					index, NULL, 0, timeout);
 			}
 			return 0;
 		}
 		dev_info(&dev->dev,
-			 "the vid(0x%04x),but pid(0x%04x) is out range\n",
-			 usb_host_test_vid, usb_host_test_pid);
+			"the vid(0x%04x),but pid(0x%04x) is out range\n",
+			usb_host_test_vid, usb_host_test_pid);
 		return -1;
 	}
 
@@ -1997,24 +1926,27 @@ static void send_testcmd_timer_func(struct work_struct *ws)
 		struct usb_device, portstatus_work.work);
 
 	usb_send_host_elect_testcmd(dev);
+	return;
+
 }
+
 
 static int usb_delaysend_hsel_testcmd(struct usb_device *dev)
 {
-	if (dev->descriptor.idVendor != usb_host_test_vid ||
-	    usb_host_test_pid > 0x200 || usb_host_test_pid < 0x101) {
+	if ((dev->descriptor.idVendor != usb_host_test_vid)
+		|| (usb_host_test_pid > 0x200) || (usb_host_test_pid < 0x101)) {
 		dev_warn(&dev->dev,
-			 "<%s><%u><idVendor is not test mode,>dev_vid=0x%04x,test_vid=0x%04x\n",
-			 __func__, __LINE__,
-			 dev->descriptor.idVendor, usb_host_test_vid);
+			"<%s><%u><idVendor is not test mode,>dev_vid=0x%04x,test_vid=0x%04x\n",
+		    __func__, __LINE__,
+		    dev->descriptor.idVendor, usb_host_test_vid);
 		return -1;
 	}
 
 	dev_warn(&dev->dev, "<%s><%u>\n", __func__, __LINE__);
 	INIT_DELAYED_WORK(&dev->portstatus_work, send_testcmd_timer_func);
-	queue_delayed_work(system_wq,
-			   &dev->portstatus_work,
-			   msecs_to_jiffies(5000));
+			queue_delayed_work(system_wq,
+					&dev->portstatus_work,
+					msecs_to_jiffies(5000));
 
 	return 0;
 }
@@ -2101,8 +2033,8 @@ int usb_set_configuration(struct usb_device *dev, int configuration)
 	n = nintf = 0;
 	if (cp) {
 		nintf = cp->desc.bNumInterfaces;
-		new_interfaces = kmalloc_array(nintf, sizeof(*new_interfaces),
-					       GFP_NOIO);
+		new_interfaces = kmalloc(nintf * sizeof(*new_interfaces),
+				GFP_NOIO);
 		if (!new_interfaces)
 			return -ENOMEM;
 
@@ -2153,7 +2085,7 @@ free_interfaces:
 	 * timeouts.
 	 */
 	if (dev->actconfig && usb_disable_lpm(dev)) {
-		dev_err(&dev->dev, "%s Failed to disable LPM\n", __func__);
+		dev_err(&dev->dev, "%s Failed to disable LPM\n.", __func__);
 		mutex_unlock(hcd->bandwidth_mutex);
 		ret = -ENOMEM;
 		goto free_interfaces;
@@ -2175,7 +2107,6 @@ free_interfaces:
 		struct usb_interface_cache *intfc;
 		struct usb_interface *intf;
 		struct usb_host_interface *alt;
-		u8 ifnum;
 
 		cp->interface[i] = intf = new_interfaces[i];
 		intfc = cp->intf_cache[i];
@@ -2194,17 +2125,11 @@ free_interfaces:
 		if (!alt)
 			alt = &intf->altsetting[0];
 
-		ifnum = alt->desc.bInterfaceNumber;
-		intf->intf_assoc = find_iad(dev, cp, ifnum);
+		intf->intf_assoc =
+			find_iad(dev, cp, alt->desc.bInterfaceNumber);
 		intf->cur_altsetting = alt;
 		usb_enable_interface(dev, intf, true);
 		intf->dev.parent = &dev->dev;
-		if (usb_of_has_combined_node(dev)) {
-			device_set_of_node_from_dev(&intf->dev, &dev->dev);
-		} else {
-			intf->dev.of_node = usb_of_get_interface_node(dev,
-					configuration, ifnum);
-		}
 		intf->dev.driver = NULL;
 		intf->dev.bus = &usb_bus_type;
 		intf->dev.type = &usb_if_device_type;
@@ -2219,8 +2144,9 @@ free_interfaces:
 		intf->minor = -1;
 		device_initialize(&intf->dev);
 		pm_runtime_no_callbacks(&intf->dev);
-		dev_set_name(&intf->dev, "%d-%s:%d.%d", dev->bus->busnum,
-				dev->devpath, configuration, ifnum);
+		dev_set_name(&intf->dev, "%d-%s:%d.%d",
+			dev->bus->busnum, dev->devpath,
+			configuration, alt->desc.bInterfaceNumber);
 		usb_get_dev(dev);
 	}
 	kfree(new_interfaces);
@@ -2269,8 +2195,8 @@ free_interfaces:
 			usb_host_test_vid = dev->descriptor.idVendor;
 			//usb_host_test_pid = dev->descriptor.idProduct;
 			dev_info(&dev->dev,
-				 "the dev port is %d, and this is test udisk vid = 0x%04x\n",
-				 dev->portnum, usb_host_test_vid);
+			"the dev port is %d, and this is test udisk vid = 0x%04x\n",
+			dev->portnum, usb_host_test_vid);
 		}
 #ifdef USB_EHTEST_DELAY_TEST
 		ret = usb_delaysend_hsel_testcmd(dev);
@@ -2282,7 +2208,9 @@ free_interfaces:
 			return 0;
 		}
 	}
+
 #endif
+
 	/* Now that all the interfaces are set up, register them
 	 * to trigger binding of drivers to interfaces.  probe()
 	 * routines may install different altsettings and may
@@ -2292,13 +2220,6 @@ free_interfaces:
 	for (i = 0; i < nintf; ++i) {
 		struct usb_interface *intf = cp->interface[i];
 
-		if (intf->dev.of_node &&
-		    !of_device_is_available(intf->dev.of_node)) {
-			dev_info(&dev->dev, "skipping disabled interface %d\n",
-				 intf->cur_altsetting->desc.bInterfaceNumber);
-			continue;
-		}
-
 		dev_dbg(&dev->dev,
 			"adding %s (config #%d, interface %d)\n",
 			dev_name(&intf->dev), configuration,
@@ -2306,7 +2227,7 @@ free_interfaces:
 		device_enable_async_suspend(&intf->dev);
 		ret = device_add(&intf->dev);
 #ifdef CONFIG_AMLOGIC_USB
-		if (!intf->dev.driver) {
+		if (((&intf->dev)->driver) == NULL) {
 			if (intf->cur_altsetting->desc.bInterfaceClass == 0x09)
 				dev_err(&dev->dev, "Unsupported the hub\n");
 			else

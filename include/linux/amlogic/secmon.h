@@ -1,6 +1,18 @@
-/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * Copyright (c) 2019 Amlogic, Inc. All rights reserved.
+ * include/linux/amlogic/secmon.h
+ *
+ * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
  */
 
 #ifndef __SEC_MON_H__
@@ -11,14 +23,10 @@ void __iomem *get_secmon_sharemem_output_base(void);
 long get_secmon_phy_input_base(void);
 long get_secmon_phy_output_base(void);
 
+void sharemem_mutex_lock(void);
+void sharemem_mutex_unlock(void);
 void secmon_clear_cma_mmu(void);
 
 int within_secmon_region(unsigned long addr);
-void meson_sm_mutex_lock(void);
-void meson_sm_mutex_unlock(void);
-void __iomem *get_meson_sm_input_base(void);
-void __iomem *get_meson_sm_output_base(void);
-unsigned int get_secmon_sharemem_in_size(void);
-unsigned int get_secmon_sharemem_out_size(void);
 
 #endif
