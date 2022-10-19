@@ -64,7 +64,8 @@
 /* Ref.2019/04/25: tl1 vdin0 afbce dynamically switch support,
  *                 vpp also should support this function
  */
-#define VDIN_VER "ver:2021-0901: txlx/tl1 bringup"
+#define VDIN_VER "ver:2021-1218: use same porttype to screenshot"
+
 
 enum vdin_work_mode_e {
 	VDIN_WORK_MD_NORMAL = 0,
@@ -725,16 +726,17 @@ extern unsigned int vdin_get_prop_in_vs_en;
 extern unsigned int vdin_prop_monitor;
 extern unsigned int vdin_get_prop_in_fe_en;
 
-char *vf_get_receiver_name(const char *provider_name);
-int start_tvin_service(int no, struct vdin_parm_s *para);
-int stop_tvin_service(int no);
-int vdin_reg_v4l2(struct vdin_v4l2_ops_s *v4l2_ops);
-void vdin_unreg_v4l2(void);
-int vdin_create_class_files(struct class *vdin_clsp);
-void vdin_remove_class_files(struct class *vdin_clsp);
-int vdin_create_debug_files(struct device *dev);
-void vdin_remove_debug_files(struct device *dev);
-int vdin_open_fe(enum tvin_port_e port, int index,
+extern char *vf_get_receiver_name(const char *provider_name);
+extern int start_tvin_service(int no, struct vdin_parm_s *para);
+int start_tvin_capture_ex(int dev_num, int port, struct vdin_parm_s  *para);
+extern int stop_tvin_service(int no);
+extern int vdin_reg_v4l2(struct vdin_v4l2_ops_s *v4l2_ops);
+extern void vdin_unreg_v4l2(void);
+extern int vdin_create_class_files(struct class *vdin_clsp);
+extern void vdin_remove_class_files(struct class *vdin_clsp);
+extern int vdin_create_debug_files(struct device *dev);
+extern void vdin_remove_debug_files(struct device *dev);
+extern int vdin_open_fe(enum tvin_port_e port, int index,
 		struct vdin_dev_s *devp);
 void vdin_close_fe(struct vdin_dev_s *devp);
 void vdin_start_dec(struct vdin_dev_s *devp);
