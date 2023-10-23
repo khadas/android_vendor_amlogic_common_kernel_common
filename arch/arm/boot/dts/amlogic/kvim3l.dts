@@ -18,13 +18,13 @@
 /dts-v1/;
 
 #include "mesonsm1.dtsi"
-#include "partition_mbox_normal.dtsi"
+#include "partition_mbox_normal_Q.dtsi"
 #include "mesonsm1_skt-panel.dtsi"
 
 / {
 	model = "Khadas";
-	amlogic-dt-id = "kvim3";
-	compatible = "khadas, vim3l";
+	amlogic-dt-id = "sm1_kvim3l";
+	compatible = "amlogic, g12a";
 	interrupt-parent = <&gic>;
 	#address-cells = <1>;
 	#size-cells = <1>;
@@ -57,9 +57,10 @@
 		ramoops@0x07400000 {
 			compatible = "ramoops";
 			reg = <0x07400000 0x00100000>;
-			record-size = <0x8000>;
-			console-size = <0x8000>;
-			ftrace-size = <0x40000>;
+			record-size = <0x20000>;
+			console-size = <0x40000>;
+			ftrace-size = <0x80000>;
+			pmsg-size = <0x20000>;
 		};
 
 		secmon_reserved:linux,secmon {
@@ -721,7 +722,7 @@
 				sound-dai = <&dummy_codec>;
 			};
 		};
-
+#if 0
 		aml-audio-card,dai-link@6 {
 			mclk-fs = <256>;
 			suffix-name = "alsaPORT-earc";
@@ -733,7 +734,7 @@
 				sound-dai = <&dummy_codec>;
 			};
 		};
-
+#endif
 		aml-audio-card,dai-link@7 {
 			mclk-fs = <256>;
 			continuous-clock;
@@ -1285,31 +1286,6 @@
 
 		/* mode 0~4, defalut:1 */
 		filter_mode = <1>;
-
-		status = "okay";
-	};
-
-	earc:earc {
-		compatible = "amlogic, sm1-snd-earc";
-		#sound-dai-cells = <0>;
-
-		clocks = <&clkaudio CLKID_AUDIO_GATE_EARCRX
-			&clkaudio CLKID_EARCRX_CMDC
-			&clkaudio CLKID_EARCRX_DMAC
-			&clkc CLKID_FCLK_DIV5
-			&clkc CLKID_FCLK_DIV3
-			>;
-		clock-names = "rx_gate",
-			"rx_cmdc",
-			"rx_dmac",
-			"rx_cmdc_srcpll",
-			"rx_dmac_srcpll";
-
-		interrupts = <
-			GIC_SPI 88 IRQ_TYPE_EDGE_RISING
-			GIC_SPI 87 IRQ_TYPE_EDGE_RISING
-		>;
-		interrupt-names = "rx_cmdc", "rx_dmac";
 
 		status = "okay";
 	};
