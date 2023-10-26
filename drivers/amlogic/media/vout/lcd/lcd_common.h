@@ -83,9 +83,11 @@ extern char *lcd_mode_mode_to_str(int mode);
 u8 *lcd_vmap(ulong addr, u32 size);
 void lcd_unmap_phyaddr(u8 *vaddr);
 
+extern void lcd_expander_gpio_set(unsigned int index, int value);
 extern void lcd_cpu_gpio_probe(unsigned int index);
 extern void lcd_cpu_gpio_set(unsigned int index, int value);
 extern unsigned int lcd_cpu_gpio_get(unsigned int index);
+extern void lcd_expander_gpio_probe(unsigned int index);
 extern void lcd_ttl_pinmux_set(int status);
 extern void lcd_vbyone_pinmux_set(int status);
 void lcd_mlvds_pinmux_set(int status);

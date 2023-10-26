@@ -28,7 +28,7 @@ size_t osd_canvas_align(size_t x);
 #define CANVAS_ALIGNED(x) osd_canvas_align(x)
 #define MAX_HOLD_LINE     0x1f
 #define MIN_HOLD_LINE     0x04
-#define VIU1_DEFAULT_HOLD_LINE  0x08
+#define VIU1_DEFAULT_HOLD_LINE  0x04
 #define VIU2_DEFAULT_HOLD_LINE  0x04
 //#define REG_OFFSET (0x20)
 #define OSD_RELATIVE_BITS 0x33330
