@@ -785,7 +785,21 @@
 		status = "okay";
 	};
 
+	sensor: sensor {
+		compatible = "soc, sensor";
+		status = "okay";
+		sensor-name = "os08a10"; /*imx290;os08a10;imx227*/
+		pinctrl-names="default";
+		pinctrl-0=<&gen_clk_ee_ao>;
+		clocks = <&clkc CLKID_GEN_CLK>;
+		clock-names = "gen_clk";
+	};
 
+	iq: iq {
+		compatible = "soc, iq";
+		status = "okay";
+		sensor-name = "os08a10"; /*imx290;os08a10;imx227*/
+	};
 }; /* end of / */
 
 &meson_fb {
@@ -1196,6 +1210,14 @@
 			pins = "GPIOAO_6";
 			function = "gpio_aobus";
 			output-low;
+		};
+	};
+
+	gen_clk_ee_ao: gen_clk_ee_ao {
+		mux {
+			groups="gen_clk_ee_ao";
+			function="gen_clk_ee_ao";
+			drive-strength = <3>;
 		};
 	};
 };  /* end of pinctrl_aobus */
