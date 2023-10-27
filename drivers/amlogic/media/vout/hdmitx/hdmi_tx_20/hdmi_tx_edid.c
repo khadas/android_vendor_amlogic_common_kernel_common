@@ -91,6 +91,7 @@ static unsigned char __nosavedata edid_checkvalue[4] = {0};
 static unsigned int hdmitx_edid_check_valid_blocks(unsigned char *buf);
 static void Edid_DTD_parsing(struct rx_cap *prxcap, unsigned char *data);
 static void hdmitx_edid_set_default_aud(struct hdmitx_dev *hdev);
+char hdmimodepropname[20] = "null";
 /* Base Block, Vendor/Product Information, byte[8]~[18] */
 struct edid_venddat_t {
 	unsigned char data[10];
@@ -2000,8 +2001,21 @@ static void hdmitx_edid_set_default_vic(struct hdmitx_dev *hdmitx_device)
 	prxcap->VIC[3] = HDMI_1920x1080p60_16x9;
 	prxcap->native_VIC = HDMI_720x480p60_16x9;
 	hdmitx_device->vic_count = prxcap->VIC_count;
-	pr_info(EDID "set default vic\n");
+	if(strncmp(hdmimodepropname, "800x480p60hz", 12) == 0) {
+		prxcap->VIC_count = 0x1;
+		prxcap->VIC[0] = HDMIV_800x480p60hz;
+		prxcap->native_VIC = HDMIV_800x480p60hz;
+		pr_info(EDID "khadas 800x480p60hz set default vic\n");
+	}
 }
+
+static int __init hdmimode_setup(char *str)
+{
+	if (str != NULL)
+		sprintf(hdmimodepropname, "%s", str);
+	return 0;
+}
+__setup("hdmimode=", hdmimode_setup);
 
 #if 0
 #define PRINT_HASH(hash)	\
