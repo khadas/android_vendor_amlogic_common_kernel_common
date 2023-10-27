@@ -1319,6 +1319,10 @@
 	};
 }; /* end of audiobus */
 
+&earc {
+	status = "okay";
+};
+
 &pinctrl_periphs {
 	tdmout_a: tdmout_a {
 		mux { /* GPIOX_11, GPIOX_10, GPIOX_9 */
