@@ -944,6 +944,10 @@
                 status = "okay";
                 spk-con-gpio = <&gpio GPIOA_11 0>;
                 spk-mute-gpio = <&gpio GPIOA_12 0>;
+                io-channels = <&saradc SARADC_CH3>;
+                hp_chan = <SARADC_CH3>;
+                hp_val = <784>; //val=voltage/1800mV*1023
+                hp_tolerance = <50>;
         };
 
 
