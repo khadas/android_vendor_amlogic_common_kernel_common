@@ -1074,6 +1074,71 @@
                reset_pin = <6>;
                status = "okay";
        };
+
+	gt9xx@5d {
+			compatible = "goodix,gt9xx";
+			status = "okay";
+			reg = <0x5d>;
+			reset_pin = <6>;
+			tp-size = <89>;
+			rotation = <1>;
+			goodix,cfg-group0 = [
+				00 80 07 B0 04 0A 3D 00 01 08 28
+				05 3C 3C 03 05 00 00 00 00 23 13
+				00 17 19 1C 13 90 30 AA 17 15 31
+				0D 00 00 01 9B 03 2C 00 00 00 00
+				00 00 00 00 00 00 00 0F 23 94 D0
+				02 07 00 00 04 A3 10 00 8C 13 00
+				7B 16 00 69 1B 00 5B 20 00 5B 00
+				00 00 00 00 00 00 00 00 00 00 00
+				00 00 00 00 00 00 00 00 00 00 00
+				00 00 00 00 00 00 00 00 00 00 00
+				00 00 00 01 04 05 06 07 08 09 0C
+				0D 0E 0F 10 11 14 15 16 17 18 19
+				FF FF FF FF FF FF FF FF FF FF 00
+				02 04 06 07 08 0A 0C 0D 0E 0F 10
+				11 12 13 14 19 1B 1C 1E 1F 20 21
+				22 23 24 25 26 27 28 29 2A FF FF
+				FF FF FF FF FF FF FF FF 8F 01];
+		};
+
+       bq25703 {
+                compatible = "bq25703";
+                reg = <0x6b>;
+                irq-gpio = <&gpio GPIOZ_15 IRQ_TYPE_LEVEL_LOW>;
+                ti,charge-current = <1500000>;
+                ti,max-charge-voltage = <8500000>;
+                ti,max-input-voltage = <20000000>;
+                ti,max-input-current = <6000000>;
+                ti,input-current-sdp = <500000>;
+                ti,input-current-dcp = <2000000>;
+                ti,input-current-cdp = <2000000>;
+                ti,input-current-dc = <2000000>;
+                ti,minimum-sys-voltage = <7400000>;
+                ti,otg-voltage = <5000000>;
+                ti,otg-current = <500000>;
+                ti,input-current = <500000>;
+                pd-charge-only = <0>;
+                status = "disabled";
+        };
+
+       cw201x {
+                status = "disabled";
+                compatible = "cw201x";
+                reg = <0x62>;
+                bat_config_info = <0x15 0x7F 0x6E 0x66 0x65 0x5C 0x5B 0x59
+                                0x58 0x57 0x57 0x54 0x53 0x51 0x4B 0x48
+                                0x40 0x33 0x2A 0x26 0x23 0x25 0x2A 0x34
+                                0x45 0x4F 0x0C 0xCD 0x44 0x68 0x67 0x68
+                                0x6E 0x6F 0x6C 0x68 0x3A 0x10 0x8A 0x01
+                                0x01 0x54 0x52 0x87 0x8F 0x91 0x94 0x52
+                                0x82 0x8C 0x92 0x96 0x82 0xFF 0xFF 0xCB
+                                0x2F 0x7D 0x64 0xA5 0xB5 0x13 0x58 0x09>;
+                monitor_sec = <5>;
+                virtual_power = <0>;
+                divider_res1 = <200>;
+                divider_res2 = <200>;
+        };
 };
 
 &i2c_AO {
@@ -1102,7 +1167,20 @@
 		reg = <0x20>;
 	};
 
-	khadas-kxtj3 {
+	es8316: es8316@10 {
+        compatible = "everest,es8316";
+        #sound-dai-cells = <0>;
+        reg = <0x10>;
+        status = "okay";
+        spk-con-gpio = <&gpio GPIOA_11 0>;
+        spk-mute-gpio = <&gpio GPIOA_12 0>;
+        io-channels = <&saradc SARADC_CH3>;
+        hp_chan = <SARADC_CH3>;
+        hp_val = <784>; //val=voltage/1800mV*1023
+        hp_tolerance = <50>;
+    };
+
+	khadas-kxtj3@e {
 		compatible = "kxtj3";
 		reg = <0x0E>;
 		type = <2>;

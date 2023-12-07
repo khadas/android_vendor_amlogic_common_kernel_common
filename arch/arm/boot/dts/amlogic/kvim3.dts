@@ -964,21 +964,20 @@
 		reg = <0x20>;
 	};
 
-        es8316: es8316@10 {
-                compatible = "everest,es8316";
-                #sound-dai-cells = <0>;
-                reg = <0x10>;
-                status = "okay";
-                spk-con-gpio = <&gpio GPIOA_11 0>;
-                spk-mute-gpio = <&gpio GPIOA_12 0>;
-                io-channels = <&saradc SARADC_CH3>;
-                hp_chan = <SARADC_CH3>;
-                hp_val = <784>; //val=voltage/1800mV*1023
-                hp_tolerance = <50>;
-        };
+    es8316: es8316@10 {
+        compatible = "everest,es8316";
+        #sound-dai-cells = <0>;
+        reg = <0x10>;
+        status = "okay";
+        spk-con-gpio = <&gpio GPIOA_11 0>;
+        spk-mute-gpio = <&gpio GPIOA_12 0>;
+        io-channels = <&saradc SARADC_CH3>;
+        hp_chan = <SARADC_CH3>;
+        hp_val = <784>; //val=voltage/1800mV*1023
+        hp_tolerance = <50>;
+    };
 
-
-	khadas-kxtj3 {
+	khadas-kxtj3@e {
 		compatible = "kxtj3";
 		reg = <0x0E>;
 		type = <2>;
@@ -987,6 +986,16 @@
 		poll_delay_ms = <30>;
 		irq-gpio = <&gpio_ao GPIOAO_9 IRQ_TYPE_EDGE_RISING>;
 		status = "okay";
+	};
+
+	sensor-i2c@6c {
+		compatible = "arm, i2c-sensor";
+		reg = <0x6c>;
+		reg-names = "i2c-sensor";
+		slave-addr = <0x6c>;
+		reg-type = <2>;
+		reg-data-type = <1>;
+		link-device = <&phycsi>;
 	};
 };
 
@@ -1300,6 +1309,14 @@
 			/*"pdm_din3_a",*/
 			"pdm_dclk_a";
 			function = "pdm";
+		};
+	};
+
+	clk12_24_z_pins:clk12_24_z_pins {
+		mux {
+			groups = "clk12_24_z";
+			function = "clk12_24_ee";
+			drive-strength = <3>;
 		};
 	};
 }; /* end of pinctrl_periphs */

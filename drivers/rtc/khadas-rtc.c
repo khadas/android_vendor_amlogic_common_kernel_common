@@ -49,7 +49,7 @@
 #define WEEKDAY_MASK    0x07
 #define RTC_CTL2_AIE    BIT(1)
 
-#define HY8563_DEBUG
+//#define HY8563_DEBUG
 #ifdef HY8563_DEBUG
     #define debug_info(msg...) printk(msg);
 #else
