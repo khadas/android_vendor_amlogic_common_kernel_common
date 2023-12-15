@@ -22,8 +22,8 @@
 #include "mesonsm1_skt-panel.dtsi"
 
 / {
-	model = "Khadas";
-	amlogic-dt-id = "sm1_kvim3l";
+	model = "Amlogic";
+	amlogic-dt-id = "kvim3l";
 	compatible = "amlogic, g12a";
 	interrupt-parent = <&gic>;
 	#address-cells = <1>;
@@ -137,13 +137,13 @@
 			//no-map;
 		};
 		/*  vdin0 CMA pool */
-		//vdin0_cma_reserved:linux,vdin0_cma {
-		//	compatible = "shared-dma-pool";
-		//	reusable;
+		vdin0_cma_reserved:linux,vdin0_cma {
+			compatible = "shared-dma-pool";
+			reusable;
 		/* 1920x1080x2x4  =16+4 M */
-		//	size = <0x04000000>;
-		//	alignment = <0x400000>;
-		//};
+			size = <0x04000000>;
+			alignment = <0x400000>;
+		};
 		/*  vdin1 CMA pool */
 		vdin1_cma_reserved:linux,vdin1_cma {
 			compatible = "shared-dma-pool";
@@ -307,6 +307,23 @@
 		dev_name = "ionvideo";
 		status = "okay";
 	};
+
+	amlvideo2_0 {
+		compatible = "amlogic, amlvideo2";
+		dev_name = "amlvideo2";
+		status = "okay";
+		amlvideo2_id = <0>;
+		cma_mode = <1>;
+	};
+
+	amlvideo2_1 {
+		compatible = "amlogic, amlvideo2";
+		dev_name = "amlvideo2";
+		status = "okay";
+		amlvideo2_id = <1>;
+		cma_mode = <1>;
+	};
+
 	vm0 {
 		compatible = "amlogic, vm";
 		memory-region = <&vm0_cma_reserved>;
@@ -554,6 +571,9 @@
 		cm_en = <0>;/*1:enabel ;0:disable*/
 		/*0: 709/601  1: bt2020*/
 		tx_op_color_primary = <0>;
+
+		interrupts = <0 56 1>;
+		interrupt-names = "vsync2";
 	};
 
 	amdolby_vision {
@@ -610,15 +630,15 @@
 			tdmacpu: cpu {
 				sound-dai = <&tdma>;
 				dai-tdm-slot-tx-mask =
-							<1 1 1 1 1 1 1 1>;
+							<1>;
 				dai-tdm-slot-rx-mask =
-							<1 1 1 1 1 1 1 1>;
-				dai-tdm-slot-num = <8>;
-				dai-tdm-slot-width = <32>;
-				system-clock-frequency = <24576000>;
+							<1>;
+				dai-tdm-slot-num = <2>;
+				dai-tdm-slot-width = <16>;
+				system-clock-frequency = <256000>;
 			};
 			tdmacodec: codec {
-				sound-dai = <&dummy_codec &dummy_codec>;
+				sound-dai = <&dummy_codec>;
 			};
 		};
 
@@ -1011,13 +1031,8 @@
 	tdma: tdm@0 {
 		compatible = "amlogic, sm1-snd-tdma";
 		#sound-dai-cells = <0>;
-		dai-tdm-lane-slot-mask-in = <1 1>;
-		dai-tdm-oe-lane-slot-mask-out = <1 1>;
-		dai-format = "dsp_a";
-		dai-tdm-slot-tx-mask = <1>;
-		dai-tdm-slot-rx-mask = <1>;
-		dai-tdm-slot-num = <2>;
-		dai-tdm-slot-width = <16>;
+		dai-tdm-lane-slot-mask-in = <0 1>;
+		dai-tdm-lane-slot-mask-out = <1 0>;
 		dai-tdm-clk-sel = <0>;
 		clocks = <&clkaudio CLKID_AUDIO_MCLK_A
 				&clkc CLKID_MPLL0>;
@@ -1392,16 +1407,14 @@
 		mux { /* GPIOX_11, GPIOX_10, GPIOX_9 */
 			groups = "tdma_sclk",
 				"tdma_fs",
-				"tdma_dout0",
-				"tdma_dout1";
+				"tdma_dout0";
 			function = "tdma_out";
 		};
 	};
 
 	tdmin_a: tdmin_a {
 		mux { /* GPIOX_8 */
-			groups = "tdma_din0",
-					"tdma_din1";
+			groups = "tdma_din1";
 			function = "tdma_in";
 		};
 	};
@@ -1592,7 +1605,7 @@
 
 /*if you want to use vdin just modify status to "ok"*/
 &vdin0 {
-	/*memory-region = <&vdin0_cma_reserved>;*/
+	memory-region = <&vdin0_cma_reserved>;
 	status = "okay";
 	/*vdin write mem color depth support:
 	 *bit0:support 8bit

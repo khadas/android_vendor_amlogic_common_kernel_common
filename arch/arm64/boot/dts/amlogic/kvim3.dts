@@ -22,8 +22,8 @@
 #include "mesong12b_skt-panel.dtsi"
 
 / {
-	model = "Khadas";
-	amlogic-dt-id = "g12b_kvim3";
+	model = "Amlogic";
+	amlogic-dt-id = "kvim3";
 	compatible = "amlogic, g12b";
 	interrupt-parent = <&gic>;
 	#address-cells = <2>;
@@ -114,7 +114,7 @@
 			 * 10x4736064=45.2M(0x2e) support 12bit
 			 * 10x4074560=40M(0x28) support 10bit
 			 */
-			size = <0x0 0x0>;
+			size = <0x0 0x02800000>;
 			alignment = <0x0 0x400000>;
 		};
 		/*  POST PROCESS MANAGER */
@@ -127,7 +127,7 @@
 			compatible = "shared-dma-pool";
 			reusable;
 			/* ion_codec_mm max can alloc size 80M*/
-			size = <0x0 0x1b000000>;//0x13400000
+			size = <0x0 0x13400000>;
 			alignment = <0x0 0x400000>;
 			linux,contiguous-region;
 			clear-map;
@@ -139,14 +139,20 @@
 			alignment = <0x0 0x100000>;
 			//no-map;
 		};
+		/*  vdin0 CMA pool */
+		vdin0_cma_reserved:linux,vdin0_cma {
+			compatible = "shared-dma-pool";
+			reusable;
+		/* 1920x1080x2x4  =16+4 M */
+			size = <0x0 0x04000000>;
+			alignment = <0x0 0x400000>;
+		};
 		/*  vdin1 CMA pool */
 		vdin1_cma_reserved:linux,vdin1_cma {
 			compatible = "shared-dma-pool";
 			reusable;
-			/* up to 1920x1080 yuv422 8bit and 5 buffers
-			 * 1920x1080x2x5 = 20 M
-			 */
-			size = <0x0 0x01400000>;
+			/* 1920x1080x2x4  =16 M */
+			size = <0x0 0x04000000>;
 			alignment = <0x0 0x400000>;
 		};
 		galcore_reserved:linux,galcore {
@@ -203,7 +209,7 @@
 		/* 1:gp0_pll vid2_clk */
 		/* 2:vid_pll vid1_clk */
 		/* 3:gp0_pll vid1_clk */
-		clk_path = <0>;
+		clk_path = <2>;
 
 		/* performance: reg_address, reg_value */
 		/* g12b */
@@ -284,34 +290,9 @@
 		status = "okay";
 	};
 
-	multi-di {
-		compatible = "amlogic, dim-g12b";
-		status = "okay";
-		/* 0:use reserved; 1:use cma; 2:use cma as reserved */
-		flag_cma = <4>; //<1>;
-		//memory-region = <&di_reserved>;
-		memory-region = <&di_cma_reserved>;
-		interrupts = <0 46 1
-				0 40 1>;
-		interrupt-names = "pre_irq", "post_irq";
-		clocks = <&clkc CLKID_VPU_CLKB_TMP_COMP>,
-			 <&clkc CLKID_VPU_CLKB_COMP>;
-		clock-names = "vpu_clkb_tmp_composite",
-				"vpu_clkb_composite";
-		clock-range = <334 667>;
-		/* buffer-size = <3621952>;(yuv422 8bit) */
-		buffer-size = <4074560>;/*yuv422 fullpack*/
-		/* reserve-iomap = "true"; */
-		/* if enable nr10bit, set nr10bit-support to 1 */
-		post-wr-support = <1>;
-		nr10bit-support = <1>;
-		nrds-enable = <1>;
-		pps-enable = <1>;
-	};
-
 	deinterlace {
 		compatible = "amlogic, deinterlace";
-		status = "disable";
+		status = "okay";
 		/* 0:use reserved; 1:use cma; 2:use cma as reserved */
 		flag_cma = <1>;
 		//memory-region = <&di_reserved>;
@@ -393,7 +374,7 @@
 	unifykey{
 		compatible = "amlogic, unifykey";
 		status = "ok";
-		unifykey-num = <16>;
+		unifykey-num = <18>;
 		unifykey-index-0 = <&keysn_0>;
 		unifykey-index-1 = <&keysn_1>;
 		unifykey-index-2 = <&keysn_2>;
@@ -410,6 +391,8 @@
 		unifykey-index-13= <&keysn_13>;
 		unifykey-index-14= <&keysn_14>;
 		unifykey-index-15= <&keysn_15>;
+		unifykey-index-16= <&keysn_16>;
+                unifykey-index-17= <&keysn_17>;
 
 		keysn_0: key_0{
 			key-name = "usid";
@@ -494,17 +477,17 @@
 			key-device = "secure";
 			key-permit = "read","write","del";
 		};
+		keysn_16:key_16{
+			key-name = "attestationdevidbox";// attest dev id box
+			key-device = "secure";
+			key-permit = "read","write","del";
+		};
+                keysn_17:key_17{
+                        key-name = "eth_exphy_para";
+                        key-device = "normal";
+                        key-permit = "read","write","del";
+                };
 	};//End unifykey
-
-
-        efuse: efuse{
-		compatible = "amlogic, efuse";
-		read_cmd = <0x82000030>;
-		write_cmd = <0x82000031>;
-		get_max_cmd = <0x82000033>;
-		key = <&efusekey>;
-		status = "okay";
-	};
 
 	efusekey:efusekey{
 		keynum = <1>;
@@ -520,7 +503,7 @@
 		compatible = "amlogic, vecm";
 		dev_name = "aml_vecm";
 		status = "okay";
-		gamma_en = <0>;/*1:enabel ;0:disable*/
+		gamma_en = <1>;/*1:enabel ;0:disable*/
 		wb_en = <0>;/*1:enabel ;0:disable*/
 		cm_en = <0>;/*1:enabel ;0:disable*/
 
@@ -608,7 +591,7 @@
 		aml-audio-card,dai-link@1 {
 			format = "i2s";
 			mclk-fs = <256>;
-			//continuous-clock;
+			continuous-clock;
 			//bitclock-inversion;
 			//frame-inversion;
 			bitclock-master = <&aml_tdmb>;
@@ -629,7 +612,7 @@
 			};
 			tdmbcodec: codec {
 				sound-dai = <&dummy_codec &dummy_codec
-				&amlogic_codec>;
+				&amlogic_codec &es8316>;
 			};
 		};
 
@@ -660,6 +643,7 @@
 
 		aml-audio-card,dai-link@3 {
 			mclk-fs = <128>;
+			continuous-clock;
 			/* suffix-name, sync with android audio hal
 			 * what's the dai link used for
 			 */
@@ -672,8 +656,7 @@
 				sound-dai = <&dummy_codec>;
 			};
 		};
-
-		aml-audio-card,dai-link@6 {
+		aml-audio-card,dai-link@4 {
 			mclk-fs = <256>;
 			continuous-clock;
 			suffix-name = "alsaPORT-loopback";
@@ -788,7 +771,7 @@
 	sensor: sensor {
 		compatible = "soc, sensor";
 		status = "okay";
-		sensor-name = "os08a10"; /*imx290;os08a10;imx227*/
+		sensor_name = "os08a10"; /*os08a10;imx415*/
 		pinctrl-names="default";
 		pinctrl-0=<&gen_clk_ee_ao>;
 		clocks = <&clkc CLKID_GEN_CLK>;
@@ -798,13 +781,28 @@
 	iq: iq {
 		compatible = "soc, iq";
 		status = "okay";
-		sensor-name = "os08a10"; /*imx290;os08a10;imx227*/
+		sensor_name = "os08a10"; /*os08a10;imx415*/
 	};
 }; /* end of / */
 
+&isp {
+	status = "okay";
+	temper-line-offset = <0x1E00>;
+	temper-buf-size = <32>;
+	temper-frame-num = <1>;
+	temper-frame-size = <0x1FA4000>;
+	memory-region = <&isp_cma_reserved>;
+};
+
+&adapter {
+	status = "okay";
+	mem_alloc = <24>;
+	memory-region = <&adapt_cma_reserved>;
+};
+
 &meson_fb {
 	status = "okay";
-	display_size_default = <1920 1080 1920 2160 32>;
+	display_size_default = <1080 1920 1080 3840 32>;
 	mem_size = <0x00800000 0x1980000 0x100000 0x100000 0x800000>;
 	logo_addr = "0x7f800000";
 	mem_alloc = <0>;
@@ -946,7 +944,7 @@
 		compatible = "kxtj3";
 		reg = <0x0E>;
 		type = <2>;
-		layout = <0>;
+		layout = <4>;
 		irq_enable = <0>;
 		poll_delay_ms = <30>;
 		irq-gpio = <&gpio_ao GPIOAO_9 IRQ_TYPE_EDGE_RISING>;
@@ -1277,6 +1275,14 @@
 			function = "pdm";
 		};
 	};
+
+	clk12_24_z_pins:clk12_24_z_pins {
+		mux {
+			groups = "clk12_24_z";
+			function = "clk12_24_ee";
+			drive-strength = <3>;
+		};
+	};
 }; /* end of pinctrl_periphs */
 
 &pinctrl_aobus {
@@ -1314,18 +1320,23 @@
 	status = "disabled";
 };
 
+&gpu {
+       tbl = <&dvfs285_cfg
+               &dvfs400_cfg
+               &dvfs500_cfg
+               &dvfs666_cfg
+               &dvfs800_cfg
+               &dvfs800_cfg>;
+};
+
 &audio_data {
 	status = "okay";
 };
 
 /*if you want to use vdin just modify status to "ok"*/
 &vdin0 {
-	/*memory-region = <&vdin0_cma_reserved>;*/
+	memory-region = <&vdin0_cma_reserved>;
 	status = "okay";
-	/* up to 1920x1080 yuv422 8bit and 5 buffers
-	 * 1920x1080x2x5 = 20 M
-	 */
-	cma_size = <20>;
 	/*vdin write mem color depth support:
 	 *bit0:support 8bit
 	 *bit1:support 9bit
@@ -1333,7 +1344,7 @@
 	 *bit3:support 12bit
 	 *bit4:support yuv422 10bit full pack mode (from txl new add)
 	 */
-	tv_bit_mode = <0x1>;
+	tv_bit_mode = <0x15>;
 };
 &vdin1 {
 	memory-region = <&vdin1_cma_reserved>;
@@ -1483,10 +1494,13 @@
 	controller-type = <2>;
 };
 &ethmac {
-	status = "okay";
-	pinctrl-names = "external_eth_pins";
-	pinctrl-0 = <&external_eth_pins>;
-	mc_val = <0x1621>;
+        status = "okay";
+        pinctrl-names = "external_eth_pins";
+        pinctrl-0 = <&external_eth_pins>;
+        mc_val = <0x1629>;
+        cali_val = <0x60000>;
+        rx_delay = <1>;
+        auto_cali_idx = <0>;
 
 	internal_phy=<0>;
 };
@@ -1500,7 +1514,7 @@
 };
 
 &pcie_A {
-	reset-gpio = <&gpio GPIOX_7 GPIO_ACTIVE_HIGH>;
+	reset-gpio = <&gpio GPIOA_8 GPIO_ACTIVE_HIGH>;
 	status = "disable";
 };
 
