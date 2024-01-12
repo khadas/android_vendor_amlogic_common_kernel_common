@@ -158,14 +158,14 @@
 			compatible = "shared-dma-pool";
 			reusable;
 			status = "okay";
-			size = <0x8000000>;
+			size = <0x18000000>;
 			alignment = <0x400000>;
 		};
 		adapt_cma_reserved:linux,adapt_cma {
 			compatible = "shared-dma-pool";
 			reusable;
 			status = "okay";
-			size = <0x1800000>;
+			size = <0x4000000>;
 		};
 	};
 
@@ -849,16 +849,16 @@
 
 &isp {
 	status = "okay";
-	temper-line-offset = <0x1E00>;
-	temper-buf-size = <32>;
+	temper-line-offset = <0x2D00>;
+	temper-buf-size = <24>;
 	temper-frame-num = <1>;
-	temper-frame-size = <0x1FA4000>;
+	temper-frame-size = <0x17BB000>;
 	memory-region = <&isp_cma_reserved>;
 };
 
 &adapter {
 	status = "okay";
-	mem_alloc = <24>;
+	mem_alloc = <12>;
 	memory-region = <&adapt_cma_reserved>;
 };
 
