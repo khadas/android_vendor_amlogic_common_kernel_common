@@ -109,6 +109,7 @@
 		/*di CMA pool */
 		di_cma_reserved:linux,di_cma {
 			compatible = "shared-dma-pool";
+			status = "disable";
 			reusable;
 			/* buffer_size = 3621952(yuv422 8bit)
 			 *  | 4736064(yuv422 10bit)
@@ -117,7 +118,8 @@
 			 * 10x4736064=45.2M(0x2e) support 12bit
 			 * 10x4074560=40M(0x28) support 10bit
 			 */
-			size = <0x0 0x02800000>;
+			//size = <0x0 0x0B000000>;
+			size = <0x0 0x0>;
 			alignment = <0x0 0x400000>;
 		};
 		/*  POST PROCESS MANAGER */
@@ -130,7 +132,8 @@
 			compatible = "shared-dma-pool";
 			reusable;
 			/* ion_codec_mm max can alloc size 80M*/
-			size = <0x0 0x13400000>;
+			//size = <0x0 0x16400000>;
+			size = <0x0 0x21400000>;/*ary*/
 			alignment = <0x0 0x400000>;
 			linux,contiguous-region;
 		};
@@ -141,20 +144,14 @@
 			alignment = <0x0 0x100000>;
 			//no-map;
 		};
-		/*  vdin0 CMA pool */
-		vdin0_cma_reserved:linux,vdin0_cma {
-			compatible = "shared-dma-pool";
-			reusable;
-		/* 1920x1080x2x4  =16+4 M */
-			size = <0x0 0x04000000>;
-			alignment = <0x0 0x400000>;
-		};
 		/*  vdin1 CMA pool */
 		vdin1_cma_reserved:linux,vdin1_cma {
 			compatible = "shared-dma-pool";
 			reusable;
-			/* 1920x1080x2x4  =16 M */
-			size = <0x0 0x04000000>;
+			/* up to 1920x1080 yuv422 8bit and 5 buffers
+			 * 1920x1080x2x5 = 20 M
+			 */
+			size = <0x0 0x01400000>;
 			alignment = <0x0 0x400000>;
 		};
 		vm0_cma_reserved:linux,vm0_cma {
@@ -163,6 +160,13 @@
 			size = <0x0 0x2000000>;
 			alignment = <0x0 0x400000>;
 		};
+	};
+
+	cma_shrinker {
+		compatible = "amlogic, cma-shrinker";
+		status = "okay";
+		adj  = <0 100 200 250 900 950>;
+		free = <8192 12288 16384 24576 28672 32768>;
 	};
 
 	galcore {
@@ -283,13 +287,37 @@
 		status = "okay";
 	};
 
+	multi-di {
+		compatible = "amlogic, dim-sm1";
+		status = "okay";
+		/* 0:use reserved; 1:use cma; 2:use cma as reserved */
+		flag_cma = <4>;	//<1>;
+		//memory-region = <&di_reserved>;
+		memory-region = <&di_cma_reserved>;
+		interrupts = <0 46 1
+				0 40 1>;
+		interrupt-names = "pre_irq", "post_irq";
+		clocks = <&clkc CLKID_VPU_CLKB_TMP_COMP>,
+			<&clkc CLKID_VPU_CLKB_COMP>;
+		clock-names = "vpu_clkb_tmp_composite",
+			"vpu_clkb_composite";
+		clock-range = <334 667>;
+		/* buffer-size = <3621952>;(yuv422 8bit) */
+		buffer-size = <4074560>;/*yuv422 fullpack*/
+		/* reserve-iomap = "true"; */
+		/* if enable nr10bit, set nr10bit-support to 1 */
+		post-wr-support = <1>;
+		nr10bit-support = <1>;
+		nrds-enable = <1>;
+		pps-enable = <1>;
+	};
 	deinterlace {
 		compatible = "amlogic, deinterlace";
-		status = "okay";
+		status = "disable";//status = "okay";
 		/* 0:use reserved; 1:use cma; 2:use cma as reserved */
 		flag_cma = <1>;
 		//memory-region = <&di_reserved>;
-		memory-region = <&di_cma_reserved>;
+		//memory-region = <&di_cma_reserved>;
 		interrupts = <0 46 1
 				0 40 1>;
 		interrupt-names = "pre_irq", "post_irq";
@@ -616,7 +644,6 @@
 		compatible = "amlogic, g12a-sound-card";
 		aml-audio-card,name = "AML-AUGESOUND";
 
-
 		/* headset detect */
 		io-channels = <&saradc SARADC_CH0>;
 		io-channel-names = "key-chan-0";
@@ -648,7 +675,7 @@
 				system-clock-frequency = <256000>;
 			};
 			tdmacodec: codec {
-				sound-dai = <&dummy_codec>;
+				sound-dai = <&dummy_codec &dummy_codec>;
 			};
 		};
 
@@ -717,6 +744,20 @@
 		};
 
 		aml-audio-card,dai-link@3 {
+			mclk-fs = <64>;
+			/* suffix-name, sync with android audio hal
+			 * what's the dai link used for
+			 */
+			suffix-name = "alsaPORT-pdm";
+			cpu {
+				sound-dai = <&pdm>;
+			};
+			codec {
+				sound-dai = <&pdm_codec>;
+			};
+		};
+
+		aml-audio-card,dai-link@4 {
 			mclk-fs = <128>;
 			/* suffix-name, sync with android audio hal used for */
 			suffix-name = "alsaPORT-spdif";
@@ -729,7 +770,7 @@
 			};
 		};
 
-		aml-audio-card,dai-link@4 {
+		aml-audio-card,dai-link@5 {
 			mclk-fs = <128>;
 			continuous-clock;
 			/* suffix-name, sync with android audio hal
@@ -744,8 +785,8 @@
 				sound-dai = <&dummy_codec>;
 			};
 		};
-
-		aml-audio-card,dai-link@5 {
+#if 0
+		aml-audio-card,dai-link@6 {
 			mclk-fs = <256>;
 			suffix-name = "alsaPORT-earc";
 			cpu {
@@ -756,8 +797,8 @@
 				sound-dai = <&dummy_codec>;
 			};
 		};
-
-		aml-audio-card,dai-link@6 {
+#endif
+		aml-audio-card,dai-link@7 {
 			mclk-fs = <256>;
 			continuous-clock;
 			suffix-name = "alsaPORT-loopback";
@@ -787,12 +828,12 @@
 		status = "disabled";
 	};
 	/* Audio Related end */
-	dvb {
-		compatible = "amlogic, dvb";
-		dev_name = "dvb";
+
+	demux {
+		compatible = "amlogic, dvb-demux";
+		dev_name = "dvb-demux";
 		status = "okay";
-//		fe0_mode = "internal";
-//		fe0_tuner = <&tuner>;
+
 		/*"parallel","serial","disable"*/
 //		ts2 = "parallel";
 //		ts2_control = <0>;
@@ -815,19 +856,6 @@
 			&clkc CLKID_AHB_ARB0
 			&clkc CLKID_DOS_PARSER>;
 		clock-names = "demux", "ahbarb0", "uparsertop";
-	};
-	tuner: tuner {
-		compatible = "amlogic, tuner";
-		status = "okay";
-		tuner_name = "mxl661_tuner";
-		tuner_i2c_adap = <&i2c1>;
-		tuner_i2c_addr = <0x60>;
-		tuner_xtal = <0>; /* 0: 16MHz, 1: 24MHz */
-		tuner_xtal_mode = <0>;
-					/* NO_SHARE_XTAL(0)
-					 * SLAVE_XTAL_SHARE(1)
-					 */
-		tuner_xtal_cap = <30>; /* when tuner_xtal_mode = 1, set 25 */
 	};
 
 	cpu_opp_table0: cpu_opp_table0 {
@@ -1070,8 +1098,7 @@
 			"samesource_srcpll", "samesource_clk";
 		pinctrl-names = "tdm_pins";
 		pinctrl-0 = <&tdmb_mclk &tdmout_b &tdmin_b>;
-		/*pinctrl-0 = < &tdmout_b &tdmin_b>;*/
-		mclk_pad = <0>;  /* 0: mclk_0; 1: mclk_1 */
+
 
 		/*
 		 * 0: tdmout_a;
@@ -1105,7 +1132,6 @@
 		clock-names = "mclk", "clk_srcpll";
 		pinctrl-names = "tdm_pins";
 		pinctrl-0 = <&tdmc_mclk &tdmout_c &tdmin_c>;
-		mclk_pad = <0>;  /* 0: mclk_0; 1: mclk_1 */
 
 		status = "okay";
 	};
@@ -1214,7 +1240,7 @@
 		/* mode 0~4, defalut:1 */
 		filter_mode = <1>;
 
-		status = "disable";
+		status = "okay";
 	};
 
 	asrca: resample@0 {
@@ -1406,6 +1432,10 @@
 		status = "disabled";
 	};
 }; /* end of audiobus */
+
+&earc {
+	status = "disabled";
+};
 
 &pinctrl_periphs {
 	tdmout_a: tdmout_a {
@@ -1610,8 +1640,12 @@
 
 /*if you want to use vdin just modify status to "ok"*/
 &vdin0 {
-	memory-region = <&vdin0_cma_reserved>;
+	/*memory-region = <&vdin0_cma_reserved>;*/
 	status = "okay";
+	/* up to 1920x1080 yuv422 8bit and 5 buffers
+	 * 1920x1080x2x5 = 20 M
+	 */
+	cma_size = <20>;
 	/*vdin write mem color depth support:
 	 *bit0:support 8bit
 	 *bit1:support 9bit
@@ -1619,7 +1653,7 @@
 	 *bit3:support 12bit
 	 *bit4:support yuv422 10bit full pack mode (from txl new add)
 	 */
-	tv_bit_mode = <0x15>;
+	tv_bit_mode = <0x1>;
 };
 &vdin1 {
 	memory-region = <&vdin1_cma_reserved>;
