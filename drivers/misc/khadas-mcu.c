@@ -78,6 +78,10 @@ enum khadas_fan_enable {
 
 enum khadas_fan_hwver {
 	KHADAS_FAN_HWVER_NONE = 0,
+	KHADAS_FAN_HWVER_VIM1_V13,
+	KHADAS_FAN_HWVER_VIM2_V12,
+	KHADAS_FAN_HWVER_VIM2_V13,
+	KHADAS_FAN_HWVER_VIM2_V14,
 	KHADAS_FAN_HWVER_VIM3_V11,
 	KHADAS_FAN_HWVER_VIM3_V12,
 	KHADAS_FAN_HWVER_VIM3_V14
@@ -216,11 +220,15 @@ static bool is_support_wol(void)
 	int hwver;
 	hwver = get_hwver();
 	switch(hwver) {
+		case HW_VERSION_VIM2_V12:
+		case HW_VERSION_VIM2_V14:
 		case HW_VERSION_VIM3_V11:
 		case HW_VERSION_VIM3_V12:
 		case HW_VERSION_VIM3_V14:
 			return true;
 		case HW_VERSION_UNKNOW:
+		case HW_VERSION_VIM1_V12:
+		case HW_VERSION_VIM1_V13:
 		default:
 			return false;
 	}
@@ -236,15 +244,35 @@ static bool is_support_pcie(void)
 		case HW_VERSION_VIM3_V14:
 			return true;
 		case HW_VERSION_UNKNOW:
+		case HW_VERSION_VIM1_V12:
+		case HW_VERSION_VIM1_V13:
+		case HW_VERSION_VIM2_V12:
+		case HW_VERSION_VIM2_V14:
 		default:
 			return false;
 	}
 }
 
+static bool is_vim1_or_vim2(void)
+{
+	int cpu_type = get_cpu_type();
+	if ((cpu_type == MESON_CPU_MAJOR_ID_GXL) || (cpu_type == MESON_CPU_MAJOR_ID_GXM)) {
+		return true;
+	}
+	return false;
+}
+
 static bool is_duty_control_version(void)
 {
 	int cpu_type = get_cpu_type();
-	if ((cpu_type == MESON_CPU_MAJOR_ID_G12B) || (cpu_type == MESON_CPU_MAJOR_ID_SM1 || MESON_CPU_MAJOR_ID_G12A)) {
+	if ((cpu_type == MESON_CPU_MAJOR_ID_G12B) || (cpu_type == MESON_CPU_MAJOR_ID_SM1 || MESON_CPU_MAJOR_ID_GXL)) {
+		if(cpu_type == MESON_CPU_MAJOR_ID_GXL) {
+			if (g_mcu_data->version == 0xff01) {
+				return false;
+			} else {
+				return true;
+			}
+		}
 		if (g_mcu_data->version >= 0x03)
 		return true;
 	}
@@ -253,7 +281,12 @@ static bool is_duty_control_version(void)
 
 static int is_mcu_fan_control_available(void)
 {
-	return 0;
+	// MCU FAN control only for Khadas VIM2 V13 and later.
+	if (g_mcu_data->fan_data.hwver >= KHADAS_FAN_HWVER_VIM1_V13){
+		return 1;
+	}
+	else
+		return 0;
 }
 
 static void khadas_fan_level_set(struct khadas_fan_data *fan_data, int level)
@@ -326,7 +359,7 @@ static void fan_test_work_func(struct work_struct *_work)
 
 }
 
-//extern int get_cpu_temp(void);
+extern int get_cpu_temp(void);
 extern int meson_get_temperature(void);
 static void fan_work_func(struct work_struct *_work)
 {
@@ -334,8 +367,10 @@ static void fan_work_func(struct work_struct *_work)
 		int temp = -EINVAL;
 		struct khadas_fan_data *fan_data = &g_mcu_data->fan_data;
 
-		//temp = get_cpu_temp();
-		temp = meson_get_temperature();
+		if (is_vim1_or_vim2())
+			temp = get_cpu_temp();
+		else
+			temp = meson_get_temperature();
 
 		if(temp != -EINVAL){
 			if (is_duty_control_version()) {
@@ -494,8 +529,10 @@ static ssize_t show_fan_temp(struct class *cls,
 			 struct class_attribute *attr, char *buf)
 {
 	int temp = -EINVAL;
-//    temp = get_cpu_temp();
-	temp = meson_get_temperature();
+	if (is_vim1_or_vim2())
+		temp = get_cpu_temp();
+	else
+		temp = meson_get_temperature();
 
 	return sprintf(buf, "cpu_temp:%d\nFan trigger temperature: level0:%d level1:%d level2:%d level3:%d\n", temp, g_mcu_data->fan_data.trig_temp_level0, g_mcu_data->fan_data.trig_temp_level1, g_mcu_data->fan_data.trig_temp_level2, g_mcu_data->fan_data.trig_temp_level3);
 }
@@ -734,14 +771,20 @@ static int mcu_parse_dt(struct device *dev)
 	// Get hardwere version
 	hwver = get_hwver();
 	printk("mcu_parse_dt hwver:%d\n",hwver);
-	if(hwver == 0x31) {
-		g_mcu_data->fan_data.hwver = KHADAS_FAN_HWVER_VIM3_V11;
-	} else if(hwver == 0x32) {
-		g_mcu_data->fan_data.hwver = KHADAS_FAN_HWVER_VIM3_V12;
-	} else if(hwver == 0x34) {
-		g_mcu_data->fan_data.hwver = KHADAS_FAN_HWVER_VIM3_V14;
-	} else {
-		g_mcu_data->fan_data.hwver = KHADAS_FAN_HWVER_NONE;
+	if(hwver == 0x13){
+		  g_mcu_data->fan_data.hwver = KHADAS_FAN_HWVER_VIM1_V13;
+	}else if(hwver == 0x22)	{
+                  g_mcu_data->fan_data.hwver = KHADAS_FAN_HWVER_VIM2_V12;
+	}else if(hwver == 0x24){
+                  g_mcu_data->fan_data.hwver = KHADAS_FAN_HWVER_VIM2_V14;
+	}else if(hwver == 0x31){
+                  g_mcu_data->fan_data.hwver = KHADAS_FAN_HWVER_VIM3_V11;
+	}else if(hwver == 0x32){
+                  g_mcu_data->fan_data.hwver = KHADAS_FAN_HWVER_VIM3_V12;
+	}else if(hwver == 0x34){
+                  g_mcu_data->fan_data.hwver = KHADAS_FAN_HWVER_VIM3_V14;
+	}else {
+                  g_mcu_data->fan_data.hwver = KHADAS_FAN_HWVER_NONE;
 	}
 
 	ret = of_property_read_u32(dev->of_node, "fan,trig_temp_level0", &g_mcu_data->fan_data.trig_temp_level0);
