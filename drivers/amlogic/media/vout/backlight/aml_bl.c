@@ -2238,7 +2238,7 @@ static int aml_bl_config_load(struct bl_config_s *bconf,
 		return -1;
 	}
 
-	bl_drv->res_bl_vsync_irq = NULL;
+	//bl_drv->res_bl_vsync_irq = NULL;
 
 	ret = of_property_read_u32(pdev->dev.of_node,
 			"key_valid", &bl_key_valid);
@@ -2278,13 +2278,13 @@ static int aml_bl_config_load(struct bl_config_s *bconf,
 		aml_ldim_probe(pdev);
 #endif
 
-	bl_drv->res_bl_vsync_irq = platform_get_resource_byname
+	/*bl_drv->res_bl_vsync_irq = platform_get_resource_byname
 				(pdev, IORESOURCE_IRQ, "vsync");
 	if (!bl_drv->res_bl_vsync_irq) {
 		ret = -ENODEV;
 		BLERR("bl_vsync_irq resource error\n");
 		return -1;
-	}
+	}*/
 
 	switch (bconf->method) {
 	case BL_CTRL_PWM:
@@ -3808,7 +3808,7 @@ static void aml_bl_init_status_update(void)
 	}
 }
 
-static inline void aml_bl_vsync_handler(void)
+/*static inline void aml_bl_vsync_handler(void)
 {
 	unsigned int level;
 
@@ -3856,7 +3856,7 @@ static void aml_bl_vsync_irq_remove(void)
 {
 	if (bl_drv->res_bl_vsync_irq)
 		free_irq(bl_drv->res_bl_vsync_irq->start, (void *)"bl_vsync");
-}
+}*/
 
 static int aml_bl_probe(struct platform_device *pdev)
 {
@@ -3943,7 +3943,7 @@ static int aml_bl_probe(struct platform_device *pdev)
 #endif
 	aml_bl_creat_class();
 
-	aml_bl_vsync_irq_init();
+	//aml_bl_vsync_irq_init();
 	aml_bl_init_status_update();
 
 	BLPR("probe OK\n");
@@ -3963,7 +3963,7 @@ static int __exit aml_bl_remove(struct platform_device *pdev)
 		return 0;
 
 	aml_bl_remove_class();
-	aml_bl_vsync_irq_remove();
+	//aml_bl_vsync_irq_remove();
 
 	ret = cancel_delayed_work_sync(&bl_drv->bl_delayed_work);
 	if (bl_drv->workqueue)
