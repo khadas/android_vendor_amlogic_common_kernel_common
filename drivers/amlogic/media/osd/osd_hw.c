@@ -1765,7 +1765,28 @@ static s64 get_adjust_vsynctime(u32 output_index)
 	int thresh_line, vsync_time;
 	s64 adjust_nsec;
 
-	vinfo = get_current_vinfo();
+	switch (output_index) {
+	case VIU1:
+	#ifdef CONFIG_AMLOGIC_VOUT_SERVE
+		vinfo = get_current_vinfo();
+	#endif
+		break;
+	case VIU2:
+	#ifdef CONFIG_AMLOGIC_VOUT2_SERVE
+		vinfo = get_current_vinfo2();
+	#endif
+		break;
+	#ifdef CONFIG_AMLOGIC_VOUT3_SERVE
+	case VIU3:
+		vinfo = get_current_vinfo3();
+		break;
+	#endif
+	default:
+		osd_log_err("%s, set output_index %u error\n",
+			    __func__, output_index);
+		break;
+	};
+
 	if (vinfo && (!strcmp(vinfo->name, "invalid") ||
 		      !strcmp(vinfo->name, "null"))) {
 		active_begin_line = get_active_begin_line(VIU1);
@@ -2729,6 +2750,7 @@ static void osd_wait_vsync_hw_viu1(void)
 static void osd_wait_vsync_hw_viu2(void)
 {
 	unsigned long timeout;
+	int ret = -1;
 
 	if (osd_hw.fb_drvier_probe) {
 		vsync_hit[VIU2] = false;
@@ -2745,8 +2767,27 @@ static void osd_wait_vsync_hw_viu2(void)
 			} else
 				timeout = msecs_to_jiffies(1000);
 		}
-		wait_event_interruptible_timeout
-			(osd_rdma_vpp1_done_wq, vsync_hit[VIU2], timeout);
+
+		/* for the independent viu2 HW module,
+		 * use the latch, waiting for vsync (not rdma interrupt).
+		 */
+		if (osd_hw.osd_meson_dev.has_viu2) {
+			ktime_t stime;
+
+			stime = ktime_get();
+			ret = wait_event_interruptible_timeout
+				(osd_vsync2_wq,
+				 (timestamp[VIU2] > stime.tv64) ? true : false,
+				 timeout);
+		} else {
+			ret = wait_event_interruptible_timeout
+				(osd_rdma_vpp1_done_wq, vsync_hit[VIU2],
+				 timeout);
+		}
+
+		if (ret <= 0 && timeout == msecs_to_jiffies(1000))
+			osd_log_err("wait for viu%d, error %d\n",
+				    VIU2 + 1, ret);
 	}
 }
 
