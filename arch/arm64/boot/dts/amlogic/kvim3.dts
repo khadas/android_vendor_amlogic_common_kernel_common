@@ -90,7 +90,7 @@
 			compatible = "amlogic, ion-fb-mem";
 			reusable;
 			/* 1920x1080x4x3 round up 4M align */
-			size = <0x0 0x1c00000>;
+			size = <0x0 0x0d000000>;
 			alignment = <0x0 0x400000>;
 		};
 		//di_reserved:linux,di {
@@ -189,7 +189,7 @@
 	cvbsout {
 		compatible = "amlogic, cvbsout-g12b";
 		dev_name = "cvbsout";
-		status = "okay";
+		status = "disabled";
 		clocks = <&clkc CLKID_VCLK2_ENCI
 			&clkc CLKID_VCLK2_VENCI0
 			&clkc CLKID_VCLK2_VENCI1
