@@ -8480,6 +8480,8 @@ void amvecm_gamma_init(bool en)
 		WRITE_VPP_REG_BITS(L_GAMMA_CNTL_PORT,
 				1, GAMMA_EN, 1);
 	}
+
+	pr_info("amvecm gamma en = %d\n", en);
 }
 static void amvecm_wb_init(bool en)
 {
@@ -8526,18 +8528,18 @@ static void amvecm_wb_init(bool en)
 				wb_init_bypass_coef[21], 3, 2);
 			WRITE_VPP_REG_BITS(VPP_MATRIX_CLIP,
 				wb_init_bypass_coef[22], 5, 3);
-		} else {
-			WRITE_VPP_REG(VPP_GAINOFF_CTRL0,
-				(1024 << 16) | 1024);
-			WRITE_VPP_REG(VPP_GAINOFF_CTRL1,
-				(1024 << 16));
 		}
 	}
 
+	WRITE_VPP_REG(VPP_GAINOFF_CTRL0,
+			(1024 << 16) | 1024);
+	WRITE_VPP_REG(VPP_GAINOFF_CTRL1,
+			(1024 << 16));
 	if (video_rgb_ogo_xvy_mtx)
 		WRITE_VPP_REG_BITS(VPP_MATRIX_CTRL, en, 6, 1);
 	else
 		WRITE_VPP_REG_BITS(VPP_GAINOFF_CTRL0, en, 31, 1);
+	pr_info("amvecm wb en = %d\n", en);
 }
 
 void amvecm_3dlut_init(bool en)

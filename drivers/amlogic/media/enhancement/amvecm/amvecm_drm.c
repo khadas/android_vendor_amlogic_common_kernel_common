@@ -26,7 +26,7 @@
 
 void amvecm_drm_init(u32 index)
 {
-	amvecm_gamma_init(1);
+	amvecm_gamma_init(0);
 }
 EXPORT_SYMBOL(amvecm_drm_init);
 

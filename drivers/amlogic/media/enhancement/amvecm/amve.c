@@ -845,12 +845,12 @@ void ve_lcd_gamma_process(void)
 	if (vecm_latch_flag & FLAG_GAMMA_TABLE_EN) {
 		vecm_latch_flag &= ~FLAG_GAMMA_TABLE_EN;
 		vpp_enable_lcd_gamma_table(viu_sel);
-		pr_amve_dbg("\n[amve..] set vpp_enable_lcd_gamma_table OK!!!\n");
+		pr_info("set vpp_enable_lcd_gamma_table OK!!! viu_sel = %d\n", viu_sel);
 	}
 	if (vecm_latch_flag & FLAG_GAMMA_TABLE_DIS) {
 		vecm_latch_flag &= ~FLAG_GAMMA_TABLE_DIS;
 		vpp_disable_lcd_gamma_table(viu_sel);
-		pr_amve_dbg("\n[amve..] set vpp_disable_lcd_gamma_table OK!!!\n");
+		pr_info("set vpp_disable_lcd_gamma_table OK!!! viu_sel = %d\n", viu_sel);
 	}
 	if (vecm_latch_flag & FLAG_GAMMA_TABLE_R) {
 		vecm_latch_flag &= ~FLAG_GAMMA_TABLE_R;
@@ -2242,6 +2242,7 @@ int vpp_pq_ctrl_config(struct pq_ctrl_s pq_cfg)
 	amvecm_wb_enable(pq_cfg.wb_en);
 
 	gamma_en = pq_cfg.gamma_en;
+	pr_info("vpp_pq ctrl gamma_en= %d\n", gamma_en);
 	VSYNC_WRITE_VPP_REG_BITS(
 		L_GAMMA_CNTL_PORT,
 		pq_cfg.gamma_en, GAMMA_EN, 1);
