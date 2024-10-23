@@ -92,8 +92,8 @@
 		ion_fb_reserved:linux,ion-fb {
 			compatible = "amlogic, ion-fb-mem";
 			reusable;
-			/* 1920x1080x4x3 round up 4M align */
-			size = <0x0 0x1c00000>;
+			/* 1920x1080x4x3x2 round up 4M align */
+			size = <0x0 0x3800000>;
 			alignment = <0x0 0x400000>;
 		};
 		//di_reserved:linux,di {
@@ -925,6 +925,7 @@
 	status = "okay";
 	display_size_default = <1080 1920 1080 3840 32>; /* portrait panel */
 	mem_size = <0x00800000 0x1980000 0x100000 0x100000 0x800000>;
+	display_device_cnt = <2>;
 	logo_addr = "0x7f800000";
 	mem_alloc = <0>;
 	pxp_mode = <0>; /** 0:normal mode 1:pxp mode */
